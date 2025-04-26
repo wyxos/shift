@@ -40,7 +40,7 @@ const editDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
 
 function openEditModal(client: { id: number, name: string }) {
-    selectedClient.value = client;
+    selectedClient.value = { ...client }; // clone instead of direct reference
     editDialogOpen.value = true;
 }
 function openDeleteModal(client: { id: number, name: string }) {

@@ -28,6 +28,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
     })->name('clients.destroy');
 
+    // put client
+    Route::put('clients/{client}', function (App\Models\Client $client) {
+        $client->update(request()->validate([
+            'name' => 'required|string|max:255',
+        ]));
+        return redirect()->route('clients.index')->with('success', 'Client updated successfully.');
+    })->name('clients.update');
+
     // projects
     Route::get('projects', function () {
         return Inertia::render('Projects');
