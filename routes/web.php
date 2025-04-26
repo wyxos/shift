@@ -16,8 +16,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // clients
     Route::get('clients', function () {
-        return Inertia::render('Clients');
+        return Inertia::render('Clients')
+            ->with([
+                'clients' => App\Models\Client::query()->paginate(10)->withQueryString(),
+            ]);
     })->name('clients.index');
+
+    // delete route
+    Route::delete('clients/{client}', function (App\Models\Client $client) {
+        $client->delete();
+        return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
+    })->name('clients.destroy');
 
     // projects
     Route::get('projects', function () {
