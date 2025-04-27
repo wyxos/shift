@@ -13,6 +13,7 @@
         "@eslint/js": "^9.19.0",
         "@oruga-ui/oruga-next": "^0.10.4",
         "@oruga-ui/theme-oruga": "^0.6.0",
+        "@types/lodash": "^4.17.16",
         "@types/node": "^22.13.5",
         "@vue/eslint-config-typescript": "^14.3.0",
         "@wyxos/vision": "^1.23.0",
