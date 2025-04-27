@@ -6,5 +6,50 @@ use Illuminate\Http\Request;
 
 class OrganisationController extends Controller
 {
-    //
+    public function index()
+    {
+        return inertia('Organisations/Index')
+            ->with([
+                'filters' => request()->only(['search']),
+                'organisations' => \App\Models\Organisation::query()
+                    ->latest()
+                    ->when(
+                        request('search'),
+                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                    )
+                    ->paginate(10)
+                    ->withQueryString(),
+            ]);
+    }
+
+    // delete route
+    public function destroy(\App\Models\Organisation $organisation)
+    {
+        $organisation->delete();
+        return redirect()->route('organisations.index')->with('success', 'Organisation deleted successfully.');
+    }
+
+    // put organisation
+    public function update(\App\Models\Organisation $organisation)
+    {
+        $organisation->update(request()->validate([
+            'name' => 'required|string|max:255',
+        ]));
+        return redirect()->route('organisations.index')->with('success', 'Organisation updated successfully.');
+    }
+
+    // create organisation
+    public function store()
+    {
+        $validate = request()->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $organisation = \App\Models\Organisation::create([
+            ...$validate,
+            'author_id' => auth()->id(),
+        ]);
+
+        return redirect()->route('organisations.index')->with('success', 'Organisation created successfully.');
+    }
 }
