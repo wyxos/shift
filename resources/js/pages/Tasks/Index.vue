@@ -62,14 +62,6 @@ const editForm = useForm<{
     name: '',
 });
 
-const createForm = useForm<{
-    name: string;
-    isActive: boolean;
-}>({
-    name: '',
-    isActive: false
-});
-
 const deleteForm = useForm<{
     id: number | null;
     isActive: boolean;
@@ -125,7 +117,7 @@ watch(search, value => debounce(() => {
 
                 <Button @click="reset">Reset</Button>
 
-                <Button @click="createForm.isActive = true">
+                <Button @click="router.get('/tasks/create')">
                     <i class="fas fa-plus"></i> Add Task
                 </Button>
             </div>
@@ -169,36 +161,6 @@ watch(search, value => debounce(() => {
                 Confirm
             </template>
         </DeleteDialog>
-
-        <!-- Create Modal -->
-        <AlertDialog v-model:open="createForm.isActive">
-            <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Create Task</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Add a new task.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="flex flex-col gap-4 p-4">
-                    <input
-                        v-model="createForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Task Name"
-                    />
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="createForm.post('/tasks')" :disabled="createForm.processing">Create</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
 
         <!-- Edit Modal -->
         <AlertDialog v-model:open="editDialogOpen">
