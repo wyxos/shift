@@ -85,6 +85,11 @@ function onPageChange(page: number) {
     router.get('/clients', { page, search: search.value }, { preserveState: true, preserveScroll: true });
 }
 
+function reset() {
+    search.value = '';
+    router.get('/clients', { search: '' }, { preserveState: true, preserveScroll: true });
+}
+
 watch(search, value => debounce(() => {
     router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
 }, 300)());
@@ -96,7 +101,11 @@ watch(search, value => debounce(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
 
-            <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+            <div class="flex gap-4">
+                <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+
+                <Button @click="reset">Reset</Button>
+            </div>
 
             <o-table :data="clients.data" :paginated="true" :per-page="clients.per_page" :current-page="clients.current_page"
                      backend-pagination :total="clients.total"
