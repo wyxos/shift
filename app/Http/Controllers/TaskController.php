@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -25,9 +26,13 @@ class TaskController extends Controller
     // create task
     public function create()
     {
+        $projects = Project::whereHas('client.organisation', function ($query) {
+            $query->where('author_id', auth()->user()->organisation_id);
+        })->get();
+
         return inertia('Tasks/Create')
             ->with([
-                'projects' => \App\Models\Project::all(),
+                'projects' => $projects
             ]);
     }
 
