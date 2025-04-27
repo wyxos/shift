@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('clients', function () {
         return Inertia::render('Clients')
             ->with([
+                'filters' => request()->only(['search']),
                 'clients' => App\Models\Client::query()
                     ->when(
                         request('search'),

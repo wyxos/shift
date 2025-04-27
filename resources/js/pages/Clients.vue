@@ -20,8 +20,12 @@ import {
 import { Input } from '@/components/ui/input';
 
 
-defineProps({
+const props = defineProps({
     clients: {
+        type: Object,
+        required: true
+    },
+    filters: {
         type: Object,
         required: true
     }
@@ -40,7 +44,7 @@ const editDialogOpen = ref(false);
 
 const deleteDialogOpen = ref(false);
 
-const search = ref('');
+const search = ref(props.filters.search);
 
 function openEditModal(client: { id: number, name: string }) {
     selectedClient.value = { ...client }; // clone instead of direct reference
@@ -76,7 +80,7 @@ function confirmDelete() {
 }
 
 function onPageChange(page: number) {
-    router.get('/clients', { page }, { preserveState: true, preserveScroll: true });
+    router.get('/clients', { page, search: search.value }, { preserveState: true, preserveScroll: true });
 }
 
 watch(search, value => debounce(() => {
