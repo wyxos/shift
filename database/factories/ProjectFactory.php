@@ -17,7 +17,8 @@ class ProjectFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'name' => $this->faker->unique()->sentence(3),
+            'client_id' => \App\Models\Client::factory(),
         ];
     }
 }
