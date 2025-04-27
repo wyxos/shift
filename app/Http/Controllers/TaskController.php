@@ -8,7 +8,7 @@ class TaskController extends Controller
 {
     public function index()
     {
-        return inertia('Tasks')
+        return inertia('Tasks/Index')
             ->with([
                 'filters' => request()->only(['search']),
                 'tasks' => \App\Models\Task::query()
@@ -19,6 +19,15 @@ class TaskController extends Controller
                     )
                     ->paginate(10)
                     ->withQueryString(),
+            ]);
+    }
+
+    // create task
+    public function create()
+    {
+        return inertia('Tasks/Create')
+            ->with([
+                'projects' => \App\Models\Project::all(),
             ]);
     }
 
