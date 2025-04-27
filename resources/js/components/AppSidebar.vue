@@ -29,16 +29,16 @@ const mainNavItems: NavItem[] = [
         href: '/tasks',
         icon: Folder,
     },
-    {
-        title: 'Reports',
-        href: '/reports',
-        icon: BookOpen,
-    },
-    {
-        title: 'Settings',
-        href: '/settings',
-        icon: Cog,
-    }
+    // {
+    //     title: 'Reports',
+    //     href: '/reports',
+    //     icon: BookOpen,
+    // },
+    // {
+    //     title: 'Settings',
+    //     href: '/settings',
+    //     icon: Cog,
+    // }
 ];
 
 const footerNavItems: NavItem[] = [
