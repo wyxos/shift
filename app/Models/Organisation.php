@@ -11,4 +11,10 @@ class Organisation extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    // user
+    public function author()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

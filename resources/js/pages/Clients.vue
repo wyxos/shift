@@ -64,9 +64,11 @@ const editForm = useForm<{
 
 const createForm = useForm<{
     name: string;
+    organisation_id: number | null;
     isActive: boolean;
 }>({
     name: '',
+    organisation_id: null,
     isActive: false
 });
 
