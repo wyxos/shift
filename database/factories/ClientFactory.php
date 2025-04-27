@@ -18,6 +18,7 @@ class ClientFactory extends Factory
     {
         return [
             'name' => $this->faker->company(),
+            'organisation_id' => \App\Models\Organisation::factory(),
         ];
     }
 }
