@@ -46,6 +46,8 @@ const deleteDialogOpen = ref(false);
 
 const search = ref(props.filters.search);
 
+const title = `Clients` + (search.value ? ` - ${search.value}` : '');
+
 function openEditModal(client: { id: number, name: string }) {
     selectedClient.value = { ...client }; // clone instead of direct reference
     editDialogOpen.value = true;
@@ -84,12 +86,12 @@ function onPageChange(page: number) {
 }
 
 watch(search, value => debounce(() => {
-    router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true });
+    router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
 }, 300)());
 </script>
 
 <template>
-    <Head title="Clients" />
+    <Head :title="title" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
