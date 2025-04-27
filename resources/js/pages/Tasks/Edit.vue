@@ -5,11 +5,15 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Input } from '@/components/ui/input';
 
-defineProps({
+const props = defineProps({
     projects: {
         type: Array,
         required: true
     },
+    task: {
+        type: Object,
+        required: true
+    }
 });
 
 
@@ -19,7 +23,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/tasks',
     },
     {
-        title: 'Create',
+        title: 'Edit Task',
         href: '/tasks/create',
     }
 ];
@@ -27,9 +31,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const title = `Create Task`;
 
 const createForm = useForm({
-    name: '',
-    description: '',
-    project_id: null,
+    name: props.task.name,
+    description: props.task.description,
+    project_id: props.task.project_id,
 });
 </script>
 
@@ -59,7 +63,7 @@ const createForm = useForm({
                     </select>
                 </div>
 
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Edit Task</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Create Task</button>
             </form>
         </div>
     </AppLayout>
