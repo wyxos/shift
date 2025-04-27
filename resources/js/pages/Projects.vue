@@ -25,6 +25,10 @@ const props = defineProps({
         type: Object,
         required: true
     },
+    clients: {
+        type: Object,
+        required: true
+    },
     filters: {
         type: Object,
         required: true
@@ -64,9 +68,11 @@ const editForm = useForm<{
 
 const createForm = useForm<{
     name: string;
+    client_id: number | null;
     isActive: boolean;
 }>({
     name: '',
+    client_id: null,
     isActive: false
 });
 
@@ -184,13 +190,20 @@ watch(search, value => debounce(() => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-4">
                     <input
                         v-model="createForm.name"
                         type="text"
                         class="border rounded px-4 py-2"
                         placeholder="Project Name"
                     />
+
+                    <select v-model="createForm.client_id" class="border rounded px-4 py-2">
+                        <option value="" disabled>Select Client</option>
+                        <option v-for="client in clients.data" :key="client.id" :value="client.id">
+                            {{ client.name }}
+                        </option>
+                    </select>
                 </div>
 
                 <AlertDialogFooter>
@@ -214,7 +227,7 @@ watch(search, value => debounce(() => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-4">
                     <input
                         v-model="editForm.name"
                         type="text"

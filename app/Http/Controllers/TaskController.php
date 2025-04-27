@@ -27,11 +27,25 @@ class TaskController extends Controller
     public function create()
     {
         $projects = Project::whereHas('client.organisation', function ($query) {
-            $query->where('author_id', auth()->user()->organisation_id);
+            $query->where('author_id', auth()->user()->id);
         })->get();
 
         return inertia('Tasks/Create')
             ->with([
+                'projects' => $projects
+            ]);
+    }
+
+    // edit task
+    public function edit(\App\Models\Task $task)
+    {
+        $projects = Project::whereHas('client.organisation', function ($query) {
+            $query->where('author_id', auth()->user()->id);
+        })->get();
+
+        return inertia('Tasks/Edit')
+            ->with([
+                'task' => $task,
                 'projects' => $projects
             ]);
     }
@@ -55,9 +69,14 @@ class TaskController extends Controller
     // create task
     public function store()
     {
-        $task = \App\Models\Task::create(request()->validate([
+        $attributes = request()->validate([
             'name' => 'required|string|max:255',
-        ]));
+            'project_id' => 'required|exists:projects,id',
+        ]);
+        $task = \App\Models\Task::create([
+            ...$attributes,
+            'author_id' => auth()->id(),
+        ]);
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 }

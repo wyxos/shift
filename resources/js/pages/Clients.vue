@@ -25,6 +25,10 @@ const props = defineProps({
         type: Object,
         required: true
     },
+    organisations: {
+        type: Object,
+        required: true
+    },
     filters: {
         type: Object,
         required: true
@@ -186,13 +190,20 @@ watch(search, value => debounce(() => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-4">
                     <input
                         v-model="createForm.name"
                         type="text"
                         class="border rounded px-4 py-2"
                         placeholder="Client Name"
                     />
+
+                    <select v-model="createForm.organisation_id" class="border rounded px-4 py-2">
+                        <option value="" disabled>Select Organisation</option>
+                        <option v-for="organisation in props.organisations" :key="organisation.id" :value="organisation.id">
+                            {{ organisation.name }}
+                        </option>
+                    </select>
                 </div>
 
                 <AlertDialogFooter>
@@ -216,7 +227,7 @@ watch(search, value => debounce(() => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-4">
                     <input
                         v-model="editForm.name"
                         type="text"
