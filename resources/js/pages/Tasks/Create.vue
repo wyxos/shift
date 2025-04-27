@@ -9,7 +9,7 @@ defineProps({
     projects: {
         type: Array,
         required: true
-    }
+    },
 });
 
 
@@ -59,7 +59,7 @@ const createForm = useForm({
                     </select>
                 </div>
 
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Create Task</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Edit Task</button>
             </form>
         </div>
     </AppLayout>

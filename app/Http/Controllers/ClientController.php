@@ -12,6 +12,9 @@ class ClientController extends Controller
             ->with([
                 'filters' => request()->only(['search']),
                 'clients' => \App\Models\Client::query()
+                    ->whereHas('organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
                     ->latest()
                     ->when(
                         request('search'),
@@ -19,6 +22,9 @@ class ClientController extends Controller
                     )
                     ->paginate(10)
                     ->withQueryString(),
+                'organisations' => \App\Models\Organisation::query()
+                    ->where('author_id', auth()->user()->id)
+                    ->get(),
             ]);
     }
 
@@ -43,6 +49,7 @@ class ClientController extends Controller
     {
         $client = \App\Models\Client::create(request()->validate([
             'name' => 'required|string|max:255',
+            'organisation_id' => 'required|exists:organisations,id',
         ]));
         return redirect()->route('clients.index')->with('success', 'Client created successfully.');
     }
