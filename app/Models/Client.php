@@ -11,4 +11,9 @@ class Client extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    public function organisation()
+    {
+        return $this->belongsTo(Organisation::class);
+    }
 }
