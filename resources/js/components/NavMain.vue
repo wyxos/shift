@@ -12,10 +12,12 @@ const page = usePage<SharedData>();
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroupLabel>
+            <slot name="label">Platform</slot>
+        </SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
-                <SidebarMenuButton 
+                <SidebarMenuButton
                     as-child :is-active="item.href === page.url"
                     :tooltip="item.title"
                 >
