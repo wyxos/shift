@@ -18,6 +18,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input';
+import DeleteDialog from '@/components/DeleteDialog.vue';
 
 
 const props = defineProps({
@@ -54,8 +55,8 @@ function openEditModal(client: { id: number, name: string }) {
     editDialogOpen.value = true;
 }
 function openDeleteModal(client: { id: number, name: string }) {
-    selectedClient.value = client;
-    deleteDialogOpen.value = true;
+    deleteForm.id = client.id;
+    deleteForm.isActive = true;
 }
 
 const editForm = useForm<{
@@ -74,6 +75,14 @@ const createForm = useForm<{
     isActive: false
 });
 
+const deleteForm = useForm<{
+    id: number | null;
+    isActive: boolean;
+}>({
+    id: null,
+    isActive: false
+});
+
 function saveEdit() {
     if (editForm.id) {
         editForm.put(`/clients/${editForm.id}`, {
@@ -86,11 +95,11 @@ function saveEdit() {
 }
 
 function confirmDelete() {
-    if (selectedClient.value) {
-        router.delete(`/clients/${selectedClient.value.id}`, {
+    if (deleteForm.id) {
+        router.delete(`/clients/${deleteForm.id}`, {
             preserveScroll: true,
             onSuccess: () => {
-                deleteDialogOpen.value = false;
+                deleteForm.isActive = false;
             },
         });
     }
@@ -181,26 +190,20 @@ watch(search, value => debounce(() => {
             </AlertDialogContent>
         </AlertDialog>
 
-
-        <!-- Delete Modal -->
-        <AlertDialog v-model:open="deleteDialogOpen">
-            <AlertDialogTrigger as-child>
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Client</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete "{{ selectedClient?.name }}"? This action cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmDelete">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
+        <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
+            <template #title>
+                Delete Client
+            </template>
+            <template #description>
+                Are you sure you want to delete this client? This action cannot be undone.
+            </template>
+            <template #cancel>
+                Cancel
+            </template>
+            <template #confirm>
+                Confirm
+            </template>
+        </DeleteDialog>
 
         <!-- Create Modal -->
         <AlertDialog v-model:open="createForm.isActive">
