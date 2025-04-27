@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ClientController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -14,43 +15,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    // clients
-    Route::get('clients', function () {
-        return Inertia::render('Clients')
-            ->with([
-                'filters' => request()->only(['search']),
-                'clients' => App\Models\Client::query()
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
-                    ->paginate(10)
-                    ->withQueryString(),
-            ]);
-    })->name('clients.index');
+    Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
 
-    // delete route
-    Route::delete('clients/{client}', function (App\Models\Client $client) {
-        $client->delete();
-        return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
-    })->name('clients.destroy');
+    Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
 
-    // put client
-    Route::put('clients/{client}', function (App\Models\Client $client) {
-        $client->update(request()->validate([
-            'name' => 'required|string|max:255',
-        ]));
-        return redirect()->route('clients.index')->with('success', 'Client updated successfully.');
-    })->name('clients.update');
+    Route::put('clients/{client}', [ClientController::class, 'update'])->name('clients.update');
 
-    // create client
-    Route::post('clients', function () {
-        $client = App\Models\Client::create(request()->validate([
-            'name' => 'required|string|max:255',
-        ]));
-        return redirect()->route('clients.index')->with('success', 'Client created successfully.');
-    })->name('clients.store');
+    Route::delete('clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
 
     // projects
     Route::get('projects', function () {
