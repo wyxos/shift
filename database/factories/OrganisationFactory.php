@@ -17,7 +17,8 @@ class OrganisationFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'name' => $this->faker->unique()->company(),
+            'author_id' => \App\Models\User::factory(),
         ];
     }
 }
