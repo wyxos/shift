@@ -20,7 +20,6 @@ import {
 import { Input } from '@/components/ui/input';
 import DeleteDialog from '@/components/DeleteDialog.vue';
 
-
 const props = defineProps({
     clients: {
         type: Object,
@@ -32,7 +31,6 @@ const props = defineProps({
     }
 })
 
-
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Clients',
@@ -40,10 +38,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const selectedClient = ref<{ id: number, name: string } | null>(null);
 const editDialogOpen = ref(false);
-
-const deleteDialogOpen = ref(false);
 
 const search = ref(props.filters.search);
 
@@ -160,36 +155,6 @@ watch(search, value => debounce(() => {
             </o-table>
         </div>
 
-        <!-- Edit Modal -->
-        <AlertDialog v-model:open="editDialogOpen">
-            <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Edit Client</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Update client information.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="flex flex-col gap-4 p-4">
-                    <input
-                        v-model="editForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Client Name"
-                    />
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
         <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
             <template #title>
                 Delete Client
@@ -231,6 +196,36 @@ watch(search, value => debounce(() => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction @click="createForm.post('/clients')" :disabled="createForm.processing">Create</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- Edit Modal -->
+        <AlertDialog v-model:open="editDialogOpen">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Edit Client</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Update client information.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4">
+                    <input
+                        v-model="editForm.name"
+                        type="text"
+                        class="border rounded px-4 py-2"
+                        placeholder="Client Name"
+                    />
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
