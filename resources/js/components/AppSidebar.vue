@@ -15,20 +15,11 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        'title': 'Clients',
-        href: '/clients',
-        icon: Folder,
-    },
-    {
-        title: 'Projects',
-        href: '/projects',
-        icon: Folder,
-    },
-    {
         title: 'Tasks',
         href: '/tasks',
         icon: Folder,
     },
+
     // {
     //     title: 'Reports',
     //     href: '/reports',
@@ -39,6 +30,24 @@ const mainNavItems: NavItem[] = [
     //     href: '/settings',
     //     icon: Cog,
     // }
+];
+
+const administrationItems: NavItem[] = [
+    {
+        'title': 'Organisations',
+        href: '/organisations',
+        icon: Folder,
+    },
+    {
+        'title': 'Clients',
+        href: '/clients',
+        icon: Folder,
+    },
+    {
+        title: 'Projects',
+        href: '/projects',
+        icon: Folder,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -71,6 +80,12 @@ const footerNavItems: NavItem[] = [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+
+            <NavMain :items="administrationItems">
+                <template #label>
+                    Administration
+                </template>
+            </NavMain>
         </SidebarContent>
 
         <SidebarFooter>
