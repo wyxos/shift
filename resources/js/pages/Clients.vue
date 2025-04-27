@@ -71,7 +71,7 @@ const createForm = useForm<{
     isActive: boolean;
 }>({
     name: '',
-    isActive: true
+    isActive: false
 });
 
 function saveEdit() {
