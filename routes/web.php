@@ -20,6 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->with([
                 'filters' => request()->only(['search']),
                 'clients' => App\Models\Client::query()
+                    ->latest()
                     ->when(
                         request('search'),
                         fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
@@ -42,6 +43,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]));
         return redirect()->route('clients.index')->with('success', 'Client updated successfully.');
     })->name('clients.update');
+
+    // create client
+    Route::post('clients', function () {
+        $client = App\Models\Client::create(request()->validate([
+            'name' => 'required|string|max:255',
+        ]));
+        return redirect()->route('clients.index')->with('success', 'Client created successfully.');
+    })->name('clients.store');
 
     // projects
     Route::get('projects', function () {

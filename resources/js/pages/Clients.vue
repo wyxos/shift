@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
 import { ref, watch } from 'vue';
@@ -49,7 +49,8 @@ const search = ref(props.filters.search);
 const title = `Clients` + (search.value ? ` - ${search.value}` : '');
 
 function openEditModal(client: { id: number, name: string }) {
-    selectedClient.value = { ...client }; // clone instead of direct reference
+    editForm.id = client.id;
+    editForm.name = client.name;
     editDialogOpen.value = true;
 }
 function openDeleteModal(client: { id: number, name: string }) {
@@ -57,15 +58,29 @@ function openDeleteModal(client: { id: number, name: string }) {
     deleteDialogOpen.value = true;
 }
 
+const editForm = useForm<{
+    id: number | null;
+    name: string;
+}>({
+    id: null,
+    name: '',
+});
+
+const createForm = useForm<{
+    name: string;
+    isActive: boolean;
+}>({
+    name: '',
+    isActive: true
+});
+
 function saveEdit() {
-    if (selectedClient.value) {
-        router.put(`/clients/${selectedClient.value.id}`, {
-            name: selectedClient.value.name,
-        }, {
-            preserveScroll: true,
+    if (editForm.id) {
+        editForm.put(`/clients/${editForm.id}`, {
             onSuccess: () => {
                 editDialogOpen.value = false;
             },
+            preserveScroll: true,
         });
     }
 }
@@ -105,6 +120,10 @@ watch(search, value => debounce(() => {
                 <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
 
                 <Button @click="reset">Reset</Button>
+
+                <Button @click="createForm.isActive = true">
+                    <i class="fas fa-plus"></i> Add Client
+                </Button>
             </div>
 
             <o-table :data="clients.data" :paginated="true" :per-page="clients.per_page" :current-page="clients.current_page"
@@ -148,7 +167,7 @@ watch(search, value => debounce(() => {
 
                 <div class="flex flex-col gap-4 p-4">
                     <input
-                        v-model="selectedClient.name"
+                        v-model="editForm.name"
                         type="text"
                         class="border rounded px-4 py-2"
                         placeholder="Client Name"
@@ -157,7 +176,7 @@ watch(search, value => debounce(() => {
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="saveEdit">Save</AlertDialogAction>
+                    <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -178,6 +197,37 @@ watch(search, value => debounce(() => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction @click="confirmDelete">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+
+        <!-- Create Modal -->
+        <AlertDialog v-model:open="createForm.isActive">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Create Client</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Add a new client.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4">
+                    <input
+                        v-model="createForm.name"
+                        type="text"
+                        class="border rounded px-4 py-2"
+                        placeholder="Client Name"
+                    />
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="createForm.post('/clients')" :disabled="createForm.processing">Create</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
