@@ -4,7 +4,8 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+import { debounce } from 'lodash';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -16,9 +17,10 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input';
 
 
-const props = defineProps({
+defineProps({
     clients: {
         type: Object,
         required: true
@@ -36,8 +38,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const selectedClient = ref<{ id: number, name: string } | null>(null);
 const editDialogOpen = ref(false);
 
-
 const deleteDialogOpen = ref(false);
+
+const search = ref('');
 
 function openEditModal(client: { id: number, name: string }) {
     selectedClient.value = { ...client }; // clone instead of direct reference
@@ -76,7 +79,9 @@ function onPageChange(page: number) {
     router.get('/clients', { page }, { preserveState: true, preserveScroll: true });
 }
 
-console.log(props.clients)
+watch(search, value => debounce(() => {
+    router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true });
+}, 300)());
 </script>
 
 <template>
@@ -84,6 +89,9 @@ console.log(props.clients)
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+
+            <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+
             <o-table :data="clients.data" :paginated="true" :per-page="clients.per_page" :current-page="clients.current_page"
                      backend-pagination :total="clients.total"
                      @page-change="onPageChange">
@@ -91,9 +99,13 @@ console.log(props.clients)
                     {{ row.name }}
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
-                    <div class="flex gap-2">
-                        <Button variant="outline" @click="openEditModal(row)">Edit</Button>
-                        <Button variant="destructive" @click="openDeleteModal(row)">Delete</Button>
+                    <div class="flex gap-2 justify-end">
+                        <Button variant="outline" @click="openEditModal(row)">
+                            <i class="fas fa-edit"></i>
+                        </Button>
+                        <Button variant="destructive" @click="openDeleteModal(row)">
+                            <i class="fas fa-trash"></i>
+                        </Button>
                     </div>
                 </o-table-column>
 

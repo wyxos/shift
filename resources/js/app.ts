@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
+import { OrugaConfig } from '@oruga-ui/oruga-next';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -27,6 +28,9 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),
     setup({ el, App, props, plugin }) {
         createApp({ render: () => h(App, props) })
+            .use(OrugaConfig, {
+                iconPack: 'fas',
+            })
             .use(plugin)
             .use(ZiggyVue)
             .mount(el);

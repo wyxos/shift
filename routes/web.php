@@ -18,7 +18,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('clients', function () {
         return Inertia::render('Clients')
             ->with([
-                'clients' => App\Models\Client::query()->paginate(10)->withQueryString(),
+                'clients' => App\Models\Client::query()
+                    ->when(
+                        request('search'),
+                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                    )
+                    ->paginate(10)
+                    ->withQueryString(),
             ]);
     })->name('clients.index');
 
