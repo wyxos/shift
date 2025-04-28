@@ -1,16 +1,15 @@
 **Dashboard MVP**
-- [ ] List Clients
-- [ ] Create Clients
-- [ ] Update Clients
-- [ ] List Projects
-- [ ] Create Projects
-- [ ] Update Projects
-- [ ] List Tasks
-- [ ] Create Tasks
-- [ ] Update Tasks
+- [x] List Clients
+- [x] Create Clients
+- [x] Update Clients
+- [x] List Projects
+- [x] Create Projects
+- [x] Update Projects
+- [x] List Tasks
+- [x] Create Tasks
+- [x] Update Tasks
 - [ ] Add/Read Comments on Tasks (basic textarea)
-- [ ] Build simple clean table UI (Shadcn acceptable)
-- [ ] Implement REST API for Tasks/Projects (read/write)
+- [x] Implement REST API for Tasks/Projects (read/write)
 
 ---
 
