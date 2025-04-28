@@ -5,7 +5,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
 import { ref, watch } from 'vue';
-import { debounce } from 'lodash';
+import debounce from 'lodash/debounce';
 import {
     AlertDialog,
     AlertDialogAction,
