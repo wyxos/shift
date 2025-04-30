@@ -8,6 +8,20 @@ class ProjectController extends Controller
 {
     public function index()
     {
+        if(request()->expectsJson()) {
+            return \App\Models\Project::query()
+                ->whereHas('client.organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })
+                ->latest()
+                ->when(
+                    request('search'),
+                    fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                )
+                ->paginate(10)
+                ->withQueryString();
+        }
+
         return inertia('Projects')
             ->with([
                 'filters' => request()->only(['search']),
@@ -59,6 +73,7 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
             'client_id' => 'required|exists:clients,id',
         ]));
+
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
 }
