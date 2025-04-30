@@ -69,8 +69,21 @@ class TaskController extends Controller
     // create task
     public function store()
     {
+        // if expects json
+        if (request()->expectsJson()) {
+            return \App\Models\Task::create([
+                ...request()->validate([
+                    'name' => 'required|string|max:255',
+                    'description' => 'nullable|string',
+                    'project_id' => 'required|exists:projects,id',
+                ]),
+                'author_id' => auth()->id(),
+            ]);
+        }
+
         $attributes = request()->validate([
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
         ]);
         $task = \App\Models\Task::create([
