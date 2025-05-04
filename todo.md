@@ -15,11 +15,11 @@
 
 **SDK MVP**
 - [ ] Connect Laravel app to SHIFT dashboard via config (`SHIFT_API_TOKEN`, `SHIFT_PROJECT_ID`, etc.)
-- [ ] Create `php artisan shift:setup` command:
-    - [ ] Prompt for API key
-    - [ ] Test connection to SHIFT
+- [x] Create `php artisan shift:setup` command:
+    - [x] Prompt for API key
+    - [x] Test connection to SHIFT
     - [ ] Search or create a Project
-    - [ ] Save config locally
+    - [x] Save config locally
 - [ ] SDK exposes `/shift` route:
     - [ ] User can view tasks they created
     - [ ] User can create/edit their own tasks (sent to SHIFT backend)
