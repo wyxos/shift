@@ -101,7 +101,7 @@ watch(search, value => debounce(() => {
                      backend-pagination :total="tasks.total"
                      @page-change="onPageChange">
                 <o-table-column v-slot="{row}">
-                    {{ row.name }}
+                    {{ row.title }}
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
                     <div class="flex gap-2 justify-end">
