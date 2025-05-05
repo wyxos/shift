@@ -17,6 +17,7 @@ class OrganisationController extends Controller
                         request('search'),
                         fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
+                    ->where('author_id', auth()->user()->id)
                     ->paginate(10)
                     ->withQueryString(),
             ]);
