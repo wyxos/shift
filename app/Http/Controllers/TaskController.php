@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectUser;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -39,14 +40,12 @@ class TaskController extends Controller
     // edit task
     public function edit(\App\Models\Task $task)
     {
-        $projects = Project::whereHas('client.organisation', function ($query) {
-            $query->where('author_id', auth()->user()->id);
-        })->get();
+        $task->load('project');
 
         return inertia('Tasks/Edit')
             ->with([
                 'task' => $task,
-                'projects' => $projects
+                'project' => $task->project
             ]);
     }
 
@@ -61,7 +60,7 @@ class TaskController extends Controller
     public function update(\App\Models\Task $task)
     {
         $task->update(request()->validate([
-            'name' => 'required|string|max:255',
+            'title' => 'required|string|max:255',
         ]));
         return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
     }
@@ -71,25 +70,46 @@ class TaskController extends Controller
     {
         // if expects json
         if (request()->expectsJson()) {
-            return \App\Models\Task::create([
+            $projectUser = ProjectUser::updateOrCreate([
                 ...request()->validate([
-                    'name' => 'required|string|max:255',
+                    'project_id' => 'required|exists:projects,id',
+                    'user_id' => 'required',
+                ])
+            ], [
+                ...request()->validate([
+                    'user_email' => 'required|string',
+                    'user_name' => 'required|string'
+                ])
+            ]);
+
+            $taskAttributes = [
+                ...request()->validate([
+                    'title' => 'required|string|max:255',
                     'description' => 'nullable|string',
                     'project_id' => 'required|exists:projects,id',
                 ]),
                 'author_id' => auth()->id(),
-            ]);
+            ];
+
+            $task = \App\Models\Task::create($taskAttributes);
+
+            $task->projectUser()->associate($projectUser)->save();
+
+
+            return $task;
         }
 
         $attributes = request()->validate([
-            'name' => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
         ]);
+
         $task = \App\Models\Task::create([
             ...$attributes,
             'author_id' => auth()->id(),
         ]);
+
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 }
