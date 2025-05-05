@@ -111,8 +111,7 @@ class TaskController extends Controller
 
             $task->projectUser()->associate($projectUser)->save();
 
-
-            return $task;
+            return response()->json($task);
         }
 
         $attributes = request()->validate([
