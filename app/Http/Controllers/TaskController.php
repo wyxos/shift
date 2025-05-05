@@ -4,12 +4,28 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectUser;
+use App\Models\Task;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-    public function index()
+    public function index(int $project = null)
     {
+        if(request()->expectsJson()){
+            // return tasks for the project
+            $tasks = Task::where('project_id', $project)
+                ->where('project_user_id', auth()->user()->id)
+                ->latest()
+                ->when(
+                    request('search'),
+                    fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                )
+                ->paginate(10)
+                ->withQueryString();
+
+            return response()->json($tasks);
+        }
+
         return inertia('Tasks/Index')
             ->with([
                 'filters' => request()->only(['search']),
