@@ -1,7 +1,3 @@
-Here’s a **comprehensive TODO list** for SHIFT (dashboard + SDK), broken into *must have*, *good to have*, and *if app scales*. I’ve included already completed items as well for reference.
-
----
-
 ## Must Have
 
 ### Core Setup & Structure
@@ -105,7 +101,3 @@ Here’s a **comprehensive TODO list** for SHIFT (dashboard + SDK), broken into 
 * [ ] Custom roles/permissions
 * [ ] White-labeling for organizations
 * [ ] Billing/subscription management
-
----
-
-**Let me know which section you want to focus on or your current status, and we’ll go step-by-step.**
