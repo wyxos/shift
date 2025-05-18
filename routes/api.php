@@ -13,9 +13,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/projects', [\App\Http\Controllers\ProjectController::class, 'store']);
     Route::put('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'update']);
     Route::delete('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'destroy']);
+    Route::get('/projects/{project}/tasks/', [\App\Http\Controllers\TaskController::class, 'index']);
 
     // tasks
-    Route::get('/tasks/{project}', [\App\Http\Controllers\TaskController::class, 'index']);
+    Route::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show']);
     Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store']);
     Route::put('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update']);
     Route::delete('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy']);
