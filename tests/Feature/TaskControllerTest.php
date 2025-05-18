@@ -64,4 +64,96 @@ class TaskControllerTest extends TestCase
         ]);
     }
 
+    public function test_it_shows_task_via_api()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+
+        $response = $this->getJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'id' => $task->id,
+            'title' => $task->title,
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function test_it_updates_task_via_api()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->put(route('tasks.update', $task), [
+            'title' => 'Updated Task Title',
+        ]);
+
+        $response->assertRedirect(route('tasks.index'));
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Updated Task Title',
+        ]);
+    }
+
+    public function test_it_deletes_task()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->delete(route('tasks.destroy', $task));
+
+        $response->assertRedirect(route('tasks.index'));
+        $this->assertDatabaseMissing('tasks', [
+            'id' => $task->id,
+        ]);
+    }
+
+    public function test_it_lists_tasks_for_project_via_api()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+
+        // Create a ProjectUser record
+        $projectUser = \App\Models\ProjectUser::create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+        ]);
+
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+            'project_user_id' => $projectUser->id,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+
+        $response = $this->getJson("/api/projects/{$project->id}/tasks");
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data',
+            'current_page',
+            'total',
+        ]);
+    }
 }
