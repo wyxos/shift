@@ -18,7 +18,7 @@ class TaskController extends Controller
                 ->latest()
                 ->when(
                     request('search'),
-                    fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                    fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
                 )
                 ->paginate(10)
                 ->withQueryString();
@@ -33,7 +33,7 @@ class TaskController extends Controller
                     ->latest()
                     ->when(
                         request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                        fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
                     ->paginate(10)
                     ->withQueryString(),
@@ -138,5 +138,63 @@ class TaskController extends Controller
             ->with([
                 'task' => $task
             ]);
+    }
+
+    /**
+     * Update the status of a task.
+     *
+     * @param Task $task
+     * @param Request $request
+     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function toggleStatus(Task $task, Request $request)
+    {
+        $validatedData = $request->validate([
+            'status' => 'required|string|in:pending,in_progress,completed',
+        ]);
+
+        $task->status = $validatedData['status'];
+        $task->save();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => $task->status,
+                'message' => 'Task status updated successfully'
+            ]);
+        }
+
+        return back()->with([
+            'status' => $task->status,
+            'message' => 'Task status updated successfully'
+        ]);
+    }
+
+    /**
+     * Update the priority of a task.
+     *
+     * @param Task $task
+     * @param Request $request
+     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function togglePriority(Task $task, Request $request)
+    {
+        $validatedData = $request->validate([
+            'priority' => 'required|string|in:low,medium,high',
+        ]);
+
+        $task->priority = $validatedData['priority'];
+        $task->save();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'priority' => $task->priority,
+                'message' => 'Task priority updated successfully'
+            ]);
+        }
+
+        return back()->with([
+            'priority' => $task->priority,
+            'message' => 'Task priority updated successfully'
+        ]);
     }
 }

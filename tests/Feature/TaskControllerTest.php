@@ -156,4 +156,100 @@ class TaskControllerTest extends TestCase
             'total',
         ]);
     }
+
+    public function test_it_toggles_task_status()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+
+        // Update to in_progress
+        $response = $this->patchJson("/api/tasks/{$task->id}/toggle-status", [
+            'status' => 'in_progress'
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson([
+            'status' => 'in_progress',
+            'message' => 'Task status updated successfully'
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => 'in_progress',
+        ]);
+
+        // Update to completed
+        $response = $this->patchJson("/api/tasks/{$task->id}/toggle-status", [
+            'status' => 'completed'
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson([
+            'status' => 'completed',
+            'message' => 'Task status updated successfully'
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => 'completed',
+        ]);
+
+        // Update back to pending
+        $response = $this->patchJson("/api/tasks/{$task->id}/toggle-status", [
+            'status' => 'pending'
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson([
+            'status' => 'pending',
+            'message' => 'Task status updated successfully'
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_it_toggles_task_priority()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create();
+        $task = \App\Models\Task::factory()->create([
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+            'priority' => 'medium',
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+
+        // Update to high priority
+        $response = $this->patchJson("/api/tasks/{$task->id}/toggle-priority", [
+            'priority' => 'high'
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson([
+            'priority' => 'high',
+            'message' => 'Task priority updated successfully'
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'priority' => 'high',
+        ]);
+
+        // Update to low priority
+        $response = $this->patchJson("/api/tasks/{$task->id}/toggle-priority", [
+            'priority' => 'low'
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson([
+            'priority' => 'low',
+            'message' => 'Task priority updated successfully'
+        ]);
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'priority' => 'low',
+        ]);
+    }
 }

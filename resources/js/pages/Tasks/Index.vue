@@ -4,21 +4,17 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import debounce from 'lodash/debounce';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogDescription,
-    AlertDialogContent,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+// Alert dialog components are used in DeleteDialog.vue
 import { Input } from '@/components/ui/input';
 import DeleteDialog from '@/components/DeleteDialog.vue';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
 const props = defineProps({
     tasks: {
@@ -30,6 +26,19 @@ const props = defineProps({
         required: true
     }
 })
+
+// Create a reactive copy of the tasks data
+const localTasks = ref({ ...props.tasks });
+
+// Update local tasks when props change
+watch(() => props.tasks, (newTasks) => {
+    localTasks.value = { ...newTasks };
+}, { deep: true });
+
+// Initialize local tasks on component mount
+onMounted(() => {
+    localTasks.value = { ...props.tasks };
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -68,17 +77,122 @@ function confirmDelete() {
 }
 
 function onPageChange(page: number) {
-    router.get('/tasks', { page, search: search.value }, { preserveState: true, preserveScroll: true });
+    // Update the current page in local tasks
+    localTasks.value.current_page = page;
+
+    // Use router to navigate to the new page
+    router.get('/tasks', { page, search: search.value }, {
+        preserveState: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            // Refresh the task list to ensure we have the latest data
+            refreshTaskList();
+        }
+    });
 }
 
 function reset() {
     search.value = '';
-    router.get('/tasks', { search: '' }, { preserveState: true, preserveScroll: true });
+    router.get('/tasks', { search: '' }, {
+        preserveState: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            // Refresh the task list to ensure we have the latest data
+            refreshTaskList();
+        }
+    });
 }
 
 watch(search, value => debounce(() => {
-    router.get('/tasks', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
+    router.get('/tasks', { search: value }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onSuccess: () => {
+            // Refresh the task list to ensure we have the latest data
+            refreshTaskList();
+        }
+    });
 }, 300)());
+
+// Status options
+const statusOptions = [
+    { value: 'pending', label: 'Pending', class: 'bg-yellow-100 text-yellow-800' },
+    { value: 'in_progress', label: 'In Progress', class: 'bg-blue-100 text-blue-800' },
+    { value: 'completed', label: 'Completed', class: 'bg-green-100 text-green-800' }
+];
+
+// Priority options
+const priorityOptions = [
+    { value: 'low', label: 'Low', class: 'bg-gray-100 text-gray-800' },
+    { value: 'medium', label: 'Medium', class: 'bg-orange-100 text-orange-800' },
+    { value: 'high', label: 'High', class: 'bg-red-100 text-red-800' }
+];
+
+// Function to update task status
+function updateTaskStatus(task, status) {
+    // Call the API endpoint to update status using Inertia
+    router.patch(`/tasks/${task.id}/toggle-status`, {
+        status: status
+    }, {
+        preserveScroll: true,
+        onSuccess: (response) => {
+            // Update the task status in the local data
+            const taskIndex = localTasks.value.data.findIndex(t => t.id === task.id);
+            if (taskIndex !== -1) {
+                localTasks.value.data[taskIndex].status = response.props.status;
+            }
+
+            // Refresh the task list to ensure changes persist
+            router.reload({ only: ['tasks'] });
+        },
+        onError: (error) => {
+            console.error('Error updating task status:', error);
+        }
+    });
+}
+
+// Function to refresh the task list
+function refreshTaskList() {
+    const currentPage = localTasks.value.current_page || 1;
+    const currentSearch = search.value || '';
+
+    // Use Inertia router to reload the tasks data
+    router.reload({
+        only: ['tasks'],
+        data: {
+            page: currentPage,
+            search: currentSearch
+        },
+        preserveScroll: true,
+        onError: (error) => {
+            console.error('Error refreshing task list:', error);
+        }
+    });
+}
+
+// Function to update task priority
+function updateTaskPriority(task, priority) {
+    // Call the API endpoint to update priority using Inertia
+    router.patch(`/tasks/${task.id}/toggle-priority`, {
+        priority: priority
+    }, {
+        preserveScroll: true,
+        onSuccess: (response) => {
+            // Update the task priority in the local data
+            const taskIndex = localTasks.value.data.findIndex(t => t.id === task.id);
+            if (taskIndex !== -1) {
+                localTasks.value.data[taskIndex].priority = response.props.priority;
+            }
+
+            // Refresh the task list to ensure changes persist
+            router.reload({ only: ['tasks'] });
+        },
+        onError: (error) => {
+            console.error('Error updating task priority:', error);
+        }
+    });
+}
 </script>
 
 <template>
@@ -97,13 +211,87 @@ watch(search, value => debounce(() => {
                 </Button>
             </div>
 
-            <o-table :data="tasks.data" :paginated="true" :per-page="tasks.per_page" :current-page="tasks.current_page"
-                     backend-pagination :total="tasks.total"
+            <o-table :data="localTasks.data" :paginated="true" :per-page="localTasks.per_page" :current-page="localTasks.current_page"
+                     backend-pagination :total="localTasks.total"
                      @page-change="onPageChange">
-                <o-table-column v-slot="{row}">
+                <o-table-column field="title" label="Title" v-slot="{row}">
                     {{ row.title }}
                 </o-table-column>
-                <o-table-column v-slot="{ row }">
+                <o-table-column field="status" label="Status" v-slot="{row}">
+                    <span
+                        class="px-2 py-1 rounded text-xs font-medium"
+                        :class="{
+                            'bg-yellow-100 text-yellow-800': row.status === 'pending',
+                            'bg-blue-100 text-blue-800': row.status === 'in_progress',
+                            'bg-green-100 text-green-800': row.status === 'completed'
+                        }"
+                    >
+                        {{ row.status.replace('_', ' ') }}
+                    </span>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="ml-2"
+                            >
+                                <i class="fas fa-chevron-down"></i>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem
+                                v-for="option in statusOptions"
+                                :key="option.value"
+                                @click="updateTaskStatus(row, option.value)"
+                            >
+                                <span
+                                    class="px-2 py-1 rounded text-xs font-medium mr-2"
+                                    :class="option.class"
+                                >
+                                    {{ option.label }}
+                                </span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </o-table-column>
+                <o-table-column field="priority" label="Priority" v-slot="{row}">
+                    <span
+                        class="px-2 py-1 rounded text-xs font-medium"
+                        :class="{
+                            'bg-gray-100 text-gray-800': row.priority === 'low',
+                            'bg-orange-100 text-orange-800': row.priority === 'medium',
+                            'bg-red-100 text-red-800': row.priority === 'high'
+                        }"
+                    >
+                        {{ row.priority }}
+                    </span>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="ml-2"
+                            >
+                                <i class="fas fa-chevron-down"></i>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem
+                                v-for="option in priorityOptions"
+                                :key="option.value"
+                                @click="updateTaskPriority(row, option.value)"
+                            >
+                                <span
+                                    class="px-2 py-1 rounded text-xs font-medium mr-2"
+                                    :class="option.class"
+                                >
+                                    {{ option.label }}
+                                </span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </o-table-column>
+                <o-table-column label="Actions" v-slot="{ row }">
                     <div class="flex gap-2 justify-end">
                         <Button variant="outline" @click="router.visit(`/tasks/${row.id}/edit`)">
                             <i class="fas fa-edit"></i>

@@ -20,4 +20,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store']);
     Route::put('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update']);
     Route::delete('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy']);
+    Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus']);
+    Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority']);
 });
