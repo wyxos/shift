@@ -54,6 +54,11 @@ class ProjectController extends Controller
     public function destroy(\App\Models\Project $project)
     {
         $project->delete();
+
+        if(request()->expectsJson()) {
+            return response()->json(['message' => 'Project deleted successfully.']);
+        }
+
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
     }
 
@@ -63,6 +68,11 @@ class ProjectController extends Controller
         $project->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
+
+        if(request()->expectsJson()) {
+            return response()->json($project);
+        }
+
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
     }
 
@@ -73,6 +83,10 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
             'client_id' => 'required|exists:clients,id',
         ]));
+
+        if(request()->expectsJson()) {
+            return response()->json($project, 201);
+        }
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
