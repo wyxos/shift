@@ -127,4 +127,16 @@ class TaskController extends Controller
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
+
+    public function show(Task $task)
+    {
+        if(request()->expectsJson()){
+            return response()->json($task);
+        }
+
+        return inertia('Tasks/Show')
+            ->with([
+                'task' => $task
+            ]);
+    }
 }
