@@ -252,4 +252,45 @@ class TaskControllerTest extends TestCase
             'priority' => 'low',
         ]);
     }
+
+    public function test_it_creates_task_with_external_submitter_info()
+    {
+        $user = User::factory()->create(); // API token owner
+        $project = Project::factory()->create();
+
+        $this->actingAs($user, 'sanctum');
+
+        $response = $this->postJson(route('tasks.store'), [
+            'title' => 'External Task',
+            'description' => 'Task from external submitter',
+            'project_id' => $project->id,
+            'submitter_name' => 'Tom',
+            'source_url' => 'https://project-a.example.com',
+            'environment' => 'production',
+        ]);
+
+        $response->assertStatus(201);
+
+        $task = \App\Models\Task::where('title', 'External Task')->first();
+
+        // Check that the task was created
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'External Task',
+            'description' => 'Task from external submitter',
+            'project_id' => $project->id,
+            'author_id' => $user->id,
+        ]);
+
+        // Check that the external task source was created
+        $this->assertDatabaseHas('external_task_sources', [
+            'task_id' => $task->id,
+            'submitter_name' => 'Tom',
+            'source_url' => 'https://project-a.example.com',
+            'environment' => 'production',
+        ]);
+
+        // Check that the task doesn't have a project_user_id
+        $this->assertNull($task->project_user_id);
+    }
 }
