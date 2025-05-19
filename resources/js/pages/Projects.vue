@@ -53,10 +53,12 @@ function openEditModal(project: { id: number, name: string }) {
     editForm.name = project.name;
     editDialogOpen.value = true;
 }
+
 function openDeleteModal(project: { id: number, name: string }) {
     deleteForm.id = project.id;
     deleteForm.isActive = true;
 }
+
 
 const editForm = useForm<{
     id: number | null;
@@ -84,6 +86,20 @@ const deleteForm = useForm<{
     isActive: false
 });
 
+const grantAccessForm = useForm<{
+    project_id: number | null;
+    project_name: string;
+    email: string;
+    name: string;
+    isOpen: boolean;
+}>({
+    project_id: null,
+    project_name: '',
+    email: '',
+    name: '',
+    isOpen: false,
+});
+
 function saveEdit() {
     if (editForm.id) {
         editForm.put(`/projects/${editForm.id}`, {
@@ -102,6 +118,19 @@ function confirmDelete() {
             onSuccess: () => {
                 deleteForm.isActive = false;
             },
+        });
+    }
+}
+
+function grantAccess() {
+    if (grantAccessForm.project_id) {
+        grantAccessForm.post(`/projects/${grantAccessForm.project_id}/users`, {
+            onSuccess: () => {
+                grantAccessForm.isOpen = false;
+                grantAccessForm.reset();
+                grantAccessForm.isOpen = false; // Set it again after reset to ensure it's false
+            },
+            preserveScroll: true,
         });
     }
 }
@@ -144,6 +173,15 @@ watch(search, value => debounce(() => {
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
                     <div class="flex gap-2 justify-end">
+                        <Button variant="outline" @click="() => {
+                            console.log('Button clicked for project:', row);
+                            grantAccessForm.project_id = row.id;
+                            grantAccessForm.project_name = row.name;
+                            grantAccessForm.isOpen = true;
+                            console.log('grantAccessForm.isOpen set to:', grantAccessForm.isOpen);
+                        }">
+                            <i class="fas fa-key"></i>
+                        </Button>
                         <Button variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
                         </Button>
@@ -239,6 +277,42 @@ watch(search, value => debounce(() => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- Grant Access Modal -->
+        <AlertDialog :open="grantAccessForm.isOpen" @update:open="grantAccessForm.isOpen = $event">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Grant Project Access</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Grant a user access to {{ grantAccessForm.project_name }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4">
+                    <input
+                        v-model="grantAccessForm.email"
+                        type="email"
+                        class="border rounded px-4 py-2"
+                        placeholder="User Email"
+                    />
+                    <input
+                        v-model="grantAccessForm.name"
+                        type="text"
+                        class="border rounded px-4 py-2"
+                        placeholder="User Name"
+                    />
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="grantAccessForm.isOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="grantAccess" :disabled="grantAccessForm.processing">Grant Access</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
