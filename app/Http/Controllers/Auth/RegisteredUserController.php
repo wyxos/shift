@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\OrganisationUser;
 use App\Models\ProjectUser;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -25,6 +26,7 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'name' => $request->name,
             'project_id' => $request->project_id,
+            'organisation_id' => $request->organisation_id,
         ]);
     }
 
@@ -40,6 +42,7 @@ class RegisteredUserController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'project_id' => 'nullable|exists:projects,id',
+            'organisation_id' => 'nullable|exists:organisations,id',
         ]);
 
         $user = User::create([
@@ -60,6 +63,16 @@ class RegisteredUserController extends Controller
                 ->update(['user_id' => $user->id]);
 
             return to_route('projects.index', ['highlight' => $request->project_id]);
+        }
+
+        // If the user was invited to an organisation, update the organisation_user record and redirect to the organisation
+        if ($request->organisation_id) {
+            // Update the organisation_user record with the new user_id
+            OrganisationUser::where('organisation_id', $request->organisation_id)
+                ->where('user_email', $request->email)
+                ->update(['user_id' => $user->id]);
+
+            return to_route('organisations.index', ['highlight' => $request->organisation_id]);
         }
 
         return to_route('dashboard');

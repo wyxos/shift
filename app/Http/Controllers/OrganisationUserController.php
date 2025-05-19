@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\User;
+use App\Notifications\OrganisationAccessNotification;
+use App\Notifications\OrganisationInvitationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class OrganisationUserController extends Controller
@@ -27,17 +30,22 @@ class OrganisationUserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        // Find the user by email if they exist
+        $user = User::where('email', $validated['email'])->first();
+
         // Check if the user is already a member of the organisation
         $existingUser = OrganisationUser::where('organisation_id', $organisation->id)
-            ->where('user_email', $validated['email'])
+            ->where(function($query) use ($validated, $user) {
+                $query->where('user_email', $validated['email']);
+                if ($user) {
+                    $query->orWhere('user_id', $user->id);
+                }
+            })
             ->first();
 
         if ($existingUser) {
             return response()->json(['message' => 'User is already a member of this organisation'], 422);
         }
-
-        // Find the user by email if they exist
-        $user = User::where('email', $validated['email'])->first();
 
         // Create the organisation user
         $organisationUser = OrganisationUser::create([
@@ -46,6 +54,17 @@ class OrganisationUserController extends Controller
             'user_email' => $validated['email'],
             'user_name' => $validated['name'],
         ]);
+
+        // Send appropriate notification based on whether the user exists or not
+        if (!$user) {
+            // For new users, send an invitation email with registration link
+            Notification::route('mail', [
+                $validated['email'] => $validated['name'],
+            ])->notify(new OrganisationInvitationNotification($organisationUser, $organisation));
+        } else {
+            // For existing users, send an access notification
+            $user->notify(new OrganisationAccessNotification($organisationUser, $organisation));
+        }
 
         if ($request->expectsJson()) {
             return response()->json($organisationUser, 201);
