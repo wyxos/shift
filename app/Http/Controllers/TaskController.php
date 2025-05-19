@@ -173,10 +173,22 @@ class TaskController extends Controller
             'project_id' => 'required|exists:projects,id',
         ]);
 
+        // Create or find a ProjectUser record for the authenticated user
+        $projectUser = ProjectUser::updateOrCreate([
+            'project_id' => $attributes['project_id'],
+            'user_id' => auth()->id(),
+        ], [
+            'user_email' => auth()->user()->email,
+            'user_name' => auth()->user()->name
+        ]);
+
         $task = \App\Models\Task::create([
             ...$attributes,
             'author_id' => auth()->id(),
         ]);
+
+        // Associate the task with the project user
+        $task->projectUser()->associate($projectUser)->save();
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
