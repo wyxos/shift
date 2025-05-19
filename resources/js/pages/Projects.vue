@@ -100,6 +100,18 @@ const grantAccessForm = useForm<{
     isOpen: false,
 });
 
+const manageUsersForm = useForm<{
+    project_id: number | null;
+    project_name: string;
+    users: any[];
+    isOpen: boolean;
+}>({
+    project_id: null,
+    project_name: '',
+    users: [],
+    isOpen: false,
+});
+
 function saveEdit() {
     if (editForm.id) {
         editForm.put(`/projects/${editForm.id}`, {
@@ -131,6 +143,34 @@ function grantAccess() {
                 grantAccessForm.isOpen = false; // Set it again after reset to ensure it's false
             },
             preserveScroll: true,
+        });
+    }
+}
+
+function openManageUsersModal(project: { id: number, name: string }) {
+    manageUsersForm.project_id = project.id;
+    manageUsersForm.project_name = project.name;
+
+    // Fetch users with access to the project
+    fetch(`/projects/${project.id}/users`)
+        .then(response => response.json())
+        .then(data => {
+            manageUsersForm.users = data;
+            manageUsersForm.isOpen = true;
+        })
+        .catch(error => {
+            console.error('Error fetching users:', error);
+        });
+}
+
+function removeAccess(projectUser: { id: number }) {
+    if (manageUsersForm.project_id) {
+        router.delete(`/projects/${manageUsersForm.project_id}/users/${projectUser.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Refresh the list of users
+                openManageUsersModal({ id: manageUsersForm.project_id as number, name: manageUsersForm.project_name });
+            },
         });
     }
 }
@@ -181,6 +221,9 @@ watch(search, value => debounce(() => {
                             console.log('grantAccessForm.isOpen set to:', grantAccessForm.isOpen);
                         }">
                             <i class="fas fa-key"></i>
+                        </Button>
+                        <Button variant="outline" @click="openManageUsersModal(row)">
+                            <i class="fas fa-users"></i>
                         </Button>
                         <Button variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
@@ -313,6 +356,41 @@ watch(search, value => debounce(() => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="grantAccessForm.isOpen = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction @click="grantAccess" :disabled="grantAccessForm.processing">Grant Access</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- Manage Users Modal -->
+        <AlertDialog :open="manageUsersForm.isOpen" @update:open="manageUsersForm.isOpen = $event">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Manage Project Access</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Users with access to {{ manageUsersForm.project_name }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4 max-h-96 overflow-y-auto">
+                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500">
+                        No users have access to this project.
+                    </div>
+                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex justify-between items-center p-2 border-b">
+                        <div>
+                            <div class="font-semibold">{{ user.user_name }}</div>
+                            <div class="text-sm text-gray-500">{{ user.user_email }}</div>
+                        </div>
+                        <Button variant="destructive" size="sm" @click="removeAccess(user)">
+                            <i class="fas fa-trash mr-1"></i> Remove
+                        </Button>
+                    </div>
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

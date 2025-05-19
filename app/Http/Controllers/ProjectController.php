@@ -100,4 +100,23 @@ class ProjectController extends Controller
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
+
+    /**
+     * Get users with access to the project.
+     */
+    public function users(\App\Models\Project $project)
+    {
+        // Check if the authenticated user has access to the project
+        $hasAccess = $project->client->organisation->author_id === auth()->id();
+
+        if (!$hasAccess) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $projectUsers = $project->projectUser()
+            ->with('user')
+            ->get();
+
+        return response()->json($projectUsers);
+    }
 }
