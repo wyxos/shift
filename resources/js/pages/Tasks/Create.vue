@@ -27,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const title = `Create Task`;
 
 const createForm = useForm({
-    name: '',
+    title: '',
     description: '',
     project_id: null,
 });
@@ -41,8 +41,8 @@ const createForm = useForm({
         <div class="p-4">
             <form @submit.prevent="createForm.post('/tasks')">
                 <div class="mb-4">
-                    <label for="name" class="block text-sm font-medium text-gray-700">Task Name</label>
-                    <Input v-model="createForm.name" type="text" id="name" required />
+                    <label for="title" class="block text-sm font-medium text-gray-700">Task Name</label>
+                    <Input v-model="createForm.title" type="text" id="title" required />
                 </div>
 
                 <div class="mb-4">
@@ -59,7 +59,7 @@ const createForm = useForm({
                     </select>
                 </div>
 
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Edit Task</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md">Create Task</button>
             </form>
         </div>
     </AppLayout>
