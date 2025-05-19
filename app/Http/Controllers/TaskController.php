@@ -26,17 +26,33 @@ class TaskController extends Controller
             return response()->json($tasks);
         }
 
+        $tasks = \App\Models\Task::query()
+            ->with(['externalTaskSource', 'projectUser.user', 'project'])
+            ->latest()
+            ->when(
+                request('search'),
+                fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
+            )
+            ->paginate(10)
+            ->withQueryString();
+
+        // Transform the tasks to include external submitter information
+        $tasks->through(function ($task) {
+            $task->is_external = $task->isExternallySubmitted();
+            if ($task->is_external) {
+                $task->submitter_info = [
+                    'name' => $task->externalTaskSource->submitter_name,
+                    'source_url' => $task->externalTaskSource->source_url,
+                    'environment' => $task->externalTaskSource->environment,
+                ];
+            }
+            return $task;
+        });
+
         return inertia('Tasks/Index')
             ->with([
                 'filters' => request()->only(['search']),
-                'tasks' => \App\Models\Task::query()
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
-                    ->paginate(10)
-                    ->withQueryString(),
+                'tasks' => $tasks,
             ]);
     }
 
@@ -91,30 +107,62 @@ class TaskController extends Controller
     {
         // if expects json
         if (request()->expectsJson()) {
-            $projectUser = ProjectUser::updateOrCreate([
-                ...request()->validate([
-                    'project_id' => 'required|exists:projects,id',
-                    'user_id' => 'required',
-                ])
-            ], [
-                ...request()->validate([
-                    'user_email' => 'required|string',
-                    'user_name' => 'required|string'
-                ])
-            ]);
+            // Check if this is an external submission
+            $isExternalSubmission = request()->has('submitter_name') && request()->has('source_url');
 
-            $taskAttributes = [
-                ...request()->validate([
-                    'title' => 'required|string|max:255',
-                    'description' => 'nullable|string',
-                    'project_id' => 'required|exists:projects,id',
-                ]),
-                'author_id' => auth()->id(),
-            ];
+            if ($isExternalSubmission) {
+                // Validate external submission data
+                $externalData = request()->validate([
+                    'submitter_name' => 'required|string|max:255',
+                    'source_url' => 'required|string|max:255',
+                    'environment' => 'nullable|string|max:50',
+                ]);
 
-            $task = \App\Models\Task::create($taskAttributes);
+                // Create task without associating with a project user
+                $taskAttributes = [
+                    ...request()->validate([
+                        'title' => 'required|string|max:255',
+                        'description' => 'nullable|string',
+                        'project_id' => 'required|exists:projects,id',
+                    ]),
+                    'author_id' => auth()->id(), // API token owner
+                ];
 
-            $task->projectUser()->associate($projectUser)->save();
+                $task = \App\Models\Task::create($taskAttributes);
+
+                // Create external task source record
+                $task->externalTaskSource()->create([
+                    'submitter_name' => $externalData['submitter_name'],
+                    'source_url' => $externalData['source_url'],
+                    'environment' => $externalData['environment'] ?? 'production',
+                ]);
+            } else {
+                // Regular submission from a Shift user
+                $projectUser = ProjectUser::updateOrCreate([
+                    ...request()->validate([
+                        'project_id' => 'required|exists:projects,id',
+                        'user_id' => 'required',
+                    ])
+                ], [
+                    ...request()->validate([
+                        'user_email' => 'required|string',
+                        'user_name' => 'required|string'
+                    ])
+                ]);
+
+                $taskAttributes = [
+                    ...request()->validate([
+                        'title' => 'required|string|max:255',
+                        'description' => 'nullable|string',
+                        'project_id' => 'required|exists:projects,id',
+                    ]),
+                    'author_id' => auth()->id(),
+                ];
+
+                $task = \App\Models\Task::create($taskAttributes);
+
+                $task->projectUser()->associate($projectUser)->save();
+            }
 
             return response()->json($task, 201);
         }
