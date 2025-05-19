@@ -39,6 +39,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const editDialogOpen = ref(false);
+const inviteDialogOpen = ref(false);
 
 const search = ref(props.filters.search);
 
@@ -49,9 +50,16 @@ function openEditModal(organisation: { id: number, name: string }) {
     editForm.name = organisation.name;
     editDialogOpen.value = true;
 }
+
 function openDeleteModal(organisation: { id: number, name: string }) {
     deleteForm.id = organisation.id;
     deleteForm.isActive = true;
+}
+
+function openInviteModal(organisation: { id: number, name: string }) {
+    inviteForm.organisation_id = organisation.id;
+    inviteForm.organisation_name = organisation.name;
+    inviteDialogOpen.value = true;
 }
 
 const editForm = useForm<{
@@ -78,6 +86,18 @@ const deleteForm = useForm<{
     isActive: false
 });
 
+const inviteForm = useForm<{
+    organisation_id: number | null;
+    organisation_name: string;
+    email: string;
+    name: string;
+}>({
+    organisation_id: null,
+    organisation_name: '',
+    email: '',
+    name: '',
+});
+
 function saveEdit() {
     if (editForm.id) {
         editForm.put(`/organisations/${editForm.id}`, {
@@ -96,6 +116,18 @@ function confirmDelete() {
             onSuccess: () => {
                 deleteForm.isActive = false;
             },
+        });
+    }
+}
+
+function inviteUser() {
+    if (inviteForm.organisation_id) {
+        inviteForm.post(`/organisations/${inviteForm.organisation_id}/users`, {
+            onSuccess: () => {
+                inviteDialogOpen.value = false;
+                inviteForm.reset();
+            },
+            preserveScroll: true,
         });
     }
 }
@@ -138,6 +170,9 @@ watch(search, value => debounce(() => {
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
                     <div class="flex gap-2 justify-end">
+                        <Button variant="outline" @click="openInviteModal(row)">
+                            <i class="fas fa-user-plus"></i>
+                        </Button>
                         <Button variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
                         </Button>
@@ -226,6 +261,42 @@ watch(search, value => debounce(() => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- Invite User Modal -->
+        <AlertDialog v-model:open="inviteDialogOpen">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Invite User to Organisation</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Invite a user to join {{ inviteForm.organisation_name }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4">
+                    <input
+                        v-model="inviteForm.email"
+                        type="email"
+                        class="border rounded px-4 py-2"
+                        placeholder="User Email"
+                    />
+                    <input
+                        v-model="inviteForm.name"
+                        type="text"
+                        class="border rounded px-4 py-2"
+                        placeholder="User Name"
+                    />
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="inviteDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="inviteUser" :disabled="inviteForm.processing">Invite</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

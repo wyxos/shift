@@ -1,0 +1,92 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Project;
+use App\Models\ProjectUser;
+use App\Models\User;
+use App\Notifications\ProjectInvitationNotification;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
+
+class ProjectUserController extends Controller
+{
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request, Project $project)
+    {
+        // Validate the request
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'name' => 'required|string|max:255',
+        ]);
+
+        // Check if the authenticated user has access to the project
+        $hasAccess = $project->client->organisation->author_id === Auth::id();
+
+        if (!$hasAccess) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Check if the user is already a member of the project
+        $existingUser = ProjectUser::where('project_id', $project->id)
+            ->where('user_email', $validated['email'])
+            ->first();
+
+        if ($existingUser) {
+            return response()->json(['message' => 'User already has access to this project'], 422);
+        }
+
+        // Find the user by email if they exist
+        $user = User::where('email', $validated['email'])->first();
+
+        // Create the project user
+        $projectUser = ProjectUser::create([
+            'project_id' => $project->id,
+            'user_id' => $user ? $user->id : null, // Use null when the user doesn't exist
+            'user_email' => $validated['email'],
+            'user_name' => $validated['name'],
+        ]);
+
+        // If the user doesn't exist, send an invitation email
+        if (!$user) {
+            Notification::route('mail', [
+                $validated['email'] => $validated['name'],
+            ])->notify(new ProjectInvitationNotification($projectUser, $project));
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json($projectUser, 201);
+        }
+
+        return redirect()->back()->with('success', 'User granted access to project successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Project $project, ProjectUser $projectUser)
+    {
+        // Check if the authenticated user has access to the project
+        $hasAccess = $project->client->organisation->author_id === Auth::id();
+
+        if (!$hasAccess) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Check if the projectUser belongs to the project
+        if ($projectUser->project_id !== $project->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $projectUser->delete();
+
+        if (request()->expectsJson()) {
+            return response()->json(['message' => 'User access to project revoked successfully.']);
+        }
+
+        return redirect()->back()->with('success', 'User access to project revoked successfully.');
+    }
+}

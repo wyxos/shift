@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\OrganisationController;
+use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -18,10 +21,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     // organisations
-    Route::get('organisations', [\App\Http\Controllers\OrganisationController::class, 'index'])->name('organisations.index');
-    Route::post('organisations', [\App\Http\Controllers\OrganisationController::class, 'store'])->name('organisations.store');
-    Route::put('organisations/{organisation}', [\App\Http\Controllers\OrganisationController::class, 'update'])->name('organisations.update');
-    Route::delete('organisations/{organisation}', [\App\Http\Controllers\OrganisationController::class, 'destroy'])->name('organisations.destroy');
+    Route::get('organisations', [OrganisationController::class, 'index'])->name('organisations.index');
+    Route::post('organisations', [OrganisationController::class, 'store'])->name('organisations.store');
+    Route::put('organisations/{organisation}', [OrganisationController::class, 'update'])->name('organisations.update');
+    Route::delete('organisations/{organisation}', [OrganisationController::class, 'destroy'])->name('organisations.destroy');
+
+    // organisation users (invitations)
+    Route::post('organisations/{organisation}/users', [OrganisationUserController::class, 'store'])->name('organisation-users.store');
+    Route::delete('organisations/{organisation}/users/{organisationUser}', [OrganisationUserController::class, 'destroy'])->name('organisation-users.destroy');
 
     // clients
     Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
@@ -34,6 +41,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+
+    // project users (access control)
+    Route::post('projects/{project}/users', [ProjectUserController::class, 'store'])->name('project-users.store');
+    Route::delete('projects/{project}/users/{projectUser}', [ProjectUserController::class, 'destroy'])->name('project-users.destroy');
 
     // tasks
     Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');

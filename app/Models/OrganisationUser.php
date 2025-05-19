@@ -6,16 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ProjectUser extends Model
+class OrganisationUser extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProjectUserFactory> */
+    /** @use HasFactory */
     use HasFactory;
 
     protected $guarded = ['id'];
 
-    public function project(): BelongsTo
+    public function organisation(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Organisation::class);
     }
 
     public function user(): BelongsTo
