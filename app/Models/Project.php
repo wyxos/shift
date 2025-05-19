@@ -18,7 +18,7 @@ class Project extends Model
         return $this->belongsTo(Client::class);
     }
 
-    public function projectUser(): Project|HasMany
+    public function projectUser(): HasMany
     {
         return $this->hasMany(ProjectUser::class);
     }
