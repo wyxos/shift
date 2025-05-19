@@ -25,6 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('organisations', [OrganisationController::class, 'store'])->name('organisations.store');
     Route::put('organisations/{organisation}', [OrganisationController::class, 'update'])->name('organisations.update');
     Route::delete('organisations/{organisation}', [OrganisationController::class, 'destroy'])->name('organisations.destroy');
+    Route::get('organisations/{organisation}/users', [OrganisationController::class, 'users'])->name('organisations.users');
 
     // organisation users (invitations)
     Route::post('organisations/{organisation}/users', [OrganisationUserController::class, 'store'])->name('organisation-users.store');
@@ -41,6 +42,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::get('projects/{project}/users', [ProjectController::class, 'users'])->name('projects.users');
 
     // project users (access control)
     Route::post('projects/{project}/users', [ProjectUserController::class, 'store'])->name('project-users.store');

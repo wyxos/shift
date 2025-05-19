@@ -8,11 +8,32 @@ import AuthBase from '@/layouts/AuthLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
 
+const props = defineProps({
+    email: {
+        type: String,
+        default: ''
+    },
+    name: {
+        type: String,
+        default: ''
+    },
+    project_id: {
+        type: [String, Number],
+        default: null
+    },
+    organisation_id: {
+        type: [String, Number],
+        default: null
+    }
+});
+
 const form = useForm({
-    name: '',
-    email: '',
+    name: props.name || '',
+    email: props.email || '',
     password: '',
     password_confirmation: '',
+    project_id: props.project_id,
+    organisation_id: props.organisation_id
 });
 
 const submit = () => {
