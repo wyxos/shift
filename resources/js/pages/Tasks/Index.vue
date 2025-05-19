@@ -215,7 +215,32 @@ function updateTaskPriority(task, priority) {
                      backend-pagination :total="localTasks.total"
                      @page-change="onPageChange">
                 <o-table-column field="title" label="Title" v-slot="{row}">
-                    {{ row.title }}
+                    <div>
+                        {{ row.title }}
+                        <div v-if="row.is_external" class="mt-1">
+                            <span class="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                External Submission
+                            </span>
+                        </div>
+                    </div>
+                </o-table-column>
+                <o-table-column field="submitter" label="Submitter" v-slot="{row}">
+                    <div v-if="row.is_external">
+                        <div class="text-sm font-medium">{{ row.submitter_info.name }}</div>
+                        <div class="text-xs text-gray-500">
+                            <div>{{ row.submitter_info.environment }}</div>
+                            <a :href="row.submitter_info.source_url" target="_blank" class="text-blue-500 hover:underline">
+                                {{ row.submitter_info.source_url }}
+                            </a>
+                        </div>
+                    </div>
+                    <div v-else-if="row.project_user && row.project_user.user">
+                        <div class="text-sm font-medium">{{ row.project_user.user.name }}</div>
+                        <div class="text-xs text-gray-500">Shift User</div>
+                    </div>
+                    <div v-else>
+                        <div class="text-xs text-gray-500">Unknown</div>
+                    </div>
                 </o-table-column>
                 <o-table-column field="status" label="Status" v-slot="{row}">
                     <span
