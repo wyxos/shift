@@ -10,8 +10,13 @@ class ProjectController extends Controller
     {
         if(request()->expectsJson()) {
             return \App\Models\Project::query()
-                ->whereHas('client.organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
+                ->where(function($query) {
+                    $query->whereHas('client.organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
+                    ->orWhereHas('projectUser', function($query) {
+                        $query->where('user_id', auth()->user()->id);
+                    });
                 })
                 ->latest()
                 ->when(
@@ -26,8 +31,13 @@ class ProjectController extends Controller
             ->with([
                 'filters' => request()->only(['search']),
                 'projects' => \App\Models\Project::query()
-                    ->whereHas('client.organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
+                    ->where(function($query) {
+                        $query->whereHas('client.organisation', function ($query) {
+                            $query->where('author_id', auth()->user()->id);
+                        })
+                        ->orWhereHas('projectUser', function($query) {
+                            $query->where('user_id', auth()->user()->id);
+                        });
                     })
                     ->latest()
                     ->when(
