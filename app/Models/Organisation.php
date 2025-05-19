@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Organisation extends Model
 {
@@ -16,5 +17,11 @@ class Organisation extends Model
     public function author()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // organisation users
+    public function organisationUsers(): HasMany
+    {
+        return $this->hasMany(OrganisationUser::class);
     }
 }

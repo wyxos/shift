@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProjectUser;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -18,9 +19,13 @@ class RegisteredUserController extends Controller
     /**
      * Show the registration page.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('auth/Register');
+        return Inertia::render('auth/Register', [
+            'email' => $request->email,
+            'name' => $request->name,
+            'project_id' => $request->project_id,
+        ]);
     }
 
     /**
@@ -34,6 +39,7 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'project_id' => 'nullable|exists:projects,id',
         ]);
 
         $user = User::create([
@@ -45,6 +51,16 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
 
         Auth::login($user);
+
+        // If the user was invited to a project, update the project_user record and redirect to the project
+        if ($request->project_id) {
+            // Update the project_user record with the new user_id
+            ProjectUser::where('project_id', $request->project_id)
+                ->where('user_email', $request->email)
+                ->update(['user_id' => $user->id]);
+
+            return to_route('projects.index', ['highlight' => $request->project_id]);
+        }
 
         return to_route('dashboard');
     }
