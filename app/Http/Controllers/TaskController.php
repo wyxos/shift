@@ -43,8 +43,13 @@ class TaskController extends Controller
     // create task
     public function create()
     {
-        $projects = Project::whereHas('client.organisation', function ($query) {
-            $query->where('author_id', auth()->user()->id);
+        $projects = Project::where(function($query) {
+            $query->whereHas('client.organisation', function ($query) {
+                $query->where('author_id', auth()->user()->id);
+            })
+            ->orWhereHas('projectUser', function($query) {
+                $query->where('user_id', auth()->user()->id);
+            });
         })->get();
 
         return inertia('Tasks/Create')
