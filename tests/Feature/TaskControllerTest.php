@@ -26,12 +26,24 @@ class TaskControllerTest extends TestCase
         ]);
 
         $response->assertRedirect(route('tasks.index'));
+
+        $task = \App\Models\Task::where('title', 'Sample Task')->first();
+
+        // Check that the task was created with the correct attributes
         $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
             'title' => 'Sample Task',
             'description' => 'Optional description',
             'project_id' => $project->id,
             'author_id' => $user->id,
         ]);
+
+        // Check that the task is associated with a project user
+        $this->assertNotNull($task->project_user_id);
+        $this->assertEquals($user->id, $task->projectUser->user_id);
+
+        // Check that the task is not flagged as an external submission
+        $this->assertFalse($task->isExternallySubmitted());
     }
 
     public function test_it_creates_task_via_api_using_project_user_token()
