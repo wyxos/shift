@@ -58,4 +58,21 @@ class OrganisationController extends Controller
 
         return redirect()->route('organisations.index')->with('success', 'Organisation created successfully.');
     }
+
+    /**
+     * Get users with access to the organisation.
+     */
+    public function users(\App\Models\Organisation $organisation)
+    {
+        // Check if the authenticated user is the author of the organisation
+        if ($organisation->author_id !== auth()->id()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $organisationUsers = $organisation->organisationUsers()
+            ->with('user')
+            ->get();
+
+        return response()->json($organisationUsers);
+    }
 }
