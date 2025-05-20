@@ -305,4 +305,53 @@ class TaskControllerTest extends TestCase
         // Check that the task doesn't have a project_user_id
         $this->assertNull($task->project_user_id);
     }
+
+    public function test_it_updates_task_with_external_submitter_info()
+    {
+        $user = User::factory()->create(); // API token owner
+        $project = Project::factory()->create();
+
+        // First create a task with external submitter info
+        $this->actingAs($user, 'sanctum');
+
+        $response = $this->postJson(route('tasks.store'), [
+            'title' => 'External Task',
+            'description' => 'Task from external submitter',
+            'project_id' => $project->id,
+            'submitter_name' => 'Tom',
+            'source_url' => 'https://project-a.example.com',
+            'environment' => 'production',
+        ]);
+
+        $task = \App\Models\Task::where('title', 'External Task')->first();
+
+        // Now update the task with new external submitter info
+        $response = $this->putJson("/api/tasks/{$task->id}", [
+            'title' => 'Updated External Task',
+            'description' => 'Updated task from external submitter',
+            'submitter_name' => 'Tom Smith',
+            'source_url' => 'https://project-b.example.com',
+            'environment' => 'staging',
+        ]);
+
+        $response->assertStatus(200);
+
+        // Check that the task was updated
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Updated External Task',
+            'description' => 'Updated task from external submitter',
+        ]);
+
+        // Check that the external task source was updated
+        $this->assertDatabaseHas('external_task_sources', [
+            'task_id' => $task->id,
+            'submitter_name' => 'Tom Smith',
+            'source_url' => 'https://project-b.example.com',
+            'environment' => 'staging',
+        ]);
+
+        // Check that the task still doesn't have a project_user_id
+        $this->assertNull($task->fresh()->project_user_id);
+    }
 }

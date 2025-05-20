@@ -14,7 +14,6 @@ class TaskController extends Controller
         if(request()->expectsJson()){
             // return tasks for the project
             $tasks = Task::where('project_id', $project)
-                ->where('project_user_id', auth()->user()->id)
                 ->latest()
                 ->when(
                     request('search'),
@@ -96,8 +95,76 @@ class TaskController extends Controller
     // put task
     public function update(\App\Models\Task $task)
     {
+        // If the request expects JSON, handle it as an API request
+        if (request()->expectsJson()) {
+            // Check if this is an external submission
+            $isExternalSubmission = request()->has('submitter_name') && request()->has('source_url');
+
+            if ($isExternalSubmission) {
+                // Validate external submission data
+                $externalData = request()->validate([
+                    'submitter_name' => 'required|string|max:255',
+                    'source_url' => 'required|string|max:255',
+                    'environment' => 'nullable|string|max:50',
+                ]);
+
+                // Update task
+                $task->update(request()->validate([
+                    'title' => 'required|string|max:255',
+                    'description' => 'nullable|string',
+                    'status' => 'nullable|string|in:pending,in_progress,completed',
+                    'priority' => 'nullable|string|in:low,medium,high',
+                ]));
+
+                // Update or create external task source record
+                $task->externalTaskSource()->updateOrCreate(
+                    ['task_id' => $task->id],
+                    [
+                        'submitter_name' => $externalData['submitter_name'],
+                        'source_url' => $externalData['source_url'],
+                        'environment' => $externalData['environment'] ?? 'production',
+                    ]
+                );
+
+                return response()->json($task);
+            } else {
+                // Regular submission from a Shift user
+                if (request()->has('user_id') && request()->has('user_email') && request()->has('user_name')) {
+                    // Update or create ProjectUser record
+                    $projectUser = ProjectUser::updateOrCreate([
+                        'project_id' => $task->project_id,
+                        'user_id' => request('user_id'),
+                    ], [
+                        'user_email' => request('user_email'),
+                        'user_name' => request('user_name')
+                    ]);
+
+                    // Update task
+                    $task->update(request()->validate([
+                        'title' => 'required|string|max:255',
+                        'description' => 'nullable|string',
+                        'status' => 'nullable|string|in:pending,in_progress,completed',
+                        'priority' => 'nullable|string|in:low,medium,high',
+                    ]));
+
+                    // Associate the task with the project user if not already associated
+                    if ($task->project_user_id !== $projectUser->id) {
+                        $task->projectUser()->associate($projectUser)->save();
+                    }
+
+                    return response()->json($task);
+                } else {
+                    // Missing required user information
+                    return response()->json(['error' => 'Missing required user information'], 422);
+                }
+            }
+        }
+
+        // Handle web form submission
         $task->update(request()->validate([
             'title' => 'required|string|max:255',
+            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'priority' => 'nullable|string|in:low,medium,high',
         ]));
         return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
     }
@@ -124,6 +191,8 @@ class TaskController extends Controller
                         'title' => 'required|string|max:255',
                         'description' => 'nullable|string',
                         'project_id' => 'required|exists:projects,id',
+                        'status' => 'nullable|string|in:pending,in_progress,completed',
+                        'priority' => 'nullable|string|in:low,medium,high',
                     ]),
                     'author_id' => auth()->id(), // API token owner
                 ];
@@ -155,6 +224,8 @@ class TaskController extends Controller
                         'title' => 'required|string|max:255',
                         'description' => 'nullable|string',
                         'project_id' => 'required|exists:projects,id',
+                        'status' => 'nullable|string|in:pending,in_progress,completed',
+                        'priority' => 'nullable|string|in:low,medium,high',
                     ]),
                     'author_id' => auth()->id(),
                 ];
@@ -171,6 +242,8 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
+            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'priority' => 'nullable|string|in:low,medium,high',
         ]);
 
         // Create or find a ProjectUser record for the authenticated user
