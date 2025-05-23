@@ -43,6 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::get('projects/{project}/users', [ProjectController::class, 'users'])->name('projects.users');
+    Route::post('projects/{project}/api-token', [ProjectController::class, 'generateApiToken'])->name('projects.api-token');
 
     // project users (access control)
     Route::post('projects/{project}/users', [ProjectUserController::class, 'store'])->name('project-users.store');

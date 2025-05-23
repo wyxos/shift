@@ -12,8 +12,18 @@ class TaskController extends Controller
     public function index(int $project = null)
     {
         if(request()->expectsJson()){
+            // If project_api_token is provided, find the project by its API token
+            if (request('project_api_token')) {
+                $projectByToken = \App\Models\Project::where('api_token', request('project_api_token'))->first();
+                if ($projectByToken) {
+                    $project = $projectByToken->id;
+                }
+            }
+
             // return tasks for the project
-            $tasks = Task::where('project_id', $project)
+            $tasks = Task::when($project, function($query) use ($project) {
+                    return $query->where('project_id', $project);
+                })
                 ->latest()
                 ->when(
                     request('search'),

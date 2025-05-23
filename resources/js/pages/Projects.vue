@@ -112,6 +112,18 @@ const manageUsersForm = useForm<{
     isOpen: false,
 });
 
+const apiTokenForm = useForm<{
+    project_id: number | null;
+    project_name: string;
+    token: string;
+    isOpen: boolean;
+}>({
+    project_id: null,
+    project_name: '',
+    token: '',
+    isOpen: false,
+});
+
 function saveEdit() {
     if (editForm.id) {
         editForm.put(`/projects/${editForm.id}`, {
@@ -175,6 +187,43 @@ function removeAccess(projectUser: { id: number }) {
     }
 }
 
+function openApiTokenModal(project: { id: number, name: string, project_api_token?: string }) {
+    apiTokenForm.project_id = project.id;
+    apiTokenForm.project_name = project.name;
+    apiTokenForm.token = project.project_api_token || '';
+    apiTokenForm.isOpen = true;
+}
+
+function generateApiToken() {
+    if (apiTokenForm.project_id) {
+        apiTokenForm.post(`/projects/${apiTokenForm.project_id}/api-token`, {
+            preserveScroll: true,
+            onSuccess: (response) => {
+                let newToken = '';
+                if (response && response.data && response.data.token) {
+                    newToken = response.data.token;
+                } else if (response && response.token) {
+                    newToken = response.token;
+                }
+
+                // Update the form token
+                apiTokenForm.token = newToken;
+
+                // Refresh the projects data to update the UI
+                const currentPage = props.projects.current_page || 1;
+                router.get('/projects', {
+                    page: currentPage,
+                    search: search.value
+                }, {
+                    preserveState: false,
+                    preserveScroll: true,
+                    only: ['projects']
+                });
+            },
+        });
+    }
+}
+
 function onPageChange(page: number) {
     router.get('/projects', { page, search: search.value }, { preserveState: true, preserveScroll: true });
 }
@@ -224,6 +273,9 @@ watch(search, value => debounce(() => {
                         </Button>
                         <Button variant="outline" @click="openManageUsersModal(row)">
                             <i class="fas fa-users"></i>
+                        </Button>
+                        <Button variant="outline" @click="openApiTokenModal(row)">
+                            <i class="fas fa-lock"></i>
                         </Button>
                         <Button variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
@@ -391,6 +443,45 @@ watch(search, value => debounce(() => {
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- API Token Modal -->
+        <AlertDialog :open="apiTokenForm.isOpen" @update:open="apiTokenForm.isOpen = $event">
+            <AlertDialogTrigger as-child>
+                <!-- Hidden trigger (manual open via v-model) -->
+                <div></div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Project API Token</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Manage API token for {{ apiTokenForm.project_name }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div class="flex flex-col gap-4 p-4">
+                    <div v-if="apiTokenForm.token" class="bg-gray-100 p-4 rounded break-all">
+                        <div class="font-semibold mb-2">Current API Token:</div>
+                        <div class="text-sm">{{ apiTokenForm.token }}</div>
+                    </div>
+                    <div v-else class="text-gray-500 italic">
+                        No API token has been generated for this project yet.
+                    </div>
+
+                    <Button @click="generateApiToken" class="mt-2">
+                        {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
+                    </Button>
+
+                    <div class="text-sm text-gray-500 mt-2">
+                        <p>This token will be used by the Shift SDK to authenticate with this project.</p>
+                        <p class="mt-1">Regenerating the token will invalidate any existing SDK installations using the old token.</p>
+                    </div>
+                </div>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="apiTokenForm.isOpen = false">Close</AlertDialogCancel>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
