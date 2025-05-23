@@ -192,14 +192,16 @@ class TaskController extends Controller
                     ...request()->validate([
                         'title' => 'required|string|max:255',
                         'description' => 'nullable|string',
-                        'project_id' => 'required|exists:projects,id',
+                        'project' => 'required|exists:projects,token',
                         'status' => 'nullable|string|in:pending,in_progress,completed',
                         'priority' => 'nullable|string|in:low,medium,high',
                     ]),
                     'author_id' => auth()->id(), // API token owner
                 ];
 
-                $task = \App\Models\Task::create($taskAttributes);
+                $project = Project::where('token', $taskAttributes['project'])->first();
+
+                $task = $project->tasks()->create($taskAttributes);
 
                 // Create external task source record
                 $task->externalTaskSource()->create([
@@ -211,7 +213,7 @@ class TaskController extends Controller
                 // Regular submission from a Shift user
                 $projectUser = ProjectUser::updateOrCreate([
                     ...request()->validate([
-                        'project_id' => 'required|exists:projects,id',
+                        'project' => 'required|exists:projects,token',
                         'user_id' => 'required',
                     ])
                 ], [
