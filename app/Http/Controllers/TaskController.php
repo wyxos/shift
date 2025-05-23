@@ -12,7 +12,7 @@ class TaskController extends Controller
     public function index(int $project = null)
     {
         if(request()->expectsJson()){
-            $project = \App\Models\Project::where('project_api_token', request('project_api_token'))->first();
+            $project = \App\Models\Project::where('token', request('project'))->first();
 
             // return tasks for the project
             $tasks = $project->tasks()
