@@ -22,9 +22,9 @@ class TaskController extends Controller
             ->withQueryString();
 
         // Transform the tasks to include external submitter information
-        $tasks->through(function ($task) {
+        $tasks->through(function (Task $task) {
             $task->is_external = $task->isExternallySubmitted();
-            if ($task->is_external) {
+            if ($task->is_external && $task->externalUser) {
                 $task->submitter_info = [
                     'name' => $task->externalUser->name,
                     'email' => $task->externalUser->email,

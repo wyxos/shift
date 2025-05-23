@@ -24,9 +24,9 @@ class Task extends Model
         return $this->belongsTo(ProjectUser::class);
     }
 
-    public function externalUser(): HasOne
+    public function externalUser(): BelongsTo
     {
-        return $this->hasOne(ExternalUser::class);
+        return $this->belongsTo(ExternalUser::class);
     }
 
     public function metadata(): HasOne
