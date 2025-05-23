@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExternalUser extends Model
 {
@@ -13,10 +13,10 @@ class ExternalUser extends Model
     protected $guarded = ['id'];
 
     /**
-     * Get the task that this external user is associated with.
+     * Get the tasks that this external user is associated with.
      */
-    public function task(): BelongsTo
+    public function tasks(): HasMany
     {
-        return $this->belongsTo(Task::class);
+        return $this->hasMany(Task::class);
     }
 }
