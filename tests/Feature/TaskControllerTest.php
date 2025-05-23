@@ -294,10 +294,15 @@ class TaskControllerTest extends TestCase
             'author_id' => $user->id,
         ]);
 
-        // Check that the external task source was created
-        $this->assertDatabaseHas('external_task_sources', [
+        // Check that the external user was created
+        $this->assertDatabaseHas('external_users', [
             'task_id' => $task->id,
-            'submitter_name' => 'Tom',
+            'name' => 'Tom',
+        ]);
+
+        // Check that the task metadata was created
+        $this->assertDatabaseHas('task_metadata', [
+            'task_id' => $task->id,
             'source_url' => 'https://project-a.example.com',
             'environment' => 'production',
         ]);
@@ -343,10 +348,15 @@ class TaskControllerTest extends TestCase
             'description' => 'Updated task from external submitter',
         ]);
 
-        // Check that the external task source was updated
-        $this->assertDatabaseHas('external_task_sources', [
+        // Check that the external user was updated
+        $this->assertDatabaseHas('external_users', [
             'task_id' => $task->id,
-            'submitter_name' => 'Tom Smith',
+            'name' => 'Tom Smith',
+        ]);
+
+        // Check that the task metadata was updated
+        $this->assertDatabaseHas('task_metadata', [
+            'task_id' => $task->id,
             'source_url' => 'https://project-b.example.com',
             'environment' => 'staging',
         ]);

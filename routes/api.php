@@ -8,20 +8,12 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function () {
-    // projects
-    Route::get('/projects', [\App\Http\Controllers\ProjectController::class, 'index']);
-    Route::post('/projects', [\App\Http\Controllers\ProjectController::class, 'store']);
-    Route::put('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'update']);
-    Route::delete('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'destroy']);
-    Route::get('/projects/{project}/tasks/', [\App\Http\Controllers\TaskController::class, 'index']);
-    Route::post('/projects/{project}/api-token', [\App\Http\Controllers\ProjectController::class, 'generateApiToken']);
-
     // tasks
-    Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index']);
-    Route::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show']);
-    Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store']);
-    Route::put('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update']);
-    Route::delete('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy']);
-    Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus']);
-    Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority']);
+    Route::get('/tasks', [\App\Http\Controllers\Api\TaskController::class, 'index']);
+    Route::get('/tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'show']);
+    Route::post('/tasks', [\App\Http\Controllers\Api\TaskController::class, 'store']);
+    Route::put('/tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'update']);
+    Route::delete('/tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'destroy']);
+    Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\Api\TaskController::class, 'toggleStatus']);
+    Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\Api\TaskController::class, 'togglePriority']);
 });
