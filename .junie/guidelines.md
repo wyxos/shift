@@ -22,3 +22,10 @@
 * **Testing:**
 
     * Add or update PHPUnit tests when adding features or fixing bugs
+
+## SHIFT SDK
+
+SHIFT consists of two main components:
+1. **SHIFT** - A web application for managing clients, projects, and tasks
+2. **SHIFT SDK** - A package that allows integration with other Laravel applications.
+3. **SHIFT SDK PACKAGE** - A Laravel app with the SDK installed to develop and test the SDK.
