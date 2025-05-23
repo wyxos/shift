@@ -24,9 +24,14 @@ class Task extends Model
         return $this->belongsTo(ProjectUser::class);
     }
 
-    public function externalTaskSource(): HasOne
+    public function externalUser(): HasOne
     {
-        return $this->hasOne(ExternalTaskSource::class);
+        return $this->hasOne(ExternalUser::class);
+    }
+
+    public function metadata(): HasOne
+    {
+        return $this->hasOne(TaskMetadata::class);
     }
 
     /**
@@ -36,6 +41,6 @@ class Task extends Model
      */
     public function isExternallySubmitted(): bool
     {
-        return $this->externalTaskSource()->exists();
+        return $this->externalUser()->exists();
     }
 }
