@@ -21,7 +21,7 @@ class Project extends Model
     public function generateApiToken(): string
     {
         $token = \Illuminate\Support\Str::random(60);
-        $this->update(['project_api_token' => $token]);
+        $this->update(['token' => $token]);
         return $token;
     }
 

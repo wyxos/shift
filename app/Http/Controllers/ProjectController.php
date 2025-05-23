@@ -10,7 +10,7 @@ class ProjectController extends Controller
     {
         if(request()->expectsJson()) {
             return \App\Models\Project::query()
-                ->select('id', 'name', 'client_id', 'project_api_token', 'created_at', 'updated_at')
+                ->select('id', 'name', 'client_id', 'token', 'created_at', 'updated_at')
                 ->where(function($query) {
                     $query->whereHas('client.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
