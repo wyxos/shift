@@ -13,6 +13,18 @@ class Project extends Model
 
     protected $guarded = ['id'];
 
+    /**
+     * Generate a new API token for the project.
+     *
+     * @return string
+     */
+    public function generateApiToken(): string
+    {
+        $token = \Illuminate\Support\Str::random(60);
+        $this->update(['project_api_token' => $token]);
+        return $token;
+    }
+
     public function client()
     {
         return $this->belongsTo(Client::class);

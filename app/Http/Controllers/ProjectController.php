@@ -10,6 +10,7 @@ class ProjectController extends Controller
     {
         if(request()->expectsJson()) {
             return \App\Models\Project::query()
+                ->select('id', 'name', 'client_id', 'project_api_token', 'created_at', 'updated_at')
                 ->where(function($query) {
                     $query->whereHas('client.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
@@ -118,5 +119,29 @@ class ProjectController extends Controller
             ->get();
 
         return response()->json($projectUsers);
+    }
+
+    /**
+     * Generate a new API token for the project.
+     */
+    public function generateApiToken(\App\Models\Project $project)
+    {
+        // Check if the authenticated user has access to the project
+        $hasAccess = $project->client->organisation->author_id === auth()->id();
+
+        if (!$hasAccess) {
+            if(request()->expectsJson()) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+            return redirect()->route('projects.index')->with('error', 'Unauthorized');
+        }
+
+        $token = $project->generateApiToken();
+
+        if(request()->expectsJson()) {
+            return response()->json(['token' => $token]);
+        }
+
+        return redirect()->back()->with('success', 'API token generated successfully')->with('token', $token);
     }
 }

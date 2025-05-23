@@ -14,8 +14,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'update']);
     Route::delete('/projects/{project}', [\App\Http\Controllers\ProjectController::class, 'destroy']);
     Route::get('/projects/{project}/tasks/', [\App\Http\Controllers\TaskController::class, 'index']);
+    Route::post('/projects/{project}/api-token', [\App\Http\Controllers\ProjectController::class, 'generateApiToken']);
 
     // tasks
+    Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index']);
     Route::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show']);
     Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store']);
     Route::put('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update']);
