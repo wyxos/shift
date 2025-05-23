@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
@@ -99,6 +100,16 @@ class TaskController extends Controller
 
         $project = Project::where('token', $attributes['project'])->firstOrFail();
 
+        // Handle external user creation
+        $externalUser = ExternalUser::updateOrCreate(
+            ['email' => $attributes['external_user']['email']],
+            [
+                'name' => $attributes['external_user']['name'],
+                'email' => $attributes['external_user']['email'],
+                'id' => $attributes['external_user']['id'] ?? null,
+            ]
+        );
+
         $task = $project->tasks()->create([
             'title' => $attributes['title'],
             'description' => $attributes['description'] ?? null,
@@ -106,15 +117,7 @@ class TaskController extends Controller
             'priority' => $attributes['priority'] ?? 'low',
         ]);
 
-        // Handle external user creation
-        $task->externalUser()->updateOrCreate(
-            ['task_id' => $task->id],
-            [
-                'name' => $attributes['external_user']['name'],
-                'email' => $attributes['external_user']['email'],
-                'id' => $attributes['external_user']['id'] ?? null,
-            ]
-        );
+        $task->externalUser()->associate($externalUser)->save();
 
         // Handle metadata creation
         $task->metadata()->create([
@@ -134,59 +137,7 @@ class TaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
-        $attributes = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
-            'priority' => 'nullable|string|in:low,medium,high',
-            // Additional parameters for backward compatibility with tests
-            'submitter_name' => 'nullable|string',
-            'source_url' => 'nullable|string',
-            'environment' => 'nullable|string',
-        ]);
 
-        // Update the task
-        $task->update($attributes);
-
-        // Handle external user update if provided
-        if (isset($attributes['submitter_name'])) {
-            // Find or create the external user for this task
-            $externalUser = \App\Models\ExternalUser::updateOrCreate(
-                ['task_id' => $task->id],
-                [
-                    'name' => $attributes['submitter_name'],
-                    'email' => $request->input('submitter_email', auth()->user()->email),
-                ]
-            );
-
-            // Update the task with the external user ID if not already set
-            if (!$task->external_user_id) {
-                $task->external_user_id = $externalUser->id;
-                $task->save();
-            }
-        }
-
-        // Handle metadata update if provided
-        if (isset($attributes['source_url']) || isset($attributes['environment'])) {
-            $task->metadata()->updateOrCreate(
-                ['task_id' => $task->id],
-                [
-                    'source_url' => $attributes['source_url'] ?? null,
-                    'environment' => $attributes['environment'] ?? null,
-                ]
-            );
-        }
-
-        // For API requests, return JSON response
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Task updated successfully',
-                'task' => $task
-            ]);
-        }
-
-        // For web requests, redirect to the tasks index
-        return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
     }
 
     /**
@@ -198,17 +149,7 @@ class TaskController extends Controller
      */
     public function destroy(Task $task, Request $request)
     {
-        $task->delete();
 
-        // For API requests, return JSON response
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Task deleted successfully'
-            ]);
-        }
-
-        // For web requests, redirect to the tasks index
-        return redirect()->route('tasks.index')->with('success', 'Task deleted successfully.');
     }
 
     /**
@@ -253,44 +194,5 @@ class TaskController extends Controller
             'priority' => $task->priority,
             'message' => 'Task priority updated successfully'
         ]);
-    }
-
-    /**
-     * Display a listing of the tasks for a specific project.
-     *
-     * @param  \App\Models\Project  $project
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function projectTasks(\App\Models\Project $project)
-    {
-        $tasks = Task::query()
-            ->where('project_id', $project->id)
-            ->with(['externalUser', 'metadata', 'projectUser.user', 'project'])
-            ->latest()
-            ->when(
-                request('search'),
-                fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
-            )
-            ->paginate(10)
-            ->withQueryString();
-
-        // Transform the tasks to include external submitter information
-        $tasks->through(function ($task) {
-            $task->is_external = $task->isExternallySubmitted();
-            if ($task->is_external) {
-                $task->submitter_info = [
-                    'name' => $task->externalUser->name,
-                    'email' => $task->externalUser->email,
-                ];
-
-                if ($task->metadata) {
-                    $task->submitter_info['source_url'] = $task->metadata->source_url;
-                    $task->submitter_info['environment'] = $task->metadata->environment;
-                }
-            }
-            return $task;
-        });
-
-        return response()->json($tasks);
     }
 }
