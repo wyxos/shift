@@ -15,6 +15,9 @@ class ProjectController extends Controller
                     $query->whereHas('client.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
                     })
+                    ->orWhereHas('organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
                     ->orWhereHas('projectUser', function($query) {
                         $query->where('user_id', auth()->user()->id);
                     });
@@ -36,6 +39,10 @@ class ProjectController extends Controller
                         $query->whereHas('client.organisation', function ($query) {
                             $query->where('author_id', auth()->user()->id);
                         })
+                        ->orWhereHas('organisation', function ($query) {
+                            $query->where('author_id', auth()->user()->id);
+                        })
+                        ->orWhereNull('client_id')
                         ->orWhereHas('projectUser', function($query) {
                             $query->where('user_id', auth()->user()->id);
                         });
@@ -58,6 +65,14 @@ class ProjectController extends Controller
                     )
                     ->paginate(10)
                     ->withQueryString(),
+                'organisations' => \App\Models\Organisation::query()
+                    ->where('author_id', auth()->user()->id)
+                    ->latest()
+                    ->when(
+                        request('search'),
+                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                    )
+                    ->get(),
             ]);
     }
 
@@ -90,14 +105,23 @@ class ProjectController extends Controller
     // create project
     public function store()
     {
-        $project = \App\Models\Project::create(request()->validate([
+        $validated = request()->validate([
             'name' => 'required|string|max:255',
-            'client_id' => 'required|exists:clients,id',
-        ]));
+            'client_id' => 'nullable|exists:clients,id',
+            'organisation_id' => 'nullable|exists:organisations,id',
+        ]);
 
-        if(request()->expectsJson()) {
-            return response()->json($project, 201);
+        // Ensure at least one of client_id or organisation_id is provided
+        if (empty($validated['client_id']) && empty($validated['organisation_id'])) {
+            return redirect()->back()->withErrors(['error' => 'Either client or organisation must be specified.'])->withInput();
         }
+
+        // Prevent providing both client_id and organisation_id
+        if (!empty($validated['client_id']) && !empty($validated['organisation_id'])) {
+            return redirect()->back()->withErrors(['error' => 'You cannot specify both client and organisation.'])->withInput();
+        }
+
+        $project = \App\Models\Project::create($validated);
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
@@ -108,7 +132,22 @@ class ProjectController extends Controller
     public function users(\App\Models\Project $project)
     {
         // Check if the authenticated user has access to the project
-        $hasAccess = $project->client->organisation->author_id === auth()->id();
+        $hasAccess = false;
+
+        // Check if project has a client with an organisation
+        if ($project->client && $project->client->organisation) {
+            $hasAccess = $project->client->organisation->author_id === auth()->id();
+        }
+
+        // Check if project is directly owned by an organisation
+        if (!$hasAccess && $project->organisation) {
+            $hasAccess = $project->organisation->author_id === auth()->id();
+        }
+
+        // Check if user is a project user
+        if (!$hasAccess) {
+            $hasAccess = $project->projectUser()->where('user_id', auth()->id())->exists();
+        }
 
         if (!$hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -127,12 +166,24 @@ class ProjectController extends Controller
     public function generateApiToken(\App\Models\Project $project)
     {
         // Check if the authenticated user has access to the project
-        $hasAccess = $project->client->organisation->author_id === auth()->id();
+        $hasAccess = false;
+
+        // Check if project has a client with an organisation
+        if ($project->client && $project->client->organisation) {
+            $hasAccess = $project->client->organisation->author_id === auth()->id();
+        }
+
+        // Check if project is directly owned by an organisation
+        if (!$hasAccess && $project->organisation) {
+            $hasAccess = $project->organisation->author_id === auth()->id();
+        }
+
+        // Check if user is a project user
+        if (!$hasAccess) {
+            $hasAccess = $project->projectUser()->where('user_id', auth()->id())->exists();
+        }
 
         if (!$hasAccess) {
-            if(request()->expectsJson()) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
             return redirect()->route('projects.index')->with('error', 'Unauthorized');
         }
 

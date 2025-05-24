@@ -24,4 +24,10 @@ class Organisation extends Model
     {
         return $this->hasMany(OrganisationUser::class);
     }
+
+    // projects directly owned by the organisation
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
 }

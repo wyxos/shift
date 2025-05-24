@@ -29,6 +29,10 @@ const props = defineProps({
         type: Object,
         required: true
     },
+    organisations: {
+        type: Object,
+        required: true
+    },
     filters: {
         type: Object,
         required: true
@@ -71,12 +75,50 @@ const editForm = useForm<{
 const createForm = useForm<{
     name: string;
     client_id: number | null;
+    organisation_id: number | null;
     isActive: boolean;
 }>({
     name: '',
     client_id: null,
+    organisation_id: null,
     isActive: false
 });
+
+// Validation error state
+const validationError = ref<string | null>(null);
+
+// Function to validate the form
+function validateCreateForm(): boolean {
+    // Reset validation error
+    validationError.value = null;
+
+    // Check if name is provided
+    if (!createForm.name) {
+        validationError.value = 'Project name is required';
+        return false;
+    }
+
+    // Check if at least one of client_id or organisation_id is provided
+    if (!createForm.client_id && !createForm.organisation_id) {
+        validationError.value = 'Either client or organisation must be specified';
+        return false;
+    }
+
+    // Check if both client_id and organisation_id are provided
+    if (createForm.client_id && createForm.organisation_id) {
+        validationError.value = 'You cannot specify both client and organisation';
+        return false;
+    }
+
+    return true;
+}
+
+// Function to validate and submit the form
+function submitCreateForm() {
+    if (validateCreateForm()) {
+        createForm.post('/projects');
+    }
+}
 
 const deleteForm = useForm<{
     id: number | null;
@@ -331,17 +373,43 @@ watch(search, value => debounce(() => {
                         placeholder="Project Name"
                     />
 
-                    <select v-model="createForm.client_id" class="border rounded px-4 py-2">
-                        <option value="" disabled>Select Client</option>
+                    <div class="text-sm text-gray-500 mb-2">
+                        Select either a client or an organisation for this project
+                    </div>
+
+                    <select
+                        v-model="createForm.client_id"
+                        class="border rounded px-4 py-2 mb-2"
+                        :disabled="createForm.organisation_id !== null"
+                        @change="createForm.organisation_id = null"
+                    >
+                        <option value="" disabled selected>Select Client (Optional)</option>
                         <option v-for="client in clients.data" :key="client.id" :value="client.id">
                             {{ client.name }}
                         </option>
                     </select>
+
+                    <select
+                        v-model="createForm.organisation_id"
+                        class="border rounded px-4 py-2"
+                        :disabled="createForm.client_id !== null"
+                        @change="createForm.client_id = null"
+                    >
+                        <option value="" disabled selected>Select Organisation (Optional)</option>
+                        <option v-for="org in organisations" :key="org.id" :value="org.id">
+                            {{ org.name }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Display validation error if any -->
+                <div v-if="validationError" class="text-red-500 mt-2 mb-2 px-4">
+                    {{ validationError }}
                 </div>
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="createForm.post('/projects')" :disabled="createForm.processing">Create</AlertDialogAction>
+                    <AlertDialogAction @click="submitCreateForm" :disabled="createForm.processing">Create</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
