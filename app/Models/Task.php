@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Task extends Model
 {
@@ -19,14 +20,13 @@ class Task extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function projectUser(): BelongsTo
+    /**
+     * Get the submitter of the task (polymorphic relationship).
+     * This can be either a User or an ExternalUser.
+     */
+    public function submitter(): MorphTo
     {
-        return $this->belongsTo(ProjectUser::class);
-    }
-
-    public function externalUser(): BelongsTo
-    {
-        return $this->belongsTo(ExternalUser::class);
+        return $this->morphTo();
     }
 
     public function metadata(): HasOne
@@ -41,6 +41,6 @@ class Task extends Model
      */
     public function isExternallySubmitted(): bool
     {
-        return $this->externalUser()->exists();
+        return $this->submitter instanceof ExternalUser;
     }
 }

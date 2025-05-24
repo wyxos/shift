@@ -228,14 +228,14 @@ function updateTaskPriority(task, priority) {
                     <div v-if="row.is_external">
                         <div class="text-sm font-medium">{{ row.submitter_info.name }}</div>
                         <div class="text-xs text-gray-500">
-                            <div>{{ row.submitter_info.environment }}</div>
-                            <a :href="row.submitter_info.source_url" target="_blank" class="text-blue-500 hover:underline">
+                            <div v-if="row.submitter_info.environment">{{ row.submitter_info.environment }}</div>
+                            <a v-if="row.submitter_info.source_url" :href="row.submitter_info.source_url" target="_blank" class="text-blue-500 hover:underline">
                                 {{ row.submitter_info.source_url }}
                             </a>
                         </div>
                     </div>
-                    <div v-else-if="row.project_user && row.project_user.user">
-                        <div class="text-sm font-medium">{{ row.project_user.user.name }}</div>
+                    <div v-else-if="row.submitter_info">
+                        <div class="text-sm font-medium">{{ row.submitter_info.name }}</div>
                         <div class="text-xs text-gray-500">Shift User</div>
                     </div>
                     <div v-else>
