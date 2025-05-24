@@ -35,6 +35,15 @@ class Task extends Model
     }
 
     /**
+     * Get the project user associated with the task.
+     * This defines which user on Shift is being given access to a project.
+     */
+    public function projectUser(): BelongsTo
+    {
+        return $this->belongsTo(ProjectUser::class);
+    }
+
+    /**
      * Check if the task was submitted by an external user.
      *
      * @return bool

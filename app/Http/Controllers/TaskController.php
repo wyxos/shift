@@ -21,30 +21,12 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Transform the tasks to include submitter information
+        // Only set the is_external flag, keeping the submitter object as is
+        // Note: The UI will reference submitter directly instead of using submitter_info
+        // This change was made to simplify the code and make it more maintainable
+        // The frontend has been updated to reference the submitter object directly
         $tasks->through(function (Task $task) {
             $task->is_external = $task->isExternallySubmitted();
-
-            if ($task->submitter) {
-                if ($task->is_external) {
-                    // For external users
-                    $task->submitter_info = [
-                        'name' => $task->submitter->name,
-                        'email' => $task->submitter->email,
-                    ];
-
-                    if ($task->metadata) {
-                        $task->submitter_info['source_url'] = $task->metadata->source_url;
-                        $task->submitter_info['environment'] = $task->metadata->environment;
-                    }
-                } else {
-                    // For users
-                    $task->submitter_info = [
-                        'name' => $task->submitter->name,
-                        'email' => $task->submitter->email,
-                    ];
-                }
-            }
             return $task;
         });
 
@@ -116,22 +98,10 @@ class TaskController extends Controller
             'priority' => 'nullable|string|in:low,medium,high',
         ]);
 
-        // Create or find a ProjectUser record for the authenticated user
-        $projectUser = ProjectUser::updateOrCreate([
-            'project_id' => $attributes['project_id'],
-            'user_id' => auth()->id(),
-        ], [
-            'user_email' => auth()->user()->email,
-            'user_name' => auth()->user()->name
-        ]);
-
         $task = \App\Models\Task::create([
             ...$attributes,
             'author_id' => auth()->id(),
         ]);
-
-        // Associate the task with the project user
-        $task->projectUser()->associate($projectUser)->save();
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
@@ -164,13 +134,6 @@ class TaskController extends Controller
         $task->status = $validatedData['status'];
         $task->save();
 
-        if ($request->wantsJson()) {
-            return response()->json([
-                'status' => $task->status,
-                'message' => 'Task status updated successfully'
-            ]);
-        }
-
         return back()->with([
             'status' => $task->status,
             'message' => 'Task status updated successfully'
@@ -192,13 +155,6 @@ class TaskController extends Controller
 
         $task->priority = $validatedData['priority'];
         $task->save();
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'priority' => $task->priority,
-                'message' => 'Task priority updated successfully'
-            ]);
-        }
 
         return back()->with([
             'priority' => $task->priority,

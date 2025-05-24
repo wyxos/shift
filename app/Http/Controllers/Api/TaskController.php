@@ -27,27 +27,12 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Transform the tasks to include submitter information
+        // Only set the is_external flag, keeping the submitter object as is
+        // Note: The UI will reference submitter directly instead of using submitter_info
+        // This change was made to simplify the code and make it more maintainable
+        // The frontend has been updated to reference the submitter object directly
         $tasks->through(function ($task) {
             $task->is_external = $task->isExternallySubmitted();
-
-            if ($task->submitter) {
-                if ($task->is_external) {
-                    // For external users
-                    $task->submitter_name = $task->submitter->name;
-                    $task->submitter_email = $task->submitter->email;
-
-                    if ($task->metadata) {
-                        $task->source_url = $task->metadata->source_url;
-                        $task->environment = $task->metadata->environment;
-                    }
-                } else {
-                    // For users
-                    $task->submitter_name = $task->submitter->name;
-                    $task->submitter_email = $task->submitter->email;
-                }
-            }
-
             return $task;
         });
 
@@ -64,25 +49,11 @@ class TaskController extends Controller
     {
         $task->load(['submitter', 'metadata', 'project']);
 
-        // Add submitter information
+        // Only set the is_external flag, keeping the submitter object as is
+        // Note: The UI will reference submitter directly instead of using submitter_info
+        // This change was made to simplify the code and make it more maintainable
+        // The frontend has been updated to reference the submitter object directly
         $task->is_external = $task->isExternallySubmitted();
-
-        if ($task->submitter) {
-            if ($task->is_external) {
-                // For external users
-                $task->submitter_name = $task->submitter->name;
-                $task->submitter_email = $task->submitter->email;
-
-                if ($task->metadata) {
-                    $task->source_url = $task->metadata->source_url;
-                    $task->environment = $task->metadata->environment;
-                }
-            } else {
-                // For users
-                $task->submitter_name = $task->submitter->name;
-                $task->submitter_email = $task->submitter->email;
-            }
-        }
 
         return response()->json($task);
     }
