@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('title');
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             $table->string('status')->default('pending');
             $table->string('priority')->default('medium');

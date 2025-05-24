@@ -11,8 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // This migration is no longer needed as the column name has been
-        // changed directly in the original tasks table migration
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->dropForeign(['author_id']);
+            $table->dropColumn('author_id');
+        });
     }
 
     /**
@@ -20,6 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // No action needed
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->foreignId('author_id')->nullable()->constrained('users')->onDelete('cascade');
+        });
     }
 };

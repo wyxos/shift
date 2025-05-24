@@ -96,12 +96,26 @@ class TaskController extends Controller
             $project = Project::where('token', $attributes['project'])->firstOrFail();
         }
 
+        // Create or find a ProjectUser record if the user is authenticated
+        $projectUserId = null;
+        if (auth()->check()) {
+            $projectUser = \App\Models\ProjectUser::firstOrCreate([
+                'project_id' => $project->id,
+                'user_id' => auth()->id(),
+            ], [
+                'user_email' => auth()->user()->email,
+                'user_name' => auth()->user()->name,
+            ]);
+            $projectUserId = $projectUser->id;
+        }
+
         // Create the task
         $task = $project->tasks()->create([
             'title' => $attributes['title'],
             'description' => $attributes['description'] ?? null,
             'status' => $attributes['status'] ?? 'pending',
             'priority' => $attributes['priority'] ?? 'low',
+            'project_user_id' => $projectUserId,
         ]);
 
         // Handle external user creation and association
@@ -132,7 +146,7 @@ class TaskController extends Controller
             ]);
         }
 
-        return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
+        return response()->json($task, 201);
     }
 
     /**
@@ -144,7 +158,54 @@ class TaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'priority' => 'nullable|string|in:low,medium,high',
+            'submitter_name' => 'nullable|string',
+            'source_url' => 'nullable|string',
+            'environment' => 'nullable|string',
+        ]);
 
+        // Update the task
+        $task->update([
+            'title' => $attributes['title'],
+            'description' => $attributes['description'] ?? $task->description,
+            'status' => $attributes['status'] ?? $task->status,
+            'priority' => $attributes['priority'] ?? $task->priority,
+        ]);
+
+        // Handle external user update if submitter_name is provided
+        if (isset($attributes['submitter_name'])) {
+            // Find or create the external user
+            $externalUser = ExternalUser::updateOrCreate(
+                ['email' => $request->input('submitter_email', 'unknown@example.com')],
+                ['name' => $attributes['submitter_name']]
+            );
+
+            // Set the polymorphic relationship
+            $task->submitter()->associate($externalUser);
+            $task->save();
+        }
+
+        // Handle metadata update
+        if (isset($attributes['source_url']) || isset($attributes['environment'])) {
+            // Create or update the metadata
+            if ($task->metadata) {
+                $task->metadata->update([
+                    'source_url' => $attributes['source_url'] ?? $task->metadata->source_url,
+                    'environment' => $attributes['environment'] ?? $task->metadata->environment,
+                ]);
+            } else {
+                $task->metadata()->create([
+                    'source_url' => $attributes['source_url'] ?? null,
+                    'environment' => $attributes['environment'] ?? null,
+                ]);
+            }
+        }
+
+        return response()->json($task, 200);
     }
 
     /**

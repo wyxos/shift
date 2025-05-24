@@ -21,10 +21,6 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Only set the is_external flag, keeping the submitter object as is
-        // Note: The UI will reference submitter directly instead of using submitter_info
-        // This change was made to simplify the code and make it more maintainable
-        // The frontend has been updated to reference the submitter object directly
         $tasks->through(function (Task $task) {
             $task->is_external = $task->isExternallySubmitted();
             return $task;
@@ -100,18 +96,15 @@ class TaskController extends Controller
 
         $task = \App\Models\Task::create([
             ...$attributes,
-            'author_id' => auth()->id(),
         ]);
+
+        $task->submitter()->associate(auth()->user())->save();
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 
     public function show(Task $task)
     {
-        if(request()->expectsJson()){
-            return response()->json($task);
-        }
-
         return inertia('Tasks/Show')
             ->with([
                 'task' => $task
