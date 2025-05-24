@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('tasks', function (Blueprint $table) {
-            $table->renameColumn('name', 'title');
-        });
+        // This migration is no longer needed as the column name has been
+        // changed directly in the original tasks table migration
     }
 
     /**
@@ -21,8 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('tasks', function (Blueprint $table) {
-            $table->renameColumn('title', 'name');
-        });
+        // No action needed
     }
 };
