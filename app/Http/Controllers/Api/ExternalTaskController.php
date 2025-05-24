@@ -19,6 +19,7 @@ class ExternalTaskController extends Controller
     {
         $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project'])
+            ->whereHas('project', fn($query) => $query->where('token', request('project')))
             ->latest()
             ->when(
                 request('search'),
@@ -38,6 +39,11 @@ class ExternalTaskController extends Controller
      */
     public function show(Task $task)
     {
+        // Ensure the task belongs to the project specified in the request
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
         $task->load(['submitter', 'metadata', 'project']);
 
         return response()->json($task);
@@ -79,6 +85,22 @@ class ExternalTaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'nullable|string|in:low,medium,high',
+            'status' => 'nullable|string|in:pending,in_progress,completed'
+        ]);
+
+        $task->update([
+            ...$attributes,
+            'status' => $attributes['status'] ?? $task->status,
+            'priority' => $attributes['priority'] ?? $task->priority,
+        ]);
 
         return response()->json($task, 200);
     }
@@ -92,7 +114,13 @@ class ExternalTaskController extends Controller
      */
     public function destroy(Task $task, Request $request)
     {
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
 
+        $task->delete();
+
+        return response()->json(['message' => 'Task deleted successfully'], 200);
     }
 
     /**
@@ -104,6 +132,10 @@ class ExternalTaskController extends Controller
      */
     public function toggleStatus(Task $task, Request $request)
     {
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
         $validatedData = $request->validate([
             'status' => 'required|string|in:pending,in_progress,completed',
         ]);
@@ -126,6 +158,10 @@ class ExternalTaskController extends Controller
      */
     public function togglePriority(Task $task, Request $request)
     {
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
         $validatedData = $request->validate([
             'priority' => 'required|string|in:low,medium,high',
         ]);
