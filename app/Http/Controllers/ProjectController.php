@@ -111,7 +111,10 @@ class ProjectController extends Controller
             'organisation_id' => 'nullable|exists:organisations,id',
         ]);
 
-        $project = \App\Models\Project::create($validated);
+        $project = \App\Models\Project::create([
+            ...$validated,
+            'author_id' => auth()->id(),
+        ]);
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
