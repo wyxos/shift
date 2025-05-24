@@ -12,7 +12,7 @@ class TaskController extends Controller
     public function index()
     {
         $tasks = \App\Models\Task::query()
-            ->with(['externalUser', 'metadata', 'projectUser.user', 'project'])
+            ->with(['submitter', 'metadata', 'project'])
             ->latest()
             ->when(
                 request('search'),
@@ -21,18 +21,28 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Transform the tasks to include external submitter information
+        // Transform the tasks to include submitter information
         $tasks->through(function (Task $task) {
             $task->is_external = $task->isExternallySubmitted();
-            if ($task->is_external && $task->externalUser) {
-                $task->submitter_info = [
-                    'name' => $task->externalUser->name,
-                    'email' => $task->externalUser->email,
-                ];
 
-                if ($task->metadata) {
-                    $task->submitter_info['source_url'] = $task->metadata->source_url;
-                    $task->submitter_info['environment'] = $task->metadata->environment;
+            if ($task->submitter) {
+                if ($task->is_external) {
+                    // For external users
+                    $task->submitter_info = [
+                        'name' => $task->submitter->name,
+                        'email' => $task->submitter->email,
+                    ];
+
+                    if ($task->metadata) {
+                        $task->submitter_info['source_url'] = $task->metadata->source_url;
+                        $task->submitter_info['environment'] = $task->metadata->environment;
+                    }
+                } else {
+                    // For users
+                    $task->submitter_info = [
+                        'name' => $task->submitter->name,
+                        'email' => $task->submitter->email,
+                    ];
                 }
             }
             return $task;

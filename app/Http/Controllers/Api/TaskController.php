@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ExternalUser;
 use App\Models\Project;
-use App\Models\ProjectUser;
 use App\Models\Task;
 use Illuminate\Http\Request;
 
@@ -19,7 +18,7 @@ class TaskController extends Controller
     public function index()
     {
         $tasks = Task::query()
-            ->with(['externalUser', 'metadata', 'projectUser.user', 'project'])
+            ->with(['submitter', 'metadata', 'project'])
             ->latest()
             ->when(
                 request('search'),
@@ -28,20 +27,27 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Transform the tasks to include external submitter information
+        // Transform the tasks to include submitter information
         $tasks->through(function ($task) {
             $task->is_external = $task->isExternallySubmitted();
-            if ($task->is_external) {
-                $task->submitter_info = [
-                    'name' => $task->externalUser->name,
-                    'email' => $task->externalUser->email,
-                ];
 
-                if ($task->metadata) {
-                    $task->submitter_info['source_url'] = $task->metadata->source_url;
-                    $task->submitter_info['environment'] = $task->metadata->environment;
+            if ($task->submitter) {
+                if ($task->is_external) {
+                    // For external users
+                    $task->submitter_name = $task->submitter->name;
+                    $task->submitter_email = $task->submitter->email;
+
+                    if ($task->metadata) {
+                        $task->source_url = $task->metadata->source_url;
+                        $task->environment = $task->metadata->environment;
+                    }
+                } else {
+                    // For users
+                    $task->submitter_name = $task->submitter->name;
+                    $task->submitter_email = $task->submitter->email;
                 }
             }
+
             return $task;
         });
 
@@ -56,19 +62,25 @@ class TaskController extends Controller
      */
     public function show(Task $task)
     {
-        $task->load(['externalUser', 'metadata', 'projectUser.user', 'project']);
+        $task->load(['submitter', 'metadata', 'project']);
 
-        // Add external submission info if applicable
+        // Add submitter information
         $task->is_external = $task->isExternallySubmitted();
-        if ($task->is_external) {
-            $task->submitter_info = [
-                'name' => $task->externalUser->name,
-                'email' => $task->externalUser->email,
-            ];
 
-            if ($task->metadata) {
-                $task->submitter_info['source_url'] = $task->metadata->source_url;
-                $task->submitter_info['environment'] = $task->metadata->environment;
+        if ($task->submitter) {
+            if ($task->is_external) {
+                // For external users
+                $task->submitter_name = $task->submitter->name;
+                $task->submitter_email = $task->submitter->email;
+
+                if ($task->metadata) {
+                    $task->source_url = $task->metadata->source_url;
+                    $task->environment = $task->metadata->environment;
+                }
+            } else {
+                // For users
+                $task->submitter_name = $task->submitter->name;
+                $task->submitter_email = $task->submitter->email;
             }
         }
 
@@ -79,37 +91,41 @@ class TaskController extends Controller
      * Store a newly created task in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function store(Request $request)
     {
-        $attributes = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'project' => 'required|exists:projects,token',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
-            'priority' => 'nullable|string|in:low,medium,high',
-            'external_user' => 'nullable|array',
-            'external_user.name' => 'required_with:external_user|string',
-            'external_user.email' => 'required_with:external_user|email',
-            'external_user.id' => 'nullable',
-            'metadata' => 'nullable|array',
-            'metadata.source_url' => 'nullable|string',
-            'metadata.environment' => 'nullable|string',
-        ]);
+        // Check if this is a web form submission (with project_id) or an API request (with project token)
+        if ($request->has('project_id')) {
+            $attributes = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'project_id' => 'required|exists:projects,id',
+                'status' => 'nullable|string|in:pending,in_progress,completed',
+                'priority' => 'nullable|string|in:low,medium,high',
+            ]);
 
-        $project = Project::where('token', $attributes['project'])->firstOrFail();
+            $project = Project::findOrFail($attributes['project_id']);
+        } else {
+            $attributes = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'project' => 'required|exists:projects,token',
+                'status' => 'nullable|string|in:pending,in_progress,completed',
+                'priority' => 'nullable|string|in:low,medium,high',
+                'external_user' => 'nullable|array',
+                'external_user.name' => 'required_with:external_user|string',
+                'external_user.email' => 'required_with:external_user|email',
+                'external_user.id' => 'nullable',
+                'metadata' => 'nullable|array',
+                'metadata.source_url' => 'nullable|string',
+                'metadata.environment' => 'nullable|string',
+            ]);
 
-        // Handle external user creation
-        $externalUser = ExternalUser::updateOrCreate(
-            ['email' => $attributes['external_user']['email']],
-            [
-                'name' => $attributes['external_user']['name'],
-                'email' => $attributes['external_user']['email'],
-                'id' => $attributes['external_user']['id'] ?? null,
-            ]
-        );
+            $project = Project::where('token', $attributes['project'])->firstOrFail();
+        }
 
+        // Create the task
         $task = $project->tasks()->create([
             'title' => $attributes['title'],
             'description' => $attributes['description'] ?? null,
@@ -117,15 +133,35 @@ class TaskController extends Controller
             'priority' => $attributes['priority'] ?? 'low',
         ]);
 
-        $task->externalUser()->associate($externalUser)->save();
+        // Handle external user creation and association
+        if (isset($attributes['external_user'])) {
+            $externalUser = ExternalUser::updateOrCreate(
+                ['email' => $attributes['external_user']['email']],
+                [
+                    'name' => $attributes['external_user']['name'],
+                    'email' => $attributes['external_user']['email'],
+                    'id' => $attributes['external_user']['id'] ?? null,
+                ]
+            );
+
+            // Set the polymorphic relationship
+            $task->submitter()->associate($externalUser);
+            $task->save();
+        } else if (auth()->check()) {
+            // If the request is coming from an authenticated user, associate the task with the user
+            $task->submitter()->associate(auth()->user());
+            $task->save();
+        }
 
         // Handle metadata creation
-        $task->metadata()->create([
-            'source_url' => $attributes['metadata']['source_url'] ?? null,
-            'environment' => $attributes['metadata']['environment'] ?? null,
-        ]);
+        if (isset($attributes['metadata'])) {
+            $task->metadata()->create([
+                'source_url' => $attributes['metadata']['source_url'] ?? null,
+                'environment' => $attributes['metadata']['environment'] ?? null,
+            ]);
+        }
 
-        return response()->json($task, 201);
+        return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 
     /**
