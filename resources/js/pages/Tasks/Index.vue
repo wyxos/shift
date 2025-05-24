@@ -225,17 +225,17 @@ function updateTaskPriority(task, priority) {
                     </div>
                 </o-table-column>
                 <o-table-column field="submitter" label="Submitter" v-slot="{row}">
-                    <div v-if="row.is_external">
-                        <div class="text-sm font-medium">{{ row.submitter_info.name }}</div>
+                    <div v-if="row.is_external && row.submitter">
+                        <div class="text-sm font-medium">{{ row.submitter.name }}</div>
                         <div class="text-xs text-gray-500">
-                            <div v-if="row.submitter_info.environment">{{ row.submitter_info.environment }}</div>
-                            <a v-if="row.submitter_info.source_url" :href="row.submitter_info.source_url" target="_blank" class="text-blue-500 hover:underline">
-                                {{ row.submitter_info.source_url }}
+                            <div v-if="row.metadata && row.metadata.environment">{{ row.metadata.environment }}</div>
+                            <a v-if="row.metadata && row.metadata.source_url" :href="row.metadata.source_url" target="_blank" class="text-blue-500 hover:underline">
+                                {{ row.metadata.source_url }}
                             </a>
                         </div>
                     </div>
-                    <div v-else-if="row.submitter_info">
-                        <div class="text-sm font-medium">{{ row.submitter_info.name }}</div>
+                    <div v-else-if="row.submitter">
+                        <div class="text-sm font-medium">{{ row.submitter.name }}</div>
                         <div class="text-xs text-gray-500">Shift User</div>
                     </div>
                     <div v-else>
