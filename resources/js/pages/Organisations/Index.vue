@@ -4,7 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import debounce from 'lodash/debounce';
 import {
     AlertDialog,
@@ -98,6 +98,16 @@ const inviteForm = useForm<{
     name: '',
 });
 
+// Computed property for other invite form errors (not related to specific fields)
+const otherInviteErrors = computed(() => {
+    return Object.entries(inviteForm.errors)
+        .filter(([key]) => !['email', 'name'].includes(key))
+        .reduce((acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+        }, {});
+});
+
 const manageUsersForm = useForm<{
     organisation_id: number | null;
     organisation_name: string;
@@ -109,6 +119,19 @@ const manageUsersForm = useForm<{
     users: [],
     isOpen: false,
 });
+
+function submitCreateForm() {
+    createForm.post('/organisations', {
+        onSuccess: () => {
+            createForm.isActive = false;
+            createForm.reset();
+        },
+        onError: () => {
+            // Keep the modal open when there are validation errors
+            createForm.isActive = true;
+        }
+    });
+}
 
 function saveEdit() {
     if (editForm.id) {
@@ -138,6 +161,10 @@ function inviteUser() {
             onSuccess: () => {
                 inviteDialogOpen.value = false;
                 inviteForm.reset();
+            },
+            onError: () => {
+                // Keep the modal open when there are validation errors
+                inviteDialogOpen.value = true;
             },
             preserveScroll: true,
         });
@@ -269,11 +296,16 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="Organisation Name"
                     />
+
+                    <!-- Display server-side validation errors -->
+                    <div v-for="(error, key) in createForm.errors" :key="key" class="text-red-500 mt-2">
+                        {{ error }}
+                    </div>
                 </div>
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="createForm.post('/organisations')" :disabled="createForm.processing">Create</AlertDialogAction>
+                    <AlertDialogAction @click="submitCreateForm" :disabled="createForm.processing">Create</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -299,6 +331,11 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="Organisation Name"
                     />
+
+                    <!-- Display server-side validation errors -->
+                    <div v-for="(error, key) in editForm.errors" :key="key" class="text-red-500 mt-2">
+                        {{ error }}
+                    </div>
                 </div>
 
                 <AlertDialogFooter>
@@ -329,12 +366,20 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="User Email"
                     />
+                    <div v-if="inviteForm.errors.email" class="text-red-500 mt-1">{{ inviteForm.errors.email }}</div>
+
                     <input
                         v-model="inviteForm.name"
                         type="text"
                         class="border rounded px-4 py-2"
                         placeholder="User Name"
                     />
+                    <div v-if="inviteForm.errors.name" class="text-red-500 mt-1">{{ inviteForm.errors.name }}</div>
+
+                    <!-- Display any other errors -->
+                    <div v-for="(error, key) in otherInviteErrors" :key="key" class="text-red-500 mt-2">
+                        {{ error }}
+                    </div>
                 </div>
 
                 <AlertDialogFooter>
@@ -359,6 +404,11 @@ watch(search, value => debounce(() => {
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4 max-h-96 overflow-y-auto">
+                    <!-- Display server-side validation errors -->
+                    <div v-for="(error, key) in manageUsersForm.errors" :key="key" class="text-red-500 mt-2 mb-2">
+                        {{ error }}
+                    </div>
+
                     <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500">
                         No users have access to this organisation.
                     </div>

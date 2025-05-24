@@ -4,7 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import debounce from 'lodash/debounce';
 import {
     AlertDialog,
@@ -76,6 +76,16 @@ const createForm = useForm<{
     isActive: false
 });
 
+// Computed property for other create form errors (not related to specific fields)
+const otherCreateErrors = computed(() => {
+    return Object.entries(createForm.errors)
+        .filter(([key]) => !['name', 'organisation_id'].includes(key))
+        .reduce((acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+        }, {});
+});
+
 const deleteForm = useForm<{
     id: number | null;
     isActive: boolean;
@@ -83,6 +93,19 @@ const deleteForm = useForm<{
     id: null,
     isActive: false
 });
+
+function submitCreateForm() {
+    createForm.post('/clients', {
+        onSuccess: () => {
+            createForm.isActive = false;
+            createForm.reset();
+        },
+        onError: () => {
+            // Keep the modal open when there are validation errors
+            createForm.isActive = true;
+        }
+    });
+}
 
 function saveEdit() {
     if (editForm.id) {
@@ -197,6 +220,7 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="Client Name"
                     />
+                    <div v-if="createForm.errors.name" class="text-red-500 mt-1">{{ createForm.errors.name }}</div>
 
                     <select v-model="createForm.organisation_id" class="border rounded px-4 py-2">
                         <option value="" disabled>Select Organisation</option>
@@ -204,11 +228,17 @@ watch(search, value => debounce(() => {
                             {{ organisation.name }}
                         </option>
                     </select>
+                    <div v-if="createForm.errors.organisation_id" class="text-red-500 mt-1">{{ createForm.errors.organisation_id }}</div>
+
+                    <!-- Display any other errors -->
+                    <div v-for="(error, key) in otherCreateErrors" :key="key" class="text-red-500 mt-2">
+                        {{ error }}
+                    </div>
                 </div>
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="createForm.post('/clients')" :disabled="createForm.processing">Create</AlertDialogAction>
+                    <AlertDialogAction @click="submitCreateForm" :disabled="createForm.processing">Create</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
