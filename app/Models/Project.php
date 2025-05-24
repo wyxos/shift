@@ -30,6 +30,11 @@ class Project extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function organisation()
+    {
+        return $this->belongsTo(Organisation::class);
+    }
+
     public function projectUser(): HasMany
     {
         return $this->hasMany(ProjectUser::class);

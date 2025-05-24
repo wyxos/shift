@@ -12,8 +12,11 @@ class ClientController extends Controller
             ->with([
                 'filters' => request()->only(['search']),
                 'clients' => \App\Models\Client::query()
-                    ->whereHas('organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
+                    ->where(function ($query) {
+                        $query->whereHas('organisation', function ($subQuery) {
+                            $subQuery->where('author_id', auth()->user()->id);
+                        })
+                        ->orWhere('author_id', auth()->user()->id);
                     })
                     ->latest()
                     ->when(
@@ -49,7 +52,7 @@ class ClientController extends Controller
     {
         $client = \App\Models\Client::create(request()->validate([
             'name' => 'required|string|max:255',
-            'organisation_id' => 'required|exists:organisations,id',
+            'organisation_id' => 'nullable|exists:organisations,id',
         ]));
         return redirect()->route('clients.index')->with('success', 'Client created successfully.');
     }
