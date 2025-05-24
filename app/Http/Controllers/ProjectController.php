@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ProjectController extends Controller
 {
@@ -156,13 +158,17 @@ class ProjectController extends Controller
     /**
      * Generate a new API token for the project.
      */
-    public function generateApiToken(\App\Models\Project $project)
+    public function generateApiToken(Project $project)
     {
         $token = $project->generateApiToken();
 
-        return response()->json([
-            'message' => 'API token generated successfully',
-            'token' => $token,
-        ]);
+        if (request()->expectsJson()) {
+            return response()->json([
+                'token' => $token,
+                'project_id' => $project->id,
+            ]);
+        }
+
+        return redirect()->back()->with('token', $token);
     }
 }
