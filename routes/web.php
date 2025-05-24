@@ -55,11 +55,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
 
     // Use Api\TaskController for API requests
-    Route::post('tasks', [\App\Http\Controllers\Api\TaskController::class, 'store'])->name('tasks.store');
-    Route::put('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'update'])->name('tasks.update');
-    Route::delete('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'destroy'])->name('tasks.destroy');
-    Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\Api\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
-    Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\Api\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
+    Route::post('tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('tasks.store');
+    Route::put('tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('tasks.update');
+    Route::delete('tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
+    Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
 });
 
 require __DIR__.'/settings.php';
