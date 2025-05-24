@@ -44,4 +44,9 @@ class Project extends Model
     {
         return $this->hasMany(Task::class);
     }
+
+    public function author()
+    {
+        return $this->belongsTo(User::class, 'author_id');
+    }
 }

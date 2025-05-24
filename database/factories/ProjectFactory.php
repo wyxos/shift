@@ -19,6 +19,22 @@ class ProjectFactory extends Factory
         return [
             'name' => $this->faker->unique()->sentence(3),
             'client_id' => \App\Models\Client::factory(),
+            'author_id' => null, // Nullable, can be set explicitly when needed
         ];
+    }
+
+    /**
+     * Set the author ID for the project.
+     *
+     * @param int $userId
+     * @return $this
+     */
+    public function withAuthor(int $userId): self
+    {
+        return $this->state(function (array $attributes) use ($userId) {
+            return [
+                'author_id' => $userId,
+            ];
+        });
     }
 }
