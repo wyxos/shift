@@ -37,9 +37,14 @@ class TaskController extends Controller
     public function create()
     {
         $projects = Project::where(function($query) {
-            $query->whereHas('client.organisation', function ($query) {
-                $query->where('author_id', auth()->user()->id);
-            })
+            $query->where(
+                fn($query) => $query->whereHas('client.organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })->orWhereHas('organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })
+                ->orWhere('author_id', auth()->user()->id)
+            )
             ->orWhereHas('projectUser', function($query) {
                 $query->where('user_id', auth()->user()->id);
             });
