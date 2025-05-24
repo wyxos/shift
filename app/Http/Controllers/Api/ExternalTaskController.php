@@ -51,6 +51,21 @@ class ExternalTaskController extends Controller
      */
     public function store(Request $request)
     {
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'project' => 'required|exists:projects,token',
+            'priority' => 'nullable|string|in:low,medium,high',
+            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'submitter_id' => 'nullable|exists:external_users,id',
+        ]);
+
+        $task = Task::create([
+            ...$attributes,
+            'project_id' => Project::where('token', $attributes['project'])->firstOrFail()->id,
+            'status' => $attributes['status'] ?? 'pending',
+            'priority' => $attributes['priority'] ?? 'medium',
+        ]);
 
         return response()->json($task, 201);
     }
