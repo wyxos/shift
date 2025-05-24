@@ -84,40 +84,18 @@ const createForm = useForm<{
     isActive: false
 });
 
-// Validation error state
-const validationError = ref<string | null>(null);
-
-// Function to validate the form
-function validateCreateForm(): boolean {
-    // Reset validation error
-    validationError.value = null;
-
-    // Check if name is provided
-    if (!createForm.name) {
-        validationError.value = 'Project name is required';
-        return false;
-    }
-
-    // Check if at least one of client_id or organisation_id is provided
-    if (!createForm.client_id && !createForm.organisation_id) {
-        validationError.value = 'Either client or organisation must be specified';
-        return false;
-    }
-
-    // Check if both client_id and organisation_id are provided
-    if (createForm.client_id && createForm.organisation_id) {
-        validationError.value = 'You cannot specify both client and organisation';
-        return false;
-    }
-
-    return true;
-}
-
-// Function to validate and submit the form
+// Function to submit the form
 function submitCreateForm() {
-    if (validateCreateForm()) {
-        createForm.post('/projects');
-    }
+    createForm.post('/projects', {
+        onSuccess: () => {
+            createForm.isActive = false;
+            createForm.reset();
+        },
+        onError: () => {
+            // Keep the modal open when there are validation errors
+            createForm.isActive = true;
+        }
+    });
 }
 
 const deleteForm = useForm<{
@@ -275,6 +253,19 @@ function reset() {
     router.get('/projects', { search: '' }, { preserveState: true, preserveScroll: true });
 }
 
+// Handle string "null" values from select elements
+watch(() => createForm.client_id, value => {
+    if (value === "null") {
+        createForm.client_id = null;
+    }
+});
+
+watch(() => createForm.organisation_id, value => {
+    if (value === "null") {
+        createForm.organisation_id = null;
+    }
+});
+
 watch(search, value => debounce(() => {
     router.get('/projects', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
 }, 300)());
@@ -387,6 +378,7 @@ watch(search, value => debounce(() => {
                         <option v-for="client in clients.data" :key="client.id" :value="client.id">
                             {{ client.name }}
                         </option>
+                        <option v-if="createForm.client_id !== null" value="null">-- Clear Selection --</option>
                     </select>
 
                     <select
@@ -399,17 +391,22 @@ watch(search, value => debounce(() => {
                         <option v-for="org in organisations" :key="org.id" :value="org.id">
                             {{ org.name }}
                         </option>
+                        <option v-if="createForm.organisation_id !== null" value="null">-- Clear Selection --</option>
                     </select>
                 </div>
 
-                <!-- Display validation error if any -->
-                <div v-if="validationError" class="text-red-500 mt-2 mb-2 px-4">
-                    {{ validationError }}
+
+                <!-- Display server-side validation errors -->
+                <div v-for="(error, key) in createForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                    {{ error }}
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="submitCreateForm" :disabled="createForm.processing">Create</AlertDialogAction>
+                    <AlertDialogCancel @click="() => {
+                        createForm.isActive = false;
+                        createForm.reset();
+                    }">Cancel</AlertDialogCancel>
+                    <Button @click="submitCreateForm" :disabled="createForm.processing">Create</Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -435,6 +432,11 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="Project Name"
                     />
+                </div>
+
+                <!-- Display server-side validation errors -->
+                <div v-for="(error, key) in editForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                    {{ error }}
                 </div>
 
                 <AlertDialogFooter>
@@ -471,6 +473,11 @@ watch(search, value => debounce(() => {
                         class="border rounded px-4 py-2"
                         placeholder="User Name"
                     />
+                </div>
+
+                <!-- Display server-side validation errors -->
+                <div v-for="(error, key) in grantAccessForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                    {{ error }}
                 </div>
 
                 <AlertDialogFooter>
@@ -538,7 +545,7 @@ watch(search, value => debounce(() => {
                         No API token has been generated for this project yet.
                     </div>
 
-                    <Button @click="generateApiToken" class="mt-2">
+                    <Button @click="generateApiToken" class="mt-2" :disabled="apiTokenForm.processing">
                         {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
                     </Button>
 
@@ -546,6 +553,11 @@ watch(search, value => debounce(() => {
                         <p>This token will be used by the Shift SDK to authenticate with this project.</p>
                         <p class="mt-1">Regenerating the token will invalidate any existing SDK installations using the old token.</p>
                     </div>
+                </div>
+
+                <!-- Display server-side validation errors -->
+                <div v-for="(error, key) in apiTokenForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                    {{ error }}
                 </div>
 
                 <AlertDialogFooter>
