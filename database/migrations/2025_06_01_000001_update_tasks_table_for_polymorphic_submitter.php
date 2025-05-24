@@ -47,10 +47,11 @@ return new class extends Migration
             }
         }
 
-        // Remove the old columns
+        // Remove the old columns except author_id
         Schema::table('tasks', function (Blueprint $table) {
-            $table->dropForeign(['author_id']);
-            $table->dropColumn('author_id');
+            // Keep author_id column for backward compatibility
+            // $table->dropForeign(['author_id']);
+            // $table->dropColumn('author_id');
 
             $table->dropForeign(['external_user_id']);
             $table->dropColumn('external_user_id');
