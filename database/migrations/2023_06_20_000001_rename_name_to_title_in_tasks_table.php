@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // This migration is no longer needed as the project_user_id column
-        // has been added to the original tasks table migration
+        // This migration is no longer needed as the column name has been
+        // changed directly in the original tasks table migration
     }
 
     /**

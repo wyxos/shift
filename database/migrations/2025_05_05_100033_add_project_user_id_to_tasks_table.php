@@ -8,19 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('tasks', function (Blueprint $table) {
-            $table->foreignId('project_user_id')
-                ->nullable()
-                ->constrained()
-                ->onDelete('cascade');
-        });
+        // This migration is no longer needed as the project_user_id column
+        // has been added to the original tasks table migration
     }
 
     public function down(): void
     {
-        Schema::table('tasks', function (Blueprint $table) {
-            $table->dropForeign(['project_user_id']);
-            $table->dropColumn('project_user_id');
-        });
+        // No action needed
     }
 };
