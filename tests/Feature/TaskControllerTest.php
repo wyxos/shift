@@ -20,19 +20,19 @@ class TaskControllerTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->post(route('tasks.store'), [
-            'title' => 'Sample Task',
+            'name' => 'Sample Task',
             'description' => 'Optional description',
             'project_id' => $project->id,
         ]);
 
         $response->assertRedirect(route('tasks.index'));
 
-        $task = \App\Models\Task::where('title', 'Sample Task')->first();
+        $task = \App\Models\Task::where('name', 'Sample Task')->first();
 
         // Check that the task was created with the correct attributes
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
-            'title' => 'Sample Task',
+            'name' => 'Sample Task',
             'description' => 'Optional description',
             'project_id' => $project->id,
             'author_id' => $user->id,
@@ -57,7 +57,7 @@ class TaskControllerTest extends TestCase
 
         $response = $this
             ->postJson(route('tasks.store'), [
-                'title' => 'From external project',
+                'name' => 'From external project',
                 'description' => 'Sent via API',
                 'project_id' => $project->id,
                 'user_id' => 4,
@@ -67,10 +67,10 @@ class TaskControllerTest extends TestCase
 
         $response->assertStatus(201);
 
-        $task = \App\Models\Task::where('title', 'From external project')->first();
+        $task = \App\Models\Task::where('name', 'From external project')->first();
 
         $this->assertDatabaseHas('tasks', [
-            'title' => 'From external project',
+            'name' => 'From external project',
             'project_id' => $project->id,
             'project_user_id' => $task->projectUser->id,
         ]);
@@ -92,7 +92,7 @@ class TaskControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson([
             'id' => $task->id,
-            'title' => $task->title,
+            'name' => $task->name,
             'project_id' => $project->id,
         ]);
     }
@@ -109,13 +109,13 @@ class TaskControllerTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->put(route('tasks.update', $task), [
-            'title' => 'Updated Task Title',
+            'name' => 'Updated Task Title',
         ]);
 
         $response->assertRedirect(route('tasks.index'));
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
-            'title' => 'Updated Task Title',
+            'name' => 'Updated Task Title',
         ]);
     }
 
@@ -273,7 +273,7 @@ class TaskControllerTest extends TestCase
         $this->actingAs($user, 'sanctum');
 
         $response = $this->postJson(route('tasks.store'), [
-            'title' => 'External Task',
+            'name' => 'External Task',
             'description' => 'Task from external submitter',
             'project_id' => $project->id,
             'submitter_name' => 'Tom',
