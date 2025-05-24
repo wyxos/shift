@@ -65,8 +65,8 @@ const otherErrors = computed(() => {
 
                 <div class="mb-4">
                     <label for="project_id" class="block text-sm font-medium text-gray-700">Project</label>
-                    <select v-model="createForm.project_id" id="project_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring focus:ring-opacity-50">
-                        <option value="">Select a project</option>
+                    <select v-model="createForm.project_id" id="project_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring focus:ring-opacity-50 disabled:bg-gray-200">
+                        <option :value="null">Select a project</option>
                         <!-- Populate with projects -->
                         <option v-for="project in props.projects" :key="project.id" :value="project.id">{{ project.name }}</option>
                     </select>

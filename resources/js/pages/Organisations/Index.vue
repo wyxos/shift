@@ -289,7 +289,7 @@ watch(search, value => debounce(() => {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-4">
                     <input
                         v-model="createForm.name"
                         type="text"
@@ -305,7 +305,7 @@ watch(search, value => debounce(() => {
 
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="submitCreateForm" :disabled="createForm.processing">Create</AlertDialogAction>
+                    <Button @click="submitCreateForm" :disabled="createForm.processing">Create</Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
