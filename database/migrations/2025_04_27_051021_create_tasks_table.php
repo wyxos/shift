@@ -20,6 +20,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamp('due_date')->nullable();
             $table->foreignId('author_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('project_user_id')->nullable()->constrained()->onDelete('cascade');
 
             $table->timestamps();
         });

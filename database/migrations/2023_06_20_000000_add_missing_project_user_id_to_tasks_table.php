@@ -11,15 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Check if the column exists before adding it
-        if (!Schema::hasColumn('tasks', 'project_user_id')) {
-            Schema::table('tasks', function (Blueprint $table) {
-                $table->foreignId('project_user_id')
-                    ->nullable()
-                    ->constrained()
-                    ->onDelete('cascade');
-            });
-        }
+        // This migration is no longer needed as the project_user_id column
+        // has been added to the original tasks table migration
     }
 
     /**
@@ -27,12 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Only drop the column if it exists
-        if (Schema::hasColumn('tasks', 'project_user_id')) {
-            Schema::table('tasks', function (Blueprint $table) {
-                $table->dropForeign(['project_user_id']);
-                $table->dropColumn('project_user_id');
-            });
-        }
+        // No action needed
     }
 };
