@@ -63,4 +63,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(ProjectUser::class);
     }
+
+    /**
+     * Get the tasks that this user is the submitter of.
+     */
+    public function tasks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Task::class, 'submitter');
+    }
 }

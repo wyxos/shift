@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ExternalUser extends Model
 {
@@ -15,8 +15,8 @@ class ExternalUser extends Model
     /**
      * Get the tasks that this external user is associated with.
      */
-    public function tasks(): HasMany
+    public function tasks(): MorphMany
     {
-        return $this->hasMany(Task::class);
+        return $this->morphMany(Task::class, 'submitter');
     }
 }
