@@ -370,28 +370,24 @@ watch(search, value => debounce(() => {
 
                     <select
                         v-model="createForm.client_id"
-                        class="border rounded px-4 py-2 mb-2"
+                        class="border rounded px-4 py-2 mb-2 disabled:bg-gray-200"
                         :disabled="createForm.organisation_id !== null"
-                        @change="createForm.organisation_id = null"
                     >
-                        <option value="" disabled selected>Select Client (Optional)</option>
+                        <option :value="null">Select Client (Optional)</option>
                         <option v-for="client in clients.data" :key="client.id" :value="client.id">
                             {{ client.name }}
                         </option>
-                        <option v-if="createForm.client_id !== null" value="null">-- Clear Selection --</option>
                     </select>
 
                     <select
                         v-model="createForm.organisation_id"
-                        class="border rounded px-4 py-2"
+                        class="border rounded px-4 py-2 disabled:bg-gray-200"
                         :disabled="createForm.client_id !== null"
-                        @change="createForm.client_id = null"
                     >
-                        <option value="" disabled selected>Select Organisation (Optional)</option>
+                        <option :value="null">Select Organisation (Optional)</option>
                         <option v-for="org in organisations" :key="org.id" :value="org.id">
                             {{ org.name }}
                         </option>
-                        <option v-if="createForm.organisation_id !== null" value="null">-- Clear Selection --</option>
                     </select>
                 </div>
 

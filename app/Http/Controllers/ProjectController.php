@@ -111,16 +111,6 @@ class ProjectController extends Controller
             'organisation_id' => 'nullable|exists:organisations,id',
         ]);
 
-        // Ensure at least one of client_id or organisation_id is provided
-        if (empty($validated['client_id']) && empty($validated['organisation_id'])) {
-            return redirect()->back()->withErrors(['error' => 'Either client or organisation must be specified.'])->withInput();
-        }
-
-        // Prevent providing both client_id and organisation_id
-        if (!empty($validated['client_id']) && !empty($validated['organisation_id'])) {
-            return redirect()->back()->withErrors(['error' => 'You cannot specify both client and organisation.'])->withInput();
-        }
-
         $project = \App\Models\Project::create($validated);
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');

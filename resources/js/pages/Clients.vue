@@ -222,8 +222,8 @@ watch(search, value => debounce(() => {
                     />
                     <div v-if="createForm.errors.name" class="text-red-500 mt-1">{{ createForm.errors.name }}</div>
 
-                    <select v-model="createForm.organisation_id" class="border rounded px-4 py-2">
-                        <option value="" disabled>Select Organisation</option>
+                    <select v-model="createForm.organisation_id" class="border rounded px-4 py-2 disabled:bg-gray-200">
+                        <option :value="null">Select Organisation</option>
                         <option v-for="organisation in props.organisations" :key="organisation.id" :value="organisation.id">
                             {{ organisation.name }}
                         </option>
