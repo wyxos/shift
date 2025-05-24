@@ -4,7 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import debounce from 'lodash/debounce';
 import {
     AlertDialog,
@@ -19,6 +19,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input';
 import DeleteDialog from '@/components/DeleteDialog.vue';
+import { usePage } from '@inertiajs/vue3';
+import axios from 'axios';
+
+const page = usePage();
 
 const props = defineProps({
     projects: {
@@ -207,40 +211,20 @@ function removeAccess(projectUser: { id: number }) {
     }
 }
 
-function openApiTokenModal(project: { id: number, name: string, project_api_token?: string }) {
+function openApiTokenModal(project: { id: number, name: string, token?: string }) {
     apiTokenForm.project_id = project.id;
     apiTokenForm.project_name = project.name;
-    apiTokenForm.token = project.project_api_token || '';
+    apiTokenForm.token = project.token || '';
     apiTokenForm.isOpen = true;
 }
 
 function generateApiToken() {
     if (apiTokenForm.project_id) {
-        apiTokenForm.post(`/projects/${apiTokenForm.project_id}/api-token`, {
-            preserveScroll: true,
-            onSuccess: (response) => {
-                let newToken = '';
-                if (response && response.data && response.data.token) {
-                    newToken = response.data.token;
-                } else if (response && response.token) {
-                    newToken = response.token;
-                }
-
-                // Update the form token
-                apiTokenForm.token = newToken;
-
-                // Refresh the projects data to update the UI
-                const currentPage = props.projects.current_page || 1;
-                router.get('/projects', {
-                    page: currentPage,
-                    search: search.value
-                }, {
-                    preserveState: false,
-                    preserveScroll: true,
-                    only: ['projects']
-                });
-            },
-        });
+        axios.post(`/projects/${apiTokenForm.project_id}/api-token`)
+            .then((response) => {
+                apiTokenForm.token = response.data.token;
+                apiTokenForm.errors = {}; // Clear any previous errors
+            });
     }
 }
 

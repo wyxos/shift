@@ -336,7 +336,7 @@ function updateTaskPriority(task, priority) {
                         <div class="text-xs text-gray-500">Shift User</div>
                     </div>
                     <div v-else>
-                        <div class="text-xs text-gray-500">Unknown</div>
+                        <div class="text-xs text-gray-500">Automated</div>
                     </div>
                 </o-table-column>
                 <o-table-column field="status" label="Status" v-slot="{row}">
