@@ -158,34 +158,11 @@ class ProjectController extends Controller
      */
     public function generateApiToken(\App\Models\Project $project)
     {
-        // Check if the authenticated user has access to the project
-        $hasAccess = false;
-
-        // Check if project has a client with an organisation
-        if ($project->client && $project->client->organisation) {
-            $hasAccess = $project->client->organisation->author_id === auth()->id();
-        }
-
-        // Check if project is directly owned by an organisation
-        if (!$hasAccess && $project->organisation) {
-            $hasAccess = $project->organisation->author_id === auth()->id();
-        }
-
-        // Check if user is a project user
-        if (!$hasAccess) {
-            $hasAccess = $project->projectUser()->where('user_id', auth()->id())->exists();
-        }
-
-        if (!$hasAccess) {
-            return redirect()->route('projects.index')->with('error', 'Unauthorized');
-        }
-
         $token = $project->generateApiToken();
 
-        if(request()->expectsJson()) {
-            return response()->json(['token' => $token]);
-        }
-
-        return redirect()->back()->with('success', 'API token generated successfully')->with('token', $token);
+        return response()->json([
+            'message' => 'API token generated successfully',
+            'token' => $token,
+        ]);
     }
 }

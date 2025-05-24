@@ -18,6 +18,18 @@ class TaskController extends Controller
                 request('search'),
                 fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
             )
+            ->when(
+                request('project_id'),
+                fn ($query) => $query->where('project_id', request('project_id'))
+            )
+            ->when(
+                request('priority'),
+                fn ($query) => $query->where('priority', request('priority'))
+            )
+            ->when(
+                request('status'),
+                fn ($query) => $query->where('status', request('status'))
+            )
             ->paginate(10)
             ->withQueryString();
 
@@ -26,10 +38,26 @@ class TaskController extends Controller
             return $task;
         });
 
+        // Get projects for the filter dropdown (same as in create method)
+        $projects = Project::where(function($query) {
+            $query->where(
+                fn($query) => $query->whereHas('client.organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })->orWhereHas('organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })
+                ->orWhere('author_id', auth()->user()->id)
+            )
+            ->orWhereHas('projectUser', function($query) {
+                $query->where('user_id', auth()->user()->id);
+            });
+        })->get();
+
         return inertia('Tasks/Index')
             ->with([
-                'filters' => request()->only(['search']),
+                'filters' => request()->only(['search', 'project_id', 'priority', 'status']),
                 'tasks' => $tasks,
+                'projects' => $projects,
             ]);
     }
 

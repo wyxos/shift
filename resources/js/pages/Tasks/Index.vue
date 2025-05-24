@@ -24,6 +24,10 @@ const props = defineProps({
     filters: {
         type: Object,
         required: true
+    },
+    projects: {
+        type: Array,
+        required: true
     }
 })
 
@@ -49,6 +53,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 
 const search = ref(props.filters.search);
+const projectId = ref(props.filters.project_id);
+const priority = ref(props.filters.priority);
+const status = ref(props.filters.status);
 
 const title = `Tasks` + (search.value ? ` - ${search.value}` : '');
 
@@ -93,7 +100,10 @@ function onPageChange(page: number) {
 
 function reset() {
     search.value = '';
-    router.get('/tasks', { search: '' }, {
+    projectId.value = '';
+    priority.value = '';
+    status.value = '';
+    router.get('/tasks', { search: '', project_id: '', priority: '', status: '' }, {
         preserveState: true,
         preserveScroll: true,
         onSuccess: () => {
@@ -103,8 +113,14 @@ function reset() {
     });
 }
 
+// Watch for changes in search input
 watch(search, value => debounce(() => {
-    router.get('/tasks', { search: value }, {
+    router.get('/tasks', {
+        search: value,
+        project_id: projectId.value,
+        priority: priority.value,
+        status: status.value
+    }, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -114,6 +130,57 @@ watch(search, value => debounce(() => {
         }
     });
 }, 300)());
+
+// Watch for changes in project filter
+watch(projectId, value => {
+    router.get('/tasks', {
+        search: search.value,
+        project_id: value,
+        priority: priority.value,
+        status: status.value
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onSuccess: () => {
+            refreshTaskList();
+        }
+    });
+});
+
+// Watch for changes in priority filter
+watch(priority, value => {
+    router.get('/tasks', {
+        search: search.value,
+        project_id: projectId.value,
+        priority: value,
+        status: status.value
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onSuccess: () => {
+            refreshTaskList();
+        }
+    });
+});
+
+// Watch for changes in status filter
+watch(status, value => {
+    router.get('/tasks', {
+        search: search.value,
+        project_id: projectId.value,
+        priority: priority.value,
+        status: value
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onSuccess: () => {
+            refreshTaskList();
+        }
+    });
+});
 
 // Status options
 const statusOptions = [
@@ -156,13 +223,19 @@ function updateTaskStatus(task, status) {
 function refreshTaskList() {
     const currentPage = localTasks.value.current_page || 1;
     const currentSearch = search.value || '';
+    const currentProjectId = projectId.value || '';
+    const currentPriority = priority.value || '';
+    const currentStatus = status.value || '';
 
     // Use Inertia router to reload the tasks data
     router.reload({
         only: ['tasks'],
         data: {
             page: currentPage,
-            search: currentSearch
+            search: currentSearch,
+            project_id: currentProjectId,
+            priority: currentPriority,
+            status: currentStatus
         },
         preserveScroll: true,
         onError: (error) => {
@@ -201,8 +274,32 @@ function updateTaskPriority(task, priority) {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
 
-            <div class="flex gap-4">
+            <div class="flex flex-wrap gap-4">
                 <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+
+                <!-- Project filter -->
+                <select v-model="projectId" class="mb-4 p-2 border rounded">
+                    <option value="">All Projects</option>
+                    <option v-for="project in projects" :key="project.id" :value="project.id">
+                        {{ project.name }}
+                    </option>
+                </select>
+
+                <!-- Priority filter -->
+                <select v-model="priority" class="mb-4 p-2 border rounded">
+                    <option value="">All Priorities</option>
+                    <option v-for="option in priorityOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
+
+                <!-- Status filter -->
+                <select v-model="status" class="mb-4 p-2 border rounded">
+                    <option value="">All Statuses</option>
+                    <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
 
                 <Button @click="reset">Reset</Button>
 
