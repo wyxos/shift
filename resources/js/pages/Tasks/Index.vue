@@ -329,6 +329,10 @@ function updateTaskPriority(task, priority) {
                             <a v-if="row.metadata && row.metadata.source_url" :href="row.metadata.source_url" target="_blank" class="text-blue-500 hover:underline">
                                 {{ row.metadata.source_url }}
                             </a>
+                            <div class="flex flex-col gap-1 mt-1">
+                                <span>{{ row.submitter.environment }}</span>
+                                <span>{{ row.submitter.url }}</span>
+                            </div>
                         </div>
                     </div>
                     <div v-else-if="row.submitter">
