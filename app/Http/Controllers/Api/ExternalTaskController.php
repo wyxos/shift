@@ -20,6 +20,12 @@ class ExternalTaskController extends Controller
         $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->whereHas('project', fn($query) => $query->where('token', request('project')))
+            ->whereHasMorph('submitter', [ExternalUser::class], function ($query) {
+                $query
+                    ->where('environment', request()->offsetGet('user.environment'))
+                    ->where('url', request()->offsetGet('user.url'))
+                    ->where('external_id', request()->offsetGet('user.id'));
+            })
             ->latest()
             ->when(
                 request('search'),
@@ -63,7 +69,20 @@ class ExternalTaskController extends Controller
             'project' => 'required|exists:projects,token',
             'priority' => 'nullable|string|in:low,medium,high',
             'status' => 'nullable|string|in:pending,in_progress,completed',
-            'submitter_id' => 'nullable|exists:external_users,id',
+            'user.id' => 'required',
+            'user.name' => 'nullable|string|max:255',
+            'user.email' => 'required|email',
+            'user.environment' => 'required|string|max:255',
+            'user.url' => 'required|url'
+        ]);
+
+        $externalUser = ExternalUser::updateOrCreate([
+            'external_id' => $attributes['user']['id'],
+            'environment' => $attributes['user']['environment'],
+            'url' => $attributes['user']['url'],
+        ], [
+            'name' => $attributes['user']['name'] ?? null,
+            'email' => $attributes['user']['email'],
         ]);
 
         $task = Task::create([
@@ -72,6 +91,8 @@ class ExternalTaskController extends Controller
             'status' => $attributes['status'] ?? 'pending',
             'priority' => $attributes['priority'] ?? 'medium',
         ]);
+
+        $task->submitter()->associate($externalUser)->save();
 
         return response()->json($task, 201);
     }
