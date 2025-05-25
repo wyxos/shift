@@ -23,8 +23,6 @@ class TaskFactory extends Factory
             'priority' => $this->faker->randomElement(['low', 'medium', 'high']),
             'description' => $this->faker->paragraph(),
             'due_date' => $this->faker->dateTimeBetween('now', '+1 month'),
-            'author_id' => \App\Models\User::factory(),
-
         ];
     }
 }
