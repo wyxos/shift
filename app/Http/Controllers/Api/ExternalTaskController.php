@@ -59,7 +59,7 @@ class ExternalTaskController extends Controller
      * Store a newly created task in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
@@ -69,20 +69,13 @@ class ExternalTaskController extends Controller
             'project' => 'required|exists:projects,token',
             'priority' => 'nullable|string|in:low,medium,high',
             'status' => 'nullable|string|in:pending,in_progress,completed',
-            'user.id' => 'required',
+            'user.id' => 'nullable',
             'user.name' => 'nullable|string|max:255',
-            'user.email' => 'required|email',
-            'user.environment' => 'required|string|max:255',
-            'user.url' => 'required|url'
-        ]);
-
-        $externalUser = ExternalUser::updateOrCreate([
-            'external_id' => $attributes['user']['id'],
-            'environment' => $attributes['user']['environment'],
-            'url' => $attributes['user']['url'],
-        ], [
-            'name' => $attributes['user']['name'] ?? null,
-            'email' => $attributes['user']['email'],
+            'user.email' => 'nullable|email',
+            'user.environment' => 'nullable|string|max:255',
+            'user.url' => 'nullable|url',
+            'metadata.url' => 'required|url',
+            'metadata.environment' => 'required|string|max:255',
         ]);
 
         $task = Task::create([
@@ -92,7 +85,23 @@ class ExternalTaskController extends Controller
             'priority' => $attributes['priority'] ?? 'medium',
         ]);
 
-        $task->submitter()->associate($externalUser)->save();
+        if(isset($attributes['user'])) {
+            $externalUser = ExternalUser::updateOrCreate([
+                'external_id' => $attributes['user']['id'],
+                'environment' => $attributes['user']['environment'],
+                'url' => $attributes['user']['url'],
+            ], [
+                'name' => $attributes['user']['name'] ?? null,
+                'email' => $attributes['user']['email'],
+            ]);
+
+            $task->submitter()->associate($externalUser)->save();
+        }
+
+        $task->metadata()->create([
+            'url' => request('user.url'),
+            'environment' => request('user.environment'),
+        ]);
 
         return response()->json($task, 201);
     }
@@ -110,11 +119,15 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
+        if(!$task->submitter || $task->submitter->external_id !== request('user.id')) {
+            return response()->json(['error' => 'Unauthorized to update this task'], 403);
+        }
+
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:low,medium,high',
-            'status' => 'nullable|string|in:pending,in_progress,completed'
+            'status' => 'nullable|string|in:pending,in_progress,completed',
         ]);
 
         $task->update([
@@ -137,6 +150,10 @@ class ExternalTaskController extends Controller
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        if(!$task->submitter || $task->submitter->external_id !== request('user.id')) {
+            return response()->json(['error' => 'Unauthorized to delete this task'], 403);
         }
 
         $task->delete();
