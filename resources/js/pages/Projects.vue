@@ -4,7 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
 import { Button } from '@/components/ui/button';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import debounce from 'lodash/debounce';
 import {
     AlertDialog,
@@ -19,10 +19,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input';
 import DeleteDialog from '@/components/DeleteDialog.vue';
-import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-
-const page = usePage();
 
 const props = defineProps({
     projects: {
@@ -489,6 +486,9 @@ watch(search, value => debounce(() => {
                         <div>
                             <div class="font-semibold">{{ user.user_name }}</div>
                             <div class="text-sm text-gray-500">{{ user.user_email }}</div>
+                            <div class="text-xs mt-1" :class="user.registration_status === 'registered' ? 'text-green-500' : 'text-amber-500'">
+                                {{ user.registration_status === 'registered' ? 'Registered' : 'Pending Registration' }}
+                            </div>
                         </div>
                         <Button variant="destructive" size="sm" @click="removeAccess(user)">
                             <i class="fas fa-trash mr-1"></i> Remove

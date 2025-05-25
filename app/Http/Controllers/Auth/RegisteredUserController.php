@@ -57,10 +57,13 @@ class RegisteredUserController extends Controller
 
         // If the user was invited to a project, update the project_user record and redirect to the project
         if ($request->project_id) {
-            // Update the project_user record with the new user_id
+            // Update the project_user record with the new user_id and set registration_status to registered
             ProjectUser::where('project_id', $request->project_id)
                 ->where('user_email', $request->email)
-                ->update(['user_id' => $user->id]);
+                ->update([
+                    'user_id' => $user->id,
+                    'registration_status' => 'registered'
+                ]);
 
             return to_route('projects.index', ['highlight' => $request->project_id]);
         }
