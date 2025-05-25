@@ -23,14 +23,13 @@ class ProjectUserController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        // Check if the authenticated user has access to the project
-        $hasAccess = $project->client?->organisation?->author_id === Auth::id() ||
-                     $project->organisation?->author_id === Auth::id() ||
-                     $project->author_id === Auth::id() ||
-                     $project->projectUser()->where('user_id', Auth::id())->exists();;
+        // Check if the authenticated user is the project owner
+        $isOwner = $project->client?->organisation?->author_id === Auth::id() ||
+                   $project->organisation?->author_id === Auth::id() ||
+                   $project->author_id === Auth::id();
 
-        if (!$hasAccess) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (!$isOwner) {
+            return response()->json(['message' => 'Unauthorized. Only project owners can grant access.'], 403);
         }
 
         // Check if the user is already a member of the project
@@ -73,14 +72,13 @@ class ProjectUserController extends Controller
      */
     public function destroy(Project $project, ProjectUser $projectUser)
     {
-        // Check if the authenticated user has access to the project
-        $hasAccess = $project->client?->organisation?->author_id === Auth::id() ||
-                     $project->organisation?->author_id === Auth::id() ||
-                     $project->author_id === Auth::id() ||
-                     $project->projectUser()->where('user_id', Auth::id())->exists();
+        // Check if the authenticated user is the project owner
+        $isOwner = $project->client?->organisation?->author_id === Auth::id() ||
+                   $project->organisation?->author_id === Auth::id() ||
+                   $project->author_id === Auth::id();
 
-        if (!$hasAccess) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (!$isOwner) {
+            return response()->json(['message' => 'Unauthorized. Only project owners can remove access.'], 403);
         }
 
         // Check if the projectUser belongs to the project

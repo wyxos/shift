@@ -276,15 +276,15 @@ watch(search, value => debounce(() => {
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
                     <div class="flex gap-2 justify-end">
-                        <Button variant="outline" @click="() => {
-                            console.log('Button clicked for project:', row);
+                        <!-- Only show grant access button for project owners -->
+                        <Button v-if="row.isOwner" variant="outline" @click="() => {
                             grantAccessForm.project_id = row.id;
                             grantAccessForm.project_name = row.name;
                             grantAccessForm.isOpen = true;
-                            console.log('grantAccessForm.isOpen set to:', grantAccessForm.isOpen);
                         }">
                             <i class="fas fa-key"></i>
                         </Button>
+                        <!-- Show users button for all users with access -->
                         <Button variant="outline" @click="openManageUsersModal(row)">
                             <i class="fas fa-users"></i>
                         </Button>
@@ -341,17 +341,17 @@ watch(search, value => debounce(() => {
                     <input
                         v-model="createForm.name"
                         type="text"
-                        class="border rounded px-4 py-2"
+                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
                         placeholder="Project Name"
                     />
 
-                    <div class="text-sm text-gray-500 mb-2">
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">
                         Select either a client or an organisation for this project
                     </div>
 
                     <select
                         v-model="createForm.client_id"
-                        class="border rounded px-4 py-2 mb-2 disabled:bg-gray-200"
+                        class="border rounded px-4 py-2 mb-2 disabled:bg-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                         :disabled="createForm.organisation_id !== null"
                     >
                         <option :value="null">Select Client (Optional)</option>
@@ -362,7 +362,7 @@ watch(search, value => debounce(() => {
 
                     <select
                         v-model="createForm.organisation_id"
-                        class="border rounded px-4 py-2 disabled:bg-gray-200"
+                        class="border rounded px-4 py-2 disabled:bg-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                         :disabled="createForm.client_id !== null"
                     >
                         <option :value="null">Select Organisation (Optional)</option>
@@ -406,7 +406,7 @@ watch(search, value => debounce(() => {
                     <input
                         v-model="editForm.name"
                         type="text"
-                        class="border rounded px-4 py-2"
+                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
                         placeholder="Project Name"
                     />
                 </div>
@@ -441,13 +441,13 @@ watch(search, value => debounce(() => {
                     <input
                         v-model="grantAccessForm.email"
                         type="email"
-                        class="border rounded px-4 py-2"
+                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
                         placeholder="User Email"
                     />
                     <input
                         v-model="grantAccessForm.name"
                         type="text"
-                        class="border rounded px-4 py-2"
+                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
                         placeholder="User Name"
                     />
                 </div>
@@ -479,13 +479,13 @@ watch(search, value => debounce(() => {
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4 max-h-96 overflow-y-auto">
-                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500">
+                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500 dark:text-gray-400">
                         No users have access to this project.
                     </div>
-                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex justify-between items-center p-2 border-b">
+                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex justify-between items-center p-2 border-b dark:border-gray-700">
                         <div>
-                            <div class="font-semibold">{{ user.user_name }}</div>
-                            <div class="text-sm text-gray-500">{{ user.user_email }}</div>
+                            <div class="font-semibold dark:text-white">{{ user.user_name }}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ user.user_email }}</div>
                             <div class="text-xs mt-1" :class="user.registration_status === 'registered' ? 'text-green-500' : 'text-amber-500'">
                                 {{ user.registration_status === 'registered' ? 'Registered' : 'Pending Registration' }}
                             </div>
@@ -517,11 +517,11 @@ watch(search, value => debounce(() => {
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4">
-                    <div v-if="apiTokenForm.token" class="bg-gray-100 p-4 rounded break-all">
-                        <div class="font-semibold mb-2">Current API Token:</div>
-                        <div class="text-sm">{{ apiTokenForm.token }}</div>
+                    <div v-if="apiTokenForm.token" class="bg-gray-100 dark:bg-gray-700 p-4 rounded break-all">
+                        <div class="font-semibold mb-2 dark:text-white">Current API Token:</div>
+                        <div class="text-sm dark:text-gray-300">{{ apiTokenForm.token }}</div>
                     </div>
-                    <div v-else class="text-gray-500 italic">
+                    <div v-else class="text-gray-500 dark:text-gray-400 italic">
                         No API token has been generated for this project yet.
                     </div>
 
@@ -529,7 +529,7 @@ watch(search, value => debounce(() => {
                         {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
                     </Button>
 
-                    <div class="text-sm text-gray-500 mt-2">
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-2">
                         <p>This token will be used by the Shift SDK to authenticate with this project.</p>
                         <p class="mt-1">Regenerating the token will invalidate any existing SDK installations using the old token.</p>
                     </div>
