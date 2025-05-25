@@ -1,73 +1,139 @@
-# SHIFT - Task Management System
+# SHIFT – Internal Task Management System
 
-SHIFT is a comprehensive task management system built with Laravel and Vue.js, designed to help teams organize and track their projects and tasks efficiently.
+SHIFT is a private, modular task management system built with **Laravel** and **Vue.js**, designed to streamline task tracking and project collaboration across multiple teams and applications.
 
-## Overview
+---
 
-SHIFT consists of two main components:
-1. **Dashboard** - A web application for managing clients, projects, and tasks
-2. **SDK** - A package that allows integration with other Laravel applications
+## 🔧 Components
 
-## Features
+SHIFT consists of two tightly integrated components:
 
-### Dashboard
-- **Organization Management**: Create and manage organizations
-- **Client Management**: Organize clients within organizations
-- **Project Management**: Create and manage projects for clients
-- **Task Management**: Create, update, and track tasks within projects
-- **Task Prioritization**: Set and toggle task priorities
-- **Task Status Tracking**: Mark tasks as complete/incomplete
+1. **Dashboard** (Admin Panel)  
+   Web UI to manage organizations, clients, projects, and tasks.
 
-### SDK Integration
-- Connect external Laravel applications to the SHIFT dashboard
-- Create and manage tasks directly from integrated applications
-- View tasks created from integrated applications
+2. **SDK** (Laravel Package)  
+   An installable package to submit and sync tasks from external Laravel apps to the core dashboard.
 
-## Technical Stack
+---
 
-- **Backend**: Laravel PHP framework
-- **Frontend**: Vue.js with Inertia.js
-- **Authentication**: Laravel Sanctum
-- **UI**: Tailwind CSS
+## 🧩 Features
 
-## Project Structure
+### 🖥️ Dashboard
+- **Organizations**: Group clients under an umbrella
+- **Clients**: Define project scopes
+- **Projects**: Assign teams, track tasks
+- **Tasks**: Create, update, and track
+- **Priorities & Statuses**: Low/Medium/High, Pending/In Progress/Done
 
-The application follows a hierarchical data structure:
-- Organizations have many Clients
-- Clients have many Projects
-- Projects have many Tasks
-- Projects can have multiple Users (team members)
+### 📦 SDK Integration
+- Submit tasks from external Laravel apps via API
+- Auto-send context (user, app, env) with task submissions
+- View/manage external tasks within the dashboard
 
-## Development Status
+---
 
-The project is currently in active development with most of the core dashboard features implemented. The SDK integration is partially complete with ongoing work to enhance its capabilities.
+## 🛠️ Tech Stack
 
-### Completed Features
-- Client CRUD operations
-- Project CRUD operations
-- Task CRUD operations
-- REST API for Tasks/Projects
-- Basic setup command for SDK integration
+| Layer       | Tech                  |
+|-------------|------------------------|
+| Backend     | Laravel (v10+)         |
+| Frontend    | Vue.js 3, Inertia.js   |
+| Auth        | Laravel Sanctum        |
+| Styling     | Tailwind CSS           |
+| API Format  | REST (JSON)            |
 
-### Planned Features
-- File attachments to tasks
-- Rich comments on tasks
-- Sub-tasks / Checklists
-- Project analytics
-- OAuth login / External user accounts
-- Notifications (email/slack/push)
+---
 
-## Getting Started
+## 🧱 Data Structure
 
-To get started with SHIFT, follow these steps:
+- **Organization** → has many **Clients**
+- **Client** → has many **Projects**
+- **Project** → has many **Tasks**
+- **Project** ↔ can have many **Users**
 
-1. Clone the repository
-2. Install dependencies with `composer install` and `npm install`
-3. Configure your environment variables
-4. Run migrations with `php artisan migrate`
-5. Start the development server with `php artisan serve`
-6. Build frontend assets with `npm run dev`
+---
 
-## License
+## 🚧 Development Status
 
-[License information would go here]
+SHIFT is under **active development**. Core features are stable; SDK integration is evolving.
+
+### ✅ Completed
+- Dashboard UI for managing organizations, clients, projects, tasks
+- Role-based access via Laravel policies
+- Full REST API for Projects & Tasks
+- SDK install & test commands
+- Authenticated submission from external apps
+
+### 🧪 In Progress / Planned
+- Task file attachments
+- Task comments & activity logs
+- Sub-tasks / checklists
+- Project metrics / analytics
+- OAuth / external user accounts
+- Slack/email/push notifications
+
+---
+
+## 🚀 Getting Started (Dashboard)
+
+```bash
+git clone git@github.com:wyxos/shift.git
+cd shift
+cp .env.example .env
+composer install
+npm install
+php artisan migrate
+npm run dev
+php artisan serve
+````
+
+Frontend will be available at:
+**[http://localhost:8000](http://localhost:8000)**
+
+Admin credentials are available in the internal docs or seeded users.
+
+---
+
+## 🔌 SDK Setup (External App)
+
+Install the SDK package in a Laravel app:
+
+```bash
+composer require wyxos/shift-sdk
+php artisan install:shift
+```
+
+You’ll be prompted to:
+
+* Enter your SHIFT API token
+* Provide a project token
+* Configure `.env`
+
+---
+
+## 📂 Repo Notes
+
+This is a **private monorepo**, containing:
+
+* `dashboard/` – Core Laravel app
+* `packages/shift-sdk/` – Reusable SDK for integration
+
+All code is internal-use only. Do not distribute without permission.
+
+---
+
+## 🧪 Local Testing
+
+To test SDK integration locally:
+
+```bash
+php artisan shift:test
+```
+
+This submits a test task to verify SDK ↔ dashboard connectivity.
+
+---
+
+## 📝 License
+
+This repository is private and proprietary. For internal use by Wyxos team members only. All rights reserved.
