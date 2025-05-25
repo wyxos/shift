@@ -99,8 +99,8 @@ class ExternalTaskController extends Controller
         }
 
         $task->metadata()->create([
-            'url' => request('user.url'),
-            'environment' => request('user.environment'),
+            'url' => request('metadata.url'),
+            'environment' => request('metadata.environment'),
         ]);
 
         return response()->json($task, 201);
