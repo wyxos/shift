@@ -326,8 +326,8 @@ function updateTaskPriority(task, priority) {
                         <div class="text-sm font-medium">{{ row.submitter.name }}</div>
                         <div class="text-xs text-gray-500">
                             <div v-if="row.metadata && row.metadata.environment">{{ row.metadata.environment }}</div>
-                            <a v-if="row.metadata && row.metadata.source_url" :href="row.metadata.source_url" target="_blank" class="text-blue-500 hover:underline">
-                                {{ row.metadata.source_url }}
+                            <a v-if="row.metadata && row.metadata.url" :href="row.metadata.url" target="_blank" class="text-blue-500 hover:underline">
+                                {{ row.metadata.url }}
                             </a>
                             <div class="flex flex-col gap-1 mt-1">
                                 <span>{{ row.submitter.environment }}</span>
