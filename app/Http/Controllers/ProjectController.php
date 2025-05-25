@@ -10,49 +10,27 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        if(request()->expectsJson()) {
-            return \App\Models\Project::query()
-                ->select('id', 'name', 'client_id', 'token', 'created_at', 'updated_at')
-                ->where(function($query) {
-                    $query->whereHas('client.organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhereHas('organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhereHas('projectUser', function($query) {
-                        $query->where('user_id', auth()->user()->id);
-                    });
-                })
-                ->latest()
-                ->when(
-                    request('search'),
-                    fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                )
-                ->paginate(10)
-                ->withQueryString();
-        }
-
         return inertia('Projects')
             ->with([
                 'filters' => request()->only(['search']),
                 'projects' => \App\Models\Project::query()
-                    ->where(function($query) {
-                        $query->whereHas('client.organisation', function ($query) {
-                            $query->where('author_id', auth()->user()->id);
-                        })
-                        ->orWhereHas('organisation', function ($query) {
-                            $query->where('author_id', auth()->user()->id);
-                        })
-                        ->orWhereNull('client_id')
-                        ->orWhereHas('projectUser', function($query) {
-                            $query->where('user_id', auth()->user()->id);
-                        });
+                    ->where(function ($query) {
+                        $query
+                            ->whereHas('client.organisation', function ($query) {
+                                $query->where('author_id', auth()->user()->id);
+                            })
+                            ->orWhereHas('organisation', function ($query) {
+                                $query->where('author_id', auth()->user()->id);
+                            })
+                            ->orWhereHas('projectUser', function ($query) {
+                                $query->where('user_id', auth()->user()->id);
+                            })
+                            ->orWhere('author_id', auth()->user()->id);
                     })
                     ->latest()
                     ->when(
                         request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
                     ->paginate(10)
                     ->withQueryString(),
@@ -63,7 +41,7 @@ class ProjectController extends Controller
                     ->latest()
                     ->when(
                         request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
                     ->paginate(10)
                     ->withQueryString(),
@@ -72,7 +50,7 @@ class ProjectController extends Controller
                     ->latest()
                     ->when(
                         request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
                     ->get(),
             ]);
@@ -83,10 +61,6 @@ class ProjectController extends Controller
     {
         $project->delete();
 
-        if(request()->expectsJson()) {
-            return response()->json(['message' => 'Project deleted successfully.']);
-        }
-
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
     }
 
@@ -96,10 +70,6 @@ class ProjectController extends Controller
         $project->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
-
-        if(request()->expectsJson()) {
-            return response()->json($project);
-        }
 
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
     }
@@ -127,22 +97,10 @@ class ProjectController extends Controller
     public function users(\App\Models\Project $project)
     {
         // Check if the authenticated user has access to the project
-        $hasAccess = false;
-
-        // Check if project has a client with an organisation
-        if ($project->client && $project->client->organisation) {
-            $hasAccess = $project->client->organisation->author_id === auth()->id();
-        }
-
-        // Check if project is directly owned by an organisation
-        if (!$hasAccess && $project->organisation) {
-            $hasAccess = $project->organisation->author_id === auth()->id();
-        }
-
-        // Check if user is a project user
-        if (!$hasAccess) {
-            $hasAccess = $project->projectUser()->where('user_id', auth()->id())->exists();
-        }
+        $hasAccess = $project->client?->organisation?->author_id === auth()->user()->id
+            || $project->organisation?->author_id === auth()->user()->id
+            || $project->author_id === auth()->user()->id
+            || $project->projectUser()->where('user_id', auth()->id())->exists();
 
         if (!$hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
