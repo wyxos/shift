@@ -285,16 +285,16 @@ watch(search, value => debounce(() => {
                             <i class="fas fa-key"></i>
                         </Button>
                         <!-- Show users button for all users with access -->
-                        <Button variant="outline" @click="openManageUsersModal(row)">
+                        <Button v-if="row.isOwner" variant="outline" @click="openManageUsersModal(row)">
                             <i class="fas fa-users"></i>
                         </Button>
-                        <Button variant="outline" @click="openApiTokenModal(row)">
+                        <Button v-if="row.isOwner" variant="outline" @click="openApiTokenModal(row)">
                             <i class="fas fa-lock"></i>
                         </Button>
-                        <Button variant="outline" @click="openEditModal(row)">
+                        <Button v-if="row.isOwner" variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
                         </Button>
-                        <Button variant="destructive" @click="openDeleteModal(row)">
+                        <Button v-if="row.isOwner" variant="destructive" @click="openDeleteModal(row)">
                             <i class="fas fa-trash"></i>
                         </Button>
                     </div>
