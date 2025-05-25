@@ -33,7 +33,18 @@ class ProjectController extends Controller
                         fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
                     )
                     ->paginate(10)
-                    ->withQueryString(),
+                    ->withQueryString()
+                    ->through(function ($project) {
+                        // Add isOwner flag to each project
+                        $isOwner = $project->client?->organisation?->author_id === auth()->id() ||
+                                  $project->organisation?->author_id === auth()->id() ||
+                                  $project->author_id === auth()->id();
+
+                        return [
+                            ...$project->toArray(),
+                            'isOwner' => $isOwner,
+                        ];
+                    }),
                 'clients' => \App\Models\Client::query()
                     ->whereHas('organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
