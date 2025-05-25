@@ -57,8 +57,21 @@ const submit = () => {
 
                 <div class="grid gap-2">
                     <Label for="email">Email address</Label>
-                    <Input id="email" type="email" required :tabindex="2" autocomplete="email" v-model="form.email" placeholder="email@example.com" />
+                    <Input
+                        id="email"
+                        type="email"
+                        required
+                        :tabindex="2"
+                        autocomplete="email"
+                        v-model="form.email"
+                        placeholder="email@example.com"
+                        :readonly="!!props.email"
+                        :class="{ 'bg-gray-100': !!props.email }"
+                    />
                     <InputError :message="form.errors.email" />
+                    <div v-if="!!props.email" class="text-xs text-gray-500">
+                        This email address cannot be changed as it was used for your invitation.
+                    </div>
                 </div>
 
                 <div class="grid gap-2">
