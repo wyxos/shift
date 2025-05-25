@@ -24,7 +24,10 @@ class ProjectUserController extends Controller
         ]);
 
         // Check if the authenticated user has access to the project
-        $hasAccess = $project->client->organisation->author_id === Auth::id();
+        $hasAccess = $project->client?->organisation?->author_id === Auth::id() ||
+                     $project->organisation?->author_id === Auth::id() ||
+                     $project->author_id === Auth::id() ||
+                     $project->projectUser()->where('user_id', Auth::id())->exists();;
 
         if (!$hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -48,6 +51,7 @@ class ProjectUserController extends Controller
             'user_id' => $user ? $user->id : null, // Use null when the user doesn't exist
             'user_email' => $validated['email'],
             'user_name' => $validated['name'],
+            'registration_status' => $user ? 'registered' : 'pending', // Set status based on user existence
         ]);
 
         // If the user doesn't exist, send an invitation email
@@ -70,7 +74,10 @@ class ProjectUserController extends Controller
     public function destroy(Project $project, ProjectUser $projectUser)
     {
         // Check if the authenticated user has access to the project
-        $hasAccess = $project->client->organisation->author_id === Auth::id();
+        $hasAccess = $project->client?->organisation?->author_id === Auth::id() ||
+                     $project->organisation?->author_id === Auth::id() ||
+                     $project->author_id === Auth::id() ||
+                     $project->projectUser()->where('user_id', Auth::id())->exists();
 
         if (!$hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -88,5 +95,28 @@ class ProjectUserController extends Controller
         }
 
         return redirect()->back()->with('success', 'User access to project revoked successfully.');
+    }
+
+    /**
+     * Update the user_id and registration_status when a user registers.
+     * This method should be called from the registration process.
+     *
+     * @param User $user The newly registered user
+     * @return void
+     */
+    public static function updateUserRegistration(User $user)
+    {
+        // Find all project users with matching email and pending status
+        $pendingProjectUsers = ProjectUser::where('user_email', $user->email)
+            ->where('registration_status', 'pending')
+            ->get();
+
+        // Update each project user with the new user_id and set status to registered
+        foreach ($pendingProjectUsers as $projectUser) {
+            $projectUser->update([
+                'user_id' => $user->id,
+                'registration_status' => 'registered',
+            ]);
+        }
     }
 }
