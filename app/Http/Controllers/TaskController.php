@@ -13,6 +13,19 @@ class TaskController extends Controller
     {
         $tasks = \App\Models\Task::query()
             ->with(['submitter', 'metadata', 'project'])
+            ->where(function($query) {
+                $query->where(
+                    fn($query) => $query->whereHas('project.client.organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })->orWhereHas('project.organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
+                    ->orWhere('author_id', auth()->user()->id)
+                )
+                ->orWhereHas('project.projectUser', function($query) {
+                    $query->where('user_id', auth()->user()->id);
+                });
+            })
             ->latest()
             ->when(
                 request('search'),
