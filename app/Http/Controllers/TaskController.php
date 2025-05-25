@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -20,7 +21,9 @@ class TaskController extends Controller
                     })->orWhereHas('project.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
                     })
-                    ->orWhere('author_id', auth()->user()->id)
+                    ->orWhereHasMorph('submitter', [User::class], function ($query) {
+                        $query->where('id', auth()->user()->id);
+                    })
                 )
                 ->orWhereHas('project.projectUser', function($query) {
                     $query->where('user_id', auth()->user()->id);
