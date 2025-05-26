@@ -45,7 +45,7 @@ class AttachmentControllerTest extends TestCase
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
         $response = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
                 'temp_identifier' => $this->tempIdentifier,
             ]);
@@ -68,7 +68,7 @@ class AttachmentControllerTest extends TestCase
     public function test_upload_fails_without_file()
     {
         $response = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'temp_identifier' => $this->tempIdentifier,
             ]);
 
@@ -81,7 +81,7 @@ class AttachmentControllerTest extends TestCase
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
         $response = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
             ]);
 
@@ -95,14 +95,14 @@ class AttachmentControllerTest extends TestCase
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
         $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
                 'temp_identifier' => $this->tempIdentifier,
             ]);
 
         // Now list the files
         $response = $this->actingAs($this->user)
-            ->get(route('task-attachments.list-temp', [
+            ->get(route('attachments.list-temp', [
                 'temp_identifier' => $this->tempIdentifier,
             ]));
 
@@ -127,7 +127,7 @@ class AttachmentControllerTest extends TestCase
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
         $uploadResponse = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
                 'temp_identifier' => $this->tempIdentifier,
             ]);
@@ -136,7 +136,7 @@ class AttachmentControllerTest extends TestCase
 
         // Now remove the file
         $response = $this->actingAs($this->user)
-            ->delete(route('task-attachments.remove-temp'), [
+            ->delete(route('attachments.remove-temp'), [
                 'path' => $path,
             ]);
 
@@ -153,7 +153,7 @@ class AttachmentControllerTest extends TestCase
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
         $uploadResponse = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
                 'temp_identifier' => $this->tempIdentifier,
             ]);
@@ -243,7 +243,7 @@ class AttachmentControllerTest extends TestCase
         $tempIdentifier = 'update-test-' . time();
 
         $uploadResponse = $this->actingAs($this->user)
-            ->post(route('task-attachments.upload'), [
+            ->post(route('attachments.upload'), [
                 'file' => $file,
                 'temp_identifier' => $tempIdentifier,
             ]);
@@ -317,7 +317,7 @@ class AttachmentControllerTest extends TestCase
 
         // Get the list of attachments
         $response = $this->actingAs($this->user)
-            ->get(route('task-attachments.list', $task));
+            ->get(route('attachments.list-task', $task));
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -358,7 +358,7 @@ class AttachmentControllerTest extends TestCase
 
         // Delete the attachment
         $response = $this->actingAs($this->user)
-            ->delete(route('task-attachments.delete', $attachment));
+            ->delete(route('attachments.delete', $attachment));
 
         $response->assertStatus(200);
         $response->assertJson(['success' => true]);
