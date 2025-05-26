@@ -4,7 +4,8 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Input } from '@/components/ui/input';
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     project: {
@@ -14,6 +15,10 @@ const props = defineProps({
     task: {
         type: Object,
         required: true
+    },
+    attachments: {
+        type: Array,
+        default: () => []
     }
 });
 
@@ -25,27 +30,121 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
     {
         title: 'Edit Task',
-        href: '/tasks/create',
+        href: `/tasks/${props.task.id}/edit`,
     }
 ];
 
-const title = `Create Task`;
+const title = `Edit Task`;
+
+// Generate a unique identifier for temporary files
+const tempIdentifier = ref(Date.now().toString());
+const uploadedFiles = ref([]);
+const existingAttachments = ref(props.attachments || []);
+const deletedAttachmentIds = ref([]);
+const isUploading = ref(false);
+const uploadError = ref('');
 
 const editForm = useForm({
     title: props.task.title,
     description: props.task.description,
     project_id: props.task.project_id,
+    temp_identifier: tempIdentifier.value,
+    deleted_attachment_ids: [],
 });
 
 // Computed property for other errors (not related to specific fields)
 const otherErrors = computed(() => {
     return Object.entries(editForm.errors)
-        .filter(([key]) => !['title', 'description', 'project_id'].includes(key))
+        .filter(([key]) => !['title', 'description', 'project_id', 'temp_identifier', 'deleted_attachment_ids'].includes(key))
         .reduce((acc, [key, value]) => {
             acc[key] = value;
             return acc;
         }, {});
 });
+
+// Load any previously uploaded files
+onMounted(() => {
+    loadTempFiles();
+});
+
+// Handle file upload
+const handleFileUpload = (event) => {
+    const files = event.target.files || event.dataTransfer.files;
+    if (!files.length) return;
+
+    for (let i = 0; i < files.length; i++) {
+        uploadFile(files[i]);
+    }
+
+    // Clear the file input
+    event.target.value = '';
+};
+
+// Upload a single file
+const uploadFile = async (file) => {
+    isUploading.value = true;
+    uploadError.value = '';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('temp_identifier', tempIdentifier.value);
+
+    try {
+        const response = await axios.post(route('task-attachments.upload'), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+
+        uploadedFiles.value.push(response.data);
+        isUploading.value = false;
+    } catch (error) {
+        isUploading.value = false;
+        uploadError.value = error.response?.data?.message || 'Error uploading file';
+        console.error('Upload error:', error);
+    }
+};
+
+// Load temporary files
+const loadTempFiles = async () => {
+    try {
+        const response = await axios.get(route('task-attachments.list-temp'), {
+            params: { temp_identifier: tempIdentifier.value }
+        });
+
+        uploadedFiles.value = response.data.files;
+    } catch (error) {
+        console.error('Error loading temp files:', error);
+    }
+};
+
+// Remove a temporary file
+const removeFile = async (file) => {
+    try {
+        await axios.delete(route('task-attachments.remove-temp'), {
+            params: { path: file.path }
+        });
+
+        // Remove from the list
+        uploadedFiles.value = uploadedFiles.value.filter(f => f.path !== file.path);
+    } catch (error) {
+        console.error('Error removing file:', error);
+    }
+};
+
+// Delete an existing attachment
+const deleteAttachment = (attachment) => {
+    // Add to deleted attachments list
+    deletedAttachmentIds.value.push(attachment.id);
+    // Remove from the displayed list
+    existingAttachments.value = existingAttachments.value.filter(a => a.id !== attachment.id);
+};
+
+// Before submitting the form, update the deleted_attachment_ids
+const submitForm = () => {
+    editForm.deleted_attachment_ids = deletedAttachmentIds.value;
+    editForm.put(`/tasks/${props.task.id}`);
+};
 </script>
 
 <template>
@@ -54,7 +153,7 @@ const otherErrors = computed(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
 
         <div class="p-4">
-            <form @submit.prevent="editForm.put('/tasks/' + props.task.id)">
+            <form @submit.prevent="submitForm">
                 <div class="mb-4">
                     <label for="name" class="block text-sm font-medium text-gray-700">Task title</label>
                     <Input v-model="editForm.title" type="text" id="title" required />
@@ -67,16 +166,86 @@ const otherErrors = computed(() => {
                     <div v-if="editForm.errors.description" class="text-red-500 text-sm mt-1">{{ editForm.errors.description }}</div>
                 </div>
 
-                <p>
-                    {{ project.name }}
-                </p>
+                <div class="mb-4">
+                    <p class="text-sm font-medium text-gray-700">Project: {{ project.name }}</p>
+                </div>
+
+                <!-- Existing Attachments Section -->
+                <div v-if="existingAttachments.length > 0" class="mb-4">
+                    <h4 class="text-sm font-medium text-gray-700">Existing Attachments:</h4>
+                    <ul class="mt-2 divide-y divide-gray-200 border border-gray-200 rounded-md">
+                        <li v-for="attachment in existingAttachments" :key="attachment.id" class="flex items-center justify-between py-2 px-3 text-sm">
+                            <div class="flex items-center">
+                                <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                </svg>
+                                <a :href="attachment.url" target="_blank" class="truncate hover:text-blue-600">{{ attachment.original_filename }}</a>
+                            </div>
+                            <button
+                                type="button"
+                                @click="deleteAttachment(attachment)"
+                                class="text-red-600 hover:text-red-900"
+                            >
+                                Remove
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- File Upload Section -->
+                <div class="mb-4">
+                    <label for="attachments" class="block text-sm font-medium text-gray-700">Add New Attachments</label>
+                    <div class="mt-1 flex items-center">
+                        <input
+                            type="file"
+                            id="attachments"
+                            @change="handleFileUpload"
+                            multiple
+                            class="block w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-md file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-blue-50 file:text-blue-700
+                            hover:file:bg-blue-100"
+                        />
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Upload files directly. They will be attached to the task when updated.</p>
+
+                    <!-- Upload error message -->
+                    <div v-if="uploadError" class="text-red-500 text-sm mt-1">{{ uploadError }}</div>
+
+                    <!-- Loading indicator -->
+                    <div v-if="isUploading" class="text-blue-500 text-sm mt-1">Uploading...</div>
+
+                    <!-- List of uploaded files -->
+                    <div v-if="uploadedFiles.length > 0" class="mt-3">
+                        <h4 class="text-sm font-medium text-gray-700">New Files:</h4>
+                        <ul class="mt-2 divide-y divide-gray-200 border border-gray-200 rounded-md">
+                            <li v-for="file in uploadedFiles" :key="file.path" class="flex items-center justify-between py-2 px-3 text-sm">
+                                <div class="flex items-center">
+                                    <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span class="truncate">{{ file.original_filename }}</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="removeFile(file)"
+                                    class="text-red-600 hover:text-red-900"
+                                >
+                                    Remove
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
 
                 <!-- Display any other errors -->
                 <div v-for="(error, key) in otherErrors" :key="key" class="text-red-500 text-sm mb-4">
                     {{ error }}
                 </div>
 
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md" :disabled="editForm.processing">Update</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md" :disabled="editForm.processing">Update Task</button>
             </form>
         </div>
     </AppLayout>

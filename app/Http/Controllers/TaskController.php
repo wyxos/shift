@@ -9,6 +9,7 @@ use App\Models\TaskAttachment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
@@ -109,12 +110,20 @@ class TaskController extends Controller
     // edit task
     public function edit(\App\Models\Task $task)
     {
-        $task->load('project');
+        $task->load(['project', 'attachments']);
 
         return inertia('Tasks/Edit')
             ->with([
                 'task' => $task,
-                'project' => $task->project
+                'project' => $task->project,
+                'attachments' => $task->attachments->map(function ($attachment) {
+                    return [
+                        'id' => $attachment->id,
+                        'original_filename' => $attachment->original_filename,
+                        'path' => $attachment->path,
+                        'url' => \Illuminate\Support\Facades\Storage::url($attachment->path),
+                    ];
+                })
             ]);
     }
 
@@ -129,11 +138,94 @@ class TaskController extends Controller
     public function update(\App\Models\Task $task)
     {
         // Handle web form submission
-        $task->update(request()->validate([
+        $attributes = request()->validate([
             'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'status' => 'nullable|string|in:pending,in_progress,completed',
             'priority' => 'nullable|string|in:low,medium,high',
-        ]));
+            'temp_identifier' => 'nullable|string',
+            'deleted_attachment_ids' => 'nullable|array',
+            'deleted_attachment_ids.*' => 'integer|exists:task_attachments,id',
+        ]);
+
+        $task->update([
+            'title' => $attributes['title'],
+            'description' => $attributes['description'] ?? $task->description,
+            'status' => $attributes['status'] ?? $task->status,
+            'priority' => $attributes['priority'] ?? $task->priority,
+        ]);
+
+        // Handle deleted attachments
+        if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
+            foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
+                $attachment = \App\Models\TaskAttachment::find($attachmentId);
+
+                if ($attachment && $attachment->task_id === $task->id) {
+                    // Delete the file if it exists
+                    if (\Illuminate\Support\Facades\Storage::exists($attachment->path)) {
+                        \Illuminate\Support\Facades\Storage::delete($attachment->path);
+                    }
+
+                    // Delete the attachment record
+                    $attachment->delete();
+                }
+            }
+        }
+
+        // Handle new attachments if temp_identifier is provided
+        if (isset($attributes['temp_identifier'])) {
+            $tempIdentifier = $attributes['temp_identifier'];
+            $tempPath = "temp_attachments/{$tempIdentifier}";
+
+            // Check if temp directory exists
+            if (\Illuminate\Support\Facades\Storage::exists($tempPath)) {
+                // Get all files in the temp directory
+                $files = \Illuminate\Support\Facades\Storage::files($tempPath);
+
+                // Create permanent directory if it doesn't exist
+                $permanentPath = "attachments/{$task->id}";
+                if (!\Illuminate\Support\Facades\Storage::exists($permanentPath)) {
+                    \Illuminate\Support\Facades\Storage::makeDirectory($permanentPath);
+                }
+
+                // Move each file to the permanent location and create attachment records
+                foreach ($files as $file) {
+                    // Skip metadata files
+                    if (\Illuminate\Support\Str::endsWith($file, '.meta')) {
+                        continue;
+                    }
+
+                    // Try to get original filename from metadata
+                    $metadataPath = $file . '.meta';
+                    $originalFilename = basename($file);
+
+                    if (\Illuminate\Support\Facades\Storage::exists($metadataPath)) {
+                        $metadata = json_decode(\Illuminate\Support\Facades\Storage::get($metadataPath), true);
+                        if (isset($metadata['original_filename'])) {
+                            $originalFilename = $metadata['original_filename'];
+                        }
+                    }
+
+                    // Generate a unique filename for storage
+                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $newPath = "{$permanentPath}/{$storedFilename}";
+
+                    // Move the file
+                    \Illuminate\Support\Facades\Storage::move($file, $newPath);
+
+                    // Create attachment record
+                    \App\Models\TaskAttachment::create([
+                        'task_id' => $task->id,
+                        'original_filename' => $originalFilename,
+                        'path' => $newPath,
+                    ]);
+                }
+
+                // Remove the temp directory
+                \Illuminate\Support\Facades\Storage::deleteDirectory($tempPath);
+            }
+        }
 
         return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
     }
@@ -174,8 +266,26 @@ class TaskController extends Controller
 
                 // Move each file to the permanent location and create attachment records
                 foreach ($files as $file) {
+                    // Skip metadata files
+                    if (Str::endsWith($file, '.meta')) {
+                        continue;
+                    }
+
+                    // Try to get original filename from metadata
+                    $metadataPath = $file . '.meta';
                     $originalFilename = basename($file);
-                    $newPath = "{$permanentPath}/{$originalFilename}";
+
+                    if (Storage::exists($metadataPath)) {
+                        $metadata = json_decode(Storage::get($metadataPath), true);
+                        if (isset($metadata['original_filename'])) {
+                            $originalFilename = $metadata['original_filename'];
+                        }
+                    }
+
+                    // Generate a unique filename for storage
+                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
                     Storage::move($file, $newPath);
