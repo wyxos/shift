@@ -90,7 +90,7 @@ const uploadFile = async (file) => {
     formData.append('temp_identifier', tempIdentifier.value);
 
     try {
-        const response = await axios.post(route('task-attachments.upload'), formData, {
+        const response = await axios.post(route('attachments.upload'), formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -108,7 +108,7 @@ const uploadFile = async (file) => {
 // Load temporary files
 const loadTempFiles = async () => {
     try {
-        const response = await axios.get(route('task-attachments.list-temp'), {
+        const response = await axios.get(route('attachments.list-temp'), {
             params: { temp_identifier: tempIdentifier.value }
         });
 
@@ -121,7 +121,7 @@ const loadTempFiles = async () => {
 // Remove a temporary file
 const removeFile = async (file) => {
     try {
-        await axios.delete(route('task-attachments.remove-temp'), {
+        await axios.delete(route('attachments.remove-temp'), {
             params: { path: file.path }
         });
 

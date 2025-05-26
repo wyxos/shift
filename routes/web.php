@@ -5,7 +5,7 @@ use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
-use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -62,12 +62,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
     Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
 
-    // Task attachments
-    Route::post('task-attachments/upload', [TaskAttachmentController::class, 'upload'])->name('task-attachments.upload');
-    Route::get('task-attachments/list-temp', [TaskAttachmentController::class, 'listTempFiles'])->name('task-attachments.list-temp');
-    Route::delete('task-attachments/remove-temp', [TaskAttachmentController::class, 'removeTempFile'])->name('task-attachments.remove-temp');
-    Route::get('tasks/{task}/attachments', [TaskAttachmentController::class, 'listTaskAttachments'])->name('task-attachments.list');
-    Route::delete('task-attachments/{attachment}', [TaskAttachmentController::class, 'deleteAttachment'])->name('task-attachments.delete');
+    // Attachments
+    Route::post('attachments/upload', [AttachmentController::class, 'upload'])->name('attachments.upload');
+    Route::get('attachments/list-temp', [AttachmentController::class, 'listTempFiles'])->name('attachments.list-temp');
+    Route::delete('attachments/remove-temp', [AttachmentController::class, 'removeTempFile'])->name('attachments.remove-temp');
+    Route::get('tasks/{task}/attachments', [AttachmentController::class, 'listTaskAttachments'])->name('attachments.list-task');
+    Route::get('{type}/{id}/attachments', [AttachmentController::class, 'listAttachments'])->name('attachments.list');
+    Route::delete('attachments/{attachment}', [AttachmentController::class, 'deleteAttachment'])->name('attachments.delete');
 });
 
 require __DIR__.'/settings.php';
