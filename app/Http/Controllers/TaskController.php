@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
-use App\Models\TaskAttachment;
+use App\Models\Attachment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -145,7 +145,7 @@ class TaskController extends Controller
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
-            'deleted_attachment_ids.*' => 'integer|exists:task_attachments,id',
+            'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
         ]);
 
         $task->update([
@@ -158,9 +158,9 @@ class TaskController extends Controller
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
             foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
-                $attachment = \App\Models\TaskAttachment::find($attachmentId);
+                $attachment = \App\Models\Attachment::find($attachmentId);
 
-                if ($attachment && $attachment->task_id === $task->id) {
+                if ($attachment && $attachment->attachable_id === $task->id && $attachment->attachable_type === Task::class) {
                     // Delete the file if it exists
                     if (\Illuminate\Support\Facades\Storage::exists($attachment->path)) {
                         \Illuminate\Support\Facades\Storage::delete($attachment->path);
@@ -215,8 +215,9 @@ class TaskController extends Controller
                     \Illuminate\Support\Facades\Storage::move($file, $newPath);
 
                     // Create attachment record
-                    \App\Models\TaskAttachment::create([
-                        'task_id' => $task->id,
+                    \App\Models\Attachment::create([
+                        'attachable_id' => $task->id,
+                        'attachable_type' => Task::class,
                         'original_filename' => $originalFilename,
                         'path' => $newPath,
                     ]);
@@ -291,8 +292,9 @@ class TaskController extends Controller
                     Storage::move($file, $newPath);
 
                     // Create attachment record
-                    TaskAttachment::create([
-                        'task_id' => $task->id,
+                    Attachment::create([
+                        'attachable_id' => $task->id,
+                        'attachable_type' => Task::class,
                         'original_filename' => $originalFilename,
                         'path' => $newPath,
                     ]);

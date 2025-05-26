@@ -57,8 +57,8 @@ class Task extends Model
     /**
      * Get the attachments for the task.
      */
-    public function attachments(): HasMany
+    public function attachments(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
-        return $this->hasMany(TaskAttachment::class);
+        return $this->morphMany(Attachment::class, 'attachable');
     }
 }

@@ -4,23 +4,24 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class TaskAttachment extends Model
+class Attachment extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'task_id',
+        'attachable_id',
+        'attachable_type',
         'original_filename',
         'path',
     ];
 
     /**
-     * Get the task that owns the attachment.
+     * Get the parent attachable model.
      */
-    public function task(): BelongsTo
+    public function attachable(): MorphTo
     {
-        return $this->belongsTo(Task::class);
+        return $this->morphTo();
     }
 }
