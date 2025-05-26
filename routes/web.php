@@ -5,6 +5,7 @@ use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
+use App\Http\Controllers\TaskAttachmentController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -60,6 +61,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('tasks.destroy');
     Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
     Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
+
+    // Task attachments
+    Route::post('task-attachments/upload', [TaskAttachmentController::class, 'upload'])->name('task-attachments.upload');
+    Route::get('task-attachments/list-temp', [TaskAttachmentController::class, 'listTempFiles'])->name('task-attachments.list-temp');
+    Route::delete('task-attachments/remove-temp', [TaskAttachmentController::class, 'removeTempFile'])->name('task-attachments.remove-temp');
 });
 
 require __DIR__.'/settings.php';
