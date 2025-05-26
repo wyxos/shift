@@ -17,7 +17,7 @@ const stars = 0 // optionally fetch from GitHub API later
     <div class="p-4 min-h-screen flex flex-col">
         <div class="flex justify-end">
             <div class="flex gap-4 mb-10">
-                <a href="https://github.com/wyxos/shift" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                <a href="https://github.com/wyxos/shift-php" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 0a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.2c-3.34.73-4.04-1.6-4.04-1.6a3.18 3.18 0 00-1.34-1.76c-1.1-.75.08-.74.08-.74a2.52 2.52 0 011.85 1.24 2.56 2.56 0 003.5 1 2.57 2.57 0 01.77-1.6c-2.66-.3-5.46-1.33-5.46-5.92a4.62 4.62 0 011.24-3.2 4.3 4.3 0 01.12-3.16s1-.33 3.3 1.22a11.43 11.43 0 016 0c2.3-1.55 3.3-1.22 3.3-1.22a4.3 4.3 0 01.12 3.16 4.61 4.61 0 011.24 3.2c0 4.6-2.8 5.61-5.47 5.9a2.87 2.87 0 01.82 2.22v3.3c0 .32.22.69.83.57A12 12 0 0012 0z"/>
                     </svg>
