@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
@@ -145,6 +147,7 @@ class TaskController extends Controller
             'project_id' => 'required|exists:projects,id',
             'status' => 'nullable|string|in:pending,in_progress,completed',
             'priority' => 'nullable|string|in:low,medium,high',
+            'temp_identifier' => 'nullable|string',
         ]);
 
         $task = \App\Models\Task::create([
@@ -152,6 +155,43 @@ class TaskController extends Controller
         ]);
 
         $task->submitter()->associate(auth()->user())->save();
+
+        // Handle attachments if temp_identifier is provided
+        if (isset($attributes['temp_identifier'])) {
+            $tempIdentifier = $attributes['temp_identifier'];
+            $tempPath = "temp_attachments/{$tempIdentifier}";
+
+            // Check if temp directory exists
+            if (Storage::exists($tempPath)) {
+                // Get all files in the temp directory
+                $files = Storage::files($tempPath);
+
+                // Create permanent directory if it doesn't exist
+                $permanentPath = "attachments/{$task->id}";
+                if (!Storage::exists($permanentPath)) {
+                    Storage::makeDirectory($permanentPath);
+                }
+
+                // Move each file to the permanent location and create attachment records
+                foreach ($files as $file) {
+                    $originalFilename = basename($file);
+                    $newPath = "{$permanentPath}/{$originalFilename}";
+
+                    // Move the file
+                    Storage::move($file, $newPath);
+
+                    // Create attachment record
+                    TaskAttachment::create([
+                        'task_id' => $task->id,
+                        'original_filename' => $originalFilename,
+                        'path' => $newPath,
+                    ]);
+                }
+
+                // Remove the temp directory
+                Storage::deleteDirectory($tempPath);
+            }
+        }
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
