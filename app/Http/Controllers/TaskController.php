@@ -13,7 +13,7 @@ class TaskController extends Controller
     public function index()
     {
         $tasks = \App\Models\Task::query()
-            ->with(['submitter', 'metadata', 'project'])
+            ->with(['submitter', 'metadata', 'project.organisation', 'project.client'])
             ->where(function ($query) {
                 $query
                     ->whereHas('project.projectUser', function ($query) {
@@ -60,16 +60,17 @@ class TaskController extends Controller
         // Get projects for the filter dropdown (same as in create method)
         $projects = Project::where(function ($query) {
             $query->where(
-                fn($query) => $query->whereHas('client.organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })->orWhereHas('organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })
+                fn($query) => $query
+                    ->whereHas('client.organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })->orWhereHas('organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
                     ->orWhere('author_id', auth()->user()->id)
-            )
-                ->orWhereHas('projectUser', function ($query) {
-                    $query->where('user_id', auth()->user()->id);
-                });
+                    ->orWhereHas('projectUser', function ($query) {
+                        $query->where('user_id', auth()->user()->id);
+                    })
+            );
         })->get();
 
         return inertia('Tasks/Index')
