@@ -66,6 +66,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('task-attachments/upload', [TaskAttachmentController::class, 'upload'])->name('task-attachments.upload');
     Route::get('task-attachments/list-temp', [TaskAttachmentController::class, 'listTempFiles'])->name('task-attachments.list-temp');
     Route::delete('task-attachments/remove-temp', [TaskAttachmentController::class, 'removeTempFile'])->name('task-attachments.remove-temp');
+    Route::get('tasks/{task}/attachments', [TaskAttachmentController::class, 'listTaskAttachments'])->name('task-attachments.list');
+    Route::delete('task-attachments/{attachment}', [TaskAttachmentController::class, 'deleteAttachment'])->name('task-attachments.delete');
 });
 
 require __DIR__.'/settings.php';
