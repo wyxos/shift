@@ -14,37 +14,40 @@ class TaskController extends Controller
     {
         $tasks = \App\Models\Task::query()
             ->with(['submitter', 'metadata', 'project'])
-            ->where(function($query) {
-                $query->where(
-                    fn($query) => $query->whereHas('project.client.organisation', function ($query) {
+            ->where(function ($query) {
+                $query
+                    ->whereHas('project.projectUser', function ($query) {
+                        $query->where('user_id', auth()->user()->id);
+                    })
+                    ->orWhereHas('project', function ($query) {
                         $query->where('author_id', auth()->user()->id);
-                    })->orWhereHas('project.organisation', function ($query) {
+                    })
+                    ->orWhereHas('project.organisation', function ($query) {
+                        $query->where('author_id', auth()->user()->id);
+                    })
+                    ->orWhereHas('project.client.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
                     })
                     ->orWhereHasMorph('submitter', [User::class], function ($query) {
-                        $query->where('id', auth()->user()->id);
-                    })
-                )
-                ->orWhereHas('project.projectUser', function($query) {
-                    $query->where('user_id', auth()->user()->id);
-                });
+                        $query->where('users.id', auth()->user()->id);
+                    });
             })
             ->latest()
             ->when(
                 request('search'),
-                fn ($query)  => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                fn($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
             )
             ->when(
                 request('project_id'),
-                fn ($query) => $query->where('project_id', request('project_id'))
+                fn($query) => $query->where('project_id', request('project_id'))
             )
             ->when(
                 request('priority'),
-                fn ($query) => $query->where('priority', request('priority'))
+                fn($query) => $query->where('priority', request('priority'))
             )
             ->when(
                 request('status'),
-                fn ($query) => $query->where('status', request('status'))
+                fn($query) => $query->where('status', request('status'))
             )
             ->paginate(10)
             ->withQueryString();
@@ -55,18 +58,18 @@ class TaskController extends Controller
         });
 
         // Get projects for the filter dropdown (same as in create method)
-        $projects = Project::where(function($query) {
+        $projects = Project::where(function ($query) {
             $query->where(
                 fn($query) => $query->whereHas('client.organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
                 })->orWhereHas('organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
                 })
-                ->orWhere('author_id', auth()->user()->id)
+                    ->orWhere('author_id', auth()->user()->id)
             )
-            ->orWhereHas('projectUser', function($query) {
-                $query->where('user_id', auth()->user()->id);
-            });
+                ->orWhereHas('projectUser', function ($query) {
+                    $query->where('user_id', auth()->user()->id);
+                });
         })->get();
 
         return inertia('Tasks/Index')
@@ -80,18 +83,18 @@ class TaskController extends Controller
     // create task
     public function create()
     {
-        $projects = Project::where(function($query) {
+        $projects = Project::where(function ($query) {
             $query->where(
                 fn($query) => $query->whereHas('client.organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
                 })->orWhereHas('organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
                 })
-                ->orWhere('author_id', auth()->user()->id)
+                    ->orWhere('author_id', auth()->user()->id)
             )
-            ->orWhereHas('projectUser', function($query) {
-                $query->where('user_id', auth()->user()->id);
-            });
+                ->orWhereHas('projectUser', function ($query) {
+                    $query->where('user_id', auth()->user()->id);
+                });
         })->get();
 
         return inertia('Tasks/Create')
