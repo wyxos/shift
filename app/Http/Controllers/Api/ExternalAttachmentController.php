@@ -36,7 +36,8 @@ class ExternalAttachmentController extends Controller
             // For non-images, return a download response
             return response()->download(
                 Storage::path($attachment->path),
-                $attachment->original_filename
+                $attachment->original_filename,
+                ['Content-Type' => 'application/octet-stream']
             );
         }
     }
