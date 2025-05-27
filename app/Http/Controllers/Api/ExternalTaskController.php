@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ExternalTaskController extends Controller
 {
@@ -50,7 +53,22 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $task->load(['submitter', 'metadata', 'project']);
+        $task->load(['submitter', 'metadata', 'project', 'attachments']);
+
+        // Format the attachments for the response
+        $formattedAttachments = $task->attachments->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => route('attachments.download', $attachment),
+                'created_at' => $attachment->created_at,
+            ];
+        });
+
+        // Add the formatted attachments to the task
+        $task = $task->toArray();
+        $task['attachments'] = $formattedAttachments;
 
         return response()->json($task);
     }
@@ -76,6 +94,8 @@ class ExternalTaskController extends Controller
             'user.url' => 'nullable|url',
             'metadata.url' => 'required|url',
             'metadata.environment' => 'required|string|max:255',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB max
         ]);
 
         $task = Task::create([
@@ -103,6 +123,37 @@ class ExternalTaskController extends Controller
             'environment' => request('metadata.environment'),
         ]);
 
+        // Handle attachments if any
+        if ($request->hasFile('attachments')) {
+            $attachmentFiles = $request->file('attachments');
+
+            // Create permanent directory if it doesn't exist
+            $permanentPath = "attachments/{$task->id}";
+            if (!Storage::exists($permanentPath)) {
+                Storage::makeDirectory($permanentPath);
+            }
+
+            foreach ($attachmentFiles as $file) {
+                $originalFilename = $file->getClientOriginalName();
+
+                // Generate a unique filename for storage
+                $extension = $file->getClientOriginalExtension();
+                $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                $newPath = "{$permanentPath}/{$storedFilename}";
+
+                // Store the file
+                $file->storeAs($permanentPath, $storedFilename);
+
+                // Create attachment record
+                Attachment::create([
+                    'attachable_id' => $task->id,
+                    'attachable_type' => Task::class,
+                    'original_filename' => $originalFilename,
+                    'path' => $newPath,
+                ]);
+            }
+        }
+
         return response()->json($task, 201);
     }
 
@@ -128,6 +179,10 @@ class ExternalTaskController extends Controller
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:low,medium,high',
             'status' => 'nullable|string|in:pending,in_progress,completed',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB max
+            'deleted_attachment_ids' => 'nullable|array',
+            'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
         ]);
 
         $task->update([
@@ -135,6 +190,54 @@ class ExternalTaskController extends Controller
             'status' => $attributes['status'] ?? $task->status,
             'priority' => $attributes['priority'] ?? $task->priority,
         ]);
+
+        // Handle deleted attachments
+        if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
+            foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
+                $attachment = Attachment::find($attachmentId);
+
+                if ($attachment && $attachment->attachable_id === $task->id && $attachment->attachable_type === Task::class) {
+                    // Delete the file if it exists
+                    if (Storage::exists($attachment->path)) {
+                        Storage::delete($attachment->path);
+                    }
+
+                    // Delete the attachment record
+                    $attachment->delete();
+                }
+            }
+        }
+
+        // Handle new attachments if any
+        if ($request->hasFile('attachments')) {
+            $attachmentFiles = $request->file('attachments');
+
+            // Create permanent directory if it doesn't exist
+            $permanentPath = "attachments/{$task->id}";
+            if (!Storage::exists($permanentPath)) {
+                Storage::makeDirectory($permanentPath);
+            }
+
+            foreach ($attachmentFiles as $file) {
+                $originalFilename = $file->getClientOriginalName();
+
+                // Generate a unique filename for storage
+                $extension = $file->getClientOriginalExtension();
+                $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                $newPath = "{$permanentPath}/{$storedFilename}";
+
+                // Store the file
+                $file->storeAs($permanentPath, $storedFilename);
+
+                // Create attachment record
+                Attachment::create([
+                    'attachable_id' => $task->id,
+                    'attachable_type' => Task::class,
+                    'original_filename' => $originalFilename,
+                    'path' => $newPath,
+                ]);
+            }
+        }
 
         return response()->json($task, 200);
     }
