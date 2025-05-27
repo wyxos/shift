@@ -69,6 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks/{task}/attachments', [AttachmentController::class, 'listTaskAttachments'])->name('attachments.list-task');
     Route::get('{type}/{id}/attachments', [AttachmentController::class, 'listAttachments'])->name('attachments.list');
     Route::delete('attachments/{attachment}', [AttachmentController::class, 'deleteAttachment'])->name('attachments.delete');
+    Route::get('attachments/{attachment}/download', [AttachmentController::class, 'downloadAttachment'])->name('attachments.download');
 });
 
 require __DIR__.'/settings.php';
