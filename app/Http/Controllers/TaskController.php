@@ -7,6 +7,7 @@ use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\Attachment;
 use App\Models\User;
+use App\Notifications\TaskCreationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -249,6 +250,9 @@ class TaskController extends Controller
 
         $task->submitter()->associate(auth()->user())->save();
 
+        // Send notification to project owner and users with access to the project
+        $this->sendTaskCreationNotifications($task);
+
         // Handle attachments if temp_identifier is provided
         if (isset($attributes['temp_identifier'])) {
             $tempIdentifier = $attributes['temp_identifier'];
@@ -358,5 +362,47 @@ class TaskController extends Controller
             'priority' => $task->priority,
             'message' => 'Task priority updated successfully'
         ]);
+    }
+
+    /**
+     * Send task creation notifications to project owner and users with access to the project.
+     * Excludes the creator of the task from receiving notifications.
+     *
+     * @param Task $task
+     * @return void
+     */
+    protected function sendTaskCreationNotifications(Task $task)
+    {
+        // Load the project with its relationships
+        $project = $task->project()->with(['author', 'projectUser.user'])->first();
+
+        // Collect all users who should receive the notification
+        $usersToNotify = collect();
+
+        // Get the creator's ID (if it's a User)
+        $creatorId = null;
+        if ($task->submitter_type === User::class) {
+            $creatorId = $task->submitter_id;
+        }
+
+        // Add the project owner (author) if they're not the creator
+        if ($project->author && $project->author->id !== $creatorId) {
+            $usersToNotify->push($project->author);
+        }
+
+        // Add all users with access to the project, except the creator
+        foreach ($project->projectUser as $projectUser) {
+            if ($projectUser->user &&
+                $projectUser->user->id !== $creatorId &&
+                !$usersToNotify->contains('id', $projectUser->user->id)) {
+                $usersToNotify->push($projectUser->user);
+            }
+        }
+
+        // Send notification to each user
+        $notification = new \App\Notifications\TaskCreationNotification($task);
+        foreach ($usersToNotify as $user) {
+            $user->notify($notification);
+        }
     }
 }
