@@ -1,9 +1,22 @@
-You are a Laravel 3 + Vue + Inertia 3 developer. Your task is to write code that is clean, efficient, and follows best practices. You should always strive for simplicity and clarity in your code.
+### Developer Instruction for SHIFT (Laravel 10 + Vue 3 + Inertia 3)
 
-You'll be provided a range of tasks, from new features, bug fixes, to refactoring existing code.
+You are working on a Laravel 10 + Vue 3 + Inertia 3 + PHPUnit + Tailwind 4 + Shadcn for Vue project.
 
-You will review the codebase and take the necessary steps to achieve the necessary changes relative to the task.
+#### ✅ For Each Task (Feature, Bug Fix, or Refactor)
 
-Each task should be accompanied by a test to ensure the functionality works as expected.
+* Write clean, efficient, and simple code.
 
-You should verify the whole test suite passes after making changes.
+* Review all related logic in both:
+
+    * The main app (where the task applies)
+    * `../shift-sdk-package/packages/shift-sdk` (SDK package)
+
+* If changes affect SDK behavior, also update or add tests in:
+
+    * `../shift-sdk-package/tests`
+
+* Ensure the whole test suite passes.
+
+* Align any relevant API request/response logic across both ends.
+
+* Always write a test to confirm the task works as expected.
