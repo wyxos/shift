@@ -9,7 +9,7 @@ You are working on a Laravel 10 + Vue 3 + Inertia 3 + PHPUnit + Tailwind 4 + Sha
 * Review all related logic in both:
 
     * The main app (where the task applies)
-    * `../shift-sdk-package/packages/shift-sdk` (SDK package)
+    * `../shift-sdk-package/packages/shift-php` (SDK package)
 
 * If changes affect SDK behavior, also update or add tests in:
 
