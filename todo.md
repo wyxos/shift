@@ -34,3 +34,4 @@
 - [ ] Project analytics (tasks open/closed stats)
 - [ ] OAuth login / External user accounts
 - [ ] Notifications (email/slack/push)
+- [ ] Git integration
