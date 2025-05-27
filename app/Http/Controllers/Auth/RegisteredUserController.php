@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\OrganisationUser;
+use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
+use App\Notifications\ProjectUserRegisteredNotification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +66,12 @@ class RegisteredUserController extends Controller
                     'user_id' => $user->id,
                     'registration_status' => 'registered'
                 ]);
+
+            // Notify the project owner that a user has completed registration
+            $project = Project::find($request->project_id);
+            if ($project && $project->author) {
+                $project->author->notify(new ProjectUserRegisteredNotification($user, $project));
+            }
 
             return to_route('projects.index', ['highlight' => $request->project_id]);
         }
