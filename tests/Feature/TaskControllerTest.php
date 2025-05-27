@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskCreationNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class TaskControllerTest extends TestCase
@@ -259,5 +262,66 @@ class TaskControllerTest extends TestCase
             'id' => $task->id,
             'priority' => 'high'
         ]);
+    }
+
+    public function test_task_creation_sends_notifications()
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        // Create a project owned by the user
+        $project = Project::factory()->create([
+            'author_id' => $this->user->id
+        ]);
+
+        // Create additional users with access to the project
+        $projectUser1 = User::factory()->create();
+        $projectUser2 = User::factory()->create();
+
+        // Give these users access to the project
+        \App\Models\ProjectUser::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $projectUser1->id,
+            'user_email' => $projectUser1->email,
+            'user_name' => $projectUser1->name,
+            'registration_status' => 'registered'
+        ]);
+
+        \App\Models\ProjectUser::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $projectUser2->id,
+            'user_email' => $projectUser2->email,
+            'user_name' => $projectUser2->name,
+            'registration_status' => 'registered'
+        ]);
+
+        // Create a task for the project
+        $taskData = [
+            'title' => 'Notification Test Task',
+            'description' => 'This task should trigger notifications',
+            'project_id' => $project->id,
+            'priority' => 'high',
+            'status' => 'pending'
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->post(route('tasks.store'), $taskData);
+
+        $response->assertRedirect(route('tasks.index'));
+        $response->assertSessionHas('success', 'Task created successfully.');
+
+        // Get the created task
+        $task = \App\Models\Task::where('title', 'Notification Test Task')->first();
+
+        // Assert that notifications were NOT sent to the task creator (who is also the project owner)
+        \Illuminate\Support\Facades\Notification::assertNotSentTo(
+            [$this->user],
+            \App\Notifications\TaskCreationNotification::class
+        );
+
+        // Assert that notifications were sent to users with access to the project
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            [$projectUser1, $projectUser2],
+            \App\Notifications\TaskCreationNotification::class
+        );
     }
 }

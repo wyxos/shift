@@ -7,6 +7,8 @@ use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
+use App\Notifications\TaskCreationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -122,6 +124,9 @@ class ExternalTaskController extends Controller
             'url' => request('metadata.url'),
             'environment' => request('metadata.environment'),
         ]);
+
+        // Send notifications to project users
+        $this->sendTaskCreationNotifications($task);
 
         // Handle attachments if any
         if ($request->hasFile('attachments')) {
@@ -314,5 +319,39 @@ class ExternalTaskController extends Controller
             'priority' => $task->priority,
             'message' => 'Task priority updated successfully'
         ]);
+    }
+
+    /**
+     * Send task creation notifications to project owner and users with access to the project.
+     * For external tasks, all relevant users should receive notifications.
+     *
+     * @param Task $task
+     * @return void
+     */
+    private function sendTaskCreationNotifications(Task $task)
+    {
+        // Load the project with its relationships
+        $project = $task->project()->with(['author', 'projectUser.user'])->first();
+
+        // Collect all users who should receive the notification
+        $usersToNotify = collect();
+
+        // Add the project owner (author)
+        if ($project->author) {
+            $usersToNotify->push($project->author);
+        }
+
+        // Add all users with access to the project
+        foreach ($project->projectUser as $projectUser) {
+            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
+                $usersToNotify->push($projectUser->user);
+            }
+        }
+
+        // Send notification to each user
+        $notification = new TaskCreationNotification($task);
+        foreach ($usersToNotify as $user) {
+            $user->notify($notification);
+        }
     }
 }
