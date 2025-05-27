@@ -367,4 +367,54 @@ class ExternalTaskControllerTest extends TestCase
             'priority' => 'high'
         ]);
     }
+
+    public function test_external_task_creation_sends_notifications_to_all_relevant_users()
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        // Create additional users with access to the project
+        $projectUser1 = User::factory()->create();
+        $projectUser2 = User::factory()->create();
+
+        // Give these users access to the project
+        \App\Models\ProjectUser::factory()->create([
+            'project_id' => $this->project->id,
+            'user_id' => $projectUser1->id,
+            'user_email' => $projectUser1->email,
+            'user_name' => $projectUser1->name,
+            'registration_status' => 'registered'
+        ]);
+
+        \App\Models\ProjectUser::factory()->create([
+            'project_id' => $this->project->id,
+            'user_id' => $projectUser2->id,
+            'user_email' => $projectUser2->email,
+            'user_name' => $projectUser2->name,
+            'registration_status' => 'registered'
+        ]);
+
+        $taskData = [
+            'title' => 'External Notification Test Task',
+            'description' => 'This task should trigger notifications to all users',
+            'project' => $this->project->token,
+            'priority' => 'high',
+            'status' => 'pending',
+            'user' => $this->externalUserData,
+            'metadata' => [
+                'url' => 'https://example.com/task/notification-test',
+                'environment' => 'testing'
+            ]
+        ];
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->postJson('/api/tasks', $taskData);
+
+        $response->assertStatus(201);
+
+        // Assert that notifications were sent to the project owner and all users with access
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            [$this->user, $projectUser1, $projectUser2],
+            \App\Notifications\TaskCreationNotification::class
+        );
+    }
 }
