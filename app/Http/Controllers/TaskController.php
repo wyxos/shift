@@ -121,7 +121,7 @@ class TaskController extends Controller
                         'id' => $attachment->id,
                         'original_filename' => $attachment->original_filename,
                         'path' => $attachment->path,
-                        'url' => \Illuminate\Support\Facades\Storage::url($attachment->path),
+                        'url' => route('attachments.download', $attachment),
                     ];
                 })
             ]);

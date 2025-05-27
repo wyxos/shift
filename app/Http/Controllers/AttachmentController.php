@@ -154,7 +154,7 @@ class AttachmentController extends Controller
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => Storage::url($attachment->path),
+                'url' => route('attachments.download', $attachment),
                 'created_at' => $attachment->created_at,
             ];
         });
@@ -175,7 +175,7 @@ class AttachmentController extends Controller
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => Storage::url($attachment->path),
+                'url' => route('attachments.download', $attachment),
                 'created_at' => $attachment->created_at,
             ];
         });
@@ -217,5 +217,25 @@ class AttachmentController extends Controller
         ];
 
         return $map[$type] ?? null;
+    }
+
+    /**
+     * Download an attachment.
+     *
+     * @param Attachment $attachment
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
+     */
+    public function downloadAttachment(Attachment $attachment)
+    {
+        // Check if the file exists
+        if (!Storage::exists($attachment->path)) {
+            abort(404, 'File not found');
+        }
+
+        // Return the file as a download response
+        return response()->download(
+            Storage::path($attachment->path),
+            $attachment->original_filename
+        );
     }
 }
