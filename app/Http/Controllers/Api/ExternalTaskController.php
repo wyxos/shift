@@ -96,8 +96,7 @@ class ExternalTaskController extends Controller
             'user.url' => 'nullable|url',
             'metadata.url' => 'required|url',
             'metadata.environment' => 'required|string|max:255',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240', // 10MB max
+            'temp_identifier' => 'nullable|string',
         ]);
 
         $task = Task::create([
@@ -128,34 +127,64 @@ class ExternalTaskController extends Controller
         // Send notifications to project users
         $this->sendTaskCreationNotifications($task);
 
-        // Handle attachments if any
-        if ($request->hasFile('attachments')) {
-            $attachmentFiles = $request->file('attachments');
+        // Handle attachments if temp_identifier is provided
+        if (isset($attributes['temp_identifier'])) {
+            $tempIdentifier = $attributes['temp_identifier'];
+            $tempPath = "temp_attachments/{$tempIdentifier}";
 
-            // Create permanent directory if it doesn't exist
-            $permanentPath = "attachments/{$task->id}";
-            if (!Storage::exists($permanentPath)) {
-                Storage::makeDirectory($permanentPath);
-            }
+            // Check if temp directory exists
+            if (Storage::exists($tempPath)) {
+                // Get all files in the temp directory
+                $files = Storage::files($tempPath);
 
-            foreach ($attachmentFiles as $file) {
-                $originalFilename = $file->getClientOriginalName();
+                // Create permanent directory if it doesn't exist
+                $permanentPath = "attachments/{$task->id}";
+                if (!Storage::exists($permanentPath)) {
+                    Storage::makeDirectory($permanentPath);
+                }
 
-                // Generate a unique filename for storage
-                $extension = $file->getClientOriginalExtension();
-                $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
-                $newPath = "{$permanentPath}/{$storedFilename}";
+                // Move each file to the permanent location and create attachment records
+                foreach ($files as $file) {
+                    // Skip metadata files
+                    if (Str::endsWith($file, '.meta')) {
+                        continue;
+                    }
 
-                // Store the file
-                $file->storeAs($permanentPath, $storedFilename);
+                    // Try to get original filename from metadata
+                    $metadataPath = $file . '.meta';
+                    $originalFilename = basename($file);
 
-                // Create attachment record
-                Attachment::create([
-                    'attachable_id' => $task->id,
-                    'attachable_type' => Task::class,
-                    'original_filename' => $originalFilename,
-                    'path' => $newPath,
-                ]);
+                    if (Storage::exists($metadataPath)) {
+                        $metadata = json_decode(Storage::get($metadataPath), true);
+                        if (isset($metadata['original_filename'])) {
+                            $originalFilename = $metadata['original_filename'];
+                        }
+                    }
+
+                    // Generate a unique filename for storage
+                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $newPath = "{$permanentPath}/{$storedFilename}";
+
+                    // Move the file
+                    Storage::move($file, $newPath);
+
+                    // Create attachment record
+                    Attachment::create([
+                        'attachable_id' => $task->id,
+                        'attachable_type' => Task::class,
+                        'original_filename' => $originalFilename,
+                        'path' => $newPath,
+                    ]);
+
+                    // Delete metadata file
+                    if (Storage::exists($metadataPath)) {
+                        Storage::delete($metadataPath);
+                    }
+                }
+
+                // Remove the temp directory
+                Storage::deleteDirectory($tempPath);
             }
         }
 
@@ -184,8 +213,7 @@ class ExternalTaskController extends Controller
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:low,medium,high',
             'status' => 'nullable|string|in:pending,in_progress,completed',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240', // 10MB max
+            'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
         ]);
@@ -213,34 +241,64 @@ class ExternalTaskController extends Controller
             }
         }
 
-        // Handle new attachments if any
-        if ($request->hasFile('attachments')) {
-            $attachmentFiles = $request->file('attachments');
+        // Handle new attachments if temp_identifier is provided
+        if (isset($attributes['temp_identifier'])) {
+            $tempIdentifier = $attributes['temp_identifier'];
+            $tempPath = "temp_attachments/{$tempIdentifier}";
 
-            // Create permanent directory if it doesn't exist
-            $permanentPath = "attachments/{$task->id}";
-            if (!Storage::exists($permanentPath)) {
-                Storage::makeDirectory($permanentPath);
-            }
+            // Check if temp directory exists
+            if (Storage::exists($tempPath)) {
+                // Get all files in the temp directory
+                $files = Storage::files($tempPath);
 
-            foreach ($attachmentFiles as $file) {
-                $originalFilename = $file->getClientOriginalName();
+                // Create permanent directory if it doesn't exist
+                $permanentPath = "attachments/{$task->id}";
+                if (!Storage::exists($permanentPath)) {
+                    Storage::makeDirectory($permanentPath);
+                }
 
-                // Generate a unique filename for storage
-                $extension = $file->getClientOriginalExtension();
-                $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
-                $newPath = "{$permanentPath}/{$storedFilename}";
+                // Move each file to the permanent location and create attachment records
+                foreach ($files as $file) {
+                    // Skip metadata files
+                    if (Str::endsWith($file, '.meta')) {
+                        continue;
+                    }
 
-                // Store the file
-                $file->storeAs($permanentPath, $storedFilename);
+                    // Try to get original filename from metadata
+                    $metadataPath = $file . '.meta';
+                    $originalFilename = basename($file);
 
-                // Create attachment record
-                Attachment::create([
-                    'attachable_id' => $task->id,
-                    'attachable_type' => Task::class,
-                    'original_filename' => $originalFilename,
-                    'path' => $newPath,
-                ]);
+                    if (Storage::exists($metadataPath)) {
+                        $metadata = json_decode(Storage::get($metadataPath), true);
+                        if (isset($metadata['original_filename'])) {
+                            $originalFilename = $metadata['original_filename'];
+                        }
+                    }
+
+                    // Generate a unique filename for storage
+                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $newPath = "{$permanentPath}/{$storedFilename}";
+
+                    // Move the file
+                    Storage::move($file, $newPath);
+
+                    // Create attachment record
+                    Attachment::create([
+                        'attachable_id' => $task->id,
+                        'attachable_type' => Task::class,
+                        'original_filename' => $originalFilename,
+                        'path' => $newPath,
+                    ]);
+
+                    // Delete metadata file
+                    if (Storage::exists($metadataPath)) {
+                        Storage::delete($metadataPath);
+                    }
+                }
+
+                // Remove the temp directory
+                Storage::deleteDirectory($tempPath);
             }
         }
 
