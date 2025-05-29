@@ -17,6 +17,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\Api\ExternalTaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
     Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\Api\ExternalTaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
 
+    // task threads
+    Route::get('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'index'])->name('task-threads.index');
+    Route::post('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'store'])->name('task-threads.store');
+    Route::get('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'show'])->name('task-threads.show');
+
     // attachments
+    Route::post('/attachments/upload', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'upload'])->name('api.attachments.upload');
+    Route::delete('/attachments/remove-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'removeTemp'])->name('api.attachments.remove-temp');
+    Route::get('/attachments/list-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'listTemp'])->name('api.attachments.list-temp');
     Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'download'])->name('api.attachments.download');
 });
