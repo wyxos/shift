@@ -62,6 +62,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
     Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
 
+    // Task Threads
+    Route::get('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'index'])->name('task-threads.index');
+    Route::post('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'store'])->name('task-threads.store');
+    Route::get('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'show'])->name('task-threads.show');
+
     // Attachments
     Route::post('attachments/upload', [AttachmentController::class, 'upload'])->name('attachments.upload');
     Route::get('attachments/list-temp', [AttachmentController::class, 'listTempFiles'])->name('attachments.list-temp');

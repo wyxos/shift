@@ -213,6 +213,7 @@ class AttachmentController extends Controller
     {
         $map = [
             'task' => Task::class,
+            'task_thread' => \App\Models\TaskThread::class,
             // Add more mappings as needed
         ];
 
