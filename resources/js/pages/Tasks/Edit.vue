@@ -6,6 +6,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Input } from '@/components/ui/input';
 import { computed, onMounted, ref } from 'vue';
 import axios from 'axios';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const props = defineProps({
     project: {
@@ -21,6 +22,118 @@ const props = defineProps({
         default: () => []
     }
 });
+
+// Thread state
+const activeTab = ref('internal');
+const internalMessages = ref([
+    { id: 1, sender: 'John Doe', content: 'This is an example internal message', timestamp: '10:30 AM', isCurrentUser: true, attachments: [] },
+    { id: 2, sender: 'Jane Smith', content: 'This is a response to the internal message', timestamp: '10:35 AM', isCurrentUser: false, attachments: [] },
+]);
+const externalMessages = ref([
+    { id: 1, sender: 'Client Name', content: 'This is an example external message from the client', timestamp: '11:30 AM', isCurrentUser: false, attachments: [] },
+    { id: 2, sender: 'You', content: 'This is a response to the client', timestamp: '11:45 AM', isCurrentUser: true, attachments: [] },
+]);
+const newMessage = ref('');
+
+// Thread attachment state
+const threadTempIdentifier = ref(Date.now().toString() + '_thread');
+const threadAttachments = ref([]);
+const isThreadUploading = ref(false);
+const threadUploadError = ref('');
+
+// Handle thread file upload
+const handleThreadFileUpload = (event) => {
+    const files = event.target.files || event.dataTransfer.files;
+    if (!files.length) return;
+
+    for (let i = 0; i < files.length; i++) {
+        uploadThreadFile(files[i]);
+    }
+
+    // Clear the file input
+    event.target.value = '';
+};
+
+// Upload a thread file
+const uploadThreadFile = async (file) => {
+    isThreadUploading.value = true;
+    threadUploadError.value = '';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('temp_identifier', threadTempIdentifier.value);
+
+    try {
+        const response = await axios.post(route('attachments.upload'), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+
+        threadAttachments.value.push(response.data);
+        isThreadUploading.value = false;
+    } catch (error) {
+        isThreadUploading.value = false;
+        threadUploadError.value = error.response?.data?.message || 'Error uploading file';
+        console.error('Thread upload error:', error);
+    }
+};
+
+// Remove a thread attachment
+const removeThreadAttachment = async (file) => {
+    try {
+        await axios.delete(route('attachments.remove-temp'), {
+            params: { path: file.path }
+        });
+
+        // Remove from the list
+        threadAttachments.value = threadAttachments.value.filter(f => f.path !== file.path);
+    } catch (error) {
+        console.error('Error removing thread attachment:', error);
+    }
+};
+
+// Function to send a new message
+const sendMessage = async (event) => {
+    // Prevent form submission
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    if (!newMessage.value.trim() && threadAttachments.value.length === 0) return;
+
+    try {
+        const response = await axios.post(route('task-threads.store', { task: props.task.id }), {
+            content: newMessage.value,
+            type: activeTab.value,
+            temp_identifier: threadAttachments.value.length > 0 ? threadTempIdentifier.value : null
+        });
+
+        const message = {
+            id: response.data.thread.id,
+            sender: response.data.thread.sender_name,
+            content: response.data.thread.content,
+            timestamp: new Date(response.data.thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isCurrentUser: response.data.thread.is_current_user,
+            attachments: response.data.thread.attachments || []
+        };
+
+        if (activeTab.value === 'internal') {
+            internalMessages.value.push(message);
+        } else {
+            externalMessages.value.push(message);
+        }
+
+        // Clear form
+        newMessage.value = '';
+        threadAttachments.value = [];
+        threadTempIdentifier.value = Date.now().toString() + '_thread';
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
+    }
+};
 
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -62,10 +175,42 @@ const otherErrors = computed(() => {
         }, {});
 });
 
-// Load any previously uploaded files
+// Load any previously uploaded files and task threads
 onMounted(() => {
     loadTempFiles();
+    loadTaskThreads();
 });
+
+// Load task threads from the server
+const loadTaskThreads = async () => {
+    try {
+        const response = await axios.get(route('task-threads.index', { task: props.task.id }));
+
+        if (response.data.internal && Array.isArray(response.data.internal)) {
+            internalMessages.value = response.data.internal.map(thread => ({
+                id: thread.id,
+                sender: thread.sender_name,
+                content: thread.content,
+                timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isCurrentUser: thread.is_current_user,
+                attachments: thread.attachments || []
+            }));
+        }
+
+        if (response.data.external && Array.isArray(response.data.external)) {
+            externalMessages.value = response.data.external.map(thread => ({
+                id: thread.id,
+                sender: thread.sender_name,
+                content: thread.content,
+                timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isCurrentUser: thread.is_current_user,
+                attachments: thread.attachments || []
+            }));
+        }
+    } catch (error) {
+        console.error('Error loading task threads:', error);
+    }
+};
 
 // Handle file upload
 const handleFileUpload = (event) => {
@@ -153,7 +298,7 @@ const submitForm = () => {
     <AppLayout :breadcrumbs="breadcrumbs">
 
         <div class="p-4">
-            <form @submit.prevent="submitForm">
+            <form @submit.prevent="submitForm" @keydown.enter.prevent>
                 <div class="mb-4">
                     <label for="name" class="block text-sm font-medium text-gray-700">Task title</label>
                     <Input v-model="editForm.title" type="text" id="title" required />
@@ -238,6 +383,192 @@ const submitForm = () => {
                             </li>
                         </ul>
                     </div>
+                </div>
+
+                <!-- Thread Tabs Section -->
+                <div class="mb-6 mt-8">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Task Threads</h3>
+
+                    <Tabs :default-value="activeTab" @update:value="activeTab = $event" class="w-full">
+                        <TabsList class="grid w-full grid-cols-2 mb-4">
+                            <TabsTrigger value="internal">Internal Thread</TabsTrigger>
+                            <TabsTrigger value="external">External Thread</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="internal" class="border rounded-md p-4">
+                            <!-- Messages container with fixed height and scrolling -->
+                            <div class="h-64 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
+                                <div v-for="message in internalMessages" :key="message.id"
+                                    class="mb-3"
+                                    :class="message.isCurrentUser ? 'text-right' : 'text-left'">
+                                    <div class="inline-block max-w-3/4 p-3 rounded-lg"
+                                        :class="message.isCurrentUser ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'">
+                                        <p class="text-sm font-semibold">{{ message.sender }}</p>
+                                        <p>{{ message.content }}</p>
+                                        <!-- Display message attachments if any -->
+                                        <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
+                                            <p class="text-xs font-semibold">Attachments:</p>
+                                            <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
+                                                <a :href="attachment.url" target="_blank" class="text-xs underline flex items-center">
+                                                    <svg class="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                                    </svg>
+                                                    {{ attachment.original_filename }}
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs mt-1 opacity-75">{{ message.timestamp }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thread attachments display -->
+                            <div v-if="threadAttachments.length > 0" class="mb-3">
+                                <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
+                                <ul class="mt-2 divide-y divide-gray-200 border border-gray-200 rounded-md">
+                                    <li v-for="file in threadAttachments" :key="file.path" class="flex items-center justify-between py-2 px-3 text-sm">
+                                        <div class="flex items-center">
+                                            <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                            </svg>
+                                            <span class="truncate">{{ file.original_filename }}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            @click="removeThreadAttachment(file)"
+                                            class="text-red-600 hover:text-red-900"
+                                        >
+                                            Remove
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Thread upload error message -->
+                            <div v-if="threadUploadError" class="text-red-500 text-sm mb-2">{{ threadUploadError }}</div>
+
+                            <!-- Thread loading indicator -->
+                            <div v-if="isThreadUploading" class="text-blue-500 text-sm mb-2">Uploading attachment...</div>
+
+                            <!-- Message input with attachment button -->
+                            <div class="flex flex-col">
+                                <div class="flex mb-2">
+                                    <input
+                                        v-model="newMessage"
+                                        type="text"
+                                        placeholder="Type your message..."
+                                        class="flex-grow border rounded-l-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        @keyup.enter.prevent="sendMessage($event)"
+                                    />
+                                    <label class="cursor-pointer bg-gray-200 text-gray-700 px-3 py-2 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                        </svg>
+                                        <input
+                                            type="file"
+                                            class="hidden"
+                                            multiple
+                                            @change="handleThreadFileUpload"
+                                        />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        @click.prevent="sendMessage($event)"
+                                        class="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="external" class="border rounded-md p-4">
+                            <!-- Messages container with fixed height and scrolling -->
+                            <div class="h-64 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
+                                <div v-for="message in externalMessages" :key="message.id"
+                                    class="mb-3"
+                                    :class="message.isCurrentUser ? 'text-right' : 'text-left'">
+                                    <div class="inline-block max-w-3/4 p-3 rounded-lg"
+                                        :class="message.isCurrentUser ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'">
+                                        <p class="text-sm font-semibold">{{ message.sender }}</p>
+                                        <p>{{ message.content }}</p>
+                                        <!-- Display message attachments if any -->
+                                        <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
+                                            <p class="text-xs font-semibold">Attachments:</p>
+                                            <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
+                                                <a :href="attachment.url" target="_blank" class="text-xs underline flex items-center">
+                                                    <svg class="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                                    </svg>
+                                                    {{ attachment.original_filename }}
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs mt-1 opacity-75">{{ message.timestamp }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thread attachments display -->
+                            <div v-if="threadAttachments.length > 0" class="mb-3">
+                                <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
+                                <ul class="mt-2 divide-y divide-gray-200 border border-gray-200 rounded-md">
+                                    <li v-for="file in threadAttachments" :key="file.path" class="flex items-center justify-between py-2 px-3 text-sm">
+                                        <div class="flex items-center">
+                                            <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+                                            </svg>
+                                            <span class="truncate">{{ file.original_filename }}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            @click="removeThreadAttachment(file)"
+                                            class="text-red-600 hover:text-red-900"
+                                        >
+                                            Remove
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Thread upload error message -->
+                            <div v-if="threadUploadError" class="text-red-500 text-sm mb-2">{{ threadUploadError }}</div>
+
+                            <!-- Thread loading indicator -->
+                            <div v-if="isThreadUploading" class="text-blue-500 text-sm mb-2">Uploading attachment...</div>
+
+                            <!-- Message input with attachment button -->
+                            <div class="flex flex-col">
+                                <div class="flex mb-2">
+                                    <input
+                                        v-model="newMessage"
+                                        type="text"
+                                        placeholder="Type your message..."
+                                        class="flex-grow border rounded-l-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        @keyup.enter.prevent="sendMessage($event)"
+                                    />
+                                    <label class="cursor-pointer bg-gray-200 text-gray-700 px-3 py-2 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                        </svg>
+                                        <input
+                                            type="file"
+                                            class="hidden"
+                                            multiple
+                                            @change="handleThreadFileUpload"
+                                        />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        @click.prevent="sendMessage($event)"
+                                        class="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
                 </div>
 
                 <!-- Display any other errors -->

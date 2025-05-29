@@ -61,4 +61,12 @@ class Task extends Model
     {
         return $this->morphMany(Attachment::class, 'attachable');
     }
+
+    /**
+     * Get the threads for the task.
+     */
+    public function threads(): HasMany
+    {
+        return $this->hasMany(TaskThread::class);
+    }
 }
