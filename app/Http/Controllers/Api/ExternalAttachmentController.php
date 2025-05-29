@@ -57,6 +57,58 @@ class ExternalAttachmentController extends Controller
     }
 
     /**
+     * Upload multiple attachments at once.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function uploadMultiple(Request $request)
+    {
+        $request->validate([
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:10240', // 10MB max
+            'temp_identifier' => 'required|string',
+        ]);
+
+        $tempIdentifier = $request->input('temp_identifier');
+        $results = [];
+
+        // Create temp directory if it doesn't exist
+        $tempPath = "temp_attachments/{$tempIdentifier}";
+        if (!Storage::exists($tempPath)) {
+            Storage::makeDirectory($tempPath);
+        }
+
+        foreach ($request->file('attachments') as $file) {
+            $originalFilename = $file->getClientOriginalName();
+
+            // Generate a unique filename for storage
+            $extension = $file->getClientOriginalExtension();
+            $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) . '_' . uniqid() . '.' . $extension;
+            $filePath = "{$tempPath}/{$storedFilename}";
+
+            // Store the file
+            $file->storeAs($tempPath, $storedFilename);
+
+            // Store metadata
+            $metadata = [
+                'original_filename' => $originalFilename,
+                'uploaded_at' => now()->toIso8601String(),
+            ];
+            Storage::put("{$filePath}.meta", json_encode($metadata));
+
+            $results[] = [
+                'original_filename' => $originalFilename,
+                'path' => $filePath,
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+            ];
+        }
+
+        return response()->json(['files' => $results]);
+    }
+
+    /**
      * Remove a temporary attachment.
      *
      * @param Request $request
