@@ -26,11 +26,9 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $internalThreads = $this->getThreadsByType($task, 'internal');
         $externalThreads = $this->getThreadsByType($task, 'external');
 
         return response()->json([
-            'internal' => $internalThreads,
             'external' => $externalThreads,
         ]);
     }
