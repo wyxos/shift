@@ -6,9 +6,139 @@ use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ExternalAttachmentController extends Controller
 {
+    /**
+     * Upload a temporary attachment.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function upload(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240', // 10MB max
+            'temp_identifier' => 'required|string',
+        ]);
+
+        $file = $request->file('file');
+        $tempIdentifier = $request->input('temp_identifier');
+        $originalFilename = $file->getClientOriginalName();
+
+        // Create temp directory if it doesn't exist
+        $tempPath = "temp_attachments/{$tempIdentifier}";
+        if (!Storage::exists($tempPath)) {
+            Storage::makeDirectory($tempPath);
+        }
+
+        // Generate a unique filename for storage
+        $extension = $file->getClientOriginalExtension();
+        $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) . '_' . uniqid() . '.' . $extension;
+        $filePath = "{$tempPath}/{$storedFilename}";
+
+        // Store the file
+        $file->storeAs($tempPath, $storedFilename);
+
+        // Store metadata
+        $metadata = [
+            'original_filename' => $originalFilename,
+            'uploaded_at' => now()->toIso8601String(),
+        ];
+        Storage::put("{$filePath}.meta", json_encode($metadata));
+
+        return response()->json([
+            'original_filename' => $originalFilename,
+            'path' => $filePath,
+            'size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+        ]);
+    }
+
+    /**
+     * Remove a temporary attachment.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function removeTemp(Request $request)
+    {
+        $request->validate([
+            'path' => 'required|string',
+        ]);
+
+        $path = $request->input('path');
+
+        // Security check to ensure we're only deleting from temp_attachments
+        if (!Str::startsWith($path, 'temp_attachments/')) {
+            return response()->json(['error' => 'Invalid path'], 400);
+        }
+
+        if (Storage::exists($path)) {
+            Storage::delete($path);
+
+            // Delete metadata file if it exists
+            $metaPath = "{$path}.meta";
+            if (Storage::exists($metaPath)) {
+                Storage::delete($metaPath);
+            }
+
+            return response()->json(['message' => 'File removed successfully']);
+        }
+
+        return response()->json(['error' => 'File not found'], 404);
+    }
+
+    /**
+     * List temporary attachments.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function listTemp(Request $request)
+    {
+        $request->validate([
+            'temp_identifier' => 'required|string',
+        ]);
+
+        $tempIdentifier = $request->input('temp_identifier');
+        $tempPath = "temp_attachments/{$tempIdentifier}";
+
+        if (!Storage::exists($tempPath)) {
+            return response()->json(['files' => []]);
+        }
+
+        $files = Storage::files($tempPath);
+        $result = [];
+
+        foreach ($files as $file) {
+            // Skip metadata files
+            if (Str::endsWith($file, '.meta')) {
+                continue;
+            }
+
+            $originalFilename = basename($file);
+            $metaPath = "{$file}.meta";
+
+            if (Storage::exists($metaPath)) {
+                $metadata = json_decode(Storage::get($metaPath), true);
+                if (isset($metadata['original_filename'])) {
+                    $originalFilename = $metadata['original_filename'];
+                }
+            }
+
+            $result[] = [
+                'original_filename' => $originalFilename,
+                'path' => $file,
+                'size' => Storage::size($file),
+                'mime_type' => Storage::mimeType($file),
+            ];
+        }
+
+        return response()->json(['files' => $result]);
+    }
+
     /**
      * Download an attachment.
      *
