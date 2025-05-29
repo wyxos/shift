@@ -38,7 +38,7 @@ class TaskThreadUpdated extends Notification
         $taskTitle = $this->data['task_title'] ?? 'Task #' . $this->data['task_id'];
         $threadType = ucfirst($this->data['type']) . ' thread';
         $snippet = Str::limit($this->data['content'], 120);
-        $url = $this->data['url'] . '/tasks/' . $this->data['task_id'] . '/edit';
+        $url = $this->data['url'] . '/shift/tasks/' . $this->data['task_id'] . '/edit';
 
         return (new MailMessage)
             ->subject("New reply in {$threadType} for {$taskTitle}")
