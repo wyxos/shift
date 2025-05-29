@@ -111,7 +111,7 @@ class ExternalTaskThreadController extends Controller
 
         $thread = new TaskThread([
             'task_id' => $task->id,
-            'type' => $request->input('type'),
+            'type' => 'external',
             'content' => $request->input('content'),
             'sender_name' => $externalUser->name,
         ]);
