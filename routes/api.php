@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // attachments
     Route::post('/attachments/upload', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'upload'])->name('api.attachments.upload');
+    Route::post('/attachments/upload-multiple', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadMultiple'])->name('api.attachments.upload-multiple');
     Route::delete('/attachments/remove-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'removeTemp'])->name('api.attachments.remove-temp');
     Route::get('/attachments/list-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'listTemp'])->name('api.attachments.list-temp');
     Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'download'])->name('api.attachments.download');
