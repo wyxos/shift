@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\Attachment;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class TaskThreadController extends Controller
@@ -70,6 +73,7 @@ class TaskThreadController extends Controller
      * @param Request $request
      * @param Task $task
      * @return \Illuminate\Http\JsonResponse
+     * @throws ConnectionException
      */
     public function store(Request $request, Task $task)
     {
@@ -98,6 +102,35 @@ class TaskThreadController extends Controller
 
         // Get the thread with attachments
         $thread->load('attachments');
+
+        if($request->input('type') === 'external') {
+            /** @var ExternalUser $externalUser */
+            $externalUser = $task->submitter;
+
+            $url = $externalUser->url;
+
+            try{
+                $response = \Http::post($url . '/shift/api/notifications', [
+                    'handler' => 'thread.update',
+                    'payload' => [
+                        'type' => 'task_thread',
+                        'user_id' => $externalUser->external_id,
+                        'task_id' => $task->id,
+                        'task_title' => $task->title,
+                        'thread_id' => $thread->id,
+                        'content' => $thread->content
+                    ]
+                ]);
+
+                Log::info('Notification sent to external user', [
+                    $response->json()
+                ]);
+            }
+            catch (\Exception $e) {
+                // Log the error or handle it as needed
+                \Log::error('Failed to send notification to external user: ' . $e->getMessage());
+            }
+        }
 
         return response()->json([
             'thread' => [
