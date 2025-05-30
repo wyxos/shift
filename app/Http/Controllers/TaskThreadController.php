@@ -129,9 +129,9 @@ class TaskThreadController extends Controller
                         $response->json()
                     ]);
 
-                    $handleInternally = $response->json('handled_by') === 'main_app';
+                    $isNotProduction = !$response->json('production');
 
-                    if($handleInternally){
+                    if($isNotProduction){
                         Notification::route('mail', $externalUser->email)->notify(new TaskThreadUpdated([
                             'type' => 'task_thread',
                             'user_id' => $externalUser->external_id,
