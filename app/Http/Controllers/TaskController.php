@@ -142,7 +142,7 @@ class TaskController extends Controller
         $attributes = request()->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed',
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
@@ -239,7 +239,7 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed',
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
         ]);
@@ -330,7 +330,7 @@ class TaskController extends Controller
     public function toggleStatus(Task $task, Request $request)
     {
         $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in_progress,completed',
+            'status' => 'required|string|in:pending,in-progress,completed',
         ]);
 
         $task->status = $validatedData['status'];
