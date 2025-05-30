@@ -139,7 +139,7 @@ class TaskThreadController extends Controller
                             'task_title' => $task->title,
                             'thread_id' => $thread->id,
                             'content' => $thread->content,
-                            'url' => $externalUser->url
+                            'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
                         ]));
                     }
                 }

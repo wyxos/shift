@@ -7,8 +7,10 @@ use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
+use App\Notifications\TaskThreadUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 class ExternalTaskThreadController extends Controller
@@ -126,6 +128,33 @@ class ExternalTaskThreadController extends Controller
 
         // Get the thread with attachments
         $thread->load('attachments');
+
+        // Notify project users about the new message
+        $projectUsers = $task->project->projectUser()->with('user')->get();
+        foreach ($projectUsers as $projectUser) {
+            if ($projectUser->user) {
+                Notification::send($projectUser->user, new TaskThreadUpdated([
+                    'type' => 'external',
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'thread_id' => $thread->id,
+                    'content' => $thread->content,
+                    'url' => route('tasks.edit', $task->id)
+                ]));
+            }
+        }
+
+        // Also notify the project author
+        if ($task->project->author) {
+            Notification::send($task->project->author, new TaskThreadUpdated([
+                'type' => 'external',
+                'task_id' => $task->id,
+                'task_title' => $task->title,
+                'thread_id' => $thread->id,
+                'content' => $thread->content,
+                'url' => route('tasks.edit', $task->id)
+            ]));
+        }
 
         return response()->json([
             'thread' => [
