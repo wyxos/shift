@@ -195,7 +195,7 @@ class ExternalTaskControllerTest extends TestCase
         $updateData = [
             'title' => 'Updated Title',
             'description' => 'Updated description',
-            'status' => 'in_progress',
+            'status' => 'in-progress',
             'priority' => 'high',
             'project' => $this->project->token,
             'user' => [
@@ -212,7 +212,7 @@ class ExternalTaskControllerTest extends TestCase
         $response->assertJson([
             'title' => 'Updated Title',
             'description' => 'Updated description',
-            'status' => 'in_progress',
+            'status' => 'in-progress',
             'priority' => 'high',
         ]);
 
@@ -220,7 +220,7 @@ class ExternalTaskControllerTest extends TestCase
             'id' => $task->id,
             'title' => 'Updated Title',
             'description' => 'Updated description',
-            'status' => 'in_progress',
+            'status' => 'in-progress',
             'priority' => 'high',
         ]);
     }

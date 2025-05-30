@@ -170,7 +170,7 @@ class TaskControllerTest extends TestCase
 
         $updateData = [
             'title' => 'Updated Title',
-            'status' => 'in_progress',
+            'status' => 'in-progress',
             'priority' => 'high'
         ];
 
@@ -183,7 +183,7 @@ class TaskControllerTest extends TestCase
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
             'title' => 'Updated Title',
-            'status' => 'in_progress',
+            'status' => 'in-progress',
             'priority' => 'high'
         ]);
     }
