@@ -88,7 +88,7 @@ class ExternalTaskController extends Controller
             'description' => 'nullable|string',
             'project' => 'required|exists:projects,token',
             'priority' => 'nullable|string|in:low,medium,high',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed',
             'user.id' => 'nullable',
             'user.name' => 'nullable|string|max:255',
             'user.email' => 'nullable|email',
@@ -212,7 +212,7 @@ class ExternalTaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'nullable|string|in:low,medium,high',
-            'status' => 'nullable|string|in:pending,in_progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -341,7 +341,7 @@ class ExternalTaskController extends Controller
         }
 
         $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in_progress,completed',
+            'status' => 'required|string|in:pending,in-progress,completed',
         ]);
 
         $task->status = $validatedData['status'];
