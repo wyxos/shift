@@ -16,7 +16,7 @@ class TaskCreationNotification extends Notification
     /**
      * The task instance.
      *
-     * @var \App\Models\Task
+     * @var Task
      */
     protected $task;
 
@@ -43,7 +43,7 @@ class TaskCreationNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = URL::route('tasks.show', $this->task);
+        $url = URL::route('tasks.edit', $this->task);
 
         return (new MailMessage)
             ->subject('New Task Created: ' . $this->task->title)
