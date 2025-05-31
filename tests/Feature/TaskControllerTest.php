@@ -199,15 +199,51 @@ class TaskControllerTest extends TestCase
         ]);
         $task->submitter()->associate($this->user)->save();
 
+        // Create attachments for the task
+        $attachment1 = \App\Models\Attachment::create([
+            'attachable_id' => $task->id,
+            'attachable_type' => Task::class,
+            'original_filename' => 'test-document1.pdf',
+            'path' => "attachments/{$task->id}/test-document1.pdf",
+        ]);
+
+        $attachment2 = \App\Models\Attachment::create([
+            'attachable_id' => $task->id,
+            'attachable_type' => Task::class,
+            'original_filename' => 'test-document2.pdf',
+            'path' => "attachments/{$task->id}/test-document2.pdf",
+        ]);
+
+        // Create fake files in storage
+        \Illuminate\Support\Facades\Storage::put($attachment1->path, 'test content 1');
+        \Illuminate\Support\Facades\Storage::put($attachment2->path, 'test content 2');
+
+        // Verify files exist before deletion
+        \Illuminate\Support\Facades\Storage::assertExists($attachment1->path);
+        \Illuminate\Support\Facades\Storage::assertExists($attachment2->path);
+
         $response = $this->actingAs($this->user)
             ->delete(route('tasks.destroy', $task));
 
         $response->assertRedirect(route('tasks.index'));
         $response->assertSessionHas('success', 'Task deleted successfully.');
 
+        // Verify task is deleted
         $this->assertDatabaseMissing('tasks', [
             'id' => $task->id
         ]);
+
+        // Verify attachments are deleted from database
+        $this->assertDatabaseMissing('attachments', [
+            'id' => $attachment1->id
+        ]);
+        $this->assertDatabaseMissing('attachments', [
+            'id' => $attachment2->id
+        ]);
+
+        // Verify files are deleted from storage
+        \Illuminate\Support\Facades\Storage::assertMissing($attachment1->path);
+        \Illuminate\Support\Facades\Storage::assertMissing($attachment2->path);
     }
 
     public function test_toggle_status_updates_task_status()
