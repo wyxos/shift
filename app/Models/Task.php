@@ -16,6 +16,27 @@ class Task extends Model
 
     protected $guarded = ['id'];
 
+    /**
+     * The "booted" method of the model.
+     *
+     * @return void
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($task) {
+            // Delete all attachments associated with this task
+            foreach ($task->attachments as $attachment) {
+                // Delete the file from storage if it exists
+                if (\Illuminate\Support\Facades\Storage::exists($attachment->path)) {
+                    \Illuminate\Support\Facades\Storage::delete($attachment->path);
+                }
+
+                // Delete the attachment record
+                $attachment->delete();
+            }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

@@ -1,4 +1,5 @@
 **Dashboard MVP**
+
 - [x] List Clients
 - [x] Create Clients
 - [x] Update Clients
@@ -8,12 +9,13 @@
 - [x] List Tasks
 - [x] Create Tasks
 - [x] Update Tasks
-- [ ] Add/Read Comments on Tasks (basic textarea)
+- [x] Add/Read Comments on Tasks (basic textarea)
 - [x] Implement REST API for Tasks/Projects (read/write)
 
 ---
 
 **SDK MVP**
+
 - [x] Connect Laravel app to SHIFT dashboard via config (`SHIFT_TOKEN`, `SHIFT_PROJECT`, etc.)
 - [x] Create `php artisan shift:install` command:
     - [x] Prompt for API key
@@ -27,8 +29,9 @@
 ---
 
 **Nice-to-Have After MVP**
+
 - [x] File attachments to tasks (upload images/files)
-- [ ] Threaded, rich comments on tasks
+- [x] Threaded, rich comments on tasks
 - [ ] Sub-tasks / Checklists inside tasks
 - [ ] Advanced grouping (URLs, branches, etc)
 - [ ] Project analytics (tasks open/closed stats)
