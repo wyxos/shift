@@ -14,10 +14,22 @@ class ExternalUserController extends Controller
      */
     public function index()
     {
-        $externalUsers = ExternalUser::with('project')->paginate(10);
+        $externalUsers = ExternalUser::with('project')
+            ->when(
+                request('search'),
+                fn($query) => $query->where(function($q) {
+                    $search = '%' . request('search') . '%';
+                    $q->whereRaw('LOWER(name) LIKE LOWER(?)', [$search])
+                      ->orWhereRaw('LOWER(email) LIKE LOWER(?)', [$search])
+                      ->orWhereRaw('LOWER(environment) LIKE LOWER(?)', [$search]);
+                })
+            )
+            ->paginate(10)
+            ->withQueryString();
 
         return Inertia::render('ExternalUsers/Index', [
-            'externalUsers' => $externalUsers
+            'externalUsers' => $externalUsers,
+            'filters' => request()->only(['search']),
         ]);
     }
 

@@ -13,6 +13,10 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    filters: {
+        type: Object,
+        required: true,
+    },
 });
 
 // Create a reactive copy of the externalUsers data
@@ -39,7 +43,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const search = ref('');
+const search = ref(props.filters.search || '');
 const title = `External Users` + (search.value ? ` - ${search.value}` : '');
 
 function onPageChange(page: number) {
