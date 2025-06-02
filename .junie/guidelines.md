@@ -20,3 +20,5 @@ You are working on a Laravel 12 + Vue 3 + Inertia 3 + PHPUnit + Tailwind 4 + Sha
 * Align any relevant API request/response logic across both ends.
 
 * Always write a test to confirm the task works as expected.
+
+* Run ```php artisan migrate``` after creating new migrations.
