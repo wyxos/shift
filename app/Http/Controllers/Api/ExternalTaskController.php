@@ -114,6 +114,7 @@ class ExternalTaskController extends Controller
             ], [
                 'name' => $attributes['user']['name'] ?? null,
                 'email' => $attributes['user']['email'],
+                'project_id' => $task->project_id, // Set project_id based on the task's project
             ]);
 
             $task->submitter()->associate($externalUser)->save();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ExternalUserController;
 use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
@@ -75,6 +76,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('{type}/{id}/attachments', [AttachmentController::class, 'listAttachments'])->name('attachments.list');
     Route::delete('attachments/{attachment}', [AttachmentController::class, 'deleteAttachment'])->name('attachments.delete');
     Route::get('attachments/{attachment}/download', [AttachmentController::class, 'downloadAttachment'])->name('attachments.download');
+
+    // External Users
+    Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');
+    Route::get('external-users/{externalUser}/edit', [ExternalUserController::class, 'edit'])->name('external-users.edit');
+    Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
 });
 
 require __DIR__.'/settings.php';
