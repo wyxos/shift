@@ -10,7 +10,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\URL;
 
-class ProjectInvitationNotification extends Notification
+class ProjectInvitationNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

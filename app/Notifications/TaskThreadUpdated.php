@@ -8,7 +8,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class TaskThreadUpdated extends Notification
+class TaskThreadUpdated extends Notification implements ShouldQueue
 {
     use Queueable;
 
