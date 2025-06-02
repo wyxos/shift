@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -89,5 +90,13 @@ class Task extends Model
     public function threads(): HasMany
     {
         return $this->hasMany(TaskThread::class);
+    }
+
+    /**
+     * Get the external users that have access to this task.
+     */
+    public function externalUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(ExternalUser::class, 'external_access');
     }
 }
