@@ -350,59 +350,9 @@ class ExternalTaskControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_toggle_status_updates_task_status()
-    {
-        // Create a task submitted by the external user
-        $task = Task::factory()->create([
-            'project_id' => $this->project->id,
-            'status' => 'pending',
-        ]);
-        $task->submitter()->associate($this->externalUser)->save();
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->patchJson("/api/tasks/{$task->id}/toggle-status", [
-            'status' => 'completed',
-            'project' => $this->project->token,
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'status' => 'completed',
-            'message' => 'Task status updated successfully'
-        ]);
-
-        $this->assertDatabaseHas('tasks', [
-            'id' => $task->id,
-            'status' => 'completed'
-        ]);
-    }
-
-    public function test_toggle_priority_updates_task_priority()
-    {
-        // Create a task submitted by the external user
-        $task = Task::factory()->create([
-            'project_id' => $this->project->id,
-            'priority' => 'low',
-        ]);
-        $task->submitter()->associate($this->externalUser)->save();
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->patchJson("/api/tasks/{$task->id}/toggle-priority", [
-            'priority' => 'high',
-            'project' => $this->project->token,
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'priority' => 'high',
-            'message' => 'Task priority updated successfully'
-        ]);
-
-        $this->assertDatabaseHas('tasks', [
-            'id' => $task->id,
-            'priority' => 'high'
-        ]);
-    }
+    // These tests have been removed as they are obsolete.
+    // They have been replaced by test_toggle_status_succeeds_with_granted_access
+    // and test_toggle_priority_succeeds_with_granted_access which include the required 'user' parameter.
 
     public function test_external_task_creation_sends_notifications_to_all_relevant_users()
     {
