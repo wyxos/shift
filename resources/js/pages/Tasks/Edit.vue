@@ -20,6 +20,14 @@ const props = defineProps({
     attachments: {
         type: Array,
         default: () => []
+    },
+    projectExternalUsers: {
+        type: Array,
+        default: () => []
+    },
+    taskExternalUserIds: {
+        type: Array,
+        default: () => []
     }
 });
 
@@ -163,6 +171,7 @@ const editForm = useForm({
     project_id: props.task.project_id,
     temp_identifier: tempIdentifier.value,
     deleted_attachment_ids: [],
+    external_user_ids: props.taskExternalUserIds || [],
 });
 
 // Computed property for other errors (not related to specific fields)
@@ -313,6 +322,34 @@ const submitForm = () => {
 
                 <div class="mb-4">
                     <p class="text-sm font-medium text-gray-700">Project: {{ project.name }}</p>
+                </div>
+
+                <!-- External Users Section -->
+                <div v-if="props.projectExternalUsers.length > 0" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Assign External Users</label>
+                    <p class="text-xs text-gray-500 mb-2">Select external users who should have access to this task</p>
+
+                    <div class="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                        <div v-for="externalUser in props.projectExternalUsers" :key="externalUser.id" class="flex items-center">
+                            <input
+                                type="checkbox"
+                                :id="'external-user-' + externalUser.id"
+                                :value="externalUser.id"
+                                v-model="editForm.external_user_ids"
+                                class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            >
+                            <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
+                                {{ externalUser.name || 'User ' + externalUser.external_id }}
+                                <span v-if="externalUser.email" class="text-xs text-gray-500 ml-1">({{ externalUser.email }})</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div v-if="editForm.errors.external_user_ids" class="text-red-500 text-sm mt-1">{{ editForm.errors.external_user_ids }}</div>
+                </div>
+
+                <div v-else class="mb-4">
+                    <p class="text-sm text-gray-500">No external users available for this project.</p>
                 </div>
 
                 <!-- Existing Attachments Section -->

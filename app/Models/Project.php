@@ -49,4 +49,12 @@ class Project extends Model
     {
         return $this->belongsTo(User::class, 'author_id');
     }
+
+    /**
+     * Get the external users associated with this project.
+     */
+    public function externalUsers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ExternalUser::class);
+    }
 }
