@@ -33,7 +33,7 @@ const title = `Edit External User`;
 const form = useForm({
     name: props.externalUser.name,
     email: props.externalUser.email,
-    project_id: props.externalUser.project_id || '',
+    project_id: props.externalUser.project_id || null,
 });
 
 // Computed property for other errors (not related to specific fields)
@@ -76,7 +76,7 @@ const submitForm = () => {
                         id="project_id"
                         class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
-                        <option value="">No Project</option>
+                        <option :value="null">No Project</option>
                         <option v-for="project in projects" :key="project.id" :value="project.id">
                             {{ project.name }}
                         </option>

@@ -144,67 +144,73 @@ watch(search, (value) =>
 );
 
 // Watch for changes in project filter
-watch(projectId, (value) => {
-    router.get(
-        '/tasks',
-        {
-            search: search.value,
-            project_id: value,
-            priority: priority.value,
-            status: status.value,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onSuccess: () => {
-                refreshTaskList();
+watch(projectId, (value) =>
+    debounce(() => {
+        router.get(
+            '/tasks',
+            {
+                search: search.value,
+                project_id: value,
+                priority: priority.value,
+                status: status.value,
             },
-        },
-    );
-});
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onSuccess: () => {
+                    refreshTaskList();
+                },
+            },
+        );
+    }, 300)(),
+);
 
 // Watch for changes in priority filter
-watch(priority, (value) => {
-    router.get(
-        '/tasks',
-        {
-            search: search.value,
-            project_id: projectId.value,
-            priority: value,
-            status: status.value,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onSuccess: () => {
-                refreshTaskList();
+watch(priority, (value) =>
+    debounce(() => {
+        router.get(
+            '/tasks',
+            {
+                search: search.value,
+                project_id: projectId.value,
+                priority: value,
+                status: status.value,
             },
-        },
-    );
-});
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onSuccess: () => {
+                    refreshTaskList();
+                },
+            },
+        );
+    }, 300)(),
+);
 
 // Watch for changes in status filter
-watch(status, (value) => {
-    router.get(
-        '/tasks',
-        {
-            search: search.value,
-            project_id: projectId.value,
-            priority: priority.value,
-            status: value,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onSuccess: () => {
-                refreshTaskList();
+watch(status, (value) =>
+    debounce(() => {
+        router.get(
+            '/tasks',
+            {
+                search: search.value,
+                project_id: projectId.value,
+                priority: priority.value,
+                status: value,
             },
-        },
-    );
-});
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onSuccess: () => {
+                    refreshTaskList();
+                },
+            },
+        );
+    }, 300)(),
+);
 
 // Status options
 const statusOptions = [
