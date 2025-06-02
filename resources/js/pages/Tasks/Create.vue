@@ -4,7 +4,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Input } from '@/components/ui/input';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -39,6 +39,23 @@ const createForm = useForm({
     description: '',
     project_id: null,
     temp_identifier: tempIdentifier.value,
+    external_user_ids: [],
+});
+
+// State for external users
+const selectedProjectExternalUsers = ref([]);
+
+// Watch for project changes to update available external users
+watch(() => createForm.project_id, (newProjectId) => {
+    if (newProjectId) {
+        const project = props.projects.find(p => p.id === newProjectId);
+        selectedProjectExternalUsers.value = project ? project.external_users : [];
+        // Reset selected external users when project changes
+        createForm.external_user_ids = [];
+    } else {
+        selectedProjectExternalUsers.value = [];
+        createForm.external_user_ids = [];
+    }
 });
 
 // Computed property for other errors (not related to specific fields)
@@ -149,6 +166,34 @@ const removeFile = async (file) => {
                         <option v-for="project in props.projects" :key="project.id" :value="project.id">{{ project.name }}</option>
                     </select>
                     <div v-if="createForm.errors.project_id" class="text-red-500 text-sm mt-1">{{ createForm.errors.project_id }}</div>
+                </div>
+
+                <!-- External Users Section -->
+                <div v-if="createForm.project_id && selectedProjectExternalUsers.length > 0" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Assign External Users</label>
+                    <p class="text-xs text-gray-500 mb-2">Select external users who should have access to this task</p>
+
+                    <div class="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                        <div v-for="externalUser in selectedProjectExternalUsers" :key="externalUser.id" class="flex items-center">
+                            <input
+                                type="checkbox"
+                                :id="'external-user-' + externalUser.id"
+                                :value="externalUser.id"
+                                v-model="createForm.external_user_ids"
+                                class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            >
+                            <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
+                                {{ externalUser.name || 'User ' + externalUser.external_id }}
+                                <span v-if="externalUser.email" class="text-xs text-gray-500 ml-1">({{ externalUser.email }})</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div v-if="createForm.errors.external_user_ids" class="text-red-500 text-sm mt-1">{{ createForm.errors.external_user_ids }}</div>
+                </div>
+
+                <div v-else-if="createForm.project_id && selectedProjectExternalUsers.length === 0" class="mb-4">
+                    <p class="text-sm text-gray-500">No external users available for this project.</p>
                 </div>
 
                 <!-- File Upload Section -->

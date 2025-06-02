@@ -22,14 +22,28 @@ class ExternalTaskController extends Controller
      */
     public function index()
     {
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
         $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->whereHas('project', fn($query) => $query->where('token', request('project')))
-            ->whereHasMorph('submitter', [ExternalUser::class], function ($query) {
-                $query
-                    ->where('environment', request()->offsetGet('user.environment'))
-                    ->where('url', request()->offsetGet('user.url'))
-                    ->where('external_id', request()->offsetGet('user.id'));
+            ->where(function($query) use ($externalUser) {
+                // Tasks where the external user is the submitter
+                $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {
+                    $query->where('external_users.id', $externalUser->id);
+                })
+                // OR tasks where the external user has been granted access
+                ->orWhereHas('externalUsers', function($query) use ($externalUser) {
+                    $query->where('external_users.id', $externalUser->id);
+                });
             })
             ->latest()
             ->when(
@@ -53,6 +67,24 @@ class ExternalTaskController extends Controller
         // Ensure the task belongs to the project specified in the request
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
+            return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
         $task->load(['submitter', 'metadata', 'project', 'attachments']);
@@ -205,7 +237,21 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        if(!$task->submitter || $task->submitter->external_id !== request('user.id')) {
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
             return response()->json(['error' => 'Unauthorized to update this task'], 403);
         }
 
@@ -319,7 +365,21 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        if(!$task->submitter || $task->submitter->external_id !== request('user.id')) {
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
             return response()->json(['error' => 'Unauthorized to delete this task'], 403);
         }
 
@@ -339,6 +399,24 @@ class ExternalTaskController extends Controller
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
+            return response()->json(['error' => 'Unauthorized to update this task status'], 403);
         }
 
         $validatedData = $request->validate([
@@ -365,6 +443,24 @@ class ExternalTaskController extends Controller
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
+            return response()->json(['error' => 'Unauthorized to update this task priority'], 403);
         }
 
         $validatedData = $request->validate([

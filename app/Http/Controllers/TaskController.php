@@ -102,6 +102,11 @@ class TaskController extends Controller
                 });
         })->get();
 
+        // Load external users for each project
+        $projects->each(function ($project) {
+            $project->load('externalUsers');
+        });
+
         return inertia('Tasks/Create')
             ->with([
                 'projects' => $projects
@@ -111,12 +116,20 @@ class TaskController extends Controller
     // edit task
     public function edit(\App\Models\Task $task)
     {
-        $task->load(['project', 'attachments']);
+        $task->load(['project', 'attachments', 'externalUsers']);
+
+        // Get all external users for the project
+        $projectExternalUsers = $task->project->externalUsers;
+
+        // Get the IDs of external users that have access to this task
+        $taskExternalUserIds = $task->externalUsers->pluck('id')->toArray();
 
         return inertia('Tasks/Edit')
             ->with([
                 'task' => $task,
                 'project' => $task->project,
+                'projectExternalUsers' => $projectExternalUsers,
+                'taskExternalUserIds' => $taskExternalUserIds,
                 'attachments' => $task->attachments->map(function ($attachment) {
                     return [
                         'id' => $attachment->id,
@@ -147,6 +160,8 @@ class TaskController extends Controller
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
+            'external_user_ids' => 'nullable|array',
+            'external_user_ids.*' => 'exists:external_users,id',
         ]);
 
         $task->update([
@@ -155,6 +170,11 @@ class TaskController extends Controller
             'status' => $attributes['status'] ?? $task->status,
             'priority' => $attributes['priority'] ?? $task->priority,
         ]);
+
+        // Update external users access
+        if (isset($attributes['external_user_ids'])) {
+            $task->externalUsers()->sync($attributes['external_user_ids']);
+        }
 
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
@@ -242,6 +262,8 @@ class TaskController extends Controller
             'status' => 'nullable|string|in:pending,in-progress,completed',
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
+            'external_user_ids' => 'nullable|array',
+            'external_user_ids.*' => 'exists:external_users,id',
         ]);
 
         $task = \App\Models\Task::create([
@@ -249,6 +271,11 @@ class TaskController extends Controller
         ]);
 
         $task->submitter()->associate(auth()->user())->save();
+
+        // Assign external users to the task if provided
+        if (isset($attributes['external_user_ids']) && !empty($attributes['external_user_ids'])) {
+            $task->externalUsers()->attach($attributes['external_user_ids']);
+        }
 
         // Send notification to project owner and users with access to the project
         $this->sendTaskCreationNotifications($task);

@@ -453,4 +453,197 @@ class ExternalTaskControllerTest extends TestCase
             \App\Notifications\TaskCreationNotification::class
         );
     }
+    public function test_index_returns_tasks_with_granted_access()
+    {
+        // Create another external user
+        $otherExternalUser = ExternalUser::create([
+            'external_id' => 'other-123',
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'environment' => 'testing',
+            'url' => 'https://other.com',
+            'project_id' => $this->project->id
+        ]);
+
+        // Create a task submitted by the other external user
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Task by other user',
+        ]);
+        $task->submitter()->associate($otherExternalUser)->save();
+
+        // Grant access to our external user
+        $task->externalUsers()->attach($this->externalUser->id);
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->getJson('/api/tasks?' . http_build_query([
+                'project' => $this->project->token,
+                'user' => $this->externalUserData
+            ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.0.title', 'Task by other user');
+    }
+
+    public function test_show_returns_task_with_granted_access()
+    {
+        // Create another external user
+        $otherExternalUser = ExternalUser::create([
+            'external_id' => 'other-123',
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'environment' => 'testing',
+            'url' => 'https://other.com',
+            'project_id' => $this->project->id
+        ]);
+
+        // Create a task submitted by the other external user
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Task by other user',
+        ]);
+        $task->submitter()->associate($otherExternalUser)->save();
+
+        // Grant access to our external user
+        $task->externalUsers()->attach($this->externalUser->id);
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+                'project' => $this->project->token,
+                'user' => $this->externalUserData
+            ]));
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'id' => $task->id,
+            'title' => 'Task by other user',
+        ]);
+    }
+
+    public function test_update_succeeds_with_granted_access()
+    {
+        // Create another external user
+        $otherExternalUser = ExternalUser::create([
+            'external_id' => 'other-123',
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'environment' => 'testing',
+            'url' => 'https://other.com',
+            'project_id' => $this->project->id
+        ]);
+
+        // Create a task submitted by the other external user
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Original Title',
+            'status' => 'pending',
+            'priority' => 'low',
+        ]);
+        $task->submitter()->associate($otherExternalUser)->save();
+
+        // Grant access to our external user
+        $task->externalUsers()->attach($this->externalUser->id);
+
+        $updateData = [
+            'title' => 'Updated By Access',
+            'description' => 'Updated by user with granted access',
+            'status' => 'in-progress',
+            'priority' => 'high',
+            'project' => $this->project->token,
+            'user' => [
+                'id' => $this->externalUser->external_id,
+                'environment' => $this->externalUser->environment,
+                'url' => $this->externalUser->url,
+            ]
+        ];
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->putJson("/api/tasks/{$task->id}", $updateData);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'title' => 'Updated By Access',
+            'description' => 'Updated by user with granted access',
+        ]);
+    }
+
+    public function test_toggle_status_succeeds_with_granted_access()
+    {
+        // Create another external user
+        $otherExternalUser = ExternalUser::create([
+            'external_id' => 'other-123',
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'environment' => 'testing',
+            'url' => 'https://other.com',
+            'project_id' => $this->project->id
+        ]);
+
+        // Create a task submitted by the other external user
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'status' => 'pending',
+        ]);
+        $task->submitter()->associate($otherExternalUser)->save();
+
+        // Grant access to our external user
+        $task->externalUsers()->attach($this->externalUser->id);
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->patchJson("/api/tasks/{$task->id}/toggle-status", [
+                'status' => 'completed',
+                'project' => $this->project->token,
+                'user' => [
+                    'id' => $this->externalUser->external_id,
+                    'environment' => $this->externalUser->environment,
+                    'url' => $this->externalUser->url,
+                ]
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'status' => 'completed',
+            'message' => 'Task status updated successfully'
+        ]);
+    }
+
+    public function test_toggle_priority_succeeds_with_granted_access()
+    {
+        // Create another external user
+        $otherExternalUser = ExternalUser::create([
+            'external_id' => 'other-123',
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'environment' => 'testing',
+            'url' => 'https://other.com',
+            'project_id' => $this->project->id
+        ]);
+
+        // Create a task submitted by the other external user
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'priority' => 'low',
+        ]);
+        $task->submitter()->associate($otherExternalUser)->save();
+
+        // Grant access to our external user
+        $task->externalUsers()->attach($this->externalUser->id);
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->patchJson("/api/tasks/{$task->id}/toggle-priority", [
+                'priority' => 'high',
+                'project' => $this->project->token,
+                'user' => [
+                    'id' => $this->externalUser->external_id,
+                    'environment' => $this->externalUser->environment,
+                    'url' => $this->externalUser->url,
+                ]
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'priority' => 'high',
+            'message' => 'Task priority updated successfully'
+        ]);
+    }
 }
