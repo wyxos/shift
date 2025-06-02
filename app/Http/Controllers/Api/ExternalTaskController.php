@@ -9,7 +9,10 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -18,7 +21,7 @@ class ExternalTaskController extends Controller
     /**
      * Display a listing of the tasks.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function index()
     {
@@ -35,20 +38,20 @@ class ExternalTaskController extends Controller
         $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->whereHas('project', fn($query) => $query->where('token', request('project')))
-            ->where(function($query) use ($externalUser) {
+            ->where(function ($query) use ($externalUser) {
                 // Tasks where the external user is the submitter
                 $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {
                     $query->where('external_users.id', $externalUser->id);
                 })
-                // OR tasks where the external user has been granted access
-                ->orWhereHas('externalUsers', function($query) use ($externalUser) {
-                    $query->where('external_users.id', $externalUser->id);
-                });
+                    // OR tasks where the external user has been granted access
+                    ->orWhereHas('externalUsers', function ($query) use ($externalUser) {
+                        $query->where('external_users.id', $externalUser->id);
+                    });
             })
             ->latest()
             ->when(
                 request('search'),
-                fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                fn($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
             )
             ->paginate(10)
             ->withQueryString();
@@ -59,8 +62,8 @@ class ExternalTaskController extends Controller
     /**
      * Display the specified task.
      *
-     * @param  \App\Models\Task  $task
-     * @return \Illuminate\Http\JsonResponse
+     * @param Task $task
+     * @return JsonResponse
      */
     public function show(Task $task)
     {
@@ -110,8 +113,8 @@ class ExternalTaskController extends Controller
     /**
      * Store a newly created task in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @param Request $request
+     * @return JsonResponse
      */
     public function store(Request $request)
     {
@@ -138,7 +141,7 @@ class ExternalTaskController extends Controller
             'priority' => $attributes['priority'] ?? 'medium',
         ]);
 
-        if(isset($attributes['user'])) {
+        if (isset($attributes['user'])) {
             $externalUser = ExternalUser::updateOrCreate([
                 'external_id' => $attributes['user']['id'],
                 'environment' => $attributes['user']['environment'],
@@ -225,11 +228,51 @@ class ExternalTaskController extends Controller
     }
 
     /**
+     * Send task creation notifications to project owner and users with access to the project.
+     * For external tasks, all relevant users should receive notifications.
+     *
+     * @param Task $task
+     * @return void
+     */
+    private function sendTaskCreationNotifications(Task $task)
+    {
+        // Load the project with its relationships
+        $project = $task->project()->with(['author', 'projectUser.user'])->first();
+
+        // Collect all users who should receive the notification
+        $usersToNotify = collect();
+
+        // Add the project owner (author)
+        if ($project->author) {
+            $usersToNotify->push($project->author);
+        }
+
+        // Add all users with access to the project
+        foreach ($project->projectUser as $projectUser) {
+            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
+                $usersToNotify->push($projectUser->user);
+            }
+        }
+
+        // Send notification to users in chunks with delays to prevent SMTP connection issues
+        if ($usersToNotify->isNotEmpty()) {
+            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
+                Notification::send($chunk, new TaskCreationNotification($task));
+
+                // Add a delay between chunks to prevent overwhelming the SMTP server
+                if ($chunk->count() > 0) {
+                    sleep(2); // 2 second delay
+                }
+            });
+        }
+    }
+
+    /**
      * Update the specified task in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Task  $task
-     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     * @param Request $request
+     * @param Task $task
+     * @return JsonResponse|RedirectResponse
      */
     public function update(Request $request, Task $task)
     {
@@ -355,9 +398,9 @@ class ExternalTaskController extends Controller
     /**
      * Remove the specified task from storage.
      *
-     * @param  \App\Models\Task  $task
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     * @param Task $task
+     * @param Request $request
+     * @return JsonResponse|RedirectResponse
      */
     public function destroy(Task $task, Request $request)
     {
@@ -391,9 +434,9 @@ class ExternalTaskController extends Controller
     /**
      * Toggle the status of the specified task.
      *
-     * @param  \App\Models\Task  $task
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @param Task $task
+     * @param Request $request
+     * @return JsonResponse
      */
     public function toggleStatus(Task $task, Request $request)
     {
@@ -435,9 +478,9 @@ class ExternalTaskController extends Controller
     /**
      * Toggle the priority of the specified task.
      *
-     * @param  \App\Models\Task  $task
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @param Task $task
+     * @param Request $request
+     * @return JsonResponse
      */
     public function togglePriority(Task $task, Request $request)
     {
@@ -474,45 +517,5 @@ class ExternalTaskController extends Controller
             'priority' => $task->priority,
             'message' => 'Task priority updated successfully'
         ]);
-    }
-
-    /**
-     * Send task creation notifications to project owner and users with access to the project.
-     * For external tasks, all relevant users should receive notifications.
-     *
-     * @param Task $task
-     * @return void
-     */
-    private function sendTaskCreationNotifications(Task $task)
-    {
-        // Load the project with its relationships
-        $project = $task->project()->with(['author', 'projectUser.user'])->first();
-
-        // Collect all users who should receive the notification
-        $usersToNotify = collect();
-
-        // Add the project owner (author)
-        if ($project->author) {
-            $usersToNotify->push($project->author);
-        }
-
-        // Add all users with access to the project
-        foreach ($project->projectUser as $projectUser) {
-            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
-                $usersToNotify->push($projectUser->user);
-            }
-        }
-
-        // Send notification to users in chunks with delays to prevent SMTP connection issues
-        if ($usersToNotify->isNotEmpty()) {
-            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
-                \Illuminate\Support\Facades\Notification::send($chunk, new TaskCreationNotification($task));
-
-                // Add a delay between chunks to prevent overwhelming the SMTP server
-                if ($chunk->count() > 0) {
-                    sleep(2); // 2 second delay
-                }
-            });
-        }
     }
 }
