@@ -7,7 +7,10 @@ use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\Attachment;
 use App\Notifications\TaskThreadUpdated;
+use Exception;
+use Http;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +23,7 @@ class TaskThreadController extends Controller
      * Get all threads for a task.
      *
      * @param Task $task
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function index(Task $task)
     {
@@ -74,7 +77,7 @@ class TaskThreadController extends Controller
      *
      * @param Request $request
      * @param Task $task
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      * @throws ConnectionException
      */
     public function store(Request $request, Task $task)
@@ -105,14 +108,14 @@ class TaskThreadController extends Controller
         // Get the thread with attachments
         $thread->load('attachments');
 
-        if($request->input('type') === 'external') {
+        if ($request->input('type') === 'external') {
             /** @var ExternalUser $externalUser */
             $externalUser = $task->submitter;
 
             $url = $externalUser->url;
 
-            try{
-                $response = \Http::post($url . '/shift/api/notifications', [
+            try {
+                $response = Http::post($url . '/shift/api/notifications', [
                     'handler' => 'thread.update',
                     'payload' => [
                         'type' => 'task_thread',
@@ -124,14 +127,14 @@ class TaskThreadController extends Controller
                     ]
                 ]);
 
-                if($response->successful()) {
+                if ($response->successful()) {
                     Log::info('Notification sent to external user', [
                         $response->json()
                     ]);
 
                     $isNotProduction = !$response->json('production');
 
-                    if($isNotProduction){
+                    if ($isNotProduction) {
                         Notification::route('mail', $externalUser->email)->notify(new TaskThreadUpdated([
                             'type' => 'task_thread',
                             'user_id' => $externalUser->external_id,
@@ -143,11 +146,7 @@ class TaskThreadController extends Controller
                         ]));
                     }
                 }
-
-
-
-            }
-            catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log the error or handle it as needed
                 \Log::error('Failed to send notification to external user: ' . $e->getMessage());
             }
@@ -234,7 +233,7 @@ class TaskThreadController extends Controller
      *
      * @param Task $task
      * @param TaskThread $thread
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function show(Task $task, TaskThread $thread)
     {
