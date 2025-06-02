@@ -8,15 +8,19 @@ use App\Models\Task;
 use App\Models\Attachment;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use App\Services\ExternalNotificationService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\Response;
 
 class TaskController extends Controller
 {
     public function index()
     {
-        $tasks = \App\Models\Task::query()
+        $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project.organisation', 'project.client'])
             ->where(function ($query) {
                 $query
@@ -86,35 +90,8 @@ class TaskController extends Controller
     }
 
     // create task
-    public function create()
-    {
-        $projects = Project::where(function ($query) {
-            $query->where(
-                fn($query) => $query->whereHas('client.organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })->orWhereHas('organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })
-                    ->orWhere('author_id', auth()->user()->id)
-            )
-                ->orWhereHas('projectUser', function ($query) {
-                    $query->where('user_id', auth()->user()->id);
-                });
-        })->get();
 
-        // Load external users for each project
-        $projects->each(function ($project) {
-            $project->load('externalUsers');
-        });
-
-        return inertia('Tasks/Create')
-            ->with([
-                'projects' => $projects
-            ]);
-    }
-
-    // edit task
-    public function edit(\App\Models\Task $task)
+    public function edit(Task $task)
     {
         $task->load(['project', 'attachments', 'externalUsers']);
 
@@ -141,15 +118,17 @@ class TaskController extends Controller
             ]);
     }
 
-    // delete route
-    public function destroy(\App\Models\Task $task)
+    // edit task
+
+    public function destroy(Task $task)
     {
         $task->delete();
         return redirect()->route('tasks.index')->with('success', 'Task deleted successfully.');
     }
 
-    // put task
-    public function update(\App\Models\Task $task)
+    // delete route
+
+    public function update(Task $task)
     {
         // Handle web form submission
         $attributes = request()->validate([
@@ -179,12 +158,12 @@ class TaskController extends Controller
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
             foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
-                $attachment = \App\Models\Attachment::find($attachmentId);
+                $attachment = Attachment::find($attachmentId);
 
                 if ($attachment && $attachment->attachable_id === $task->id && $attachment->attachable_type === Task::class) {
                     // Delete the file if it exists
-                    if (\Illuminate\Support\Facades\Storage::exists($attachment->path)) {
-                        \Illuminate\Support\Facades\Storage::delete($attachment->path);
+                    if (Storage::exists($attachment->path)) {
+                        Storage::delete($attachment->path);
                     }
 
                     // Delete the attachment record
@@ -199,20 +178,20 @@ class TaskController extends Controller
             $tempPath = "temp_attachments/{$tempIdentifier}";
 
             // Check if temp directory exists
-            if (\Illuminate\Support\Facades\Storage::exists($tempPath)) {
+            if (Storage::exists($tempPath)) {
                 // Get all files in the temp directory
-                $files = \Illuminate\Support\Facades\Storage::files($tempPath);
+                $files = Storage::files($tempPath);
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
-                if (!\Illuminate\Support\Facades\Storage::exists($permanentPath)) {
-                    \Illuminate\Support\Facades\Storage::makeDirectory($permanentPath);
+                if (!Storage::exists($permanentPath)) {
+                    Storage::makeDirectory($permanentPath);
                 }
 
                 // Move each file to the permanent location and create attachment records
                 foreach ($files as $file) {
                     // Skip metadata files
-                    if (\Illuminate\Support\Str::endsWith($file, '.meta')) {
+                    if (Str::endsWith($file, '.meta')) {
                         continue;
                     }
 
@@ -220,8 +199,8 @@ class TaskController extends Controller
                     $metadataPath = $file . '.meta';
                     $originalFilename = basename($file);
 
-                    if (\Illuminate\Support\Facades\Storage::exists($metadataPath)) {
-                        $metadata = json_decode(\Illuminate\Support\Facades\Storage::get($metadataPath), true);
+                    if (Storage::exists($metadataPath)) {
+                        $metadata = json_decode(Storage::get($metadataPath), true);
                         if (isset($metadata['original_filename'])) {
                             $originalFilename = $metadata['original_filename'];
                         }
@@ -233,10 +212,10 @@ class TaskController extends Controller
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
-                    \Illuminate\Support\Facades\Storage::move($file, $newPath);
+                    Storage::move($file, $newPath);
 
                     // Create attachment record
-                    \App\Models\Attachment::create([
+                    Attachment::create([
                         'attachable_id' => $task->id,
                         'attachable_type' => Task::class,
                         'original_filename' => $originalFilename,
@@ -245,14 +224,44 @@ class TaskController extends Controller
                 }
 
                 // Remove the temp directory
-                \Illuminate\Support\Facades\Storage::deleteDirectory($tempPath);
+                Storage::deleteDirectory($tempPath);
             }
         }
 
         return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
     }
 
+    // put task
+
+    public function create()
+    {
+        $projects = Project::where(function ($query) {
+            $query->where(
+                fn($query) => $query->whereHas('client.organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })->orWhereHas('organisation', function ($query) {
+                    $query->where('author_id', auth()->user()->id);
+                })
+                    ->orWhere('author_id', auth()->user()->id)
+            )
+                ->orWhereHas('projectUser', function ($query) {
+                    $query->where('user_id', auth()->user()->id);
+                });
+        })->get();
+
+        // Load external users for each project
+        $projects->each(function ($project) {
+            $project->load('externalUsers');
+        });
+
+        return inertia('Tasks/Create')
+            ->with([
+                'projects' => $projects
+            ]);
+    }
+
     // create task
+
     public function store()
     {
         $attributes = request()->validate([
@@ -266,7 +275,7 @@ class TaskController extends Controller
             'external_user_ids.*' => 'exists:external_users,id',
         ]);
 
-        $task = \App\Models\Task::create([
+        $task = Task::create([
             ...$attributes,
         ]);
 
@@ -339,58 +348,6 @@ class TaskController extends Controller
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 
-    public function show(Task $task)
-    {
-        return inertia('Tasks/Show')
-            ->with([
-                'task' => $task
-            ]);
-    }
-
-    /**
-     * Update the status of a task.
-     *
-     * @param Task $task
-     * @param Request $request
-     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
-     */
-    public function toggleStatus(Task $task, Request $request)
-    {
-        $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in-progress,completed',
-        ]);
-
-        $task->status = $validatedData['status'];
-        $task->save();
-
-        return back()->with([
-            'status' => $task->status,
-            'message' => 'Task status updated successfully'
-        ]);
-    }
-
-    /**
-     * Update the priority of a task.
-     *
-     * @param Task $task
-     * @param Request $request
-     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
-     */
-    public function togglePriority(Task $task, Request $request)
-    {
-        $validatedData = $request->validate([
-            'priority' => 'required|string|in:low,medium,high',
-        ]);
-
-        $task->priority = $validatedData['priority'];
-        $task->save();
-
-        return back()->with([
-            'priority' => $task->priority,
-            'message' => 'Task priority updated successfully'
-        ]);
-    }
-
     /**
      * Send task creation notifications to project owner and users with access to the project.
      * Excludes the creator of the task from receiving notifications.
@@ -430,7 +387,7 @@ class TaskController extends Controller
         // Send notification to users in chunks with delays to prevent SMTP connection issues
         if ($usersToNotify->isNotEmpty()) {
             $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
-                \Illuminate\Support\Facades\Notification::send($chunk, new \App\Notifications\TaskCreationNotification($task));
+                Notification::send($chunk, new TaskCreationNotification($task));
 
                 // Add a delay between chunks to prevent overwhelming the SMTP server
                 if ($chunk->count() > 0) {
@@ -443,47 +400,91 @@ class TaskController extends Controller
         $externalUsers = $task->externalUsers;
 
         if ($externalUsers->isNotEmpty()) {
+            $notificationService = new ExternalNotificationService();
+
             foreach ($externalUsers as $externalUser) {
                 $url = $externalUser->url;
 
-                try {
-                    $response = \Http::post($url . '/shift/api/notifications', [
-                        'handler' => 'task.created',
-                        'payload' => [
-                            'type' => 'task',
-                            'user_id' => $externalUser->external_id,
-                            'task_id' => $task->id,
-                            'task_title' => $task->title,
-                            'task_description' => $task->description,
-                            'task_status' => $task->status,
-                            'task_priority' => $task->priority
-                        ],
-                        'source' => [
-                            'url' => config('app.url'),
-                            'environment' => app()->environment()
-                        ]
-                    ]);
+                $payload = [
+                    'type' => 'task',
+                    'user_id' => $externalUser->external_id,
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'task_description' => $task->description,
+                    'task_status' => $task->status,
+                    'task_priority' => $task->priority
+                ];
 
-                    if ($response->successful()) {
-                        \Illuminate\Support\Facades\Log::info('Task creation notification sent to external user', [
-                            $response->json()
-                        ]);
+                $response = $notificationService->sendNotification(
+                    $url,
+                    'task.created',
+                    $payload
+                );
 
-                        $isNotProduction = !$response->json('production');
+                // Create a custom URL for the external user's system
+                $url = $externalUser->url . '/shift/tasks/' . $task->id . '/edit';
 
-                        if ($isNotProduction) {
-                            \Illuminate\Support\Facades\Notification::route('mail', $externalUser->email)
-                                ->notify(new \App\Notifications\TaskCreationNotification($task));
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // Log the error or handle it as needed
-                    \Illuminate\Support\Facades\Log::error('Failed to send task creation notification to external user: ' . $e->getMessage());
-                }
+                $notificationService->sendFallbackEmailIfNeeded(
+                    $response,
+                    $externalUser->email,
+                    new TaskCreationNotification($task, $url)
+                );
 
                 // Add a delay between external user notifications to prevent overwhelming the server
                 sleep(1); // 1 second delay
             }
         }
+    }
+
+    public function show(Task $task)
+    {
+        return inertia('Tasks/Show')
+            ->with([
+                'task' => $task
+            ]);
+    }
+
+    /**
+     * Update the status of a task.
+     *
+     * @param Task $task
+     * @param Request $request
+     * @return Response|RedirectResponse
+     */
+    public function toggleStatus(Task $task, Request $request)
+    {
+        $validatedData = $request->validate([
+            'status' => 'required|string|in:pending,in-progress,completed',
+        ]);
+
+        $task->status = $validatedData['status'];
+        $task->save();
+
+        return back()->with([
+            'status' => $task->status,
+            'message' => 'Task status updated successfully'
+        ]);
+    }
+
+    /**
+     * Update the priority of a task.
+     *
+     * @param Task $task
+     * @param Request $request
+     * @return Response|RedirectResponse
+     */
+    public function togglePriority(Task $task, Request $request)
+    {
+        $validatedData = $request->validate([
+            'priority' => 'required|string|in:low,medium,high',
+        ]);
+
+        $task->priority = $validatedData['priority'];
+        $task->save();
+
+        return back()->with([
+            'priority' => $task->priority,
+            'message' => 'Task priority updated successfully'
+        ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\Attachment;
 use App\Notifications\TaskThreadUpdated;
+use App\Services\ExternalNotificationService;
 use Exception;
 use Http;
 use Illuminate\Http\Client\ConnectionException;
@@ -114,42 +115,33 @@ class TaskThreadController extends Controller
 
             $url = $externalUser->url;
 
-            try {
-                $response = Http::post($url . '/shift/api/notifications', [
-                    'handler' => 'thread.update',
-                    'payload' => [
-                        'type' => 'task_thread',
-                        'user_id' => $externalUser->external_id,
-                        'task_id' => $task->id,
-                        'task_title' => $task->title,
-                        'thread_id' => $thread->id,
-                        'content' => $thread->content
-                    ]
-                ]);
+            $payload = [
+                'type' => 'task_thread',
+                'user_id' => $externalUser->external_id,
+                'task_id' => $task->id,
+                'task_title' => $task->title,
+                'thread_id' => $thread->id,
+                'content' => $thread->content
+            ];
 
-                if ($response->successful()) {
-                    Log::info('Notification sent to external user', [
-                        $response->json()
-                    ]);
+            $notificationService = new ExternalNotificationService();
 
-                    $isNotProduction = !$response->json('production');
+            $response = $notificationService->sendNotification(
+                $url,
+                'thread.update',
+                $payload
+            );
 
-                    if ($isNotProduction) {
-                        Notification::route('mail', $externalUser->email)->notify(new TaskThreadUpdated([
-                            'type' => 'task_thread',
-                            'user_id' => $externalUser->external_id,
-                            'task_id' => $task->id,
-                            'task_title' => $task->title,
-                            'thread_id' => $thread->id,
-                            'content' => $thread->content,
-                            'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
-                        ]));
-                    }
-                }
-            } catch (Exception $e) {
-                // Log the error or handle it as needed
-                \Log::error('Failed to send notification to external user: ' . $e->getMessage());
-            }
+            // Create notification object with additional URL for email
+            $notificationData = array_merge($payload, [
+                'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
+            ]);
+
+            $notificationService->sendFallbackEmailIfNeeded(
+                $response,
+                $externalUser->email,
+                new TaskThreadUpdated($notificationData)
+            );
         }
 
         return response()->json([
