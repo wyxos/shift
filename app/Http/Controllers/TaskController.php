@@ -394,6 +394,7 @@ class TaskController extends Controller
     /**
      * Send task creation notifications to project owner and users with access to the project.
      * Excludes the creator of the task from receiving notifications.
+     * Also notifies external users attached to the task.
      *
      * @param Task $task
      * @return void
@@ -436,6 +437,53 @@ class TaskController extends Controller
                     sleep(2); // 2 second delay
                 }
             });
+        }
+
+        // Notify external users attached to the task
+        $externalUsers = $task->externalUsers;
+
+        if ($externalUsers->isNotEmpty()) {
+            foreach ($externalUsers as $externalUser) {
+                $url = $externalUser->url;
+
+                try {
+                    $response = \Http::post($url . '/shift/api/notifications', [
+                        'handler' => 'task.created',
+                        'payload' => [
+                            'type' => 'task',
+                            'user_id' => $externalUser->external_id,
+                            'task_id' => $task->id,
+                            'task_title' => $task->title,
+                            'task_description' => $task->description,
+                            'task_status' => $task->status,
+                            'task_priority' => $task->priority
+                        ],
+                        'source' => [
+                            'url' => config('app.url'),
+                            'environment' => app()->environment()
+                        ]
+                    ]);
+
+                    if ($response->successful()) {
+                        \Illuminate\Support\Facades\Log::info('Task creation notification sent to external user', [
+                            $response->json()
+                        ]);
+
+                        $isNotProduction = !$response->json('production');
+
+                        if ($isNotProduction) {
+                            \Illuminate\Support\Facades\Notification::route('mail', $externalUser->email)
+                                ->notify(new \App\Notifications\TaskCreationNotification($task));
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Log the error or handle it as needed
+                    \Illuminate\Support\Facades\Log::error('Failed to send task creation notification to external user: ' . $e->getMessage());
+                }
+
+                // Add a delay between external user notifications to prevent overwhelming the server
+                sleep(1); // 1 second delay
+            }
         }
     }
 }
