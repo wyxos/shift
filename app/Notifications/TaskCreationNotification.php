@@ -21,11 +21,22 @@ class TaskCreationNotification extends Notification implements ShouldQueue
     protected $task;
 
     /**
-     * Create a new notification instance.
+     * Optional custom URL for the notification.
+     *
+     * @var string|null
      */
-    public function __construct(Task $task)
+    protected $url;
+
+    /**
+     * Create a new notification instance.
+     *
+     * @param Task $task
+     * @param string|null $url Optional custom URL for external notifications
+     */
+    public function __construct(Task $task, string $url = null)
     {
         $this->task = $task;
+        $this->url = $url;
     }
 
     /**
@@ -43,7 +54,7 @@ class TaskCreationNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = URL::route('tasks.edit', $this->task);
+        $url = $this->url;
 
         return (new MailMessage)
             ->subject('New Task Created: ' . $this->task->title)
