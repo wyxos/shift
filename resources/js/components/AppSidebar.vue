@@ -1,11 +1,11 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Cog } from 'lucide-vue-next';
+import { Folder, LayoutGrid } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -34,18 +34,23 @@ const mainNavItems: NavItem[] = [
 
 const administrationItems: NavItem[] = [
     {
-        'title': 'Organisations',
+        title: 'Organisations',
         href: '/organisations',
         icon: Folder,
     },
     {
-        'title': 'Clients',
+        title: 'Clients',
         href: '/clients',
         icon: Folder,
     },
     {
         title: 'Projects',
         href: '/projects',
+        icon: Folder,
+    },
+    {
+        title: 'External users',
+        href: '/external-users',
         icon: Folder,
     },
 ];
@@ -69,7 +74,7 @@ const footerNavItems: NavItem[] = [
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
+                    <SidebarMenuButton as-child size="lg">
                         <Link :href="route('dashboard')">
                             <AppLogo />
                         </Link>
@@ -82,9 +87,7 @@ const footerNavItems: NavItem[] = [
             <NavMain :items="mainNavItems" />
 
             <NavMain :items="administrationItems">
-                <template #label>
-                    Administration
-                </template>
+                <template #label> Administration</template>
             </NavMain>
         </SidebarContent>
 

@@ -1,6 +1,6 @@
-### Developer Instruction for SHIFT (Laravel 10 + Vue 3 + Inertia 3)
+### Developer Instruction for SHIFT (Laravel 12 + Vue 3 + Inertia 3)
 
-You are working on a Laravel 10 + Vue 3 + Inertia 3 + PHPUnit + Tailwind 4 + Shadcn for Vue project.
+You are working on a Laravel 12 + Vue 3 + Inertia 3 + PHPUnit + Tailwind 4 + Shadcn for Vue project.
 
 #### ✅ For Each Task (Feature, Bug Fix, or Refactor)
 
