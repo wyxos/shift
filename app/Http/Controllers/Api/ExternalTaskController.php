@@ -503,10 +503,16 @@ class ExternalTaskController extends Controller
             }
         }
 
-        // Send notification to each user
-        $notification = new TaskCreationNotification($task);
-        foreach ($usersToNotify as $user) {
-            $user->notify($notification);
+        // Send notification to users in chunks with delays to prevent SMTP connection issues
+        if ($usersToNotify->isNotEmpty()) {
+            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
+                \Illuminate\Support\Facades\Notification::send($chunk, new TaskCreationNotification($task));
+
+                // Add a delay between chunks to prevent overwhelming the SMTP server
+                if ($chunk->count() > 0) {
+                    sleep(2); // 2 second delay
+                }
+            });
         }
     }
 }

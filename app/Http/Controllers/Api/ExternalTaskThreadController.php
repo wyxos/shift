@@ -129,11 +129,26 @@ class ExternalTaskThreadController extends Controller
         // Get the thread with attachments
         $thread->load('attachments');
 
-        // Notify project users about the new message
+        // Collect all users who should receive the notification
+        $usersToNotify = collect();
+
+        // Add project users
         $projectUsers = $task->project->projectUser()->with('user')->get();
         foreach ($projectUsers as $projectUser) {
-            if ($projectUser->user) {
-                Notification::send($projectUser->user, new TaskThreadUpdated([
+            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
+                $usersToNotify->push($projectUser->user);
+            }
+        }
+
+        // Add the project author if not already included
+        if ($task->project->author && !$usersToNotify->contains('id', $task->project->author->id)) {
+            $usersToNotify->push($task->project->author);
+        }
+
+        // Send notification to users in chunks with delays to prevent SMTP connection issues
+        if ($usersToNotify->isNotEmpty()) {
+            $usersToNotify->chunk(3)->each(function ($chunk) use ($task, $thread) {
+                Notification::send($chunk, new TaskThreadUpdated([
                     'type' => 'external',
                     'task_id' => $task->id,
                     'task_title' => $task->title,
@@ -141,19 +156,12 @@ class ExternalTaskThreadController extends Controller
                     'content' => $thread->content,
                     'url' => route('tasks.edit', $task->id)
                 ]));
-            }
-        }
 
-        // Also notify the project author
-        if ($task->project->author) {
-            Notification::send($task->project->author, new TaskThreadUpdated([
-                'type' => 'external',
-                'task_id' => $task->id,
-                'task_title' => $task->title,
-                'thread_id' => $thread->id,
-                'content' => $thread->content,
-                'url' => route('tasks.edit', $task->id)
-            ]));
+                // Add a delay between chunks to prevent overwhelming the SMTP server
+                if ($chunk->count() > 0) {
+                    sleep(2); // 2 second delay
+                }
+            });
         }
 
         return response()->json([
