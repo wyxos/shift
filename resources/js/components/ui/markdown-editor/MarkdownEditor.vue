@@ -31,7 +31,7 @@ onMounted(() => {
       height: props.height,
       initialValue: props.modelValue,
       initialEditType: 'markdown', // Set to markdown mode
-      previewStyle: 'tab', // Use tab style for preview
+      previewStyle: 'none', // Disable preview
       hideModeSwitch: true, // Hide the mode switch to enforce markdown only
       placeholder: props.placeholder,
       toolbarItems: [
