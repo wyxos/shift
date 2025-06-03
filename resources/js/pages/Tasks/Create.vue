@@ -4,6 +4,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Input } from '@/components/ui/input';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 
@@ -154,7 +155,13 @@ const removeFile = async (file) => {
 
                 <div class="mb-4">
                     <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-                    <textarea v-model="createForm.description" id="description" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring focus:ring-opacity-50"></textarea>
+                    <MarkdownEditor
+                        v-model="createForm.description"
+                        id="description"
+                        height="300px"
+                        placeholder="Write your task description here..."
+                        class="mt-1"
+                    />
                     <div v-if="createForm.errors.description" class="text-red-500 text-sm mt-1">{{ createForm.errors.description }}</div>
                 </div>
 
