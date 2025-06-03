@@ -110,38 +110,54 @@ class TaskThreadController extends Controller
         $thread->load('attachments');
 
         if ($request->input('type') === 'external') {
-            /** @var ExternalUser $externalUser */
-            $externalUser = $task->submitter;
-
-            $url = $externalUser->url;
-
-            $payload = [
-                'type' => 'task_thread',
-                'user_id' => $externalUser->external_id,
-                'task_id' => $task->id,
-                'task_title' => $task->title,
-                'thread_id' => $thread->id,
-                'content' => $thread->content
-            ];
-
             $notificationService = new ExternalNotificationService();
+            $externalUsers = collect();
 
-            $response = $notificationService->sendNotification(
-                $url,
-                'thread.update',
-                $payload
-            );
+            // Check if the submitter is an external user
+            if ($task->isExternallySubmitted()) {
+                /** @var ExternalUser $externalUser */
+                $externalUser = $task->submitter;
+                $externalUsers->push($externalUser);
+            }
 
-            // Create notification object with additional URL for email
-            $notificationData = array_merge($payload, [
-                'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
-            ]);
+            // Get all external users who have access to the task
+            // If submitter is already in the collection, it won't be added again
+            $task->externalUsers->each(function ($user) use ($externalUsers) {
+                if (!$externalUsers->contains('id', $user->id)) {
+                    $externalUsers->push($user);
+                }
+            });
 
-            $notificationService->sendFallbackEmailIfNeeded(
-                $response,
-                $externalUser->email,
-                new TaskThreadUpdated($notificationData)
-            );
+            // Send notifications to all external users
+            foreach ($externalUsers as $externalUser) {
+                $url = $externalUser->url;
+
+                $payload = [
+                    'type' => 'task_thread',
+                    'user_id' => $externalUser->external_id,
+                    'task_id' => $task->id,
+                    'task_title' => $task->title,
+                    'thread_id' => $thread->id,
+                    'content' => $thread->content
+                ];
+
+                $response = $notificationService->sendNotification(
+                    $url,
+                    'thread.update',
+                    $payload
+                );
+
+                // Create notification object with additional URL for email
+                $notificationData = array_merge($payload, [
+                    'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
+                ]);
+
+                $notificationService->sendFallbackEmailIfNeeded(
+                    $response,
+                    $externalUser->email,
+                    new TaskThreadUpdated($notificationData)
+                );
+            }
         }
 
         return response()->json([

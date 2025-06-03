@@ -68,7 +68,8 @@ const externalMessages = ref([
         attachments: [],
     },
 ]);
-const newMessage = ref('');
+const internalNewMessage = ref('');
+const externalNewMessage = ref('');
 
 // Thread attachment state
 const threadTempIdentifier = ref(Date.now().toString() + '_thread');
@@ -136,11 +137,14 @@ const sendMessage = async (event) => {
         event.stopPropagation();
     }
 
-    if (!newMessage.value.trim() && threadAttachments.value.length === 0) return;
+    // Get the appropriate message based on the active tab
+    const messageContent = activeTab.value === 'internal' ? internalNewMessage.value : externalNewMessage.value;
+
+    if (!messageContent.trim() && threadAttachments.value.length === 0) return;
 
     try {
         const response = await axios.post(route('task-threads.store', { task: props.task.id }), {
-            content: newMessage.value,
+            content: messageContent,
             type: activeTab.value,
             temp_identifier: threadAttachments.value.length > 0 ? threadTempIdentifier.value : null,
         });
@@ -159,12 +163,15 @@ const sendMessage = async (event) => {
 
         if (activeTab.value === 'internal') {
             internalMessages.value.push(message);
+            // Clear internal message form
+            internalNewMessage.value = '';
         } else {
             externalMessages.value.push(message);
+            // Clear external message form
+            externalNewMessage.value = '';
         }
 
-        // Clear form
-        newMessage.value = '';
+        // Clear attachments
         threadAttachments.value = [];
         threadTempIdentifier.value = Date.now().toString() + '_thread';
     } catch (error) {
@@ -467,7 +474,12 @@ const submitForm = () => {
                 <h3 class="mb-4 font-medium text-gray-900">Comments</h3>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="rounded-md border p-4">
+                    <div
+                        :class="[
+                            'rounded-md border p-4 cursor-pointer',
+                            activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : ''
+                        ]"
+                        @click="activeTab = 'internal'">
                         <h4>Internal</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
@@ -539,11 +551,11 @@ const submitForm = () => {
                         <!-- Message input with attachment button -->
                         <div class="flex flex-col">
                             <div class="mb-2 flex">
-                                <input
-                                    v-model="newMessage"
-                                    class="flex-grow rounded-l-md border p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                <MarkdownEditor
+                                    v-model="internalNewMessage"
+                                    class="flex-grow"
+                                    height="100px"
                                     placeholder="Type your message..."
-                                    type="text"
                                     @keyup.enter.prevent="sendMessage($event)"
                                 />
                                 <label
@@ -570,7 +582,12 @@ const submitForm = () => {
                         </div>
                     </div>
 
-                    <div class="rounded-md border p-4">
+                    <div
+                        :class="[
+                            'rounded-md border p-4 cursor-pointer',
+                            activeTab === 'external' ? 'border-blue-500 bg-blue-50' : ''
+                        ]"
+                        @click="activeTab = 'external'">
                         <h4>External</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
@@ -642,11 +659,11 @@ const submitForm = () => {
                         <!-- Message input with attachment button -->
                         <div class="flex flex-col">
                             <div class="mb-2 flex">
-                                <input
-                                    v-model="newMessage"
-                                    class="flex-grow rounded-l-md border p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                <MarkdownEditor
+                                    v-model="externalNewMessage"
+                                    class="flex-grow"
+                                    height="100px"
                                     placeholder="Type your message..."
-                                    type="text"
                                     @keyup.enter.prevent="sendMessage($event)"
                                 />
                                 <label

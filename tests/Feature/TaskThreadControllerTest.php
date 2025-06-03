@@ -111,4 +111,95 @@ class TaskThreadControllerTest extends TestCase
         // Assert that no notification was sent
         Notification::assertNothingSent();
     }
+
+    public function test_external_thread_creation_with_non_external_submitter_sends_notification_to_external_users()
+    {
+        Notification::fake();
+
+        // Create a task submitted by a regular user (not an external user)
+        $regularUser = User::factory()->create();
+        $task = Task::factory()->create();
+        $task->submitter()->associate($regularUser)->save();
+
+        // Add an external user with access to the task
+        $task->externalUsers()->attach($this->externalUser);
+
+        // Mock the HTTP call to the external system
+        Http::fake([
+            'https://example.com/shift/api/notifications' => Http::response([
+                'success' => true,
+                'production' => false // This will trigger the notification
+            ], 200)
+        ]);
+
+        // Create a thread message as the authenticated user
+        $response = $this->actingAs($this->user)
+            ->postJson(route('task-threads.store', $task), [
+                'content' => 'This is a test message',
+                'type' => 'external',
+            ]);
+
+        $response->assertStatus(201);
+
+        // Assert that a notification was sent to the external user
+        Notification::assertSentOnDemand(
+            TaskThreadUpdated::class,
+            function ($notification, $channels, $notifiable) {
+                return $notifiable->routes['mail'] === $this->externalUser->email;
+            }
+        );
+    }
+
+    public function test_external_thread_creation_sends_notification_to_multiple_external_users()
+    {
+        Notification::fake();
+
+        // Create another external user
+        $anotherExternalUser = ExternalUser::factory()->create([
+            'external_id' => 'ext-456',
+            'environment' => 'testing',
+            'url' => 'https://another-example.com',
+            'name' => 'Another External User',
+            'email' => 'another-external@example.com',
+        ]);
+
+        // Add both external users to the task
+        $this->task->externalUsers()->attach([$this->externalUser->id, $anotherExternalUser->id]);
+
+        // Mock the HTTP calls to both external systems
+        Http::fake([
+            'https://example.com/shift/api/notifications' => Http::response([
+                'success' => true,
+                'production' => false // This will trigger the notification
+            ], 200),
+            'https://another-example.com/shift/api/notifications' => Http::response([
+                'success' => true,
+                'production' => false // This will trigger the notification
+            ], 200)
+        ]);
+
+        // Create a thread message as the authenticated user
+        $response = $this->actingAs($this->user)
+            ->postJson(route('task-threads.store', $this->task), [
+                'content' => 'This is a test message',
+                'type' => 'external',
+            ]);
+
+        $response->assertStatus(201);
+
+        // Assert that notifications were sent to both external users
+        Notification::assertSentOnDemand(
+            TaskThreadUpdated::class,
+            function ($notification, $channels, $notifiable) {
+                return $notifiable->routes['mail'] === $this->externalUser->email;
+            }
+        );
+
+        Notification::assertSentOnDemand(
+            TaskThreadUpdated::class,
+            function ($notification, $channels, $notifiable) use ($anotherExternalUser) {
+                return $notifiable->routes['mail'] === $anotherExternalUser->email;
+            }
+        );
+    }
 }
