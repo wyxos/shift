@@ -354,9 +354,9 @@ const submitForm = () => {
                     <MarkdownEditor
                         id="description"
                         v-model="editForm.description"
+                        class="mt-1"
                         height="300px"
                         placeholder="Write your task description here..."
-                        class="mt-1"
                     />
                     <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
                         {{ editForm.errors.description }}
@@ -475,11 +475,9 @@ const submitForm = () => {
 
                 <div class="grid grid-cols-2 gap-4">
                     <div
-                        :class="[
-                            'rounded-md border p-4 cursor-pointer',
-                            activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : ''
-                        ]"
-                        @click="activeTab = 'internal'">
+                        :class="['cursor-pointer rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
+                        @click="activeTab = 'internal'"
+                    >
                         <h4>Internal</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
@@ -550,7 +548,7 @@ const submitForm = () => {
 
                         <!-- Message input with attachment button -->
                         <div class="flex flex-col">
-                            <div class="mb-2 flex">
+                            <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="internalNewMessage"
                                     class="flex-grow"
@@ -558,36 +556,36 @@ const submitForm = () => {
                                     placeholder="Type your message..."
                                     @keyup.enter.prevent="sendMessage($event)"
                                 />
-                                <label
-                                    class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                >
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path
-                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                        />
-                                    </svg>
-                                    <input class="hidden" multiple type="file" @change="handleThreadFileUpload" />
-                                </label>
-                                <button
-                                    class="rounded-r-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    type="button"
-                                    @click.prevent="sendMessage($event)"
-                                >
-                                    Send
-                                </button>
+                                <div class="mt-2 flex justify-end gap-2">
+                                    <label
+                                        class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    >
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path
+                                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                            />
+                                        </svg>
+                                        <input class="hidden" multiple type="file" @change="handleThreadFileUpload" />
+                                    </label>
+                                    <button
+                                        class="rounded-r-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        type="button"
+                                        @click.prevent="sendMessage($event)"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div
-                        :class="[
-                            'rounded-md border p-4 cursor-pointer',
-                            activeTab === 'external' ? 'border-blue-500 bg-blue-50' : ''
-                        ]"
-                        @click="activeTab = 'external'">
+                        :class="['cursor-pointer rounded-md border p-4', activeTab === 'external' ? 'border-blue-500 bg-blue-50' : '']"
+                        @click="activeTab = 'external'"
+                    >
                         <h4>External</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
@@ -658,7 +656,7 @@ const submitForm = () => {
 
                         <!-- Message input with attachment button -->
                         <div class="flex flex-col">
-                            <div class="mb-2 flex">
+                            <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="externalNewMessage"
                                     class="flex-grow"
@@ -666,26 +664,28 @@ const submitForm = () => {
                                     placeholder="Type your message..."
                                     @keyup.enter.prevent="sendMessage($event)"
                                 />
-                                <label
-                                    class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                >
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path
-                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                        />
-                                    </svg>
-                                    <input class="hidden" multiple type="file" @change="handleThreadFileUpload" />
-                                </label>
-                                <button
-                                    class="rounded-r-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    type="button"
-                                    @click.prevent="sendMessage($event)"
-                                >
-                                    Send
-                                </button>
+                                <div class="mt-2 flex justify-end gap-2">
+                                    <label
+                                        class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    >
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path
+                                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                            />
+                                        </svg>
+                                        <input class="hidden" multiple type="file" @change="handleThreadFileUpload" />
+                                    </label>
+                                    <button
+                                        class="rounded-r-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        type="button"
+                                        @click.prevent="sendMessage($event)"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
