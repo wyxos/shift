@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { Input } from '@/components/ui/input';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -343,12 +344,13 @@ const submitForm = () => {
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700" for="description">Description</label>
-                    <textarea
+                    <MarkdownEditor
                         id="description"
                         v-model="editForm.description"
-                        class="focus:ring-opacity-50 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring"
-                        rows="4"
-                    ></textarea>
+                        height="300px"
+                        placeholder="Write your task description here..."
+                        class="mt-1"
+                    />
                     <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
                         {{ editForm.errors.description }}
                     </div>
