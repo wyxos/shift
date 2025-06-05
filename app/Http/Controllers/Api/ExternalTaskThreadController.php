@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attachment;
-use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Models\Attachment;
+use App\Models\ExternalUser;
 use App\Notifications\TaskThreadUpdated;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
@@ -144,16 +145,19 @@ class ExternalTaskThreadController extends Controller
             $usersToNotify->push($task->project->author);
         }
 
-        // Send notification to users using Laravel's queue system
+        // Send notification to users in chunks with delays to prevent SMTP connection issues
         if ($usersToNotify->isNotEmpty()) {
-            Notification::send($usersToNotify, new TaskThreadUpdated([
-                'type' => 'external',
-                'task_id' => $task->id,
-                'task_title' => $task->title,
-                'thread_id' => $thread->id,
-                'content' => $thread->content,
-                'url' => route('tasks.edit', $task->id)
-            ]));
+            Notification::send(
+                $usersToNotify,
+                new TaskThreadUpdated([
+                    'type'       => 'external',
+                    'task_id'    => $task->id,
+                    'task_title' => $task->title,
+                    'thread_id'  => $thread->id,
+                    'content'    => $thread->content,
+                    'url'        => route('tasks.edit', $task->id),
+                ])
+            );
         }
 
         return response()->json([
