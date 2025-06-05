@@ -7,8 +7,8 @@ use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\Attachment;
 use App\Models\User;
+use App\Jobs\NotifyExternalUser;
 use App\Notifications\TaskCreationNotification;
-use App\Services\ExternalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -384,54 +384,16 @@ class TaskController extends Controller
             }
         }
 
-        // Send notification to users in chunks with delays to prevent SMTP connection issues
         if ($usersToNotify->isNotEmpty()) {
-            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
-                Notification::send($chunk, new TaskCreationNotification($task));
-
-                // Add a delay between chunks to prevent overwhelming the SMTP server
-                if ($chunk->count() > 0) {
-                    sleep(2); // 2 second delay
-                }
-            });
+            Notification::send($usersToNotify, new TaskCreationNotification($task));
         }
 
         // Notify external users attached to the task
         $externalUsers = $task->externalUsers;
 
         if ($externalUsers->isNotEmpty()) {
-            $notificationService = new ExternalNotificationService();
-
             foreach ($externalUsers as $externalUser) {
-                $url = $externalUser->url;
-
-                $payload = [
-                    'type' => 'task',
-                    'user_id' => $externalUser->external_id,
-                    'task_id' => $task->id,
-                    'task_title' => $task->title,
-                    'task_description' => $task->description,
-                    'task_status' => $task->status,
-                    'task_priority' => $task->priority
-                ];
-
-                $response = $notificationService->sendNotification(
-                    $url,
-                    'task.created',
-                    $payload
-                );
-
-                // Create a custom URL for the external user's system
-                $url = $externalUser->url . '/shift/tasks/' . $task->id . '/edit';
-
-                $notificationService->sendFallbackEmailIfNeeded(
-                    $response,
-                    $externalUser->email,
-                    new TaskCreationNotification($task, $url)
-                );
-
-                // Add a delay between external user notifications to prevent overwhelming the server
-                sleep(1); // 1 second delay
+                NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }
         }
     }

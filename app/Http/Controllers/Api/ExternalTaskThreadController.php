@@ -147,21 +147,17 @@ class ExternalTaskThreadController extends Controller
 
         // Send notification to users in chunks with delays to prevent SMTP connection issues
         if ($usersToNotify->isNotEmpty()) {
-            $usersToNotify->chunk(3)->each(function ($chunk) use ($task, $thread) {
-                Notification::send($chunk, new TaskThreadUpdated([
-                    'type' => 'external',
-                    'task_id' => $task->id,
+            Notification::send(
+                $usersToNotify,
+                new TaskThreadUpdated([
+                    'type'       => 'external',
+                    'task_id'    => $task->id,
                     'task_title' => $task->title,
-                    'thread_id' => $thread->id,
-                    'content' => $thread->content,
-                    'url' => route('tasks.edit', $task->id)
-                ]));
-
-                // Add a delay between chunks to prevent overwhelming the SMTP server
-                if ($chunk->count() > 0) {
-                    sleep(2); // 2 second delay
-                }
-            });
+                    'thread_id'  => $thread->id,
+                    'content'    => $thread->content,
+                    'url'        => route('tasks.edit', $task->id),
+                ])
+            );
         }
 
         return response()->json([

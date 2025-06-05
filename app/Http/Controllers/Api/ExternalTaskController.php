@@ -254,16 +254,11 @@ class ExternalTaskController extends Controller
             }
         }
 
-        // Send notification to users in chunks with delays to prevent SMTP connection issues
         if ($usersToNotify->isNotEmpty()) {
-            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
-                Notification::send($chunk, new TaskCreationNotification($task, route('tasks.edit', ['task' => $task->id])));
-
-                // Add a delay between chunks to prevent overwhelming the SMTP server
-                if ($chunk->count() > 0) {
-                    sleep(2); // 2 second delay
-                }
-            });
+            Notification::send(
+                $usersToNotify,
+                new TaskCreationNotification($task, route('tasks.edit', ['task' => $task->id]))
+            );
         }
     }
 
