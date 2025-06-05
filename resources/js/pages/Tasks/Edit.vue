@@ -14,7 +14,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, nextTick, watch } from 'vue';
 
 const props = defineProps({
     project: {
@@ -77,6 +77,8 @@ const externalMessages = ref([
         attachments: [],
     },
 ]);
+const internalContainer = ref(null);
+const externalContainer = ref(null);
 const internalNewMessage = ref('');
 const externalNewMessage = ref('');
 
@@ -183,6 +185,12 @@ const sendMessage = async (event) => {
         // Clear attachments
         threadAttachments.value = [];
         threadTempIdentifier.value = Date.now().toString() + '_thread';
+        await nextTick();
+        if (activeTab.value === 'internal') {
+            scrollToBottom(internalContainer);
+        } else {
+            scrollToBottom(externalContainer);
+        }
     } catch (error) {
         console.error('Error sending message:', error);
         alert('Failed to send message. Please try again.');
@@ -238,7 +246,9 @@ onMounted(() => {
 // Load task threads from the server
 const loadTaskThreads = async () => {
     try {
-        const response = await axios.get(route('task-threads.index', { task: props.task.id }));
+        const response = await axios.get(route('task-threads.index', { task: props.task.id }), {
+            params: { limit: 20 },
+        });
 
         if (response.data.internal && Array.isArray(response.data.internal)) {
             internalMessages.value = response.data.internal.map((thread) => ({
@@ -264,7 +274,65 @@ const loadTaskThreads = async () => {
     } catch (error) {
         console.error('Error loading task threads:', error);
     }
+    await nextTick();
+    scrollToBottom(internalContainer);
+    scrollToBottom(externalContainer);
 };
+
+const scrollToBottom = (container) => {
+    if (container.value) {
+        container.value.scrollTop = container.value.scrollHeight;
+    }
+};
+
+const loadMoreThreads = async (type) => {
+    const messages = type === 'internal' ? internalMessages : externalMessages;
+    const container = type === 'internal' ? internalContainer : externalContainer;
+    if (messages.value.length === 0) return;
+
+    const firstId = messages.value[0].id;
+    const prevHeight = container.value ? container.value.scrollHeight : 0;
+
+    try {
+        const response = await axios.get(route('task-threads.index', { task: props.task.id }), {
+            params: { type, before: firstId, limit: 20 },
+        });
+
+        if (Array.isArray(response.data.threads) && response.data.threads.length > 0) {
+            const newMessages = response.data.threads.map((thread) => ({
+                id: thread.id,
+                sender: thread.sender_name,
+                content: thread.content,
+                timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isCurrentUser: thread.is_current_user,
+                attachments: thread.attachments || [],
+            }));
+            messages.value = [...newMessages, ...messages.value];
+            await nextTick();
+            if (container.value) {
+                container.value.scrollTop = container.value.scrollHeight - prevHeight;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading more threads:', error);
+    }
+};
+
+const handleScroll = (type, event) => {
+    if (event.target.scrollTop === 0) {
+        loadMoreThreads(type);
+    }
+};
+
+watch(() => activeTab.value, () => {
+    nextTick(() => {
+        if (activeTab.value === 'internal') {
+            scrollToBottom(internalContainer);
+        } else {
+            scrollToBottom(externalContainer);
+        }
+    });
+});
 
 // Handle file upload
 const handleFileUpload = (event) => {
@@ -487,7 +555,7 @@ const submitForm = () => {
                 </Card>
             </form>
             <!-- Thread Tabs Section -->
-            <Card class="col-span-1 lg:col-span-2">
+            <Card class="col-span-1 lg:col-span-2 h-screen">
                 <CardHeader>
                     <CardTitle>Comments</CardTitle>
                 </CardHeader>
@@ -499,7 +567,11 @@ const submitForm = () => {
                     >
                         <h4>Internal</h4>
                         <!-- Messages container with fixed height and scrolling -->
-                        <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
+                        <div
+                            ref="internalContainer"
+                            class="mb-4 h-[calc(100vh-20rem)] overflow-y-auto rounded bg-gray-50 p-2"
+                            @scroll="handleScroll('internal', $event)"
+                        >
                             <div
                                 v-for="message in internalMessages"
                                 :key="message.id"
@@ -607,7 +679,11 @@ const submitForm = () => {
                     >
                         <h4>External</h4>
                         <!-- Messages container with fixed height and scrolling -->
-                        <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
+                        <div
+                            ref="externalContainer"
+                            class="mb-4 h-[calc(100vh-20rem)] overflow-y-auto rounded bg-gray-50 p-2"
+                            @scroll="handleScroll('external', $event)"
+                        >
                             <div
                                 v-for="message in externalMessages"
                                 :key="message.id"

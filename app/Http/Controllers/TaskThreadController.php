@@ -26,10 +26,22 @@ class TaskThreadController extends Controller
      * @param Task $task
      * @return JsonResponse
      */
-    public function index(Task $task)
+    public function index(Request $request, Task $task)
     {
-        $internalThreads = $this->getThreadsByType($task, 'internal');
-        $externalThreads = $this->getThreadsByType($task, 'external');
+        $type = $request->input('type');
+        $before = $request->input('before');
+        $limit = (int) $request->input('limit', 20);
+
+        if ($type) {
+            $threads = $this->getThreadsByType($task, $type, $before, $limit);
+
+            return response()->json([
+                'threads' => $threads,
+            ]);
+        }
+
+        $internalThreads = $this->getThreadsByType($task, 'internal', $before, $limit);
+        $externalThreads = $this->getThreadsByType($task, 'external', $before, $limit);
 
         return response()->json([
             'internal' => $internalThreads,
@@ -44,12 +56,17 @@ class TaskThreadController extends Controller
      * @param string $type
      * @return array
      */
-    private function getThreadsByType(Task $task, string $type)
+    private function getThreadsByType(Task $task, string $type, $before = null, $limit = 20)
     {
         return $task->threads()
             ->where('type', $type)
-            ->orderBy('created_at', 'asc')
+            ->when($before, function ($q) use ($before) {
+                $q->where('id', '<', $before);
+            })
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
             ->get()
+            ->reverse()
             ->map(function ($thread) {
                 $attachments = $thread->attachments()->get()->map(function ($attachment) {
                     return [
