@@ -1,6 +1,15 @@
 <script lang="ts" setup>
 import { Input } from '@/components/ui/input';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -341,16 +350,21 @@ const submitForm = () => {
     <Head :title="title" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="grid grid-cols-3 gap-4 p-4">
-            <form @submit.prevent="submitForm" @keydown.enter.prevent>
+        <div class="grid grid-cols-1 gap-4 p-4 lg:grid-cols-3">
+            <form @submit.prevent="submitForm" @keydown.enter.prevent class="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Edit Task</CardTitle>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700" for="name">Task title</label>
+                    <Label for="title">Task title</Label>
                     <Input id="title" v-model="editForm.title" required type="text" />
                     <div v-if="editForm.errors.title" class="mt-1 text-sm text-red-500">{{ editForm.errors.title }}</div>
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700" for="description">Description</label>
+                    <Label for="description">Description</Label>
                     <MarkdownEditor
                         id="description"
                         v-model="editForm.description"
@@ -369,7 +383,7 @@ const submitForm = () => {
 
                 <!-- External Users Section -->
                 <div v-if="props.projectExternalUsers.length > 0" class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Assign External Users</label>
+                    <Label>Assign External Users</Label>
                     <p class="mb-2 text-xs text-gray-500">Select external users who should have access to this task</p>
 
                     <div class="mt-2 max-h-60 space-y-2 overflow-y-auto rounded-md border p-2">
@@ -423,7 +437,7 @@ const submitForm = () => {
 
                 <!-- File Upload Section -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700" for="attachments">Add New Attachments</label>
+                    <Label for="attachments">Add New Attachments</Label>
                     <div class="mt-1 flex items-center">
                         <input
                             id="attachments"
@@ -466,14 +480,19 @@ const submitForm = () => {
                 <div v-for="(error, key) in otherErrors" :key="key" class="mb-4 text-sm text-red-500">
                     {{ error }}
                 </div>
-
-                <button :disabled="editForm.processing" class="rounded-md bg-blue-600 px-4 py-2 text-white" type="submit">Update Task</button>
+                    </CardContent>
+                    <CardFooter class="justify-end">
+                        <Button type="submit" :disabled="editForm.processing">Update Task</Button>
+                    </CardFooter>
+                </Card>
             </form>
             <!-- Thread Tabs Section -->
-            <div class="col-span-2">
-                <h3 class="mb-4 font-medium text-gray-900">Comments</h3>
-
-                <div class="grid grid-cols-2 gap-4">
+            <Card class="col-span-1 lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Comments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div
                         :class="['cursor-pointer rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
                         @click="activeTab = 'internal'"
@@ -690,7 +709,8 @@ const submitForm = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     </AppLayout>
 </template>
