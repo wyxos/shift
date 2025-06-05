@@ -2,20 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\TaskThread;
-use App\Models\Attachment;
 use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalNotificationService;
-use Exception;
-use Http;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 class TaskThreadController extends Controller
