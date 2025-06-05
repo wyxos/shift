@@ -79,8 +79,11 @@ class ExternalNotificationService
         $isNotProduction = !$response->json('production');
 
         if ($isNotProduction) {
-            Notification::route('mail', $email)
-                ->notify($notification);
+            // Queue the notification by dispatching it to the queue
+            dispatch(function() use ($email, $notification) {
+                Notification::route('mail', $email)
+                    ->notify($notification);
+            });
 
             return true;
         }

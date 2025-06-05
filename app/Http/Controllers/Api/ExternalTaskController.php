@@ -7,7 +7,6 @@ use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
-use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

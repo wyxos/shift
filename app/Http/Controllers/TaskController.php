@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Project;
-use App\Models\ProjectUser;
-use App\Models\Task;
 use App\Models\Attachment;
+use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use App\Services\ExternalNotificationService;
@@ -384,16 +383,9 @@ class TaskController extends Controller
             }
         }
 
-        // Send notification to users in chunks with delays to prevent SMTP connection issues
+        // Send notification to users using Laravel's queue system
         if ($usersToNotify->isNotEmpty()) {
-            $usersToNotify->chunk(3)->each(function ($chunk) use ($task) {
-                Notification::send($chunk, new TaskCreationNotification($task));
-
-                // Add a delay between chunks to prevent overwhelming the SMTP server
-                if ($chunk->count() > 0) {
-                    sleep(2); // 2 second delay
-                }
-            });
+            Notification::send($usersToNotify, new TaskCreationNotification($task));
         }
 
         // Notify external users attached to the task
@@ -430,8 +422,7 @@ class TaskController extends Controller
                     new TaskCreationNotification($task, $url)
                 );
 
-                // Add a delay between external user notifications to prevent overwhelming the server
-                sleep(1); // 1 second delay
+                // No need for delay as we're using Laravel's queue system
             }
         }
     }
