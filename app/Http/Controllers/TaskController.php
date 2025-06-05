@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Attachment;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
+use App\Models\Attachment;
 use App\Models\User;
+use App\Jobs\NotifyExternalUser;
 use App\Notifications\TaskCreationNotification;
-use App\Services\ExternalNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -383,7 +384,6 @@ class TaskController extends Controller
             }
         }
 
-        // Send notification to users using Laravel's queue system
         if ($usersToNotify->isNotEmpty()) {
             Notification::send($usersToNotify, new TaskCreationNotification($task));
         }
@@ -392,37 +392,8 @@ class TaskController extends Controller
         $externalUsers = $task->externalUsers;
 
         if ($externalUsers->isNotEmpty()) {
-            $notificationService = new ExternalNotificationService();
-
             foreach ($externalUsers as $externalUser) {
-                $url = $externalUser->url;
-
-                $payload = [
-                    'type' => 'task',
-                    'user_id' => $externalUser->external_id,
-                    'task_id' => $task->id,
-                    'task_title' => $task->title,
-                    'task_description' => $task->description,
-                    'task_status' => $task->status,
-                    'task_priority' => $task->priority
-                ];
-
-                $response = $notificationService->sendNotification(
-                    $url,
-                    'task.created',
-                    $payload
-                );
-
-                // Create a custom URL for the external user's system
-                $url = $externalUser->url . '/shift/tasks/' . $task->id . '/edit';
-
-                $notificationService->sendFallbackEmailIfNeeded(
-                    $response,
-                    $externalUser->email,
-                    new TaskCreationNotification($task, $url)
-                );
-
-                // No need for delay as we're using Laravel's queue system
+                NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }
         }
     }
