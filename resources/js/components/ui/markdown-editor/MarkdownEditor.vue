@@ -25,6 +25,7 @@ let editor: Editor | null = null;
 
 onMounted(() => {
     if (editorRef.value) {
+        console.log(props.modelValue)
         // Initialize the editor with markdown only mode
         editor = new Editor({
             el: editorRef.value,
@@ -32,7 +33,7 @@ onMounted(() => {
             initialEditType: 'markdown', // Set to markdown mode
             hideModeSwitch: true, // Hide the mode switch to enforce markdown only
             placeholder: props.placeholder,
-            initialValue: props.modelValue
+            initialValue: props.modelValue || ''
         });
 
         // Listen for changes and emit them to the parent
