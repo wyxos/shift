@@ -128,8 +128,8 @@ class ExternalTaskController extends Controller
             'user.email' => 'nullable|email',
             'user.environment' => 'nullable|string|max:255',
             'user.url' => 'nullable|url',
-            'metadata.url' => 'required|url',
-            'metadata.environment' => 'required|string|max:255',
+            'metadata.url' => 'nullable|url',
+            'metadata.environment' => 'nullable|string|max:255',
             'temp_identifier' => 'nullable|string',
         ]);
 
@@ -154,10 +154,12 @@ class ExternalTaskController extends Controller
             $task->submitter()->associate($externalUser)->save();
         }
 
-        $task->metadata()->create([
-            'url' => request('metadata.url'),
-            'environment' => request('metadata.environment'),
-        ]);
+        if (isset($attributes['metadata'])) {
+            $task->metadata()->create([
+                'url' => request('metadata.url'),
+                'environment' => request('metadata.environment'),
+            ]);
+        }
 
         // Send notifications to project users
         $this->sendTaskCreationNotifications($task);
