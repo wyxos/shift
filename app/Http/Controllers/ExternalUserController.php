@@ -14,7 +14,18 @@ class ExternalUserController extends Controller
      */
     public function index()
     {
+        // Get the current user
+        $user = auth()->user();
+
+        // Get the IDs of projects that the user owns or has access to
+        $projectIds = Project::where('author_id', $user->id)
+            ->orWhereHas('projectUser', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->pluck('id');
+
         $externalUsers = ExternalUser::with('project')
+            ->whereIn('project_id', $projectIds)
             ->when(
                 request('search'),
                 fn($query) => $query->where(function($q) {
@@ -62,8 +73,23 @@ class ExternalUserController extends Controller
      */
     public function edit(string $id)
     {
-        $externalUser = ExternalUser::with('project')->findOrFail($id);
-        $projects = Project::all(['id', 'name']);
+        // Get the current user
+        $user = auth()->user();
+
+        // Get the IDs of projects that the user owns or has access to
+        $projectIds = Project::where('author_id', $user->id)
+            ->orWhereHas('projectUser', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->pluck('id');
+
+        $externalUser = ExternalUser::with('project')
+            ->whereIn('project_id', $projectIds)
+            ->findOrFail($id);
+
+        // Only show projects the user has access to
+        $projects = Project::whereIn('id', $projectIds)
+            ->get(['id', 'name']);
 
         return Inertia::render('ExternalUsers/Edit', [
             'externalUser' => $externalUser,
@@ -76,13 +102,25 @@ class ExternalUserController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        // Get the current user
+        $user = auth()->user();
+
+        // Get the IDs of projects that the user owns or has access to
+        $projectIds = Project::where('author_id', $user->id)
+            ->orWhereHas('projectUser', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->pluck('id');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
-            'project_id' => 'nullable|exists:projects,id',
+            'project_id' => 'nullable|exists:projects,id|in:' . $projectIds->implode(','),
         ]);
 
-        $externalUser = ExternalUser::findOrFail($id);
+        $externalUser = ExternalUser::whereIn('project_id', $projectIds)
+            ->findOrFail($id);
+
         $externalUser->update($validated);
 
         return redirect()->route('external-users.index')
