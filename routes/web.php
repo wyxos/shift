@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ExternalUserController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
@@ -79,6 +80,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');
     Route::get('external-users/{externalUser}/edit', [ExternalUserController::class, 'edit'])->name('external-users.edit');
     Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
+
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/unread', [NotificationController::class, 'getUnread'])->name('notifications.unread');
+    Route::post('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
+    Route::post('notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
 });
 
 require __DIR__.'/settings.php';

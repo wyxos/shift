@@ -27,7 +27,7 @@ class TaskThreadUpdated extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     /**
@@ -56,7 +56,12 @@ class TaskThreadUpdated extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            //
+            'task_id' => $this->data['task_id'],
+            'task_title' => $this->data['task_title'] ?? 'Task #' . $this->data['task_id'],
+            'type' => $this->data['type'],
+            'content' => $this->data['content'],
+            'url' => $this->data['url'],
+            'thread_id' => $this->data['thread_id'] ?? null,
         ];
     }
 }
