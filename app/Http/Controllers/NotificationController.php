@@ -67,4 +67,15 @@ class NotificationController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Mark a notification as unread.
+     */
+    public function markAsUnread(Request $request, $id)
+    {
+        $notification = Auth::user()->notifications()->findOrFail($id);
+        $notification->markAsUnread();
+
+        return response()->json(['success' => true]);
+    }
 }

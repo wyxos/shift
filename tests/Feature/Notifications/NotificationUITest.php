@@ -85,4 +85,46 @@ class NotificationUITest extends TestCase
             ->has('notifications')
         );
     }
+
+    public function test_marking_notification_as_unread(): void
+    {
+        // Create a user and authenticate
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create a task
+        $task = Task::factory()->create();
+
+        // Send notification to the user
+        $user->notify(new TaskCreationNotification($task));
+
+        // Get the notification ID
+        $notification = $user->notifications()->first();
+        $notificationId = $notification->id;
+
+        // Mark the notification as read first
+        $this->post(route('notifications.mark-as-read', ['id' => $notificationId]));
+
+        // Verify the notification is marked as read
+        $this->assertDatabaseHas('notifications', [
+            'id' => $notificationId,
+            'read_at' => now()->startOfSecond(),
+        ], 'mysql');
+
+        // Test marking the notification as unread
+        $markAsUnreadResponse = $this->post(route('notifications.mark-as-unread', ['id' => $notificationId]));
+        $markAsUnreadResponse->assertStatus(200);
+        $markAsUnreadResponse->assertJson([
+            'success' => true
+        ]);
+
+        // Verify the notification is now marked as unread
+        $this->assertDatabaseHas('notifications', [
+            'id' => $notificationId,
+            'read_at' => null,
+        ], 'mysql');
+
+        // Verify it appears in the unread notifications count
+        $this->assertEquals(1, $user->unreadNotifications()->count());
+    }
 }
