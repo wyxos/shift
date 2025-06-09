@@ -31,7 +31,13 @@ class ExternalTaskController extends Controller
             ->first();
 
         if (!$externalUser) {
-            return response()->json(['error' => 'External user not found'], 404);
+            $externalUser = ExternalUser::create([
+                'external_id' => request()->offsetGet('user.id'),
+                'name' => request()->offsetGet('user.name'),
+                'email' => request()->offsetGet('user.email'),
+                'environment' => request()->offsetGet('user.environment'),
+                'url' => request()->offsetGet('user.url'),
+            ]);
         }
 
         $tasks = Task::query()
