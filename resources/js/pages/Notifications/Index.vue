@@ -38,7 +38,10 @@ const markAllAsRead = async () => {
 // Format notification title based on type
 const getNotificationTitle = (notification) => {
   const type = notification.type;
-  const data = JSON.parse(notification.data);
+  // Handle both string and object data formats
+  const data = typeof notification.data === 'string'
+    ? JSON.parse(notification.data)
+    : notification.data;
 
   switch (type) {
     case 'App\\Notifications\\TaskCreationNotification':
@@ -60,7 +63,10 @@ const getNotificationTitle = (notification) => {
 
 // Get notification URL
 const getNotificationUrl = (notification) => {
-  const data = JSON.parse(notification.data);
+  // Handle both string and object data formats
+  const data = typeof notification.data === 'string'
+    ? JSON.parse(notification.data)
+    : notification.data;
 
   if (data.url) {
     return data.url;
@@ -92,7 +98,10 @@ const formatDate = (dateString) => {
 
 // Get notification description
 const getNotificationDescription = (notification) => {
-  const data = JSON.parse(notification.data);
+  // Handle both string and object data formats
+  const data = typeof notification.data === 'string'
+    ? JSON.parse(notification.data)
+    : notification.data;
   const type = notification.type;
 
   switch (type) {
