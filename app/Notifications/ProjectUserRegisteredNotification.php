@@ -43,7 +43,7 @@ class ProjectUserRegisteredNotification extends Notification implements ShouldQu
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     /**

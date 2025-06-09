@@ -2,6 +2,7 @@
 import AppLogo from '@/components/AppLogo.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import NotificationBadge from '@/components/NotificationBadge.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -159,6 +160,8 @@ const rightNavItems: NavItem[] = [
                                 </TooltipProvider>
                             </template>
                         </div>
+
+                        <NotificationBadge />
                     </div>
 
                     <DropdownMenu>

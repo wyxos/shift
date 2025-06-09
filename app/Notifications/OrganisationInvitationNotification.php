@@ -44,7 +44,7 @@ class OrganisationInvitationNotification extends Notification implements ShouldQ
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     /**
