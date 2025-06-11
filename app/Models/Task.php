@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\ExternalUser;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,29 @@ class Task extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    /**
+     * Scope a query to only include tasks with a specific status.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $status
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWithStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope a query to only include tasks submitted by external users.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeExternallySubmitted($query)
+    {
+        return $query->where('submitter_type', ExternalUser::class);
+    }
 
     /**
      * The "booted" method of the model.
