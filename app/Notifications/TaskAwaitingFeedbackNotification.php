@@ -14,23 +14,16 @@ class TaskAwaitingFeedbackNotification extends Notification implements ShouldQue
 
     /**
      * The tasks awaiting feedback.
-     *
-     * @var array
      */
-    protected $tasks;
+    protected array $tasks;
 
     /**
      * The URL to view tasks awaiting feedback.
-     *
-     * @var string
      */
-    protected $url;
+    protected string $url;
 
     /**
      * Create a new notification instance.
-     *
-     * @param array $tasks
-     * @param string $url
      */
     public function __construct(array $tasks, string $url)
     {
@@ -40,8 +33,6 @@ class TaskAwaitingFeedbackNotification extends Notification implements ShouldQue
 
     /**
      * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
@@ -70,8 +61,6 @@ class TaskAwaitingFeedbackNotification extends Notification implements ShouldQue
 
     /**
      * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array
     {

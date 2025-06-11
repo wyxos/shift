@@ -12,12 +12,6 @@ class ExternalNotificationService
 {
     /**
      * Send a notification to an external API endpoint.
-     *
-     * @param string $url The base URL of the external API
-     * @param string $handler The notification handler (e.g., 'task.created', 'thread.update')
-     * @param array $payload The notification payload
-     * @param array $source Optional source information
-     * @return Response|null The HTTP response or null if the request failed
      */
     public function sendNotification(string $url, string $handler, array $payload, array $source = []): ?Response
     {
@@ -64,11 +58,6 @@ class ExternalNotificationService
 
     /**
      * Send a fallback email notification if the external API indicates it's not in production.
-     *
-     * @param Response|null $response The HTTP response from the external API
-     * @param string $email The email address to send the notification to
-     * @param object $notification The notification object to send
-     * @return bool Whether a fallback notification was sent
      */
     public function sendFallbackEmailIfNeeded(?Response $response, string $email, object $notification): bool
     {

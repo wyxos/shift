@@ -18,11 +18,8 @@ class TaskThreadController extends Controller
 {
     /**
      * Get all threads for a task.
-     *
-     * @param Task $task
-     * @return JsonResponse
      */
-    public function index(Task $task)
+    public function index(Task $task): JsonResponse
     {
         $internalThreads = $this->getThreadsByType($task, 'internal');
         $externalThreads = $this->getThreadsByType($task, 'external');
@@ -35,12 +32,8 @@ class TaskThreadController extends Controller
 
     /**
      * Get threads by type for a task.
-     *
-     * @param Task $task
-     * @param string $type
-     * @return array
      */
-    private function getThreadsByType(Task $task, string $type)
+    private function getThreadsByType(Task $task, string $type): array
     {
         return $task->threads()
             ->ofType($type)
@@ -72,12 +65,9 @@ class TaskThreadController extends Controller
     /**
      * Store a new thread message.
      *
-     * @param Request $request
-     * @param Task $task
-     * @return JsonResponse
      * @throws ConnectionException
      */
-    public function store(Request $request, Task $task)
+    public function store(Request $request, Task $task): JsonResponse
     {
         $request->validate([
             'content' => 'required|string',
@@ -178,12 +168,8 @@ class TaskThreadController extends Controller
 
     /**
      * Process temporary attachments and associate them with the thread.
-     *
-     * @param string $tempIdentifier
-     * @param TaskThread $thread
-     * @return void
      */
-    private function processTemporaryAttachments($tempIdentifier, TaskThread $thread)
+    private function processTemporaryAttachments(string $tempIdentifier, TaskThread $thread): void
     {
         $tempPath = "temp_attachments/{$tempIdentifier}";
 
@@ -234,12 +220,8 @@ class TaskThreadController extends Controller
 
     /**
      * Get a specific thread message.
-     *
-     * @param Task $task
-     * @param TaskThread $thread
-     * @return JsonResponse
      */
-    public function show(Task $task, TaskThread $thread)
+    public function show(Task $task, TaskThread $thread): JsonResponse
     {
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
