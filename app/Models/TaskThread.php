@@ -15,6 +15,18 @@ class TaskThread extends Model
     protected $guarded = ['id'];
 
     /**
+     * Scope a query to only include threads of a specific type.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $type
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeOfType($query, string $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
