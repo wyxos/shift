@@ -22,7 +22,7 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         Notification::fake();
     }
 
-    public function it_sends_notifications_to_external_users_with_tasks_awaiting_feedback()
+    public function test_it_sends_notifications_to_external_users_with_tasks_awaiting_feedback()
     {
         // Create a project
         $project = Project::factory()->create();
@@ -64,7 +64,7 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         );
     }
 
-    public function it_does_not_send_notifications_when_no_tasks_are_awaiting_feedback()
+    public function test_it_does_not_send_notifications_when_no_tasks_are_awaiting_feedback()
     {
         // Create a project
         $project = Project::factory()->create();
@@ -92,7 +92,7 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function it_only_notifies_about_tasks_submitted_by_external_users()
+    public function test_it_only_notifies_about_tasks_submitted_by_external_users()
     {
         // Create a project
         $project = Project::factory()->create();
