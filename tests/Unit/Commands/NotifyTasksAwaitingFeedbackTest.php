@@ -6,6 +6,7 @@ use App\Console\Commands\NotifyTasksAwaitingFeedback;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use App\Notifications\TaskAwaitingFeedbackNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -21,7 +22,6 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         Notification::fake();
     }
 
-    /** @test */
     public function it_sends_notifications_to_external_users_with_tasks_awaiting_feedback()
     {
         // Create a project
@@ -64,7 +64,6 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         );
     }
 
-    /** @test */
     public function it_does_not_send_notifications_when_no_tasks_are_awaiting_feedback()
     {
         // Create a project
@@ -93,7 +92,6 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    /** @test */
     public function it_only_notifies_about_tasks_submitted_by_external_users()
     {
         // Create a project
@@ -105,7 +103,7 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         ]);
 
         // Create a regular user
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         // Create a task with awaiting-feedback status submitted by the external user
         $externalTask = Task::factory()->create([
@@ -119,7 +117,7 @@ class NotifyTasksAwaitingFeedbackTest extends TestCase
         $internalTask = Task::factory()->create([
             'project_id' => $project->id,
             'status' => 'awaiting-feedback',
-            'submitter_type' => \App\Models\User::class,
+            'submitter_type' => User::class,
             'submitter_id' => $user->id
         ]);
 
