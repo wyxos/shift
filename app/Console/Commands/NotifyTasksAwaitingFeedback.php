@@ -33,7 +33,7 @@ class NotifyTasksAwaitingFeedback extends Command
         $this->info('Checking for tasks awaiting feedback...');
 
         // Get all tasks with 'awaiting-feedback' status
-        $tasks = Task::where('status', 'awaiting-feedback')->get();
+        $tasks = Task::withStatus('awaiting-feedback')->get();
 
         if ($tasks->isEmpty()) {
             $this->info('No tasks awaiting feedback found.');

@@ -43,7 +43,7 @@ class TaskThreadController extends Controller
     private function getThreadsByType(Task $task, string $type)
     {
         return $task->threads()
-            ->where('type', $type)
+            ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($thread) {
