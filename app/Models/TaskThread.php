@@ -16,12 +16,8 @@ class TaskThread extends Model
 
     /**
      * Scope a query to only include threads of a specific type.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $type
-     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeOfType($query, string $type)
+    public function scopeOfType(\Illuminate\Database\Eloquent\Builder $query, string $type): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('type', $type);
     }
