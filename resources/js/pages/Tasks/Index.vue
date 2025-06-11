@@ -217,6 +217,7 @@ const statusOptions = [
     { value: 'pending', label: 'Pending', class: 'bg-yellow-100 text-yellow-800' },
     { value: 'in-progress', label: 'In Progress', class: 'bg-blue-100 text-blue-800' },
     { value: 'completed', label: 'Completed', class: 'bg-green-100 text-green-800' },
+    { value: 'awaiting-feedback', label: 'Awaiting Feedback', class: 'bg-purple-100 text-purple-800' },
 ];
 
 // Priority options
@@ -385,10 +386,11 @@ function updateTaskPriority(task, priority) {
                             'bg-yellow-100 text-yellow-800': row.status === 'pending',
                             'bg-blue-100 text-blue-800': row.status === 'in-progress',
                             'bg-green-100 text-green-800': row.status === 'completed',
+                            'bg-purple-100 text-purple-800': row.status === 'awaiting-feedback',
                         }"
                         class="rounded px-2 py-1 text-xs font-medium"
                     >
-                        {{ row.status.replace('_', ' ') }}
+                        {{ row.status.replace('_', ' ').replace('-', ' ') }}
                     </span>
                     <DropdownMenu>
                         <DropdownMenuTrigger>

@@ -1,0 +1,106 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\Task;
+use App\Models\ExternalUser;
+use App\Notifications\TaskAwaitingFeedbackNotification;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
+
+class NotifyTasksAwaitingFeedback extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'tasks:notify-awaiting-feedback';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Notify external users about tasks that are awaiting their feedback';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $this->info('Checking for tasks awaiting feedback...');
+
+        // Get all tasks with 'awaiting-feedback' status
+        $tasks = Task::where('status', 'awaiting-feedback')->get();
+
+        if ($tasks->isEmpty()) {
+            $this->info('No tasks awaiting feedback found.');
+            return 0;
+        }
+
+        $this->info('Found ' . $tasks->count() . ' tasks awaiting feedback.');
+
+        // Group tasks by external user
+        $tasksByExternalUser = [];
+
+        foreach ($tasks as $task) {
+            // Only process tasks submitted by external users
+            if (!$task->isExternallySubmitted()) {
+                continue;
+            }
+
+            $externalUser = $task->submitter;
+
+            if (!isset($tasksByExternalUser[$externalUser->id])) {
+                $tasksByExternalUser[$externalUser->id] = [
+                    'user' => $externalUser,
+                    'tasks' => []
+                ];
+            }
+
+            $tasksByExternalUser[$externalUser->id]['tasks'][] = $task;
+        }
+
+        // Send notifications to each external user
+        foreach ($tasksByExternalUser as $userData) {
+            $externalUser = $userData['user'];
+            $userTasks = $userData['tasks'];
+
+            if (empty($userTasks)) {
+                continue;
+            }
+
+            // Generate URL with filter for awaiting-feedback tasks
+            $url = config('app.url') . '/tasks?status=awaiting-feedback';
+
+            try {
+                // Send notification to the external user
+                Notification::send($externalUser, new TaskAwaitingFeedbackNotification($userTasks, $url));
+
+                $this->info('Sent notification to ' . $externalUser->email . ' about ' . count($userTasks) . ' tasks.');
+
+                // Log the notification
+                Log::info('Sent awaiting feedback notification', [
+                    'external_user_id' => $externalUser->id,
+                    'external_user_email' => $externalUser->email,
+                    'task_count' => count($userTasks),
+                    'task_ids' => collect($userTasks)->pluck('id')->toArray()
+                ]);
+            } catch (\Exception $e) {
+                $this->error('Failed to send notification to ' . $externalUser->email . ': ' . $e->getMessage());
+
+                Log::error('Failed to send awaiting feedback notification', [
+                    'external_user_id' => $externalUser->id,
+                    'external_user_email' => $externalUser->email,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        $this->info('Notification process completed.');
+
+        return 0;
+    }
+}

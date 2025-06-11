@@ -416,7 +416,7 @@ class TaskController extends Controller
     public function toggleStatus(Task $task, Request $request)
     {
         $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in-progress,completed',
+            'status' => 'required|string|in:pending,in-progress,completed,awaiting-feedback',
         ]);
 
         $task->status = $validatedData['status'];
