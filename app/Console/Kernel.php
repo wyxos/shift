@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         \App\Console\Commands\CleanTempAttachments::class,
+        \App\Console\Commands\NotifyTasksAwaitingFeedback::class,
     ];
 
     /**
@@ -23,6 +24,9 @@ class Kernel extends ConsoleKernel
     {
         // Clean temporary attachments daily
         $schedule->command('attachments:clean-temp')->daily();
+
+        // Check for tasks awaiting feedback and notify external users daily
+        $schedule->command('tasks:notify-awaiting-feedback')->daily();
     }
 
     /**

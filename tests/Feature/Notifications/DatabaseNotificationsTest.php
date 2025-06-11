@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use ReflectionClass;
 use Tests\TestCase;
 
 class DatabaseNotificationsTest extends TestCase
@@ -33,7 +34,7 @@ class DatabaseNotificationsTest extends TestCase
         $notification = $user->notifications()->first();
         $this->assertNotNull($notification);
 
-        $data = json_decode($notification->data, true);
+        $data = is_array($notification->data) ? $notification->data : json_decode($notification->data, true);
         $this->assertEquals($task->id, $data['task_id']);
         $this->assertEquals($task->title, $data['task_title']);
     }
@@ -59,7 +60,7 @@ class DatabaseNotificationsTest extends TestCase
         // For each notification class, check if it uses the database channel
         foreach ($notificationClasses as $notificationClass) {
             // Create a reflection class to access the via method
-            $reflection = new \ReflectionClass($notificationClass);
+            $reflection = new ReflectionClass($notificationClass);
 
             // Skip abstract classes
             if ($reflection->isAbstract()) {
