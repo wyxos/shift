@@ -49,7 +49,7 @@ class NotificationUITest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'id' => $notificationId,
             'read_at' => now()->startOfSecond(),
-        ], 'mysql');
+        ]);
 
         // Send another notification
         $user->notify(new TaskCreationNotification($task));
@@ -109,7 +109,7 @@ class NotificationUITest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'id' => $notificationId,
             'read_at' => now()->startOfSecond(),
-        ], 'mysql');
+        ]);
 
         // Test marking the notification as unread
         $markAsUnreadResponse = $this->post(route('notifications.mark-as-unread', ['id' => $notificationId]));
@@ -122,7 +122,7 @@ class NotificationUITest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'id' => $notificationId,
             'read_at' => null,
-        ], 'mysql');
+        ]);
 
         // Verify it appears in the unread notifications count
         $this->assertEquals(1, $user->unreadNotifications()->count());
