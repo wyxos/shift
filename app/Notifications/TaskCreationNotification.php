@@ -14,23 +14,16 @@ class TaskCreationNotification extends Notification implements ShouldQueue
 
     /**
      * The task instance.
-     *
-     * @var Task
      */
-    protected $task;
+    protected Task $task;
 
     /**
      * Optional custom URL for the notification.
-     *
-     * @var string|null
      */
-    protected $url;
+    protected ?string $url;
 
     /**
      * Create a new notification instance.
-     *
-     * @param Task $task
-     * @param string|null $url Optional custom URL for external notifications
      */
     public function __construct(Task $task, string $url = null)
     {
@@ -40,8 +33,6 @@ class TaskCreationNotification extends Notification implements ShouldQueue
 
     /**
      * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
@@ -67,8 +58,6 @@ class TaskCreationNotification extends Notification implements ShouldQueue
 
     /**
      * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array
     {

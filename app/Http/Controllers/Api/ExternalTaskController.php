@@ -19,10 +19,8 @@ class ExternalTaskController extends Controller
 {
     /**
      * Display a listing of the tasks.
-     *
-     * @return JsonResponse
      */
-    public function index()
+    public function index(): JsonResponse
     {
         // Get the current external user
         $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
@@ -66,11 +64,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Display the specified task.
-     *
-     * @param Task $task
-     * @return JsonResponse
      */
-    public function show(Task $task)
+    public function show(Task $task): JsonResponse
     {
         // Ensure the task belongs to the project specified in the request
         if ($task->project->token !== request('project')) {
@@ -117,11 +112,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Store a newly created task in storage.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
@@ -237,11 +229,8 @@ class ExternalTaskController extends Controller
     /**
      * Send task creation notifications to project owner and users with access to the project.
      * For external tasks, all relevant users should receive notifications.
-     *
-     * @param Task $task
-     * @return void
      */
-    private function sendTaskCreationNotifications(Task $task)
+    private function sendTaskCreationNotifications(Task $task): void
     {
         // Load the project with its relationships
         $project = $task->project()->with(['author', 'projectUser.user'])->first();
@@ -271,12 +260,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Update the specified task in storage.
-     *
-     * @param Request $request
-     * @param Task $task
-     * @return JsonResponse|RedirectResponse
      */
-    public function update(Request $request, Task $task)
+    public function update(Request $request, Task $task): JsonResponse|RedirectResponse
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
@@ -399,12 +384,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Remove the specified task from storage.
-     *
-     * @param Task $task
-     * @param Request $request
-     * @return JsonResponse|RedirectResponse
      */
-    public function destroy(Task $task, Request $request)
+    public function destroy(Task $task, Request $request): JsonResponse|RedirectResponse
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
@@ -435,12 +416,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Toggle the status of the specified task.
-     *
-     * @param Task $task
-     * @param Request $request
-     * @return JsonResponse
      */
-    public function toggleStatus(Task $task, Request $request)
+    public function toggleStatus(Task $task, Request $request): JsonResponse
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
@@ -479,12 +456,8 @@ class ExternalTaskController extends Controller
 
     /**
      * Toggle the priority of the specified task.
-     *
-     * @param Task $task
-     * @param Request $request
-     * @return JsonResponse
      */
-    public function togglePriority(Task $task, Request $request)
+    public function togglePriority(Task $task, Request $request): JsonResponse
     {
         if ($task->project->token !== request('project')) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);

@@ -20,33 +20,24 @@ class Task extends Model
 
     /**
      * Scope a query to only include tasks with a specific status.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $status
-     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeWithStatus($query, string $status)
+    public function scopeWithStatus(\Illuminate\Database\Eloquent\Builder $query, string $status): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', $status);
     }
 
     /**
      * Scope a query to only include tasks submitted by external users.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeExternallySubmitted($query)
+    public function scopeExternallySubmitted(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('submitter_type', ExternalUser::class);
     }
 
     /**
      * The "booted" method of the model.
-     *
-     * @return void
      */
-    protected static function booted()
+    protected static function booted(): void
     {
         static::deleting(function ($task) {
             // Delete all attachments associated with this task
@@ -92,8 +83,6 @@ class Task extends Model
 
     /**
      * Check if the task was submitted by an external user.
-     *
-     * @return bool
      */
     public function isExternallySubmitted(): bool
     {
