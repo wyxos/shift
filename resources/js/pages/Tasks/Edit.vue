@@ -214,6 +214,8 @@ const editForm = useForm({
     title: props.task.title,
     description: props.task.description,
     project_id: props.task.project_id,
+    status: props.task.status,
+    priority: props.task.priority,
     temp_identifier: tempIdentifier.value,
     deleted_attachment_ids: [],
     external_user_ids: props.taskExternalUserIds || [],
@@ -222,7 +224,7 @@ const editForm = useForm({
 // Computed property for other errors (not related to specific fields)
 const otherErrors = computed(() => {
     return Object.entries(editForm.errors)
-        .filter(([key]) => !['title', 'description', 'project_id', 'temp_identifier', 'deleted_attachment_ids'].includes(key))
+        .filter(([key]) => !['title', 'description', 'project_id', 'status', 'priority', 'temp_identifier', 'deleted_attachment_ids'].includes(key))
         .reduce((acc, [key, value]) => {
             acc[key] = value;
             return acc;
@@ -379,6 +381,41 @@ const submitForm = () => {
 
                 <div class="mb-4">
                     <p class="text-sm font-medium text-gray-700">Project: {{ project.name }}</p>
+                </div>
+
+                <!-- Status Dropdown -->
+                <div class="mb-4">
+                    <Label for="status">Status</Label>
+                    <select
+                        id="status"
+                        v-model="editForm.status"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="awaiting-feedback">Awaiting Feedback</option>
+                    </select>
+                    <div v-if="editForm.errors.status" class="mt-1 text-sm text-red-500">
+                        {{ editForm.errors.status }}
+                    </div>
+                </div>
+
+                <!-- Priority Dropdown -->
+                <div class="mb-4">
+                    <Label for="priority">Priority</Label>
+                    <select
+                        id="priority"
+                        v-model="editForm.priority"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <div v-if="editForm.errors.priority" class="mt-1 text-sm text-red-500">
+                        {{ editForm.errors.priority }}
+                    </div>
                 </div>
 
                 <!-- External Users Section -->
