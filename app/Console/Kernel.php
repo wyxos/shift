@@ -2,6 +2,8 @@
 
 namespace App\Console;
 
+use App\Console\Commands\CleanTempAttachments;
+use App\Console\Commands\NotifyTasksAwaitingFeedback;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -13,8 +15,8 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        \App\Console\Commands\CleanTempAttachments::class,
-        \App\Console\Commands\NotifyTasksAwaitingFeedback::class,
+        CleanTempAttachments::class,
+        NotifyTasksAwaitingFeedback::class,
     ];
 
     /**
@@ -26,7 +28,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('attachments:clean-temp')->daily();
 
         // Check for tasks awaiting feedback and notify external users daily
-        $schedule->command('tasks:notify-awaiting-feedback')->daily();
+//        $schedule->command('tasks:notify-awaiting-feedback')->daily();
     }
 
     /**
@@ -34,7 +36,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }
