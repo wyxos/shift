@@ -169,8 +169,12 @@ class TaskThreadController extends Controller
     /**
      * Process temporary attachments and associate them with the thread.
      */
-    private function processTemporaryAttachments(string $tempIdentifier, TaskThread $thread): void
+    private function processTemporaryAttachments(?string $tempIdentifier, TaskThread $thread): void
     {
+        if ($tempIdentifier === null) {
+            return;
+        }
+
         $tempPath = "temp_attachments/{$tempIdentifier}";
 
         if (!Storage::exists($tempPath)) {
