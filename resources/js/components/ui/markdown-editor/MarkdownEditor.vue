@@ -18,10 +18,11 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'enter']);
 
 const editorRef = ref<HTMLElement | null>(null);
 let editor: Editor | null = null;
+let keydownHandler: ((event: KeyboardEvent) => void) | null = null;
 
 onMounted(() => {
     if (editorRef.value) {
@@ -41,6 +42,24 @@ onMounted(() => {
                 emit('update:modelValue', editor.getMarkdown());
             }
         });
+
+        // Get the editor's DOM element
+        const editorEl = editor.getUI().getEl();
+
+        // Create keydown handler function
+        keydownHandler = (event: KeyboardEvent) => {
+            if (event.key === 'Enter') {
+                if (!event.shiftKey) {
+                    // Enter without Shift: emit enter event and prevent default
+                    event.preventDefault();
+                    emit('enter');
+                }
+                // Shift+Enter: allow default behavior (new line)
+            }
+        };
+
+        // Add keydown event listener for Enter and Shift+Enter
+        editorEl.addEventListener('keydown', keydownHandler);
     }
 });
 
@@ -54,6 +73,13 @@ watch(() => props.modelValue, (newValue) => {
 // Clean up on component unmount
 onBeforeUnmount(() => {
     if (editor) {
+        // Remove the keydown event listener
+        if (keydownHandler) {
+            const editorEl = editor.getUI().getEl();
+            editorEl.removeEventListener('keydown', keydownHandler);
+            keydownHandler = null;
+        }
+
         editor.off('change');
         editor.destroy();
         editor = null;
