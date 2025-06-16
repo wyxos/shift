@@ -83,9 +83,35 @@ shift-sdk-package/packages/shift-php/
 
 ### Testing
 
+#### Backend Testing
 - Run all tests: `composer test`
 - Run specific test suite: `php artisan test --testsuite=Unit`
 - Create test database: `touch database/database.sqlite`
+
+#### Frontend Testing
+- Run all frontend tests: `npm test`
+- Run tests in watch mode: `npm run test:watch`
+- Run tests with coverage: `npm run test:coverage`
+
+Vitest is used for testing Vue components. Test files are located in the `resources/js/__tests__` directory, mirroring the structure of the components being tested.
+
+Example of a component test:
+```typescript
+import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
+import MyComponent from '@/components/MyComponent.vue'
+
+describe('MyComponent.vue', () => {
+  it('renders correctly', () => {
+    const wrapper = mount(MyComponent, {
+      props: { /* props here */ }
+    })
+
+    // Assert component behavior
+    expect(wrapper.text()).toContain('Expected text')
+  })
+})
+```
 
 ## SDK Integration
 
