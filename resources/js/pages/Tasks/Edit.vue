@@ -87,10 +87,19 @@ const internalNewMessage = ref('');
 const externalNewMessage = ref('');
 
 // Thread attachment state
-const threadTempIdentifier = ref(Date.now().toString() + '_thread');
-const threadAttachments = ref([]);
+const internalThreadTempIdentifier = ref(Date.now().toString() + '_internal_thread');
+const externalThreadTempIdentifier = ref(Date.now().toString() + '_external_thread');
+const internalThreadAttachments = ref([]);
+const externalThreadAttachments = ref([]);
 const isThreadUploading = ref(false);
 const threadUploadError = ref('');
+
+// Computed property to get the current thread temp identifier based on active tab
+const currentThreadTempIdentifier = computed(() => {
+    return activeTab.value === 'internal' ? internalThreadTempIdentifier.value : externalThreadTempIdentifier.value;
+});
+
+// We don't need a computed property for thread attachments since we'll use the specific arrays directly
 
 // Handle thread file upload
 const handleThreadFileUpload = (event) => {
@@ -112,7 +121,7 @@ const uploadThreadFile = async (file) => {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('temp_identifier', threadTempIdentifier.value);
+    formData.append('temp_identifier', currentThreadTempIdentifier.value);
 
     try {
         const response = await axios.post(route('attachments.upload'), formData, {
@@ -121,7 +130,11 @@ const uploadThreadFile = async (file) => {
             },
         });
 
-        threadAttachments.value.push(response.data);
+        if (activeTab.value === 'internal') {
+            internalThreadAttachments.value.push(response.data);
+        } else {
+            externalThreadAttachments.value.push(response.data);
+        }
         isThreadUploading.value = false;
     } catch (error) {
         isThreadUploading.value = false;
@@ -137,8 +150,12 @@ const removeThreadAttachment = async (file) => {
             params: { path: file.path },
         });
 
-        // Remove from the list
-        threadAttachments.value = threadAttachments.value.filter((f) => f.path !== file.path);
+        // Remove from the appropriate list based on active tab
+        if (activeTab.value === 'internal') {
+            internalThreadAttachments.value = internalThreadAttachments.value.filter((f) => f.path !== file.path);
+        } else {
+            externalThreadAttachments.value = externalThreadAttachments.value.filter((f) => f.path !== file.path);
+        }
     } catch (error) {
         console.error('Error removing thread attachment:', error);
     }
@@ -155,13 +172,16 @@ const sendMessage = async (event) => {
     // Get the appropriate message based on the active tab
     const messageContent = activeTab.value === 'internal' ? internalNewMessage.value : externalNewMessage.value;
 
-    if (!messageContent.trim() && threadAttachments.value.length === 0) return;
+    // Get the appropriate attachments based on the active tab
+    const currentAttachments = activeTab.value === 'internal' ? internalThreadAttachments.value : externalThreadAttachments.value;
+
+    if (!messageContent.trim() && currentAttachments.length === 0) return;
 
     try {
         const response = await axios.post(route('task-threads.store', { task: props.task.id }), {
             content: messageContent,
             type: activeTab.value,
-            temp_identifier: threadAttachments.value.length > 0 ? threadTempIdentifier.value : null,
+            temp_identifier: currentAttachments.length > 0 ? currentThreadTempIdentifier.value : null,
         });
 
         const message = {
@@ -180,15 +200,17 @@ const sendMessage = async (event) => {
             internalMessages.value.push(message);
             // Clear internal message form
             internalNewMessage.value = '';
+            // Clear internal attachments
+            internalThreadAttachments.value = [];
+            internalThreadTempIdentifier.value = Date.now().toString() + '_internal_thread';
         } else {
             externalMessages.value.push(message);
             // Clear external message form
             externalNewMessage.value = '';
+            // Clear external attachments
+            externalThreadAttachments.value = [];
+            externalThreadTempIdentifier.value = Date.now().toString() + '_external_thread';
         }
-
-        // Clear attachments
-        threadAttachments.value = [];
-        threadTempIdentifier.value = Date.now().toString() + '_thread';
     } catch (error) {
         console.error('Error sending message:', error);
         alert('Failed to send message. Please try again.');
@@ -617,10 +639,10 @@ const submitForm = () => {
                         </div>
 
                         <!-- Thread attachments display -->
-                        <div v-if="threadAttachments.length > 0" class="mb-3">
+                        <div v-if="internalThreadAttachments.length > 0" class="mb-3">
                             <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
                             <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                                <li v-for="file in threadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
+                                <li v-for="file in internalThreadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
                                     <div class="flex items-center">
                                         <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path
@@ -737,10 +759,10 @@ const submitForm = () => {
                         </div>
 
                         <!-- Thread attachments display -->
-                        <div v-if="threadAttachments.length > 0" class="mb-3">
+                        <div v-if="externalThreadAttachments.length > 0" class="mb-3">
                             <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
                             <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                                <li v-for="file in threadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
+                                <li v-for="file in externalThreadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
                                     <div class="flex items-center">
                                         <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path
