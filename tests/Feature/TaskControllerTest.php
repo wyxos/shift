@@ -273,6 +273,33 @@ class TaskControllerTest extends TestCase
         ]);
     }
 
+    public function test_toggle_status_updates_task_status_to_awaiting_feedback()
+    {
+        $project = Project::factory()->create([
+            'author_id' => $this->user->id
+        ]);
+
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => 'pending'
+        ]);
+        $task->submitter()->associate($this->user)->save();
+
+        $response = $this->actingAs($this->user)
+            ->patch(route('tasks.toggle-status', $task), [
+                'status' => 'awaiting-feedback'
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status', 'awaiting-feedback');
+        $response->assertSessionHas('message', 'Task status updated successfully');
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'status' => 'awaiting-feedback'
+        ]);
+    }
+
     public function test_toggle_priority_updates_task_priority()
     {
         $project = Project::factory()->create([
