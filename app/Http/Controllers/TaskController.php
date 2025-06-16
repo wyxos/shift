@@ -134,7 +134,7 @@ class TaskController extends Controller
         $attributes = request()->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,in-progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed,awaiting-feedback',
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
@@ -268,7 +268,7 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
-            'status' => 'nullable|string|in:pending,in-progress,completed',
+            'status' => 'nullable|string|in:pending,in-progress,completed,awaiting-feedback',
             'priority' => 'nullable|string|in:low,medium,high',
             'temp_identifier' => 'nullable|string',
             'external_user_ids' => 'nullable|array',

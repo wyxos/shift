@@ -5,8 +5,8 @@ namespace App\Console\Commands;
 use App\Models\Task;
 use App\Models\ExternalUser;
 use App\Notifications\TaskAwaitingFeedbackNotification;
+use App\Services\ExternalNotificationService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Log;
 
 class NotifyTasksAwaitingFeedback extends Command
@@ -28,7 +28,7 @@ class NotifyTasksAwaitingFeedback extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(ExternalNotificationService $notificationService)
     {
         $this->info('Checking for tasks awaiting feedback...');
 
@@ -72,12 +72,34 @@ class NotifyTasksAwaitingFeedback extends Command
                 continue;
             }
 
-            // Generate URL with filter for awaiting-feedback tasks
-            $url = config('app.url') . '/tasks?status=awaiting-feedback';
-
             try {
-                // Send notification to the external user
-                Notification::send($externalUser, new TaskAwaitingFeedbackNotification($userTasks, $url));
+                // Prepare task IDs for the payload
+                $taskIds = collect($userTasks)->pluck('id')->toArray();
+
+                // Prepare payload for external notification
+                $payload = [
+                    'type' => 'tasks.awaiting_feedback',
+                    'user_id' => $externalUser->external_id,
+                    'task_ids' => $taskIds,
+                    'task_count' => count($userTasks)
+                ];
+
+                // Send notification to the external API
+                $response = $notificationService->sendNotification(
+                    $externalUser->url,
+                    'tasks.awaiting_feedback',
+                    $payload
+                );
+
+                // Generate URL with filter for awaiting-feedback tasks in the consuming app
+                $url = $externalUser->url . '/shift/tasks?status=awaiting-feedback';
+
+                // Send fallback email notification if the app is not in production
+                $notificationService->sendFallbackEmailIfNeeded(
+                    $response,
+                    $externalUser->email,
+                    new TaskAwaitingFeedbackNotification($userTasks, $url)
+                );
 
                 $this->info('Sent notification to ' . $externalUser->email . ' about ' . count($userTasks) . ' tasks.');
 
@@ -86,7 +108,7 @@ class NotifyTasksAwaitingFeedback extends Command
                     'external_user_id' => $externalUser->id,
                     'external_user_email' => $externalUser->email,
                     'task_count' => count($userTasks),
-                    'task_ids' => collect($userTasks)->pluck('id')->toArray()
+                    'task_ids' => $taskIds
                 ]);
             } catch (\Exception $e) {
                 $this->error('Failed to send notification to ' . $externalUser->email . ': ' . $e->getMessage());

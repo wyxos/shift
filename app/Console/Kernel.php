@@ -28,7 +28,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('attachments:clean-temp')->daily();
 
         // Check for tasks awaiting feedback and notify external users daily
-//        $schedule->command('tasks:notify-awaiting-feedback')->daily();
+        $schedule->command('tasks:notify-awaiting-feedback')->daily();
     }
 
     /**
