@@ -96,7 +96,6 @@ class TaskThreadController extends Controller
         $thread->load('attachments');
 
         if ($request->input('type') === 'external') {
-            $notificationService = new ExternalNotificationService();
             $externalUsers = collect();
 
             // Check if the submitter is an external user
@@ -114,10 +113,8 @@ class TaskThreadController extends Controller
                 }
             });
 
-            // Send notifications to all external users
+            // Queue delayed notifications to all external users
             foreach ($externalUsers as $externalUser) {
-                $url = $externalUser->url;
-
                 $payload = [
                     'type' => 'task_thread',
                     'user_id' => $externalUser->external_id,
@@ -127,21 +124,17 @@ class TaskThreadController extends Controller
                     'content' => $thread->content
                 ];
 
-                $response = $notificationService->sendNotification(
-                    $url,
-                    'thread.update',
+                $externalUserData = [
+                    'url' => $externalUser->url,
+                    'email' => $externalUser->email,
+                    'external_id' => $externalUser->external_id
+                ];
+
+                // Dispatch job with 1-minute delay that will check if thread still exists
+                \App\Jobs\SendTaskThreadNotification::dispatch(
+                    $thread->id,
+                    $externalUserData,
                     $payload
-                );
-
-                // Create notification object with additional URL for email
-                $notificationData = array_merge($payload, [
-                    'url' => $externalUser->url . '/shift/tasks/' . $task->id . '/edit'
-                ]);
-
-                $notificationService->sendFallbackEmailIfNeeded(
-                    $response,
-                    $externalUser->email,
-                    new TaskThreadUpdated($notificationData)
                 );
             }
         }
@@ -251,5 +244,36 @@ class TaskThreadController extends Controller
                 'attachments' => $attachments,
             ],
         ]);
+    }
+
+    /**
+     * Delete a thread message.
+     */
+    public function destroy(Task $task, TaskThread $thread): JsonResponse
+    {
+        if ($thread->task_id !== $task->id) {
+            return response()->json(['error' => 'Thread does not belong to this task'], 403);
+        }
+
+        // Check if the current user is the owner of the message
+        if ($thread->sender_id !== Auth::id() || $thread->sender_type !== get_class(Auth::user())) {
+            return response()->json(['error' => 'You can only delete your own messages'], 403);
+        }
+
+        // Delete all attachments
+        foreach ($thread->attachments as $attachment) {
+            // Delete the file from storage
+            if (Storage::exists($attachment->path)) {
+                Storage::delete($attachment->path);
+            }
+
+            // Delete the attachment record
+            $attachment->delete();
+        }
+
+        // Delete the thread
+        $thread->delete();
+
+        return response()->json(['message' => 'Thread message deleted successfully']);
     }
 }
