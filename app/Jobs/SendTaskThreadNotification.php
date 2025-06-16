@@ -17,13 +17,6 @@ class SendTaskThreadNotification implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * The number of seconds to wait before processing the job.
-     *
-     * @var int
-     */
-    public $delay = 60; // 1 minute delay
-
-    /**
      * The task thread instance.
      *
      * @var int
@@ -56,6 +49,7 @@ class SendTaskThreadNotification implements ShouldQueue
         $this->threadId = $threadId;
         $this->externalUserData = $externalUserData;
         $this->payload = $payload;
+        $this->delay(60); // 1 minute delay
     }
 
     /**
