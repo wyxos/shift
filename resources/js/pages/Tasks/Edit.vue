@@ -677,7 +677,7 @@ const submitForm = () => {
                 </CardHeader>
                 <CardContent class="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
                     <div
-                        :class="['cursor-pointer rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
+                        :class="['rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
                         class="flex flex-col"
                         @click="activeTab = 'internal'"
                     >
@@ -776,12 +776,12 @@ const submitForm = () => {
                                 <MarkdownEditor
                                     v-model="internalNewMessage"
                                     :class="['flex-grow', isDraggingInternal ? 'drag-over' : '']"
-                                    height="100px"
+                                    height="200px"
                                     placeholder="Type your message or drop files here..."
                                     @dragleave="(event) => handleDragLeave(event, 'internal')"
                                     @dragover="(event) => handleDragOver(event, 'internal')"
                                     @drop="(event) => handleDrop(event, 'internal')"
-                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
+                                    @enter="sendMessage"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -810,7 +810,7 @@ const submitForm = () => {
                     </div>
 
                     <div
-                        :class="['cursor-pointer rounded-md border p-4', activeTab === 'external' ? 'border-blue-500 bg-blue-50' : '']"
+                        :class="['rounded-md border p-4', activeTab === 'external' ? 'border-blue-500 bg-blue-50' : '']"
                         class="flex flex-col"
                         @click="activeTab = 'external'"
                     >
@@ -909,12 +909,12 @@ const submitForm = () => {
                                 <MarkdownEditor
                                     v-model="externalNewMessage"
                                     :class="['flex-grow', isDraggingExternal ? 'drag-over' : '']"
-                                    height="100px"
+                                    height="200px"
                                     placeholder="Type your message or drop files here..."
                                     @dragleave="(event) => handleDragLeave(event, 'external')"
                                     @dragover="(event) => handleDragOver(event, 'external')"
                                     @drop="(event) => handleDrop(event, 'external')"
-                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
+                                    @enter="sendMessage"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
