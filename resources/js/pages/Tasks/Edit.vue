@@ -1,15 +1,9 @@
 <script lang="ts" setup>
-import { Input } from '@/components/ui/input';
-import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -35,10 +29,7 @@ function truncateFilename(filename, maxLength = 30) {
     const startChars = Math.floor((maxLength - 3 - extension.length) / 2);
     const endChars = Math.ceil((maxLength - 3 - extension.length) / 2);
 
-    return nameWithoutExtension.substring(0, startChars) +
-           '...' +
-           nameWithoutExtension.substring(nameWithoutExtension.length - endChars) +
-           extension;
+    return nameWithoutExtension.substring(0, startChars) + '...' + nameWithoutExtension.substring(nameWithoutExtension.length - endChars) + extension;
 }
 
 const props = defineProps({
@@ -104,6 +95,19 @@ const externalMessages = ref([
 ]);
 const internalNewMessage = ref('');
 const externalNewMessage = ref('');
+
+// Refs for message containers to enable autoscrolling
+const internalMessagesContainer = ref(null);
+const externalMessagesContainer = ref(null);
+
+// Function to scroll message container to the bottom
+const scrollToBottom = (container) => {
+    if (container) {
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 50); // Small delay to ensure content is rendered
+    }
+};
 
 // Thread attachment state
 const internalThreadTempIdentifier = ref(Date.now().toString() + '_internal_thread');
@@ -263,6 +267,8 @@ const sendMessage = async (event) => {
             // Clear internal attachments
             internalThreadAttachments.value = [];
             internalThreadTempIdentifier.value = Date.now().toString() + '_internal_thread';
+            // Scroll to bottom of internal messages
+            scrollToBottom(internalMessagesContainer.value);
         } else {
             externalMessages.value.push(message);
             // Clear external message form
@@ -270,6 +276,8 @@ const sendMessage = async (event) => {
             // Clear external attachments
             externalThreadAttachments.value = [];
             externalThreadTempIdentifier.value = Date.now().toString() + '_external_thread';
+            // Scroll to bottom of external messages
+            scrollToBottom(externalMessagesContainer.value);
         }
     } catch (error) {
         console.error('Error sending message:', error);
@@ -295,16 +303,18 @@ const deleteMessage = async (messageId, messageType) => {
     }
 
     try {
-        await axios.delete(route('task-threads.destroy', {
-            task: props.task.id,
-            thread: messageId
-        }));
+        await axios.delete(
+            route('task-threads.destroy', {
+                task: props.task.id,
+                thread: messageId,
+            }),
+        );
 
         // Remove the message from the appropriate list
         if (messageType === 'internal') {
-            internalMessages.value = internalMessages.value.filter(message => message.id !== messageId);
+            internalMessages.value = internalMessages.value.filter((message) => message.id !== messageId);
         } else {
-            externalMessages.value = externalMessages.value.filter(message => message.id !== messageId);
+            externalMessages.value = externalMessages.value.filter((message) => message.id !== messageId);
         }
     } catch (error) {
         console.error('Error deleting message:', error);
@@ -379,6 +389,8 @@ const loadTaskThreads = async () => {
                 attachments: thread.attachments || [],
                 created_at: thread.created_at,
             }));
+            // Scroll to bottom of internal messages
+            scrollToBottom(internalMessagesContainer.value);
         }
 
         if (response.data.external && Array.isArray(response.data.external)) {
@@ -391,6 +403,8 @@ const loadTaskThreads = async () => {
                 attachments: thread.attachments || [],
                 created_at: thread.created_at,
             }));
+            // Scroll to bottom of external messages
+            scrollToBottom(externalMessagesContainer.value);
         }
     } catch (error) {
         console.error('Error loading task threads:', error);
@@ -481,191 +495,195 @@ const submitForm = () => {
     <Head :title="title" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="grid grid-cols-1 gap-4 p-4 lg:grid-cols-3">
-            <form @submit.prevent="submitForm" @keydown.enter.prevent class="space-y-4">
+        <div class="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-3">
+            <form class="space-y-4" @submit.prevent="submitForm" @keydown.enter.prevent>
                 <Card>
                     <CardHeader>
                         <CardTitle>Edit Task</CardTitle>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                <div class="mb-4">
-                    <Label for="title">Task title</Label>
-                    <Input id="title" v-model="editForm.title" required type="text" />
-                    <div v-if="editForm.errors.title" class="mt-1 text-sm text-red-500">{{ editForm.errors.title }}</div>
-                </div>
-
-                <div class="mb-4">
-                    <Label for="description">Description</Label>
-                    <MarkdownEditor
-                        id="description"
-                        v-model="editForm.description"
-                        class="mt-1"
-                        height="300px"
-                        placeholder="Write your task description here..."
-                    />
-                    <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
-                        {{ editForm.errors.description }}
-                    </div>
-                </div>
-
-                <div class="mb-4">
-                    <p class="text-sm font-medium text-gray-700">Project: {{ project.name }}</p>
-                </div>
-
-                <!-- Status Dropdown -->
-                <div class="mb-4">
-                    <Label for="status">Status</Label>
-                    <select
-                        id="status"
-                        v-model="editForm.status"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    >
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="awaiting-feedback">Awaiting Feedback</option>
-                    </select>
-                    <div v-if="editForm.errors.status" class="mt-1 text-sm text-red-500">
-                        {{ editForm.errors.status }}
-                    </div>
-                </div>
-
-                <!-- Priority Dropdown -->
-                <div class="mb-4">
-                    <Label for="priority">Priority</Label>
-                    <select
-                        id="priority"
-                        v-model="editForm.priority"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                    </select>
-                    <div v-if="editForm.errors.priority" class="mt-1 text-sm text-red-500">
-                        {{ editForm.errors.priority }}
-                    </div>
-                </div>
-
-                <!-- External Users Section -->
-                <div v-if="props.projectExternalUsers.length > 0" class="mb-4">
-                    <Label>Assign External Users</Label>
-                    <p class="mb-2 text-xs text-gray-500">Select external users who should have access to this task</p>
-
-                    <div class="mt-2 max-h-60 space-y-2 overflow-y-auto rounded-md border p-2">
-                        <div v-for="externalUser in props.projectExternalUsers" :key="externalUser.id" class="flex items-center">
-                            <input
-                                :id="'external-user-' + externalUser.id"
-                                v-model="editForm.external_user_ids"
-                                :value="externalUser.id"
-                                class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                type="checkbox"
-                            />
-                            <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
-                                {{ externalUser.name || 'User ' + externalUser.external_id }}
-                                <span v-if="externalUser.email" class="ml-1 text-xs text-gray-500">({{ externalUser.email }})</span>
-                            </label>
+                        <div class="mb-4">
+                            <Label for="title">Task title</Label>
+                            <Input id="title" v-model="editForm.title" required type="text" />
+                            <div v-if="editForm.errors.title" class="mt-1 text-sm text-red-500">{{ editForm.errors.title }}</div>
                         </div>
-                    </div>
 
-                    <div v-if="editForm.errors.external_user_ids" class="mt-1 text-sm text-red-500">
-                        {{ editForm.errors.external_user_ids }}
-                    </div>
-                </div>
-
-                <div v-else class="mb-4">
-                    <p class="text-sm text-gray-500">No external users available for this project.</p>
-                </div>
-
-                <!-- Existing Attachments Section -->
-                <div v-if="existingAttachments.length > 0" class="mb-4">
-                    <h4 class="text-sm font-medium text-gray-700">Existing Attachments:</h4>
-                    <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                        <li
-                            v-for="attachment in existingAttachments"
-                            :key="attachment.id"
-                            class="flex items-center justify-between px-3 py-2 text-sm"
-                        >
-                            <div class="flex items-center">
-                                <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                    <path
-                                        clip-rule="evenodd"
-                                        d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                        fill-rule="evenodd"
-                                    />
-                                </svg>
-                                <a :href="attachment.url" class="hover:text-blue-600" target="_blank">{{ truncateFilename(attachment.original_filename) }}</a>
+                        <div class="mb-4">
+                            <Label for="description">Description</Label>
+                            <MarkdownEditor
+                                id="description"
+                                v-model="editForm.description"
+                                class="mt-1"
+                                height="300px"
+                                placeholder="Write your task description here..."
+                            />
+                            <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
+                                {{ editForm.errors.description }}
                             </div>
-                            <button class="text-red-600 hover:text-red-900" type="button" @click="deleteAttachment(attachment)">Remove</button>
-                        </li>
-                    </ul>
-                </div>
+                        </div>
 
-                <!-- File Upload Section -->
-                <div class="mb-4">
-                    <Label for="attachments">Add New Attachments</Label>
-                    <div class="mt-1 flex items-center">
-                        <input
-                            id="attachments"
-                            class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                            multiple
-                            type="file"
-                            @change="handleFileUpload"
-                        />
-                    </div>
-                    <p class="mt-1 text-xs text-gray-500">Upload files directly. They will be attached to the task when updated.</p>
+                        <div class="mb-4">
+                            <p class="text-sm font-medium text-gray-700">Project: {{ project.name }}</p>
+                        </div>
 
-                    <!-- Upload error message -->
-                    <div v-if="uploadError" class="mt-1 text-sm text-red-500">{{ uploadError }}</div>
+                        <!-- Status Dropdown -->
+                        <div class="mb-4">
+                            <Label for="status">Status</Label>
+                            <select
+                                id="status"
+                                v-model="editForm.status"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            >
+                                <option value="pending">Pending</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="awaiting-feedback">Awaiting Feedback</option>
+                            </select>
+                            <div v-if="editForm.errors.status" class="mt-1 text-sm text-red-500">
+                                {{ editForm.errors.status }}
+                            </div>
+                        </div>
 
-                    <!-- Loading indicator -->
-                    <div v-if="isUploading" class="mt-1 text-sm text-blue-500">Uploading...</div>
+                        <!-- Priority Dropdown -->
+                        <div class="mb-4">
+                            <Label for="priority">Priority</Label>
+                            <select
+                                id="priority"
+                                v-model="editForm.priority"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                            <div v-if="editForm.errors.priority" class="mt-1 text-sm text-red-500">
+                                {{ editForm.errors.priority }}
+                            </div>
+                        </div>
 
-                    <!-- List of uploaded files -->
-                    <div v-if="uploadedFiles.length > 0" class="mt-3">
-                        <h4 class="text-sm font-medium text-gray-700">New Files:</h4>
-                        <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                            <li v-for="file in uploadedFiles" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
-                                <div class="flex items-center">
-                                    <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path
-                                            clip-rule="evenodd"
-                                            d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                            fill-rule="evenodd"
-                                        />
-                                    </svg>
-                                    <span>{{ truncateFilename(file.original_filename) }}</span>
+                        <!-- External Users Section -->
+                        <div v-if="props.projectExternalUsers.length > 0" class="mb-4">
+                            <Label>Assign External Users</Label>
+                            <p class="mb-2 text-xs text-gray-500">Select external users who should have access to this task</p>
+
+                            <div class="mt-2 max-h-60 space-y-2 overflow-y-auto rounded-md border p-2">
+                                <div v-for="externalUser in props.projectExternalUsers" :key="externalUser.id" class="flex items-center">
+                                    <input
+                                        :id="'external-user-' + externalUser.id"
+                                        v-model="editForm.external_user_ids"
+                                        :value="externalUser.id"
+                                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        type="checkbox"
+                                    />
+                                    <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
+                                        {{ externalUser.name || 'User ' + externalUser.external_id }}
+                                        <span v-if="externalUser.email" class="ml-1 text-xs text-gray-500">({{ externalUser.email }})</span>
+                                    </label>
                                 </div>
-                                <button class="text-red-600 hover:text-red-900" type="button" @click="removeFile(file)">Remove</button>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+                            </div>
 
-                <!-- Display any other errors -->
-                <div v-for="(error, key) in otherErrors" :key="key" class="mb-4 text-sm text-red-500">
-                    {{ error }}
-                </div>
+                            <div v-if="editForm.errors.external_user_ids" class="mt-1 text-sm text-red-500">
+                                {{ editForm.errors.external_user_ids }}
+                            </div>
+                        </div>
+
+                        <div v-else class="mb-4">
+                            <p class="text-sm text-gray-500">No external users available for this project.</p>
+                        </div>
+
+                        <!-- Existing Attachments Section -->
+                        <div v-if="existingAttachments.length > 0" class="mb-4">
+                            <h4 class="text-sm font-medium text-gray-700">Existing Attachments:</h4>
+                            <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
+                                <li
+                                    v-for="attachment in existingAttachments"
+                                    :key="attachment.id"
+                                    class="flex items-center justify-between px-3 py-2 text-sm"
+                                >
+                                    <div class="flex items-center">
+                                        <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                clip-rule="evenodd"
+                                                d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                                                fill-rule="evenodd"
+                                            />
+                                        </svg>
+                                        <a :href="attachment.url" class="hover:text-blue-600" target="_blank">{{
+                                            truncateFilename(attachment.original_filename)
+                                        }}</a>
+                                    </div>
+                                    <button class="text-red-600 hover:text-red-900" type="button" @click="deleteAttachment(attachment)">
+                                        Remove
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- File Upload Section -->
+                        <div class="mb-4">
+                            <Label for="attachments">Add New Attachments</Label>
+                            <div class="mt-1 flex items-center">
+                                <input
+                                    id="attachments"
+                                    class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                                    multiple
+                                    type="file"
+                                    @change="handleFileUpload"
+                                />
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Upload files directly. They will be attached to the task when updated.</p>
+
+                            <!-- Upload error message -->
+                            <div v-if="uploadError" class="mt-1 text-sm text-red-500">{{ uploadError }}</div>
+
+                            <!-- Loading indicator -->
+                            <div v-if="isUploading" class="mt-1 text-sm text-blue-500">Uploading...</div>
+
+                            <!-- List of uploaded files -->
+                            <div v-if="uploadedFiles.length > 0" class="mt-3">
+                                <h4 class="text-sm font-medium text-gray-700">New Files:</h4>
+                                <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
+                                    <li v-for="file in uploadedFiles" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
+                                        <div class="flex items-center">
+                                            <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path
+                                                    clip-rule="evenodd"
+                                                    d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                                                    fill-rule="evenodd"
+                                                />
+                                            </svg>
+                                            <span>{{ truncateFilename(file.original_filename) }}</span>
+                                        </div>
+                                        <button class="text-red-600 hover:text-red-900" type="button" @click="removeFile(file)">Remove</button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Display any other errors -->
+                        <div v-for="(error, key) in otherErrors" :key="key" class="mb-4 text-sm text-red-500">
+                            {{ error }}
+                        </div>
                     </CardContent>
                     <CardFooter class="justify-end">
-                        <Button type="submit" :disabled="editForm.processing">Update Task</Button>
+                        <Button :disabled="editForm.processing" type="submit">Update Task</Button>
                     </CardFooter>
                 </Card>
             </form>
             <!-- Thread Tabs Section -->
-            <Card class="col-span-1 lg:col-span-2">
+            <Card class="col-span-1 h-full lg:col-span-2">
                 <CardHeader>
                     <CardTitle>Comments</CardTitle>
                 </CardHeader>
-                <CardContent>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <CardContent class="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
                     <div
                         :class="['cursor-pointer rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
+                        class="flex flex-col"
                         @click="activeTab = 'internal'"
                     >
                         <h4>Internal</h4>
                         <!-- Messages container with fixed height and scrolling -->
-                        <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
+                        <div ref="internalMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
                             <div
                                 v-for="message in internalMessages"
                                 :key="message.id"
@@ -673,18 +691,23 @@ const submitForm = () => {
                                 class="mb-3"
                             >
                                 <div class="flex items-center justify-between">
-                                    <p class="text-sm" :class="message.isCurrentUser ? 'ml-auto' : ''">
+                                    <p :class="message.isCurrentUser ? 'ml-auto' : ''" class="text-sm">
                                         <span class="font-semibold">{{ message.sender }} - </span>
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
                                     <button
                                         v-if="message.isCurrentUser && isMessageDeletable(message.created_at)"
-                                        @click="deleteMessage(message.id, 'internal')"
                                         class="ml-2 text-xs text-red-500 hover:text-red-700"
                                         title="Delete message"
+                                        @click="deleteMessage(message.id, 'internal')"
                                     >
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            <path
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                            ></path>
                                         </svg>
                                     </button>
                                 </div>
@@ -719,7 +742,11 @@ const submitForm = () => {
                         <div v-if="internalThreadAttachments.length > 0" class="mb-3">
                             <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
                             <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                                <li v-for="file in internalThreadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
+                                <li
+                                    v-for="file in internalThreadAttachments"
+                                    :key="file.path"
+                                    class="flex items-center justify-between px-3 py-2 text-sm"
+                                >
                                     <div class="flex items-center">
                                         <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path
@@ -751,10 +778,10 @@ const submitForm = () => {
                                     :class="['flex-grow', isDraggingInternal ? 'drag-over' : '']"
                                     height="100px"
                                     placeholder="Type your message or drop files here..."
-                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
-                                    @dragover="(event) => handleDragOver(event, 'internal')"
                                     @dragleave="(event) => handleDragLeave(event, 'internal')"
+                                    @dragover="(event) => handleDragOver(event, 'internal')"
                                     @drop="(event) => handleDrop(event, 'internal')"
+                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -784,11 +811,12 @@ const submitForm = () => {
 
                     <div
                         :class="['cursor-pointer rounded-md border p-4', activeTab === 'external' ? 'border-blue-500 bg-blue-50' : '']"
+                        class="flex flex-col"
                         @click="activeTab = 'external'"
                     >
                         <h4>External</h4>
                         <!-- Messages container with fixed height and scrolling -->
-                        <div class="mb-4 h-64 overflow-y-auto rounded bg-gray-50 p-2">
+                        <div ref="externalMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
                             <div
                                 v-for="message in externalMessages"
                                 :key="message.id"
@@ -796,18 +824,23 @@ const submitForm = () => {
                                 class="mb-3"
                             >
                                 <div class="flex items-center justify-between">
-                                    <p class="text-sm" :class="message.isCurrentUser ? 'ml-auto' : ''">
+                                    <p :class="message.isCurrentUser ? 'ml-auto' : ''" class="text-sm">
                                         <span class="font-semibold">{{ message.sender }} - </span>
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
                                     <button
                                         v-if="message.isCurrentUser && isMessageDeletable(message.created_at)"
-                                        @click="deleteMessage(message.id, 'external')"
                                         class="ml-2 text-xs text-red-500 hover:text-red-700"
                                         title="Delete message"
+                                        @click="deleteMessage(message.id, 'external')"
                                     >
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            <path
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                            ></path>
                                         </svg>
                                     </button>
                                 </div>
@@ -842,7 +875,11 @@ const submitForm = () => {
                         <div v-if="externalThreadAttachments.length > 0" class="mb-3">
                             <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
                             <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                                <li v-for="file in externalThreadAttachments" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
+                                <li
+                                    v-for="file in externalThreadAttachments"
+                                    :key="file.path"
+                                    class="flex items-center justify-between px-3 py-2 text-sm"
+                                >
                                     <div class="flex items-center">
                                         <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path
@@ -874,10 +911,10 @@ const submitForm = () => {
                                     :class="['flex-grow', isDraggingExternal ? 'drag-over' : '']"
                                     height="100px"
                                     placeholder="Type your message or drop files here..."
-                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
-                                    @dragover="(event) => handleDragOver(event, 'external')"
                                     @dragleave="(event) => handleDragLeave(event, 'external')"
+                                    @dragover="(event) => handleDragOver(event, 'external')"
                                     @drop="(event) => handleDrop(event, 'external')"
+                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -904,7 +941,6 @@ const submitForm = () => {
                             </div>
                         </div>
                     </div>
-                </div>
                 </CardContent>
             </Card>
         </div>
@@ -928,12 +964,29 @@ const submitForm = () => {
     font-weight: bold;
 }
 
-.markdown-content h1 { font-size: 1.5em; }
-.markdown-content h2 { font-size: 1.3em; }
-.markdown-content h3 { font-size: 1.2em; }
-.markdown-content h4 { font-size: 1.1em; }
-.markdown-content h5 { font-size: 1em; }
-.markdown-content h6 { font-size: 0.9em; }
+.markdown-content h1 {
+    font-size: 1.5em;
+}
+
+.markdown-content h2 {
+    font-size: 1.3em;
+}
+
+.markdown-content h3 {
+    font-size: 1.2em;
+}
+
+.markdown-content h4 {
+    font-size: 1.1em;
+}
+
+.markdown-content h5 {
+    font-size: 1em;
+}
+
+.markdown-content h6 {
+    font-size: 0.9em;
+}
 
 .markdown-content p {
     margin-bottom: 1em;

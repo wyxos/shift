@@ -5,17 +5,20 @@
 SHIFT is a task management system built with Laravel and Vue.js. It consists of two main components:
 
 1. **Main Application** - A Laravel application with Vue.js frontend for task management
-2. **SDK Package** - A Laravel package (`wyxos/shift-php`) for external application integration
+2. **SDK Package** - A Laravel package (`wyxos/shift-php`) for external application integration located at
+   ../shift-sdk/packages/shift-php
 
 ## Tech Stack
 
 ### Backend
+
 - PHP 8.2+
 - Laravel 12.x
 - Laravel Sanctum for API authentication
 - Laravel Inertia for backend-frontend integration
 
 ### Frontend
+
 - Vue.js 3.5+
 - TypeScript
 - Tailwind CSS 4.x
@@ -26,6 +29,7 @@ SHIFT is a task management system built with Laravel and Vue.js. It consists of 
 ## Project Structure
 
 ### Main Application
+
 ```
 shift/
 ├── app/                  # Application code
@@ -47,6 +51,7 @@ shift/
 ```
 
 ### SDK Package
+
 ```
 shift-sdk-package/packages/shift-php/
 ├── config/               # Configuration files
@@ -58,17 +63,20 @@ shift-sdk-package/packages/shift-php/
 ## Development Commands
 
 ### Environment Setup
+
 - Install PHP dependencies: `composer install`
 - Install JavaScript dependencies: `npm install`
 - Start development server: `composer dev`
 - Start SSR mode: `composer dev:ssr`
 
 ### Testing
+
 - Backend tests: `composer test`
 - Frontend tests: `npm test`
 - Test with coverage: `npm run test:coverage`
 
 ### Common Laravel Commands
+
 - Create controller: `php artisan make:controller NameController`
 - Create model with migration: `php artisan make:model Name -m`
 - Create test: `php artisan make:test NameTest`
@@ -94,6 +102,7 @@ shift-sdk-package/packages/shift-php/
 
 ## AI Assistant Guidelines
 
-- After completing each task, update this guidelines.md file if you've made changes that affect the project structure, workflow, or best practices
+- After completing each task, update this guidelines.md file if you've made changes that affect the project structure,
+  workflow, or best practices
 - When implementing new features, document them in this file if they introduce new patterns or technologies
 - Keep this file concise and focused on information that will help with future development tasks
