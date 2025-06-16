@@ -14,7 +14,13 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
+import { marked } from 'marked';
 import { computed, onMounted, ref } from 'vue';
+
+// Function to render markdown content
+function renderMarkdown(content) {
+    return marked(content);
+}
 
 const props = defineProps({
     project: {
@@ -589,7 +595,7 @@ const submitForm = () => {
                                     "
                                     class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3"
                                 >
-                                    <p>{{ message.content }}</p>
+                                    <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
                                     <!-- Display message attachments if any -->
                                     <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
                                         <p class="text-xs font-semibold">Attachments:</p>
@@ -709,7 +715,7 @@ const submitForm = () => {
                                     "
                                     class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3"
                                 >
-                                    <p>{{ message.content }}</p>
+                                    <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
                                     <!-- Display message attachments if any -->
                                     <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
                                         <p class="text-xs font-semibold">Attachments:</p>
@@ -799,3 +805,90 @@ const submitForm = () => {
         </div>
     </AppLayout>
 </template>
+
+<style>
+.markdown-content {
+    /* Basic styling for markdown content */
+    line-height: 1.5;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+}
+
+.markdown-content h1 { font-size: 1.5em; }
+.markdown-content h2 { font-size: 1.3em; }
+.markdown-content h3 { font-size: 1.2em; }
+.markdown-content h4 { font-size: 1.1em; }
+.markdown-content h5 { font-size: 1em; }
+.markdown-content h6 { font-size: 0.9em; }
+
+.markdown-content p {
+    margin-bottom: 1em;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.markdown-content ul {
+    list-style-type: disc;
+}
+
+.markdown-content ol {
+    list-style-type: decimal;
+}
+
+.markdown-content a {
+    color: #3182ce;
+    text-decoration: underline;
+}
+
+.markdown-content code {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.markdown-content pre {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin-bottom: 1em;
+}
+
+.markdown-content blockquote {
+    border-left: 4px solid #e2e8f0;
+    padding-left: 1em;
+    margin-left: 0;
+    margin-bottom: 1em;
+    color: #4a5568;
+}
+
+.markdown-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 1em;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+    border: 1px solid #e2e8f0;
+    padding: 0.5em;
+}
+
+.markdown-content table th {
+    background-color: #f7fafc;
+}
+</style>
