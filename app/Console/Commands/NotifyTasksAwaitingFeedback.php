@@ -78,7 +78,7 @@ class NotifyTasksAwaitingFeedback extends Command
 
                 // Prepare payload for external notification
                 $payload = [
-                    'type' => 'tasks.awaiting_feedback',
+                    'type' => 'tasks_awaiting_feedback',
                     'user_id' => $externalUser->external_id,
                     'task_ids' => $taskIds,
                     'task_count' => count($userTasks)
