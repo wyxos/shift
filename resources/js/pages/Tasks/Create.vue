@@ -8,6 +8,25 @@ import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 
+// Function to truncate long filenames, showing part of the start and end
+function truncateFilename(filename, maxLength = 30) {
+    if (!filename || filename.length <= maxLength) {
+        return filename;
+    }
+
+    const extension = filename.lastIndexOf('.') > 0 ? filename.substring(filename.lastIndexOf('.')) : '';
+    const nameWithoutExtension = filename.substring(0, filename.length - extension.length);
+
+    // Calculate how many characters to keep from start and end
+    const startChars = Math.floor((maxLength - 3 - extension.length) / 2);
+    const endChars = Math.ceil((maxLength - 3 - extension.length) / 2);
+
+    return nameWithoutExtension.substring(0, startChars) +
+           '...' +
+           nameWithoutExtension.substring(nameWithoutExtension.length - endChars) +
+           extension;
+}
+
 const props = defineProps({
     projects: {
         type: Array,
@@ -237,7 +256,7 @@ const removeFile = async (file) => {
                                     <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
                                     </svg>
-                                    <span class="truncate">{{ file.original_filename }}</span>
+                                    <span>{{ truncateFilename(file.original_filename) }}</span>
                                 </div>
                                 <button
                                     type="button"
