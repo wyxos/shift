@@ -43,11 +43,26 @@ onMounted(() => {
             }
         });
 
-        // Get the editor's DOM element
-        const editorEl = editor.getUI().getEl();
+        // // Get the editor's DOM element
+        // const editorEl = editor.getUI().getEl();
+        //
+        // // Create keydown handler function
+        // keydownHandler = (event: KeyboardEvent) => {
+        //     if (event.key === 'Enter') {
+        //         if (!event.shiftKey) {
+        //             // Enter without Shift: emit enter event and prevent default
+        //             event.preventDefault();
+        //             emit('enter');
+        //         }
+        //         // Shift+Enter: allow default behavior (new line)
+        //     }
+        // };
+        //
+        // // Add keydown event listener for Enter and Shift+Enter
+        // editorEl.addEventListener('keydown', keydownHandler);
 
-        // Create keydown handler function
-        keydownHandler = (event: KeyboardEvent) => {
+        editor.on('keydown', (editor: Editor, event: KeyboardEvent) => {
+            console.log('Key pressed:', event);
             if (event.key === 'Enter') {
                 if (!event.shiftKey) {
                     // Enter without Shift: emit enter event and prevent default
@@ -56,10 +71,7 @@ onMounted(() => {
                 }
                 // Shift+Enter: allow default behavior (new line)
             }
-        };
-
-        // Add keydown event listener for Enter and Shift+Enter
-        editorEl.addEventListener('keydown', keydownHandler);
+        });
     }
 });
 

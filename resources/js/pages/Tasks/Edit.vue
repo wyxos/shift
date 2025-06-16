@@ -671,14 +671,14 @@ const submitForm = () => {
                 </Card>
             </form>
             <!-- Thread Tabs Section -->
-            <Card class="col-span-1 h-full lg:col-span-2">
+            <Card class="col-span-1 h-full overflow-hidden lg:col-span-2">
                 <CardHeader>
                     <CardTitle>Comments</CardTitle>
                 </CardHeader>
-                <CardContent class="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
+                <CardContent class="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-2">
                     <div
                         :class="['rounded-md border p-4', activeTab === 'internal' ? 'border-blue-500 bg-blue-50' : '']"
-                        class="flex flex-col"
+                        class="flex h-full flex-col overflow-hidden"
                         @click="activeTab = 'internal'"
                     >
                         <h4>Internal</h4>
@@ -811,7 +811,7 @@ const submitForm = () => {
 
                     <div
                         :class="['rounded-md border p-4', activeTab === 'external' ? 'border-blue-500 bg-blue-50' : '']"
-                        class="flex flex-col"
+                        class="flex h-full flex-col overflow-hidden"
                         @click="activeTab = 'external'"
                     >
                         <h4>External</h4>
