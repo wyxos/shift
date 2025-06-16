@@ -189,6 +189,30 @@ const sendMessage = async (event) => {
     }
 };
 
+// Function to delete a message
+const deleteMessage = async (messageId, messageType) => {
+    if (!confirm('Are you sure you want to delete this message?')) {
+        return;
+    }
+
+    try {
+        await axios.delete(route('task-threads.destroy', {
+            task: props.task.id,
+            thread: messageId
+        }));
+
+        // Remove the message from the appropriate list
+        if (messageType === 'internal') {
+            internalMessages.value = internalMessages.value.filter(message => message.id !== messageId);
+        } else {
+            externalMessages.value = externalMessages.value.filter(message => message.id !== messageId);
+        }
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        alert('Failed to delete message. Please try again.');
+    }
+};
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Tasks',
@@ -543,10 +567,22 @@ const submitForm = () => {
                                 :class="message.isCurrentUser ? 'text-right' : 'text-left'"
                                 class="mb-3"
                             >
-                                <p class="text-sm">
-                                    <span class="font-semibold">{{ message.sender }} - </span>
-                                    <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
-                                </p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm" :class="message.isCurrentUser ? 'ml-auto' : ''">
+                                        <span class="font-semibold">{{ message.sender }} - </span>
+                                        <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
+                                    </p>
+                                    <button
+                                        v-if="message.isCurrentUser"
+                                        @click="deleteMessage(message.id, 'internal')"
+                                        class="ml-2 text-xs text-red-500 hover:text-red-700"
+                                        title="Delete message"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <div
                                     :class="
                                         message.isCurrentUser ? 'rounded-br-none bg-blue-500 text-white' : 'rounded-bl-none bg-gray-200 text-gray-800'
@@ -610,7 +646,7 @@ const submitForm = () => {
                                     class="flex-grow"
                                     height="100px"
                                     placeholder="Type your message..."
-                                    @keyup.enter.prevent="sendMessage($event)"
+                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -651,10 +687,22 @@ const submitForm = () => {
                                 :class="message.isCurrentUser ? 'text-right' : 'text-left'"
                                 class="mb-3"
                             >
-                                <p class="text-sm">
-                                    <span class="font-semibold">{{ message.sender }} - </span>
-                                    <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
-                                </p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm" :class="message.isCurrentUser ? 'ml-auto' : ''">
+                                        <span class="font-semibold">{{ message.sender }} - </span>
+                                        <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
+                                    </p>
+                                    <button
+                                        v-if="message.isCurrentUser"
+                                        @click="deleteMessage(message.id, 'external')"
+                                        class="ml-2 text-xs text-red-500 hover:text-red-700"
+                                        title="Delete message"
+                                    >
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <div
                                     :class="
                                         message.isCurrentUser ? 'rounded-br-none bg-blue-500 text-white' : 'rounded-bl-none bg-gray-200 text-gray-800'
@@ -718,7 +766,7 @@ const submitForm = () => {
                                     class="flex-grow"
                                     height="100px"
                                     placeholder="Type your message..."
-                                    @keyup.enter.prevent="sendMessage($event)"
+                                    @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
