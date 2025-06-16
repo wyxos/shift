@@ -56,6 +56,10 @@ class ExternalTaskController extends Controller
                 request('search'),
                 fn($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
             )
+            ->when(
+                request('status'),
+                fn($query) => $query->where('status', request('status'))
+            )
             ->paginate(10)
             ->withQueryString();
 
