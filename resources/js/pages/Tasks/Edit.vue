@@ -22,6 +22,25 @@ function renderMarkdown(content) {
     return marked(content);
 }
 
+// Function to truncate long filenames, showing part of the start and end
+function truncateFilename(filename, maxLength = 30) {
+    if (!filename || filename.length <= maxLength) {
+        return filename;
+    }
+
+    const extension = filename.lastIndexOf('.') > 0 ? filename.substring(filename.lastIndexOf('.')) : '';
+    const nameWithoutExtension = filename.substring(0, filename.length - extension.length);
+
+    // Calculate how many characters to keep from start and end
+    const startChars = Math.floor((maxLength - 3 - extension.length) / 2);
+    const endChars = Math.ceil((maxLength - 3 - extension.length) / 2);
+
+    return nameWithoutExtension.substring(0, startChars) +
+           '...' +
+           nameWithoutExtension.substring(nameWithoutExtension.length - endChars) +
+           extension;
+}
+
 const props = defineProps({
     project: {
         type: Object,
@@ -110,8 +129,48 @@ const handleThreadFileUpload = (event) => {
         uploadThreadFile(files[i]);
     }
 
-    // Clear the file input
-    event.target.value = '';
+    // Clear the file input if it's a file input element
+    if (event.target.value !== undefined) {
+        event.target.value = '';
+    }
+};
+
+// Drag and drop state
+const isDraggingInternal = ref(false);
+const isDraggingExternal = ref(false);
+
+// Drag event handlers
+const handleDragOver = (event, type) => {
+    event.preventDefault();
+    if (type === 'internal') {
+        isDraggingInternal.value = true;
+    } else {
+        isDraggingExternal.value = true;
+    }
+};
+
+const handleDragLeave = (event, type) => {
+    event.preventDefault();
+    if (type === 'internal') {
+        isDraggingInternal.value = false;
+    } else {
+        isDraggingExternal.value = false;
+    }
+};
+
+const handleDrop = (event, type) => {
+    event.preventDefault();
+
+    // Set the active tab based on where the file was dropped
+    activeTab.value = type;
+
+    if (type === 'internal') {
+        isDraggingInternal.value = false;
+    } else {
+        isDraggingExternal.value = false;
+    }
+
+    handleThreadFileUpload(event);
 };
 
 // Upload a thread file
@@ -194,6 +253,7 @@ const sendMessage = async (event) => {
             }),
             isCurrentUser: response.data.thread.is_current_user,
             attachments: response.data.thread.attachments || [],
+            created_at: response.data.thread.created_at,
         };
 
         if (activeTab.value === 'internal') {
@@ -217,6 +277,17 @@ const sendMessage = async (event) => {
     }
 };
 
+// Function to check if a message is older than 1 minute
+const isMessageDeletable = (createdAt) => {
+    if (!createdAt) return false;
+
+    const messageDate = new Date(createdAt);
+    const now = new Date();
+    const diffInMinutes = (now - messageDate) / (1000 * 60);
+
+    return diffInMinutes <= 1;
+};
+
 // Function to delete a message
 const deleteMessage = async (messageId, messageType) => {
     if (!confirm('Are you sure you want to delete this message?')) {
@@ -237,7 +308,11 @@ const deleteMessage = async (messageId, messageType) => {
         }
     } catch (error) {
         console.error('Error deleting message:', error);
-        alert('Failed to delete message. Please try again.');
+        if (error.response?.data?.error === 'Messages can only be deleted within 1 minute of creation') {
+            alert('Messages can only be deleted within 1 minute of creation.');
+        } else {
+            alert('Failed to delete message. Please try again.');
+        }
     }
 };
 
@@ -302,6 +377,7 @@ const loadTaskThreads = async () => {
                 timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isCurrentUser: thread.is_current_user,
                 attachments: thread.attachments || [],
+                created_at: thread.created_at,
             }));
         }
 
@@ -313,6 +389,7 @@ const loadTaskThreads = async () => {
                 timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isCurrentUser: thread.is_current_user,
                 attachments: thread.attachments || [],
+                created_at: thread.created_at,
             }));
         }
     } catch (error) {
@@ -517,7 +594,7 @@ const submitForm = () => {
                                         fill-rule="evenodd"
                                     />
                                 </svg>
-                                <a :href="attachment.url" class="truncate hover:text-blue-600" target="_blank">{{ attachment.original_filename }}</a>
+                                <a :href="attachment.url" class="hover:text-blue-600" target="_blank">{{ truncateFilename(attachment.original_filename) }}</a>
                             </div>
                             <button class="text-red-600 hover:text-red-900" type="button" @click="deleteAttachment(attachment)">Remove</button>
                         </li>
@@ -557,7 +634,7 @@ const submitForm = () => {
                                             fill-rule="evenodd"
                                         />
                                     </svg>
-                                    <span class="truncate">{{ file.original_filename }}</span>
+                                    <span>{{ truncateFilename(file.original_filename) }}</span>
                                 </div>
                                 <button class="text-red-600 hover:text-red-900" type="button" @click="removeFile(file)">Remove</button>
                             </li>
@@ -601,7 +678,7 @@ const submitForm = () => {
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
                                     <button
-                                        v-if="message.isCurrentUser"
+                                        v-if="message.isCurrentUser && isMessageDeletable(message.created_at)"
                                         @click="deleteMessage(message.id, 'internal')"
                                         class="ml-2 text-xs text-red-500 hover:text-red-700"
                                         title="Delete message"
@@ -630,7 +707,7 @@ const submitForm = () => {
                                                         fill-rule="evenodd"
                                                     />
                                                 </svg>
-                                                {{ attachment.original_filename }}
+                                                {{ truncateFilename(attachment.original_filename) }}
                                             </a>
                                         </div>
                                     </div>
@@ -651,7 +728,7 @@ const submitForm = () => {
                                                 fill-rule="evenodd"
                                             />
                                         </svg>
-                                        <span class="truncate">{{ file.original_filename }}</span>
+                                        <span>{{ truncateFilename(file.original_filename) }}</span>
                                     </div>
                                     <button class="text-red-600 hover:text-red-900" type="button" @click="removeThreadAttachment(file)">
                                         Remove
@@ -671,10 +748,13 @@ const submitForm = () => {
                             <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="internalNewMessage"
-                                    class="flex-grow"
+                                    :class="['flex-grow', isDraggingInternal ? 'drag-over' : '']"
                                     height="100px"
-                                    placeholder="Type your message..."
+                                    placeholder="Type your message or drop files here..."
                                     @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
+                                    @dragover="(event) => handleDragOver(event, 'internal')"
+                                    @dragleave="(event) => handleDragLeave(event, 'internal')"
+                                    @drop="(event) => handleDrop(event, 'internal')"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -721,7 +801,7 @@ const submitForm = () => {
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
                                     <button
-                                        v-if="message.isCurrentUser"
+                                        v-if="message.isCurrentUser && isMessageDeletable(message.created_at)"
                                         @click="deleteMessage(message.id, 'external')"
                                         class="ml-2 text-xs text-red-500 hover:text-red-700"
                                         title="Delete message"
@@ -750,7 +830,7 @@ const submitForm = () => {
                                                         fill-rule="evenodd"
                                                     />
                                                 </svg>
-                                                {{ attachment.original_filename }}
+                                                {{ truncateFilename(attachment.original_filename) }}
                                             </a>
                                         </div>
                                     </div>
@@ -771,7 +851,7 @@ const submitForm = () => {
                                                 fill-rule="evenodd"
                                             />
                                         </svg>
-                                        <span class="truncate">{{ file.original_filename }}</span>
+                                        <span>{{ truncateFilename(file.original_filename) }}</span>
                                     </div>
                                     <button class="text-red-600 hover:text-red-900" type="button" @click="removeThreadAttachment(file)">
                                         Remove
@@ -791,10 +871,13 @@ const submitForm = () => {
                             <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="externalNewMessage"
-                                    class="flex-grow"
+                                    :class="['flex-grow', isDraggingExternal ? 'drag-over' : '']"
                                     height="100px"
-                                    placeholder="Type your message..."
+                                    placeholder="Type your message or drop files here..."
                                     @keyup.enter.prevent="(event) => !event.shiftKey && sendMessage(event)"
+                                    @dragover="(event) => handleDragOver(event, 'external')"
+                                    @dragleave="(event) => handleDragLeave(event, 'external')"
+                                    @drop="(event) => handleDrop(event, 'external')"
                                 />
                                 <div class="mt-2 flex justify-end gap-2">
                                     <label
@@ -912,5 +995,12 @@ const submitForm = () => {
 
 .markdown-content table th {
     background-color: #f7fafc;
+}
+
+/* Drag and drop styles */
+.drag-over {
+    border: 2px dashed #3182ce !important;
+    background-color: rgba(49, 130, 206, 0.1) !important;
+    transition: all 0.2s ease;
 }
 </style>
