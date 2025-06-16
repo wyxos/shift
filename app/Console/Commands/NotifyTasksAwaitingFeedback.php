@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\ExternalUser;
 use App\Notifications\TaskAwaitingFeedbackNotification;
 use App\Services\ExternalNotificationService;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -45,6 +46,7 @@ class NotifyTasksAwaitingFeedback extends Command
         // Group tasks by external user
         $tasksByExternalUser = [];
 
+        /** @var Task $task */
         foreach ($tasks as $task) {
             // Only process tasks submitted by external users
             if (!$task->isExternallySubmitted()) {
@@ -92,7 +94,7 @@ class NotifyTasksAwaitingFeedback extends Command
                 );
 
                 // Generate URL with filter for awaiting-feedback tasks in the consuming app
-                $url = $externalUser->url . '/shift/tasks?status=awaiting-feedback';
+                $url = $externalUser->url . '/shift/?status=awaiting-feedback';
 
                 // Send fallback email notification if the app is not in production
                 $notificationService->sendFallbackEmailIfNeeded(
@@ -110,7 +112,7 @@ class NotifyTasksAwaitingFeedback extends Command
                     'task_count' => count($userTasks),
                     'task_ids' => $taskIds
                 ]);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->error('Failed to send notification to ' . $externalUser->email . ': ' . $e->getMessage());
 
                 Log::error('Failed to send awaiting feedback notification', [
