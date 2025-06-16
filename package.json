@@ -41,6 +41,7 @@
         "laravel-vite-plugin": "^1.0",
         "lucide": "^0.468.0",
         "lucide-vue-next": "^0.468.0",
+        "marked": "^15.0.12",
         "reka-ui": "^2.2.0",
         "tailwind-merge": "^3.2.0",
         "tailwindcss": "^4.1.1",
