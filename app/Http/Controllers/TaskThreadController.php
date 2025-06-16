@@ -260,6 +260,11 @@ class TaskThreadController extends Controller
             return response()->json(['error' => 'You can only delete your own messages'], 403);
         }
 
+        // Check if more than 1 minute has passed since the message was created
+        if (now()->diffInMinutes($thread->created_at) > 1) {
+            return response()->json(['error' => 'Messages can only be deleted within 1 minute of creation'], 403);
+        }
+
         // Delete all attachments
         foreach ($thread->attachments as $attachment) {
             // Delete the file from storage
