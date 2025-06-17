@@ -496,7 +496,7 @@ const submitForm = () => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-3">
-            <form class="space-y-4" @submit.prevent="submitForm" @keydown.enter.prevent>
+            <form class="h-full space-y-4 overflow-auto" @submit.prevent="submitForm" @keydown.enter.prevent>
                 <Card>
                     <CardHeader>
                         <CardTitle>Edit Task</CardTitle>
