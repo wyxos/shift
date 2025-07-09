@@ -1,108 +1,29 @@
-# SHIFT Developer Guidelines
+General guidelines:
 
-## Project Overview
+- Always use Laravel ```php artisan``` command to scaffold relevant class for the task.
+- Ensure to remove any logging statements you added before completing a task.
+- Favor type hints and type declaration for php code.
+- Ensure all javascript code contain type hints.
+- For any UI alignment, verify if backend alignments are also needed and vice versa.
+- This project uses the PEST testing framework for PHP tests, so ensure all tests are written using PEST syntax.
+- After completing a task involving PHP logic, create a new PEST test case if it doesn't exists, and evaluate the test
+  individually ensuring it passes. If a test case exists, align it accordingly.
+- Run the full ```php artisan test``` after completing a task to ensure all tests pass.
+- Never make assumptions or use placeholders. If in doubt, ask for clarification or halt the task with a comment.
+- Any created command/logic that deals with looping through a consequent amount of data or performs intensive disk
+  operations should be queued in a job to avoid blocking the main thread.
+- Never use Model::all() or similar methods that load entire datasets into memory; always use chunking (Model::chunk())
+  for processing large collections.
+- Always use Inertia router where applicable if present. Otherwise favor axios and never use fetch.
+- Do not create custom files to test functionalities. Use test cases as per project test framework.
+- Use laravel.log and Log class to debug issues, and ensure to remove any logging statements and to clear the
+  laravel.log file before completing the task.
+- For details about @wyxos/vision component, navigate to ../../../wyxos/js/vision.
 
-SHIFT is a task management system built with Laravel and Vue.js. It consists of two main components:
-
-1. **Main Application** - A Laravel application with Vue.js frontend for task management
-2. **SDK Package** - A Laravel package (`wyxos/shift-php`) for external application integration located at
-   ../shift-sdk/packages/shift-php
-
-## Tech Stack
-
-### Backend
-
-- PHP 8.2+
-- Laravel 12.x
-- Laravel Sanctum for API authentication
-- Laravel Inertia for backend-frontend integration
-
-### Frontend
-
-- Vue.js 3.5+
-- TypeScript
-- Tailwind CSS 4.x
-- Vite as build tool
-- Inertia.js for SPA functionality
-- UI components: Oruga UI, TanStack Table, Toast UI Editor
-
-## Project Structure
-
-### Main Application
-
-```
-shift/
-├── app/                  # Application code
-│   ├── Console/          # Artisan commands
-│   ├── Http/             # Controllers, middleware, requests
-│   ├── Jobs/             # Queue jobs
-│   ├── Models/           # Eloquent models
-│   ├── Notifications/    # Notification classes
-│   ├── Providers/        # Service providers
-│   └── Services/         # Business logic services
-├── config/               # Configuration files
-├── database/             # Migrations, factories, seeders
-├── resources/            # Frontend assets
-│   ├── js/               # Vue components and JavaScript
-│   ├── css/              # CSS files
-│   └── views/            # Blade templates
-├── routes/               # Route definitions
-└── tests/                # Test files
-```
-
-### SDK Package
-
-```
-shift-sdk-package/packages/shift-php/
-├── config/               # Configuration files
-├── routes/               # Route definitions
-├── src/                  # PHP source code
-└── ui/                   # Frontend components
-```
-
-## Development Commands
-
-### Environment Setup
-
-- Install PHP dependencies: `composer install`
-- Install JavaScript dependencies: `npm install`
-- Start development server: `composer dev`
-- Start SSR mode: `composer dev:ssr`
-
-### Testing
-
-- Backend tests: `composer test`
-- Frontend tests: `npm test`
-- Test with coverage: `npm run test:coverage`
-
-### Common Laravel Commands
-
-- Create controller: `php artisan make:controller NameController`
-- Create model with migration: `php artisan make:model Name -m`
-- Create test: `php artisan make:test NameTest`
-- Run migrations: `php artisan migrate`
-- Roll back migrations: `php artisan migrate:rollback`
-- Clear cache: `php artisan cache:clear`
-
-## Best Practices
-
-- Follow Laravel and PSR-12 style guidelines
-- Use type hints and strict types
-- Use dependency injection where possible
-- Write tests for new features and bug fixes
-- Run migrations and tests before each commit
-- Generate Laravel components using artisan commands
-- Remove unused code and perform basic refactoring
-- Refer to official documentation for latest syntax and best practices
-- Write or update unit, feature, and e2e tests as appropriate
-- Make migrations, factories, and seeders for new or changed tables
-- Update policies, validation rules, and documentation as needed
-- Update related front-end components if needed
-- Always generate new Laravel components using artisan commands
-
-## AI Assistant Guidelines
+Project specific guidelines:
 
 - After completing each task, update this guidelines.md file if you've made changes that affect the project structure,
   workflow, or best practices
 - When implementing new features, document them in this file if they introduce new patterns or technologies
 - Keep this file concise and focused on information that will help with future development tasks
+
