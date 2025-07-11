@@ -1,29 +1,37 @@
-General guidelines:
+**GENERAL GUIDELINES**
+Code Quality:
 
-- Always use Laravel ```php artisan``` command to scaffold relevant class for the task.
-- Ensure to remove any logging statements you added before completing a task.
-- Favor type hints and type declaration for php code.
-- Ensure all javascript code contain type hints.
-- For any UI alignment, verify if backend alignments are also needed and vice versa.
-- This project uses the PEST testing framework for PHP tests, so ensure all tests are written using PEST syntax.
-- After completing a task involving PHP logic, create a new PEST test case if it doesn't exists, and evaluate the test
-  individually ensuring it passes. If a test case exists, align it accordingly.
-- Run the full ```php artisan test``` after completing a task to ensure all tests pass.
-- Never make assumptions or use placeholders. If in doubt, ask for clarification or halt the task with a comment.
-- Any created command/logic that deals with looping through a consequent amount of data or performs intensive disk
-  operations should be queued in a job to avoid blocking the main thread.
-- Never use Model::all() or similar methods that load entire datasets into memory; always use chunking (Model::chunk())
-  for processing large collections.
-- Always use Inertia router where applicable if present. Otherwise favor axios and never use fetch.
-- Do not create custom files to test functionalities. Use test cases as per project test framework.
-- Use laravel.log and Log class to debug issues, and ensure to remove any logging statements and to clear the
-  laravel.log file before completing the task.
-- For details about @wyxos/vision component, navigate to ../../../wyxos/js/vision.
+* Use Laravel `php artisan` to scaffold classes.
+* Use type hints and declarations in PHP code.
+* All JS code must contain type hints.
+* Do not assume or use placeholders; ask for clarification or halt with a comment if unsure.
 
-Project specific guidelines:
+Debugging:
 
-- After completing each task, update this guidelines.md file if you've made changes that affect the project structure,
-  workflow, or best practices
-- When implementing new features, document them in this file if they introduce new patterns or technologies
-- Keep this file concise and focused on information that will help with future development tasks
+* Use `laravel.log` and the `Log` class for debugging.
+* Remove logging statements and clear `laravel.log` before task completion.
 
+Testing:
+
+* Use PEST for PHP tests only.
+* After PHP logic tasks: create a PEST test case if missing, evaluate individually, align existing tests, run
+  `php artisan test` to ensure all pass.
+* Do not create JS tests.
+* Use ```test``` and not ```it``` in PEST tests.
+
+Performance:
+
+* Queue jobs for large dataset loops or intensive disk operations.
+* Do not use `Model::all()` on large datasets; use `Model::chunk()`.
+
+UI/Integration:
+
+* Check if UI alignments need backend alignments and vice versa.
+* Use Inertia router if applicable; otherwise, Axios; never Fetch.
+
+Task Management:
+
+* Strike out completed tasks in `todo.md`.
+* Read `.junie/feature-documentation.md` before tasks to understand flows and context.
+* Update `.junie/feature-documentation.md` after tasks with feature purpose, flow overview, setup/config/business logic,
+  and notes for future agents.
