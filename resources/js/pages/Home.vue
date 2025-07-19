@@ -11,38 +11,206 @@ const stars = 0 // optionally fetch from GitHub API later
 </script>
 
 <template>
-    <Head title="Welcome">
-        <meta name="description" content="SHIFT – Laravel-based internal task management and SDK." />
+    <Head title="SHIFT - Open Source Task Management System">
+        <meta name="description" content="SHIFT is an open-source, modular task management system built with Laravel and Vue.js. Streamline task tracking and project collaboration across teams with our powerful dashboard and SDK integration." />
+        <meta name="keywords" content="task management, project management, open source, Laravel, Vue.js, collaboration, productivity, teams, dashboard, SDK" />
+        <meta property="og:title" content="SHIFT - Open Source Task Management System" />
+        <meta property="og:description" content="Streamline task tracking and project collaboration with our modular task management system. Built with Laravel and Vue.js." />
+        <meta property="og:type" content="website" />
     </Head>
-    <div class="p-4 min-h-screen flex flex-col">
-        <div class="flex justify-end">
-            <div class="flex gap-4 mb-10">
-                <a href="https://github.com/wyxos/shift-php" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.2c-3.34.73-4.04-1.6-4.04-1.6a3.18 3.18 0 00-1.34-1.76c-1.1-.75.08-.74.08-.74a2.52 2.52 0 011.85 1.24 2.56 2.56 0 003.5 1 2.57 2.57 0 01.77-1.6c-2.66-.3-5.46-1.33-5.46-5.92a4.62 4.62 0 011.24-3.2 4.3 4.3 0 01.12-3.16s1-.33 3.3 1.22a11.43 11.43 0 016 0c2.3-1.55 3.3-1.22 3.3-1.22a4.3 4.3 0 01.12 3.16 4.61 4.61 0 011.24 3.2c0 4.6-2.8 5.61-5.47 5.9a2.87 2.87 0 01.82 2.22v3.3c0 .32.22.69.83.57A12 12 0 0012 0z"/>
-                    </svg>
-                    GitHub<span class="text-sm text-gray-500 dark:text-gray-400">({{ stars }})</span>
-                </a>
-                <a href="https://wyxos.com" target="_blank" class="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
-                    Wyxos
-                </a>
+    <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <!-- Navigation -->
+        <nav class="border-b border-slate-200 bg-white/50 backdrop-blur-lg dark:border-slate-700 dark:bg-slate-800/50">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                            S
+                        </div>
+                        <span class="text-xl font-bold text-slate-900 dark:text-slate-100">SHIFT</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="https://github.com/wyxos/shift" target="_blank" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
+                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                        <a href="https://wyxos.com" target="_blank" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
+                            Wyxos
+                        </a>
+                        <div v-if="!auth?.user" class="flex items-center space-x-2">
+                            <Link :href="route('login')" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
+                                Log in
+                            </Link>
+                            <Link :href="route('register')" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                                Get Started
+                            </Link>
+                        </div>
+                        <div v-else>
+                            <Link :href="route('dashboard')" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors">
+                                Dashboard
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-6xl">
+                    Streamline Task Management
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">with SHIFT</span>
+                </h1>
+                <p class="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+                    SHIFT is an open-source, modular task management system built with Laravel and Vue.js. 
+                    Designed to streamline task tracking and project collaboration across multiple teams and applications.
+                </p>
+                <div class="mt-10 flex items-center justify-center gap-x-6">
+                    <Link v-if="!auth?.user" :href="route('register')" class="rounded-lg bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
+                        Get Started
+                    </Link>
+                    <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
+                        Go to Dashboard
+                    </Link>
+                    <a href="https://github.com/wyxos/shift" target="_blank" class="text-base font-semibold leading-6 text-slate-900 dark:text-slate-100 hover:text-slate-600 dark:hover:text-slate-400 transition-colors">
+                        View on GitHub <span aria-hidden="true">→</span>
+                    </a>
+                </div>
             </div>
         </div>
-        <div class="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-900 dark:text-white p-6">
-            <h1 class="text-4xl font-bold mb-2">SHIFT</h1>
-            <p class="text-lg mb-6 text-gray-600 dark:text-gray-400 text-center">
-                Service Hub for Integrated Framework Tasks — Laravel dashboard + SDK for unified task management.
-            </p>
 
-
-
-            <div v-if="!auth?.user" class="flex gap-4">
-                <Link :href="route('login')" class="px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700">Log In</Link>
-                <Link :href="route('register')" class="px-6 py-3 border border-blue-600 text-blue-600 rounded hover:bg-blue-50">Register</Link>
+        <!-- Features Section -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-base font-semibold leading-7 text-blue-600 dark:text-blue-400">Everything you need</h2>
+                <p class="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+                    Powerful features for modern teams
+                </p>
+                <p class="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-400">
+                    SHIFT combines a comprehensive dashboard with a flexible SDK to provide complete task management solutions.
+                </p>
             </div>
-            <div v-else>
-                <Link :href="route('dashboard')" class="mt-4 px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700">Go to Dashboard</Link>
+            <div class="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
+                <dl class="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+                    <div class="flex flex-col">
+                        <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-slate-900 dark:text-slate-100">
+                            <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                </svg>
+                            </div>
+                            Dashboard Management
+                        </dt>
+                        <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-slate-600 dark:text-slate-400">
+                            <p class="flex-auto">Comprehensive web UI to manage organizations, clients, projects, and tasks with role-based access control.</p>
+                        </dd>
+                    </div>
+                    <div class="flex flex-col">
+                        <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-slate-900 dark:text-slate-100">
+                            <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m13 0h-6m-2-5v6a2 2 0 01-2 2H6a2 2 0 01-2-2V9a2 2 0 012-2h8a2 2 0 012 2z"></path>
+                                </svg>
+                            </div>
+                            SDK Integration
+                        </dt>
+                        <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-slate-600 dark:text-slate-400">
+                            <p class="flex-auto">The <strong>shift-php</strong> Laravel package enables seamless integration with external applications to submit and sync tasks via API.</p>
+                        </dd>
+                    </div>
+                    <div class="flex flex-col">
+                        <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-slate-900 dark:text-slate-100">
+                            <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            Team Collaboration
+                        </dt>
+                        <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-slate-600 dark:text-slate-400">
+                            <p class="flex-auto">Multi-user support with project assignments, priority levels, status tracking, and team management features.</p>
+                        </dd>
+                    </div>
+                </dl>
             </div>
         </div>
+
+        <!-- Tech Stack Section -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-base font-semibold leading-7 text-blue-600 dark:text-blue-400">Built with modern technology</h2>
+                <p class="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+                    Reliable Tech Stack
+                </p>
+            </div>
+            <div class="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:grid-cols-4">
+                <div class="flex flex-col items-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <div class="text-2xl font-bold text-red-600 mb-2">Laravel</div>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 text-center">PHP framework for robust backend development</p>
+                </div>
+                <div class="flex flex-col items-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <div class="text-2xl font-bold text-green-600 mb-2">Vue.js</div>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 text-center">Progressive JavaScript framework for dynamic UIs</p>
+                </div>
+                <div class="flex flex-col items-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <div class="text-2xl font-bold text-blue-600 mb-2">TypeScript</div>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 text-center">Type-safe JavaScript for better development</p>
+                </div>
+                <div class="flex flex-col items-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <div class="text-2xl font-bold text-cyan-600 mb-2">Tailwind</div>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 text-center">Utility-first CSS framework for modern design</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+                    Ready to get started?
+                </h2>
+                <p class="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-400">
+                    SHIFT is completely open source and free to use. Deploy it on your own infrastructure and take full control of your task management.
+                </p>
+                <div class="mt-10 flex items-center justify-center gap-x-6">
+                    <Link v-if="!auth?.user" :href="route('register')" class="rounded-lg bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
+                        Start Managing Tasks
+                    </Link>
+                    <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
+                        Go to Dashboard
+                    </Link>
+                    <a href="https://github.com/wyxos/shift" target="_blank" class="text-base font-semibold leading-6 text-slate-900 dark:text-slate-100 hover:text-slate-600 dark:hover:text-slate-400 transition-colors">
+                        Contribute on GitHub <span aria-hidden="true">→</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 dark:border-slate-700">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+                <div class="flex justify-between items-center">
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        © 2025 SHIFT. Open source under MIT License.
+                    </p>
+                    <div class="flex space-x-6">
+                        <a href="https://github.com/wyxos/shift" target="_blank" class="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300">
+                            <span class="sr-only">GitHub</span>
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                        <a href="https://wyxos.com" target="_blank" class="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300">
+                            <span class="sr-only">Wyxos</span>
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </footer>
     </div>
 </template>
