@@ -103,6 +103,6 @@ SHIFT is open-source software licensed under the [MIT License](LICENSE). You're 
 
 **[Back to Top](#shift)**
 
-**Open Source Task Management for Laravel**
+**Open Source Task Management System**
 
 </div>
