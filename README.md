@@ -96,7 +96,6 @@ SHIFT is open-source software licensed under the [MIT License](LICENSE). You're 
 ## Acknowledgments
 
 - Created by [Wyxos](https://wyxos.com)
-- Inspired by modern project management methodologies
 
 ---
 
