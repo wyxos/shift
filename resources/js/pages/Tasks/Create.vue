@@ -178,6 +178,8 @@ const removeFile = async (file) => {
                         v-model="createForm.description"
                         id="description"
                         height="300px"
+                        :auto-grow="true"
+                        max-height="600px"
                         placeholder="Write your task description here..."
                         class="mt-1"
                     />
