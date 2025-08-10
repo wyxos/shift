@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
@@ -385,6 +386,83 @@ class TaskControllerTest extends TestCase
         \Illuminate\Support\Facades\Notification::assertSentTo(
             [$projectUser1, $projectUser2],
             \App\Notifications\TaskCreationNotification::class
+        );
+    }
+
+    public function test_edit_shows_all_external_users_for_internal_task()
+    {
+        $project = Project::factory()->create([
+            'author_id' => $this->user->id
+        ]);
+
+        // Create external users with different environments
+        $externalUser1 = ExternalUser::factory()->create([
+            'project_id' => $project->id,
+            'environment' => 'production',
+            'name' => 'Production User'
+        ]);
+        $externalUser2 = ExternalUser::factory()->create([
+            'project_id' => $project->id,
+            'environment' => 'staging',
+            'name' => 'Staging User'
+        ]);
+
+        // Create a task submitted by an internal user
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+        ]);
+        $task->submitter()->associate($this->user)->save();
+
+        $response = $this->actingAs($this->user)
+            ->get(route('tasks.edit', $task));
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->component('Tasks/Edit')
+            ->has('projectExternalUsers', 2)
+            ->where('projectExternalUsers.0.name', 'Production User')
+            ->where('projectExternalUsers.1.name', 'Staging User')
+        );
+    }
+
+    public function test_edit_shows_only_same_environment_external_users_for_external_task()
+    {
+        $project = Project::factory()->create([
+            'author_id' => $this->user->id
+        ]);
+
+        // Create external users with different environments
+        $externalUser1 = ExternalUser::factory()->create([
+            'project_id' => $project->id,
+            'environment' => 'production',
+            'name' => 'Production User'
+        ]);
+        $externalUser2 = ExternalUser::factory()->create([
+            'project_id' => $project->id,
+            'environment' => 'staging',
+            'name' => 'Staging User'
+        ]);
+        $externalUser3 = ExternalUser::factory()->create([
+            'project_id' => $project->id,
+            'environment' => 'production',
+            'name' => 'Another Production User'
+        ]);
+
+        // Create a task submitted by an external user from production
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+        ]);
+        $task->submitter()->associate($externalUser1)->save();
+
+        $response = $this->actingAs($this->user)
+            ->get(route('tasks.edit', $task));
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->component('Tasks/Edit')
+            ->has('projectExternalUsers', 2) // Only production users should be shown
+            ->where('projectExternalUsers.0.name', 'Production User')
+            ->where('projectExternalUsers.1.name', 'Another Production User')
         );
     }
 }
