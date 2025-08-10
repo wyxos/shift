@@ -11,6 +11,7 @@ import { useTaskAttachments } from '@/composables/useTaskAttachments';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted } from 'vue';
+import { Paperclip } from 'lucide-vue-next';
 
 interface Props {
     project: {
@@ -244,13 +245,7 @@ const submitForm = (): void => {
                                     class="flex items-center justify-between px-3 py-2 text-sm"
                                 >
                                     <div class="flex items-center">
-                                        <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                            <path
-                                                clip-rule="evenodd"
-                                                d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                                fill-rule="evenodd"
-                                            />
-                                        </svg>
+                                        <Paperclip :size="20" class="mr-2 text-gray-400" />
                                         <a :href="attachment.url" class="hover:text-blue-600" target="_blank">{{
                                             truncateFilename(attachment.original_filename)
                                         }}</a>
@@ -288,13 +283,7 @@ const submitForm = (): void => {
                                 <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
                                     <li v-for="file in uploadedFiles" :key="file.path" class="flex items-center justify-between px-3 py-2 text-sm">
                                         <div class="flex items-center">
-                                            <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                                <path
-                                                    clip-rule="evenodd"
-                                                    d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                                    fill-rule="evenodd"
-                                                />
-                                            </svg>
+                                            <Paperclip :size="20" class="mr-2 text-gray-400" />
                                             <span>{{ truncateFilename(file.original_filename) }}</span>
                                         </div>
                                         <button class="text-red-600 hover:text-red-900" type="button" @click="removeFile(file)">Remove</button>

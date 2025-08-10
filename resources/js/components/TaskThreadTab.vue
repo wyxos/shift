@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import TaskThreadMessage from './TaskThreadMessage.vue';
+import { Paperclip, Send } from 'lucide-vue-next';
 import type { Ref } from 'vue';
 
 interface Message {
@@ -81,13 +82,7 @@ defineEmits<Emits>();
                     class="flex items-center justify-between px-3 py-2 text-sm"
                 >
                     <div class="flex items-center">
-                        <svg class="mr-2 h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                                clip-rule="evenodd"
-                                d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                fill-rule="evenodd"
-                            />
-                        </svg>
+                        <Paperclip :size="20" class="mr-2 text-gray-400" />
                         <span>{{ truncateFilename(file.original_filename) }}</span>
                     </div>
                     <button class="text-red-600 hover:text-red-900" type="button" @click="$emit('removeThreadAttachment', file)">
@@ -123,14 +118,7 @@ defineEmits<Emits>();
                     <label
                         class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     >
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                            />
-                        </svg>
+                        <Paperclip :size="20" />
                         <input class="hidden" multiple type="file" @change="$emit('handleThreadFileUpload', $event)" />
                     </label>
                     <button

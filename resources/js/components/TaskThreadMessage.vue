@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defineProps, defineEmits } from 'vue';
+import { Trash2, Paperclip } from 'lucide-vue-next';
 
 interface Message {
     id: number;
@@ -43,14 +44,7 @@ defineEmits<Emits>();
                     title="Delete message"
                     @click="$emit('deleteMessage', message.id, messageType)"
                 >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                        ></path>
-                    </svg>
+                    <Trash2 :size="16" />
                 </button>
                 <p class="text-sm">
                     <span class="font-semibold">{{ message.sender }} - </span>
@@ -73,13 +67,7 @@ defineEmits<Emits>();
                     <p class="text-xs font-semibold">Attachments:</p>
                     <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
                         <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
-                            <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                    clip-rule="evenodd"
-                                    d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                    fill-rule="evenodd"
-                                />
-                            </svg>
+                            <Paperclip :size="12" class="mr-1" />
                             {{ truncateFilename(attachment.original_filename) }}
                         </a>
                     </div>
