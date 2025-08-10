@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,8 @@ interface Props {
         project_id: number;
         status: string;
         priority: string;
+        submitter_type?: string;
+        submitter?: any;
     };
     attachments?: any[];
     projectExternalUsers?: any[];
@@ -109,6 +111,11 @@ const otherErrors = computed(() => {
             acc[key] = value;
             return acc;
         }, {});
+});
+
+// Check if task was submitted by an external user
+const isTaskExternallySubmitted = computed(() => {
+    return props.task.submitter_type === 'App\\Models\\ExternalUser';
 });
 
 // Load any previously uploaded files and task threads
@@ -213,6 +220,7 @@ const submitForm = (): void => {
                                     <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
                                         {{ externalUser.name || 'User ' + externalUser.external_id }}
                                         <span v-if="externalUser.email" class="ml-1 text-xs text-gray-500">({{ externalUser.email }})</span>
+                                        <span class="ml-1 text-xs text-blue-600 font-medium">[{{ externalUser.environment }}]</span>
                                     </label>
                                 </div>
                             </div>
@@ -312,18 +320,18 @@ const submitForm = (): void => {
                 </CardHeader>
                 <CardContent class="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-2">
                     <TaskThreadTab
-                        tab-type="internal"
                         :active-tab="activeTab"
-                        :messages="internalMessages"
-                        :new-message="internalNewMessage"
-                        :messages-container="internalMessagesContainer"
-                        :thread-attachments="internalThreadAttachments"
-                        :is-thread-uploading="isThreadUploading"
-                        :thread-upload-error="threadUploadError"
                         :is-dragging="isDraggingInternal"
-                        :render-markdown="renderMarkdown"
                         :is-message-deletable="isMessageDeletable"
+                        :is-thread-uploading="isThreadUploading"
+                        :messages="internalMessages"
+                        :messages-container="internalMessagesContainer"
+                        :new-message="internalNewMessage"
+                        :render-markdown="renderMarkdown"
+                        :thread-attachments="internalThreadAttachments"
+                        :thread-upload-error="threadUploadError"
                         :truncate-filename="truncateFilename"
+                        tab-type="internal"
                         @update:active-tab="activeTab = $event"
                         @update:new-message="internalNewMessage = $event"
                         @delete-message="deleteMessage"
@@ -336,18 +344,18 @@ const submitForm = (): void => {
                     />
 
                     <TaskThreadTab
-                        tab-type="external"
                         :active-tab="activeTab"
-                        :messages="externalMessages"
-                        :new-message="externalNewMessage"
-                        :messages-container="externalMessagesContainer"
-                        :thread-attachments="externalThreadAttachments"
-                        :is-thread-uploading="isThreadUploading"
-                        :thread-upload-error="threadUploadError"
                         :is-dragging="isDraggingExternal"
-                        :render-markdown="renderMarkdown"
                         :is-message-deletable="isMessageDeletable"
+                        :is-thread-uploading="isThreadUploading"
+                        :messages="externalMessages"
+                        :messages-container="externalMessagesContainer"
+                        :new-message="externalNewMessage"
+                        :render-markdown="renderMarkdown"
+                        :thread-attachments="externalThreadAttachments"
+                        :thread-upload-error="threadUploadError"
                         :truncate-filename="truncateFilename"
+                        tab-type="external"
                         @update:active-tab="activeTab = $event"
                         @update:new-message="externalNewMessage = $event"
                         @delete-message="deleteMessage"

@@ -103,10 +103,21 @@ class TaskController extends Controller
 
     public function edit(Task $task)
     {
-        $task->load(['project', 'attachments', 'externalUsers']);
+        $task->load(['project', 'attachments', 'externalUsers', 'submitter']);
 
-        // Get all external users for the project
-        $projectExternalUsers = $task->project->externalUsers;
+        // Check if task was submitted by an external user
+        $isExternallySubmitted = $task->isExternallySubmitted();
+        
+        if ($isExternallySubmitted) {
+            // If submitted by external user, only show external users from the same environment
+            $submitterEnvironment = $task->submitter->environment;
+            $projectExternalUsers = $task->project->externalUsers()
+                ->where('environment', $submitterEnvironment)
+                ->get();
+        } else {
+            // If submitted by internal user, show all external users from the project
+            $projectExternalUsers = $task->project->externalUsers;
+        }
 
         // Get the IDs of external users that have access to this task
         $taskExternalUserIds = $task->externalUsers->pluck('id')->toArray();
