@@ -513,8 +513,10 @@ const submitForm = () => {
                             <MarkdownEditor
                                 id="description"
                                 v-model="editForm.description"
+                                :auto-grow="true"
                                 class="mt-1"
                                 height="300px"
+                                max-height="600px"
                                 placeholder="Write your task description here..."
                             />
                             <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
@@ -684,14 +686,9 @@ const submitForm = () => {
                         <h4>Internal</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div ref="internalMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
-                            <div
-                                v-for="message in internalMessages"
-                                :key="message.id"
-                                :class="message.isCurrentUser ? 'text-right' : 'text-left'"
-                                class="mb-3"
-                            >
+                            <div v-for="message in internalMessages" :key="message.id" class="mb-3">
                                 <div class="flex items-center justify-between">
-                                    <p :class="message.isCurrentUser ? 'ml-auto' : ''" class="text-sm">
+                                    <p class="text-sm">
                                         <span class="font-semibold">{{ message.sender }} - </span>
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
@@ -711,27 +708,31 @@ const submitForm = () => {
                                         </svg>
                                     </button>
                                 </div>
-                                <div
-                                    :class="
-                                        message.isCurrentUser ? 'rounded-br-none bg-blue-500 text-white' : 'rounded-bl-none bg-gray-200 text-gray-800'
-                                    "
-                                    class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3"
-                                >
-                                    <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
-                                    <!-- Display message attachments if any -->
-                                    <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
-                                        <p class="text-xs font-semibold">Attachments:</p>
-                                        <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
-                                            <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
-                                                <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path
-                                                        clip-rule="evenodd"
-                                                        d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                                        fill-rule="evenodd"
-                                                    />
-                                                </svg>
-                                                {{ truncateFilename(attachment.original_filename) }}
-                                            </a>
+                                <div :class="['flex', message.isCurrentUser ? 'justify-end' : 'justify-start']">
+                                    <div
+                                        :class="
+                                            message.isCurrentUser
+                                                ? 'rounded-br-none bg-blue-500 text-white'
+                                                : 'rounded-bl-none bg-gray-200 text-gray-800'
+                                        "
+                                        class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
+                                    >
+                                        <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
+                                        <!-- Display message attachments if any -->
+                                        <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
+                                            <p class="text-xs font-semibold">Attachments:</p>
+                                            <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
+                                                <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
+                                                    <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path
+                                                            clip-rule="evenodd"
+                                                            d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                                                            fill-rule="evenodd"
+                                                        />
+                                                    </svg>
+                                                    {{ truncateFilename(attachment.original_filename) }}
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -775,8 +776,10 @@ const submitForm = () => {
                             <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="internalNewMessage"
+                                    :auto-grow="true"
                                     :class="['flex-grow', isDraggingInternal ? 'drag-over' : '']"
                                     height="200px"
+                                    max-height="600px"
                                     placeholder="Type your message or drop files here..."
                                     @dragleave="(event) => handleDragLeave(event, 'internal')"
                                     @dragover="(event) => handleDragOver(event, 'internal')"
@@ -817,14 +820,9 @@ const submitForm = () => {
                         <h4>External</h4>
                         <!-- Messages container with fixed height and scrolling -->
                         <div ref="externalMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
-                            <div
-                                v-for="message in externalMessages"
-                                :key="message.id"
-                                :class="message.isCurrentUser ? 'text-right' : 'text-left'"
-                                class="mb-3"
-                            >
+                            <div v-for="message in externalMessages" :key="message.id" class="mb-3">
                                 <div class="flex items-center justify-between">
-                                    <p :class="message.isCurrentUser ? 'ml-auto' : ''" class="text-sm">
+                                    <p class="text-sm">
                                         <span class="font-semibold">{{ message.sender }} - </span>
                                         <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                                     </p>
@@ -844,27 +842,31 @@ const submitForm = () => {
                                         </svg>
                                     </button>
                                 </div>
-                                <div
-                                    :class="
-                                        message.isCurrentUser ? 'rounded-br-none bg-blue-500 text-white' : 'rounded-bl-none bg-gray-200 text-gray-800'
-                                    "
-                                    class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3"
-                                >
-                                    <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
-                                    <!-- Display message attachments if any -->
-                                    <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
-                                        <p class="text-xs font-semibold">Attachments:</p>
-                                        <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
-                                            <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
-                                                <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path
-                                                        clip-rule="evenodd"
-                                                        d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                                                        fill-rule="evenodd"
-                                                    />
-                                                </svg>
-                                                {{ truncateFilename(attachment.original_filename) }}
-                                            </a>
+                                <div :class="['flex', message.isCurrentUser ? 'justify-end' : 'justify-start']">
+                                    <div
+                                        :class="
+                                            message.isCurrentUser
+                                                ? 'rounded-br-none bg-blue-500 text-white'
+                                                : 'rounded-bl-none bg-gray-200 text-gray-800'
+                                        "
+                                        class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
+                                    >
+                                        <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
+                                        <!-- Display message attachments if any -->
+                                        <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
+                                            <p class="text-xs font-semibold">Attachments:</p>
+                                            <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
+                                                <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
+                                                    <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path
+                                                            clip-rule="evenodd"
+                                                            d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                                                            fill-rule="evenodd"
+                                                        />
+                                                    </svg>
+                                                    {{ truncateFilename(attachment.original_filename) }}
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -908,8 +910,10 @@ const submitForm = () => {
                             <div class="mb-2">
                                 <MarkdownEditor
                                     v-model="externalNewMessage"
+                                    :auto-grow="true"
                                     :class="['flex-grow', isDraggingExternal ? 'drag-over' : '']"
                                     height="200px"
+                                    max-height="600px"
                                     placeholder="Type your message or drop files here..."
                                     @dragleave="(event) => handleDragLeave(event, 'external')"
                                     @dragover="(event) => handleDragOver(event, 'external')"
