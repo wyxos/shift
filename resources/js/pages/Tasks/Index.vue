@@ -442,9 +442,11 @@ function updateTaskPriority(task, priority) {
                 </o-table-column>
                 <o-table-column v-slot="{ row }" label="Actions">
                     <div class="flex justify-end gap-2">
-                        <Button variant="outline" @click="router.visit(`/tasks/${row.id}/edit`)">
-                            <i class="fas fa-edit"></i>
-                        </Button>
+                        <a :href="`/tasks/${row.id}/edit`" rel="noopener" aria-label="Edit task in new tab">
+                            <Button variant="outline">
+                                <i class="fas fa-edit"></i>
+                            </Button>
+                        </a>
                         <Button variant="destructive" @click="openDeleteModal(row)">
                             <i class="fas fa-trash"></i>
                         </Button>
