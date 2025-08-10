@@ -211,7 +211,7 @@ describe('Tasks/Index.vue', () => {
     expect(searchInput.exists()).toBe(true)
   })
 
-  it('has filter dropdowns', () => {
+  it('has filter controls: 2 dropdowns + status checkboxes', () => {
     const wrapper = mount(Index, {
       props: {
         tasks: mockTasks,
@@ -221,7 +221,10 @@ describe('Tasks/Index.vue', () => {
     })
 
     const selects = wrapper.findAll('select')
-    expect(selects.length).toBe(3) // Project, Priority, Status filters
+    expect(selects.length).toBe(2) // Project, Priority filters
+
+    const statusCheckboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(statusCheckboxes.length).toBeGreaterThanOrEqual(4)
   })
 
   it('has reset button', () => {

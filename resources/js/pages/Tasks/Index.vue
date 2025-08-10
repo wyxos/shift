@@ -53,7 +53,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 const search = ref(props.filters.search);
 const projectId = ref(props.filters.project_id);
 const priority = ref(props.filters.priority);
-const status = ref(props.filters.status);
+// Normalize incoming status filter to an array; default to all statuses checked
+const statusOptions = [
+    { value: 'pending', label: 'Pending', class: 'bg-yellow-100 text-yellow-800' },
+    { value: 'in-progress', label: 'In Progress', class: 'bg-blue-100 text-blue-800' },
+    { value: 'completed', label: 'Completed', class: 'bg-green-100 text-green-800' },
+    { value: 'awaiting-feedback', label: 'Awaiting Feedback', class: 'bg-purple-100 text-purple-800' },
+];
+const selectedStatuses = ref(
+    Array.isArray(props.filters.status)
+        ? (props.filters.status.length ? props.filters.status : statusOptions.map(o => o.value))
+        : (props.filters.status ? [props.filters.status] : statusOptions.map(o => o.value))
+);
 
 const title = `Tasks` + (search.value ? ` - ${search.value}` : '');
 
@@ -104,7 +115,7 @@ function reset() {
     search.value = '';
     projectId.value = '';
     priority.value = '';
-    status.value = '';
+    selectedStatuses.value = statusOptions.map(o => o.value);
     router.get(
         '/tasks',
         { search: '', project_id: '', priority: '', status: '' },
@@ -128,7 +139,7 @@ watch(search, (value) =>
                 search: value,
                 project_id: projectId.value,
                 priority: priority.value,
-                status: status.value,
+                status: selectedStatuses.value,
             },
             {
                 preserveState: true,
@@ -152,7 +163,7 @@ watch(projectId, (value) =>
                 search: search.value,
                 project_id: value,
                 priority: priority.value,
-                status: status.value,
+                status: selectedStatuses.value,
             },
             {
                 preserveState: true,
@@ -175,7 +186,7 @@ watch(priority, (value) =>
                 search: search.value,
                 project_id: projectId.value,
                 priority: value,
-                status: status.value,
+                status: selectedStatuses.value,
             },
             {
                 preserveState: true,
@@ -189,8 +200,8 @@ watch(priority, (value) =>
     }, 300)(),
 );
 
-// Watch for changes in status filter
-watch(status, (value) =>
+// Watch for changes in status checkboxes
+watch(selectedStatuses, (values) =>
     debounce(() => {
         router.get(
             '/tasks',
@@ -198,7 +209,7 @@ watch(status, (value) =>
                 search: search.value,
                 project_id: projectId.value,
                 priority: priority.value,
-                status: value,
+                status: values,
             },
             {
                 preserveState: true,
@@ -210,15 +221,10 @@ watch(status, (value) =>
             },
         );
     }, 300)(),
+    { deep: true }
 );
 
 // Status options
-const statusOptions = [
-    { value: 'pending', label: 'Pending', class: 'bg-yellow-100 text-yellow-800' },
-    { value: 'in-progress', label: 'In Progress', class: 'bg-blue-100 text-blue-800' },
-    { value: 'completed', label: 'Completed', class: 'bg-green-100 text-green-800' },
-    { value: 'awaiting-feedback', label: 'Awaiting Feedback', class: 'bg-purple-100 text-purple-800' },
-];
 
 // Priority options
 const priorityOptions = [
@@ -260,7 +266,7 @@ function refreshTaskList() {
     const currentSearch = search.value || '';
     const currentProjectId = projectId.value || '';
     const currentPriority = priority.value || '';
-    const currentStatus = status.value || '';
+    const currentStatuses = selectedStatuses.value && selectedStatuses.value.length ? selectedStatuses.value : '';
 
     // Use Inertia router to reload the tasks data
     router.reload({
@@ -270,7 +276,7 @@ function refreshTaskList() {
             search: currentSearch,
             project_id: currentProjectId,
             priority: currentPriority,
-            status: currentStatus,
+            status: currentStatuses,
         },
         preserveScroll: true,
         onError: (error) => {
@@ -331,13 +337,14 @@ function updateTaskPriority(task, priority) {
                     </option>
                 </select>
 
-                <!-- Status filter -->
-                <select v-model="status" class="mb-4 rounded border p-2">
-                    <option value="">All Statuses</option>
-                    <option v-for="option in statusOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                    </option>
-                </select>
+                <!-- Status filter checkboxes -->
+                <div class="mb-4 flex flex-wrap items-center gap-4">
+                    <span class="text-sm text-gray-700">Status:</span>
+                    <label v-for="option in statusOptions" :key="option.value" class="flex items-center gap-2">
+                        <input type="checkbox" :value="option.value" v-model="selectedStatuses" />
+                        <span>{{ option.label }}</span>
+                    </label>
+                </div>
 
                 <Button @click="reset">Reset</Button>
 
