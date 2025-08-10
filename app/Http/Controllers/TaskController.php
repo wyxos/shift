@@ -55,7 +55,17 @@ class TaskController extends Controller
             )
             ->when(
                 request('status'),
-                fn($query) => $query->where('status', request('status'))
+                function ($query) {
+                    $status = request('status');
+                    if (is_array($status)) {
+                        $status = array_filter($status, fn($s) => filled($s));
+                        if (count($status) > 0) {
+                            $query->whereIn('status', $status);
+                        }
+                    } else {
+                        $query->where('status', $status);
+                    }
+                }
             )
             ->paginate(10)
             ->withQueryString();

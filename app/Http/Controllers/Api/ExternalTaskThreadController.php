@@ -8,6 +8,7 @@ use App\Models\TaskThread;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Notifications\TaskThreadUpdated;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
@@ -19,7 +20,7 @@ class ExternalTaskThreadController extends Controller
      * Get all threads for a task.
      *
      * @param Task $task
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function index(Task $task)
     {
@@ -54,7 +55,8 @@ class ExternalTaskThreadController extends Controller
                         'id' => $attachment->id,
                         'original_filename' => $attachment->original_filename,
                         'path' => $attachment->path,
-                        'url' => route('api.attachments.download', $attachment),
+                        // Return SDK-facing download URL so the client can access via its own app
+                        'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                         'created_at' => $attachment->created_at,
                     ];
                 });
@@ -86,7 +88,7 @@ class ExternalTaskThreadController extends Controller
      *
      * @param Request $request
      * @param Task $task
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function store(Request $request, Task $task)
     {
@@ -150,12 +152,12 @@ class ExternalTaskThreadController extends Controller
             Notification::send(
                 $usersToNotify,
                 new TaskThreadUpdated([
-                    'type'       => 'external',
-                    'task_id'    => $task->id,
+                    'type' => 'external',
+                    'task_id' => $task->id,
                     'task_title' => $task->title,
-                    'thread_id'  => $thread->id,
-                    'content'    => $thread->content,
-                    'url'        => route('tasks.edit', $task->id),
+                    'thread_id' => $thread->id,
+                    'content' => $thread->content,
+                    'url' => route('tasks.edit', $task->id),
                 ])
             );
         }
@@ -172,7 +174,8 @@ class ExternalTaskThreadController extends Controller
                         'id' => $attachment->id,
                         'original_filename' => $attachment->original_filename,
                         'path' => $attachment->path,
-                        'url' => route('api.attachments.download', $attachment),
+                        // Return SDK-facing download URL so the client can access via its own app
+                        'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                         'created_at' => $attachment->created_at,
                     ];
                 }),
@@ -241,7 +244,7 @@ class ExternalTaskThreadController extends Controller
      *
      * @param Task $task
      * @param TaskThread $thread
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function show(Task $task, $threadId)
     {
@@ -261,7 +264,8 @@ class ExternalTaskThreadController extends Controller
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => route('api.attachments.download', $attachment),
+//                'url' => route('api.attachments.download', $attachment),
+                'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
         });

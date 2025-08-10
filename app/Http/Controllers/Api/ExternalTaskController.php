@@ -102,7 +102,7 @@ class ExternalTaskController extends Controller
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => route('attachments.download', $attachment),
+                'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
         });
