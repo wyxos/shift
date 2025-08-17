@@ -16,8 +16,6 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
-
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -88,6 +86,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/{id}/mark-as-unread', [NotificationController::class, 'markAsUnread'])->name('notifications.mark-as-unread');
     Route::post('notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
+
+    Route::inertia('/components', 'Components');
 });
 
 require __DIR__.'/settings.php';
