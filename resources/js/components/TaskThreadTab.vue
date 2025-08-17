@@ -20,75 +20,35 @@ interface ThreadFile {
     url?: string;
 }
 
-const props = defineProps({
-    tabType: {
-        type: String as () => 'internal' | 'external',
-        required: true
-    },
-    activeTab: {
-        type: String as () => 'internal' | 'external',
-        required: true
-    },
-    messages: {
-        type: Array as () => Message[],
-        required: true
-    },
-    newMessage: {
-        type: String,
-        required: true
-    },
-    messagesContainer: {
-        type: Object as () => Ref<HTMLElement | null>,
-        default: null
-    },
-    threadAttachments: {
-        type: Array as () => ThreadFile[],
-        required: true
-    },
-    isThreadUploading: {
-        type: Boolean,
-        required: true
-    },
-    threadUploadError: {
-        type: String,
-        required: true
-    },
-    isDragging: {
-        type: Boolean,
-        required: true
-    },
-    renderMarkdown: {
-        type: Function as () => (content: string) => string,
-        required: true
-    },
-    isMessageDeletable: {
-        type: Function as () => (createdAt?: string) => boolean,
-        required: true
-    },
-    truncateFilename: {
-        type: Function as () => (filename: string, maxLength?: number) => string,
-        required: true
-    }
-});
+interface Props {
+    tabType: 'internal' | 'external';
+    activeTab: 'internal' | 'external';
+    messages: Message[];
+    newMessage: string;
+    messagesContainer: Ref<HTMLElement | null>;
+    threadAttachments: ThreadFile[];
+    isThreadUploading: boolean;
+    threadUploadError: string;
+    isDragging: boolean;
+    renderMarkdown: (content: string) => string;
+    isMessageDeletable: (createdAt?: string) => boolean;
+    truncateFilename: (filename: string, maxLength?: number) => string;
+}
 
-defineEmits<{
-    'update:activeTab': [value: 'internal' | 'external'];
-    'update:newMessage': [value: string];
-    'deleteMessage': [messageId: number, messageType: 'internal' | 'external'];
-    'handleDragOver': [event: DragEvent, type: 'internal' | 'external'];
-    'handleDragLeave': [event: DragEvent, type: 'internal' | 'external'];
-    'handleDrop': [event: DragEvent, type: 'internal' | 'external'];
-    'handleThreadFileUpload': [event: Event];
-    'removeThreadAttachment': [file: ThreadFile];
-    'sendMessage': [event?: Event];
-}>();
+interface Emits {
+    (e: 'update:activeTab', value: 'internal' | 'external'): void;
+    (e: 'update:newMessage', value: string): void;
+    (e: 'deleteMessage', messageId: number, messageType: 'internal' | 'external'): void;
+    (e: 'handleDragOver', event: DragEvent, type: 'internal' | 'external'): void;
+    (e: 'handleDragLeave', event: DragEvent, type: 'internal' | 'external'): void;
+    (e: 'handleDrop', event: DragEvent, type: 'internal' | 'external'): void;
+    (e: 'handleThreadFileUpload', event: Event): void;
+    (e: 'removeThreadAttachment', file: ThreadFile): void;
+    (e: 'sendMessage', event?: Event): void;
+}
 
-// Function to set the messages container ref from the parent
-const setMessagesContainer = (el: HTMLElement | null) => {
-    if (props.messagesContainer) {
-        props.messagesContainer.value = el;
-    }
-};
+defineProps<Props>();
+defineEmits<Emits>();
 </script>
 
 <template>
@@ -99,7 +59,7 @@ const setMessagesContainer = (el: HTMLElement | null) => {
     >
         <h4>{{ tabType === 'internal' ? 'Internal' : 'External' }}</h4>
         <!-- Messages container with fixed height and scrolling -->
-        <div :ref="setMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
+        <div :ref="messagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
             <TaskThreadMessage
                 v-for="message in messages"
                 :key="message.id"
@@ -143,7 +103,11 @@ const setMessagesContainer = (el: HTMLElement | null) => {
             <div class="mb-2">
                 <MarkdownEditor
                     :model-value="newMessage"
+                    :auto-grow="true"
                     :class="['flex-grow', isDragging ? 'drag-over' : '']"
+                    height="200px"
+                    max-height="600px"
+                    placeholder="Type your message or drop files here..."
                     @update:model-value="$emit('update:newMessage', $event)"
                     @dragleave="$emit('handleDragLeave', $event, tabType)"
                     @dragover="$emit('handleDragOver', $event, tabType)"

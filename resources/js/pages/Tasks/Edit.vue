@@ -154,7 +154,11 @@ const submitForm = (): void => {
                             <MarkdownEditor
                                 id="description"
                                 v-model="editForm.description"
+                                :auto-grow="true"
                                 class="mt-1"
+                                height="300px"
+                                max-height="600px"
+                                placeholder="Write your task description here..."
                             />
                             <div v-if="editForm.errors.description" class="mt-1 text-sm text-red-500">
                                 {{ editForm.errors.description }}
