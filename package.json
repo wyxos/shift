@@ -14,6 +14,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
+        "@milkdown/theme-nord": "^7.15.3",
         "@oruga-ui/oruga-next": "^0.10.4",
         "@oruga-ui/theme-oruga": "^0.6.0",
         "@testing-library/vue": "^8.1.0",
@@ -36,9 +37,9 @@
     },
     "dependencies": {
         "@inertiajs/vue3": "^2.0.0-beta.3",
+        "@milkdown/crepe": "^7.15.3",
         "@tailwindcss/vite": "^4.1.1",
         "@tanstack/vue-table": "^8.21.3",
-        "@toast-ui/editor": "^3.2.2",
         "@vitejs/plugin-vue": "^5.2.1",
         "@vueuse/core": "^12.8.2",
         "axios": "^1.9.0",
