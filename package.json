@@ -37,7 +37,9 @@
     },
     "dependencies": {
         "@inertiajs/vue3": "^2.0.0-beta.3",
+        "@milkdown/crepe": "^7.15.3",
         "@milkdown/kit": "^7.15.3",
+        "@milkdown/vue": "^7.15.3",
         "@tailwindcss/vite": "^4.1.1",
         "@tanstack/vue-table": "^8.21.3",
         "@toast-ui/editor": "^3.2.2",
