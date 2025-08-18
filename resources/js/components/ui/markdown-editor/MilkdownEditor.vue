@@ -1,5 +1,7 @@
 <template>
-  <Milkdown />
+  <div class="milkdown-editor border-2 border-blue-500 rounded">
+    <Milkdown />
+  </div>
 </template>
 
 <script>
@@ -26,4 +28,12 @@ export default defineComponent({
   },
 });
 </script>
+
+<style>
+.milkdown-editor .ProseMirror {
+  min-height: 300px;
+  max-height: 700px;
+  overflow-y: auto;
+}
+</style>
 
