@@ -16,7 +16,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="border-2 border-blue-500 rounded">
+        <div class="p-4">
             <MilkdownEditorWrapper  />
         </div>
     </AppLayout>
