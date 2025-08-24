@@ -3,6 +3,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import MilkdownEditorWrapper from '@/components/ui/markdown-editor/MilkdownEditorWrapper.vue';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/Icon.vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -17,7 +19,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
-            <MilkdownEditorWrapper  />
+            <!-- Editor with footer actions -->
+            <div class="rounded-md border-2 border-blue-500 bg-background">
+                <div class="p-2">
+                    <MilkdownEditorWrapper />
+                </div>
+                <div class="flex items-center justify-between gap-2 border-t px-2 py-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <Button variant="ghost" size="sm" aria-label="Emoji">
+                            <Icon name="smile" :size="18" />
+                        </Button>
+                        <Button variant="ghost" size="sm" aria-label="Attach file">
+                            <Icon name="paperclip" :size="18" />
+                        </Button>
+                        <Button variant="ghost" size="sm" aria-label="More">
+                            <Icon name="plus" :size="18" />
+                        </Button>
+                    </div>
+                    <div class="flex items-center">
+                        <Button size="sm" aria-label="Send">
+                            <Icon name="send" :size="18" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>
