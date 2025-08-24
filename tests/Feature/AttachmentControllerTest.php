@@ -371,4 +371,30 @@ class AttachmentControllerTest extends TestCase
         // Check that the file was deleted from storage
         Storage::assertMissing($attachment->path);
     }
+
+    public function test_show_temp_serves_image_inline()
+    {
+        $temp = 'temp-' . time();
+        $filename = 'image.png';
+        $path = "temp_attachments/{$temp}/{$filename}";
+
+        Storage::put($path, 'fake-image-content');
+
+        $response = $this->actingAs($this->user)
+            ->get(route('attachments.temp', ['temp' => $temp, 'filename' => $filename]));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_show_temp_returns_404_for_missing_file()
+    {
+        $temp = 'missing-temp';
+        $filename = 'nope.png';
+
+        $response = $this->actingAs($this->user)
+            ->get(route('attachments.temp', ['temp' => $temp, 'filename' => $filename]));
+
+        $response->assertStatus(404);
+    }
 }
