@@ -1,5 +1,4 @@
 
-
 <script>
 import { Editor, rootCtx } from "@milkdown/kit/core";
 import { editorViewCtx } from "@milkdown/core";
