@@ -125,6 +125,7 @@ export default defineComponent({
         const data = response?.data || {};
         const url = data.url; // rely on backend-provided URL for correctness
         const title = data.original_filename || file.name;
+          if (!url) throw new Error("No URL in response");
         if (url) {
           // Insert an image node so it renders immediately in the editor
           insertImageAtSelection({ src: url, alt: '1.00', title });
