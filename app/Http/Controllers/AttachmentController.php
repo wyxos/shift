@@ -52,7 +52,10 @@ class AttachmentController extends Controller
         return response()->json([
             'original_filename' => $originalFilename,
             'path' => $path,
-            'url' => Storage::url($path),
+            'url' => route('attachments.temp', [
+                'temp' => $tempIdentifier,
+                'filename' => $storedFilename,
+            ]),
         ]);
     }
 
@@ -102,11 +105,39 @@ class AttachmentController extends Controller
             $fileData[] = [
                 'path' => $file,
                 'original_filename' => $originalFilename,
-                'url' => Storage::url($file),
+                'url' => route('attachments.temp', [
+                    'temp' => $tempIdentifier,
+                    'filename' => basename($file),
+                ]),
             ];
         }
 
         return response()->json(['files' => $fileData]);
+    }
+
+    /**
+     * Serve a temporary attachment file inline.
+     */
+    public function showTemp(string $temp, string $filename)
+    {
+        // basic sanitization on temp segment
+        $safeTemp = preg_replace('/[^a-zA-Z0-9_\-]/', '', $temp);
+        if ($safeTemp !== $temp) {
+            abort(404);
+        }
+
+        $path = "temp_attachments/{$safeTemp}/{$filename}";
+        if (!Storage::exists($path)) {
+            abort(404, 'File not found');
+        }
+
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $mime = $this->getMimeType($extension);
+
+        return response()->file(
+            Storage::path($path),
+            ['Content-Type' => $mime]
+        );
     }
 
     /**

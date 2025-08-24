@@ -1,0 +1,5 @@
+integrations:
+  forge:
+    shift.wyxos.com:
+      site-id: 2825999
+      server-id: 952117
