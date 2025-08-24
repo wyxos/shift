@@ -240,5 +240,25 @@ export default defineComponent({
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Make images inline tiles with wrapping */
+.milkdown-editor .ProseMirror img {
+    display: inline-block;        /* override any theme block styles */
+    vertical-align: top;
+    max-width: 200px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 0.25rem;
+    cursor: zoom-in;
+    margin: 0 0.5rem 0.5rem 0;    /* space between images */
+}
+
+/* If images are each wrapped in their own <p>, make those paragraphs inline too */
+.milkdown-editor .ProseMirror p:has(> img:only-child) {
+    display: inline-block;
+    margin: 0 0.5rem 0.5rem 0;
+}
 </style>
 
