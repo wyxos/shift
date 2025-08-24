@@ -1,22 +1,4 @@
-<template>
-  <div ref="containerRef" class="milkdown-editor relative border-2 border-blue-500 rounded p-4">
-    <Milkdown />
-  </div>
 
-  <!-- Image modal -->
-  <div
-    v-if="isImageModalOpen"
-    class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
-    @click="closeImageModal"
-  >
-    <img
-      :src="modalImageSrc"
-      class="max-w-[90vw] max-h-[90vh] object-contain"
-      @click.stop
-      alt="full-size"
-    />
-  </div>
-</template>
 
 <script>
 import { Editor, rootCtx } from "@milkdown/kit/core";
@@ -365,3 +347,22 @@ export default defineComponent({
 }
 </style>
 
+<template>
+    <div ref="containerRef" class="milkdown-editor relative border-2 border-blue-200 rounded p-4">
+        <Milkdown />
+    </div>
+
+    <!-- Image modal -->
+    <div
+        v-if="isImageModalOpen"
+        class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
+        @click="closeImageModal"
+    >
+        <img
+            :src="modalImageSrc"
+            class="max-w-[90vw] max-h-[90vh] object-contain"
+            @click.stop
+            alt="full-size"
+        />
+    </div>
+</template>
