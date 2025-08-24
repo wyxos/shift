@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="milkdown-editor relative border-2 border-blue-500 rounded">
+  <div ref="containerRef" class="milkdown-editor relative border-2 border-blue-500 rounded p-4">
     <!-- Upload overlay spinner -->
     <div v-if="isUploading" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
       <div class="inline-flex items-center gap-2 text-gray-700">
@@ -8,6 +8,20 @@
       </div>
     </div>
     <Milkdown />
+  </div>
+
+  <!-- Image modal -->
+  <div
+    v-if="isImageModalOpen"
+    class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
+    @click="closeImageModal"
+  >
+    <img
+      :src="modalImageSrc"
+      class="max-w-[90vw] max-h-[90vh] object-contain"
+      @click.stop
+      alt="full-size"
+    />
   </div>
 </template>
 
@@ -30,6 +44,9 @@ export default defineComponent({
     const isUploading = ref(false);
     const pendingUploads = ref(0);
     const tempIdentifier = ref(Date.now().toString());
+
+    const isImageModalOpen = ref(false);
+    const modalImageSrc = ref("");
 
     const { get } = useEditor((root) =>
       Editor.make()
@@ -58,6 +75,27 @@ export default defineComponent({
         }
         view.focus();
       });
+    };
+
+    const openImageModal = (src) => {
+      modalImageSrc.value = src;
+      isImageModalOpen.value = true;
+    };
+    const closeImageModal = () => {
+      isImageModalOpen.value = false;
+      modalImageSrc.value = "";
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") closeImageModal();
+    };
+    const onClickInEditor = (event) => {
+      const target = event.target;
+      if (target instanceof HTMLImageElement) {
+        event.preventDefault();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        event.stopPropagation();
+        openImageModal(target.src);
+      }
     };
 
     const startUpload = () => {
@@ -91,8 +129,8 @@ export default defineComponent({
           // Insert an image node so it renders immediately in the editor
           insertImageAtSelection({ src: url, alt: '1.00', title });
         }
-      } catch (e) {
-        console.error("Upload failed", e);
+      } catch (error) {
+        console.error("Upload failed", error);
       } finally {
         endUpload();
       }
@@ -147,6 +185,8 @@ export default defineComponent({
       element.addEventListener("dragover", preventDefault, true);
       element.addEventListener("dragenter", preventDefault, true);
       element.addEventListener("drop", handleDrop, true);
+      element.addEventListener("click", onClickInEditor, true);
+      window.addEventListener("keydown", onKeydown);
     });
 
     onBeforeUnmount(() => {
@@ -156,11 +196,16 @@ export default defineComponent({
       element.removeEventListener("dragover", preventDefault, true);
       element.removeEventListener("dragenter", preventDefault, true);
       element.removeEventListener("drop", handleDrop, true);
+      element.removeEventListener("click", onClickInEditor, true);
+      window.removeEventListener("keydown", onKeydown);
     });
 
     return {
       containerRef,
       isUploading,
+      isImageModalOpen,
+      modalImageSrc,
+      closeImageModal,
     };
   },
 });
@@ -172,6 +217,27 @@ export default defineComponent({
   min-height: 300px;
   max-height: 700px;
   overflow-y: auto;
+}
+.milkdown-editor .ProseMirror img {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0.25rem;
+  cursor: zoom-in;
+}
+/* Remove focus ring/outline from the ProseMirror container */
+.milkdown-editor .ProseMirror:focus,
+.milkdown-editor .ProseMirror:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Also ensure the wrapper doesn't show any outline on focus-within */
+.milkdown-editor:focus,
+.milkdown-editor:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
 }
 </style>
 
