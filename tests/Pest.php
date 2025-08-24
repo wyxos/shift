@@ -11,8 +11,12 @@
 |
 */
 
+// Ensure both Feature and Unit tests use the Laravel TestCase (boots the app container)
 pest()->extend(Tests\TestCase::class)
-  ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->in('Feature', 'Unit');
+
+// Apply RefreshDatabase only to Feature tests (Unit tests can opt-in per file)
+pest()->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
 
 /*
