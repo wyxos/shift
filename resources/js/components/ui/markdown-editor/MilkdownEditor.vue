@@ -1,12 +1,5 @@
 <template>
   <div ref="containerRef" class="milkdown-editor relative border-2 border-blue-500 rounded p-4">
-    <!-- Upload overlay spinner -->
-    <div v-if="isUploading" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
-      <div class="inline-flex items-center gap-2 text-gray-700">
-        <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></span>
-        <span>Uploading image...</span>
-      </div>
-    </div>
     <Milkdown />
   </div>
 
@@ -41,8 +34,6 @@ export default defineComponent({
   },
   setup: () => {
     const containerRef = ref(null);
-    const isUploading = ref(false);
-    const pendingUploads = ref(0);
     const tempIdentifier = ref(Date.now().toString());
 
     const isImageModalOpen = ref(false);
@@ -56,6 +47,93 @@ export default defineComponent({
         })
         .use(commonmark),
     );
+
+    // Helper: create a unique ID for each upload placeholder
+    const createUploadId = () => `upload-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+    // Helper: build a 200x200 SVG progress tile as a data URL
+    const progressTile = (percent = 0, label = "Uploading...") => {
+      const p = Math.max(0, Math.min(100, Math.round(percent)));
+      const barWidth = 160 * (p / 100);
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+  <defs>
+    <style>
+      .bg{fill:#f3f4f6;}
+      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
+      .bar-bg{fill:#e5e7eb;}
+      .bar{fill:#3b82f6;}
+      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#374151;font-size:14px;}
+    </style>
+  </defs>
+  <rect x='1' y='1' width='198' height='198' class='bg' />
+  <rect x='1' y='1' width='198' height='198' class='border' />
+  <rect x='20' y='120' width='160' height='12' rx='6' class='bar-bg'/>
+  <rect x='20' y='120' width='${barWidth}' height='12' rx='6' class='bar'/>
+  <text x='100' y='95' text-anchor='middle' class='txt'>${label}</text>
+  <text x='100' y='145' text-anchor='middle' class='txt'>${p}%</text>
+</svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    };
+
+    // Insert a placeholder image with a unique uploadId in the title attr
+    const insertUploadPlaceholder = (file, uploadId) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const { from, to } = state.selection;
+        const imageType = state.schema.nodes.image;
+        if (!imageType) return;
+        const node = imageType.create({ src: progressTile(0), alt: file?.name || "image", title: uploadId });
+        const tr = state.tr.replaceRangeWith(from, to, node);
+        dispatch(tr.scrollIntoView());
+        view.focus();
+      });
+    };
+
+    // Find the position of an image node by title attribute
+    const findImagePosByTitle = (view, titleValue) => {
+      const imageType = view.state.schema.nodes.image;
+      let found = null;
+      view.state.doc.descendants((node, pos) => {
+        if (node.type === imageType && node.attrs && node.attrs.title === titleValue) {
+          found = { pos, node };
+          return false; // stop
+        }
+        return true;
+      });
+      return found;
+    };
+
+    const updateUploadProgress = (uploadId, percent) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const found = findImagePosByTitle(view, uploadId);
+        if (!found) return;
+        const imageType = view.state.schema.nodes.image;
+        const newAttrs = { ...found.node.attrs, src: progressTile(percent) };
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+        view.dispatch(tr);
+      });
+    };
+
+    const finalizeUpload = (uploadId, finalUrl, finalTitle) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const found = findImagePosByTitle(view, uploadId);
+        if (!found) return;
+        const imageType = view.state.schema.nodes.image;
+        const newAttrs = { ...found.node.attrs, src: finalUrl, title: finalTitle || found.node.attrs.title };
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+        view.dispatch(tr);
+      });
+    };
 
     const insertImageAtSelection = ({ src, alt, title }) => {
       const instance = get?.();
@@ -71,7 +149,7 @@ export default defineComponent({
           dispatch(tr.scrollIntoView());
         } else {
           // Fallback: insert as markdown text if image node not available
-          dispatch(state.tr.insertText(`![${alt}](${src} "${title}")`, from, to));
+          dispatch(state.tr.insertText(`![${alt}](${src} \"${title}\")`, from, to));
         }
         view.focus();
       });
@@ -91,6 +169,8 @@ export default defineComponent({
     const onClickInEditor = (event) => {
       const target = event.target;
       if (target instanceof HTMLImageElement) {
+        // Avoid opening modal for our SVG progress placeholders
+        if (typeof target.src === 'string' && target.src.startsWith('data:image/svg+xml')) return;
         event.preventDefault();
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
         event.stopPropagation();
@@ -98,42 +178,58 @@ export default defineComponent({
       }
     };
 
-    const startUpload = () => {
-      pendingUploads.value += 1;
-      isUploading.value = true;
-    };
 
-    const endUpload = () => {
-      pendingUploads.value = Math.max(0, pendingUploads.value - 1);
-      if (pendingUploads.value === 0) {
-        isUploading.value = false;
-      }
-    };
-
-    const uploadImage = async (file) => {
+    const uploadImage = async (file, uploadId) => {
       if (!file) return;
       try {
-        startUpload();
         const formData = new FormData();
         formData.append("file", file, file.name);
         formData.append("temp_identifier", tempIdentifier.value);
 
         const response = await axios.post(route("attachments.upload"), formData, {
           headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (e) => {
+            try {
+              const total = e?.total || 0;
+              const loaded = e?.loaded || 0;
+              const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+              updateUploadProgress(uploadId, percent);
+            } catch (_) { /* noop */ }
+          },
         });
 
         const data = response?.data || {};
         const url = data.url; // rely on backend-provided URL for correctness
         const title = data.original_filename || file.name;
-          if (!url) throw new Error("No URL in response");
-        if (url) {
-          // Insert an image node so it renders immediately in the editor
-          insertImageAtSelection({ src: url, alt: '1.00', title });
-        }
+        if (!url) throw new Error("No URL in response");
+        // Finalize: replace placeholder with the actual image
+        finalizeUpload(uploadId, url, title);
       } catch (error) {
         console.error("Upload failed", error);
-      } finally {
-        endUpload();
+        // Show error state in placeholder
+        try {
+          updateUploadProgress(uploadId, 0);
+          const instance = get?.();
+          if (instance) {
+            instance.action((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const found = findImagePosByTitle(view, uploadId);
+              if (!found) return;
+              const imageType = view.state.schema.nodes.image;
+              const errorSvg = (() => {
+                const svg = `<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+  <rect x='1' y='1' width='198' height='198' fill='#FEF2F2' stroke='#FCA5A5' stroke-width='2'/>
+  <text x='100' y='100' text-anchor='middle' style='font-family: ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Ubuntu,\"Helvetica Neue\",Arial; fill:#B91C1C; font-size:14px;'>Upload failed</text>
+</svg>`;
+                return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+              })();
+              const newAttrs = { ...found.node.attrs, src: errorSvg };
+              const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+              view.dispatch(tr);
+            });
+          }
+        } catch (_) { /* noop */ }
       }
     };
 
@@ -154,7 +250,11 @@ export default defineComponent({
         event.preventDefault();
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
         event.stopPropagation();
-        files.forEach(uploadImage);
+        files.forEach((file) => {
+          const id = createUploadId();
+          insertUploadPlaceholder(file, id);
+          uploadImage(file, id);
+        });
       }
     };
 
@@ -167,7 +267,11 @@ export default defineComponent({
       if (!dataTransfer) return;
       const files = Array.from(dataTransfer.files || []).filter((file) => file.type && file.type.startsWith("image/"));
       if (files.length > 0) {
-        files.forEach(uploadImage);
+        files.forEach((file) => {
+          const id = createUploadId();
+          insertUploadPlaceholder(file, id);
+          uploadImage(file, id);
+        });
       }
     };
 
@@ -203,7 +307,6 @@ export default defineComponent({
 
     return {
       containerRef,
-      isUploading,
       isImageModalOpen,
       modalImageSrc,
       closeImageModal,
