@@ -57,6 +57,61 @@ export default defineComponent({
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     };
 
+    // Helper: build a 200x100 SVG progress tile for generic files (attachments)
+    const attachmentProgressTile = (percent = 0, filename = "Uploading...") => {
+      const p = Math.max(0, Math.min(100, Math.round(percent)));
+      const barWidth = 160 * (p / 100);
+      const name = (filename || '').slice(0, 24);
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
+  <defs>
+    <style>
+      .bg{fill:#f9fafb;}
+      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
+      .bar-bg{fill:#e5e7eb;}
+      .bar{fill:#3b82f6;}
+      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#374151;font-size:12px;}
+    </style>
+  </defs>
+  <rect x='1' y='1' width='198' height='98' class='bg'/>
+  <rect x='1' y='1' width='198' height='98' class='border'/>
+  <!-- file icon -->
+  <rect x='14' y='18' width='28' height='34' rx='3' fill='#dbeafe' stroke='#93c5fd' stroke-width='2'/>
+  <polyline points='42,18 42,28 52,28' fill='none' stroke='#93c5fd' stroke-width='2'/>
+  <!-- filename -->
+  <text x='64' y='35' class='txt'>${name}</text>
+  <!-- progress bar -->
+  <rect x='64' y='52' width='122' height='8' rx='4' class='bar-bg'/>
+  <rect x='64' y='52' width='${barWidth}' height='8' rx='4' class='bar'/>
+  <text x='190' y='58' text-anchor='end' class='txt'>${p}%</text>
+</svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    };
+
+    // Helper: build the final 200x100 tile for attachments with icon, name and size
+    const attachmentFinalTile = (filename = "file", sizeLabel = "") => {
+      const name = (filename || '').slice(0, 28);
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
+  <defs>
+    <style>
+      .bg{fill:#f9fafb;}
+      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
+      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#111827;font-size:12px;}
+      .muted{fill:#6b7280;}
+    </style>
+  </defs>
+  <rect x='1' y='1' width='198' height='98' class='bg'/>
+  <rect x='1' y='1' width='198' height='98' class='border'/>
+  <!-- file icon -->
+  <rect x='14' y='20' width='32' height='40' rx='4' fill='#dbeafe' stroke='#93c5fd' stroke-width='2'/>
+  <polyline points='46,20 46,32 58,32' fill='none' stroke='#93c5fd' stroke-width='2'/>
+  <text x='64' y='38' class='txt'>${name}</text>
+  <text x='64' y='58' class='txt muted'>${sizeLabel}</text>
+</svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    };
+
     // Insert a placeholder image with a unique uploadId in the title attr
     const insertUploadPlaceholder = (file, uploadId) => {
       const instance = get?.();
@@ -68,6 +123,23 @@ export default defineComponent({
         const imageType = state.schema.nodes.image;
         if (!imageType) return;
         const node = imageType.create({ src: progressTile(0), alt: file?.name || "image", title: uploadId });
+        const tr = state.tr.replaceRangeWith(from, to, node);
+        dispatch(tr.scrollIntoView());
+        view.focus();
+      });
+    };
+
+    // Insert placeholder for attachments (non-images)
+    const insertAttachmentPlaceholder = (file, uploadId) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state, dispatch } = view;
+        const { from, to } = state.selection;
+        const imageType = state.schema.nodes.image;
+        if (!imageType) return;
+        const node = imageType.create({ src: attachmentProgressTile(0, file?.name || 'file'), alt: file?.name || 'file', title: `attachment:${uploadId}` });
         const tr = state.tr.replaceRangeWith(from, to, node);
         dispatch(tr.scrollIntoView());
         view.focus();
@@ -102,6 +174,20 @@ export default defineComponent({
       });
     };
 
+    const updateAttachmentUploadProgress = (uploadId, percent, filename) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const found = findImagePosByTitle(view, `attachment:${uploadId}`);
+        if (!found) return;
+        const imageType = view.state.schema.nodes.image;
+        const newAttrs = { ...found.node.attrs, src: attachmentProgressTile(percent, filename) };
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+        view.dispatch(tr);
+      });
+    };
+
     const finalizeUpload = (uploadId, finalUrl, finalTitle) => {
       const instance = get?.();
       if (!instance) return;
@@ -111,6 +197,22 @@ export default defineComponent({
         if (!found) return;
         const imageType = view.state.schema.nodes.image;
         const newAttrs = { ...found.node.attrs, src: finalUrl, title: finalTitle || found.node.attrs.title };
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+        view.dispatch(tr);
+      });
+    };
+
+    const finalizeAttachment = (uploadId, url, filename, sizeLabel) => {
+      const instance = get?.();
+      if (!instance) return;
+      instance.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const found = findImagePosByTitle(view, `attachment:${uploadId}`);
+        if (!found) return;
+        const imageType = view.state.schema.nodes.image;
+        const tile = attachmentFinalTile(filename, sizeLabel);
+        const title = `attachment|${encodeURIComponent(filename || '')}|${encodeURIComponent(sizeLabel || '')}|${url}`;
+        const newAttrs = { ...found.node.attrs, src: tile, title };
         const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
         view.dispatch(tr);
       });
@@ -150,7 +252,15 @@ export default defineComponent({
     const onClickInEditor = (event) => {
       const target = event.target;
       if (target instanceof HTMLImageElement) {
-        // Avoid opening modal for our SVG progress placeholders
+        const title = target.getAttribute('title') || '';
+        // If this is an attachment tile, open the file in a new tab
+        if (title.startsWith('attachment|')) {
+          const parts = title.split('|');
+          const url = parts[3] || '';
+          if (url) window.open(url, '_blank');
+          return;
+        }
+        // Avoid opening modal for our SVG progress placeholders for images
         if (typeof target.src === 'string' && target.src.startsWith('data:image/svg+xml')) return;
         event.preventDefault();
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
@@ -159,6 +269,13 @@ export default defineComponent({
       }
     };
 
+    const formatBytes = (bytes = 0) => {
+      if (!bytes || isNaN(bytes)) return '0 B';
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      const val = bytes / Math.pow(1024, i);
+      return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
+    };
 
     const uploadImage = async (file, uploadId) => {
       if (!file) return;
@@ -214,6 +331,55 @@ export default defineComponent({
       }
     };
 
+    const uploadAttachment = async (file, uploadId) => {
+      if (!file) return;
+      try {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+        formData.append("temp_identifier", tempIdentifier.value);
+
+        const response = await axios.post(route("attachments.upload"), formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (e) => {
+            try {
+              const total = e?.total || 0;
+              const loaded = e?.loaded || 0;
+              const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+              updateAttachmentUploadProgress(uploadId, percent, file.name);
+            } catch (_) { /* noop */ }
+          },
+        });
+
+        const data = response?.data || {};
+        const url = data.url;
+        const filename = data.original_filename || file.name;
+        const sizeLabel = data.size ? formatBytes(parseInt(data.size, 10)) : formatBytes(file.size);
+        if (!url) throw new Error('No URL in response');
+        finalizeAttachment(uploadId, url, filename, sizeLabel);
+      } catch (error) {
+        console.error('Attachment upload failed', error);
+        try {
+          const instance = get?.();
+          if (instance) {
+            instance.action((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const found = findImagePosByTitle(view, `attachment:${uploadId}`);
+              if (!found) return;
+              const imageType = view.state.schema.nodes.image;
+              const svg = `<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
+  <rect x='1' y='1' width='198' height='98' fill='#FEF2F2' stroke='#FCA5A5' stroke-width='2'/>
+  <text x='100' y='54' text-anchor='middle' style='font-family: ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Ubuntu,\"Helvetica Neue\",Arial; fill:#B91C1C; font-size:12px;'>Upload failed</text>
+</svg>`;
+              const errorTile = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+              const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: errorTile }, found.node.marks);
+              view.dispatch(tr);
+            });
+          }
+        } catch (_) { /* noop */ }
+      }
+    };
+
     const handlePaste = (event) => {
       if (!event || !event.clipboardData) return;
       const items = event.clipboardData.items || [];
@@ -222,9 +388,7 @@ export default defineComponent({
         const item = items[index];
         if (item.kind === "file") {
           const file = item.getAsFile();
-          if (file && file.type && file.type.startsWith("image/")) {
-            files.push(file);
-          }
+          if (file) files.push(file);
         }
       }
       if (files.length > 0) {
@@ -233,8 +397,13 @@ export default defineComponent({
         event.stopPropagation();
         files.forEach((file) => {
           const id = createUploadId();
-          insertUploadPlaceholder(file, id);
-          uploadImage(file, id);
+          if (file.type && file.type.startsWith('image/')) {
+            insertUploadPlaceholder(file, id);
+            uploadImage(file, id);
+          } else {
+            insertAttachmentPlaceholder(file, id);
+            uploadAttachment(file, id);
+          }
         });
       }
     };
@@ -246,12 +415,17 @@ export default defineComponent({
       event.stopPropagation();
       const dataTransfer = event.dataTransfer;
       if (!dataTransfer) return;
-      const files = Array.from(dataTransfer.files || []).filter((file) => file.type && file.type.startsWith("image/"));
+      const files = Array.from(dataTransfer.files || []);
       if (files.length > 0) {
         files.forEach((file) => {
           const id = createUploadId();
-          insertUploadPlaceholder(file, id);
-          uploadImage(file, id);
+          if (file.type && file.type.startsWith('image/')) {
+            insertUploadPlaceholder(file, id);
+            uploadImage(file, id);
+          } else {
+            insertAttachmentPlaceholder(file, id);
+            uploadAttachment(file, id);
+          }
         });
       }
     };
