@@ -38,7 +38,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                         </Button>
                     </div>
                     <div class="flex items-center">
-                        <Button size="sm" aria-label="Send">
+                        <Button size="sm" aria-label="Send" @click="$refs.tiptapRef?.send?.()">
                             <Icon name="send" :size="18" />
                         </Button>
                     </div>
