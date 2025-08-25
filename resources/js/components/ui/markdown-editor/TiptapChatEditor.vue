@@ -7,10 +7,8 @@ import Placeholder from '@tiptap/extension-placeholder'
 import axios from 'axios'
 import { renderTileToDataUrl } from './tiles/render'
 import ImageProgressTile from './tiles/ImageProgressTile.vue'
-import AttachmentProgressTile from './tiles/AttachmentProgressTile.vue'
-import AttachmentFinalTile from './tiles/AttachmentFinalTile.vue'
 import ImageErrorTile from './tiles/ImageErrorTile.vue'
-import AttachmentErrorTile from './tiles/AttachmentErrorTile.vue'
+import { Attachment } from './attachment/Attachment'
 
 export default defineComponent({
   name: 'TiptapChatEditor',
@@ -24,8 +22,9 @@ export default defineComponent({
     const editor = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, horizontalRule: false }),
-        Image.configure({ allowBase64: true }),
+        Image.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: 'Message…' }),
+        Attachment,
       ],
       content: '',
     })
@@ -35,12 +34,8 @@ export default defineComponent({
     const imageProgressTile = async (percent = 0, label = 'Uploading...') => {
       return renderTileToDataUrl(ImageProgressTile, { percent, label })
     }
-    const attachmentProgressTile = async (percent = 0, filename = 'Uploading...') => {
-      return renderTileToDataUrl(AttachmentProgressTile, { percent, filename })
-    }
-    const attachmentFinalTile = async (filename = 'file', sizeLabel = '') => {
-      return renderTileToDataUrl(AttachmentFinalTile, { filename, sizeLabel })
-    }
+    // Attachment chips are rendered via a custom TipTap NodeView using lucide icons.
+    // Progress and final states are handled by node attributes; no SVG tiles.
 
     const findImagePosByTitle = (view, titleValue) => {
       const imageType = view.state.schema.nodes.image
@@ -56,37 +51,50 @@ export default defineComponent({
     }
 
     const insertUploadPlaceholder = (file, uploadId) => {
-      if (!editor?.value) return
-      const view = editor.value.view
-      const { state, dispatch } = view
-      const imageType = state.schema.nodes.image
-      const node = imageType.create({ src: '', alt: file?.name || 'image', title: uploadId })
-      const tr = state.tr.replaceSelectionWith(node)
-      dispatch(tr.scrollIntoView())
+      const tiptap = editor?.value
+      if (!tiptap) return
+      // Insert the placeholder image and a trailing space, so subsequent pastes append instead of replacing.
+      tiptap
+        .chain()
+        .focus()
+        .insertContent([
+          { type: 'image', attrs: { src: '', alt: file?.name || 'image', title: uploadId } },
+          { type: 'text', text: ' ' },
+        ])
+        .run()
+
       imageProgressTile(0, 'Uploading...').then((dataUrl) => {
+        const view = tiptap.view
+        const imageType = view.state.schema.nodes.image
         const posFound = findImagePosByTitle(view, uploadId)
         if (!posFound) return
         const tr2 = view.state.tr.setNodeMarkup(posFound.pos, imageType, { ...posFound.node.attrs, src: dataUrl }, posFound.node.marks)
         view.dispatch(tr2)
       })
-      view.focus()
     }
 
     const insertAttachmentPlaceholder = (file, uploadId) => {
-      if (!editor?.value) return
-      const view = editor.value.view
-      const { state, dispatch } = view
-      const imageType = state.schema.nodes.image
-      const node = imageType.create({ src: '', alt: file?.name || 'file', title: `attachment:${uploadId}` })
-      const tr = state.tr.replaceSelectionWith(node)
-      dispatch(tr.scrollIntoView())
-      attachmentProgressTile(0, file?.name || 'file').then((dataUrl) => {
-        const posFound = findImagePosByTitle(view, `attachment:${uploadId}`)
-        if (!posFound) return
-        const tr2 = view.state.tr.setNodeMarkup(posFound.pos, imageType, { ...posFound.node.attrs, src: dataUrl }, posFound.node.marks)
-        view.dispatch(tr2)
-      })
-      view.focus()
+      const tiptap = editor?.value
+      if (!tiptap) return
+      tiptap
+        .chain()
+        .focus()
+        .insertContent([
+          {
+            type: 'attachment',
+            attrs: {
+              uid: uploadId,
+              href: null,
+              filename: file?.name || 'file',
+              sizeLabel: '',
+              uploading: true,
+              percent: 0,
+              error: false,
+            },
+          },
+          { type: 'text', text: ' ' },
+        ])
+        .run()
     }
 
     const updateUploadProgress = (uploadId, percent) => {
@@ -101,16 +109,25 @@ export default defineComponent({
       })
     }
 
+    const findAttachmentPosByUid = (view, uid) => {
+      let result = null
+      view.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'attachment' && node.attrs && node.attrs.uid === uid) {
+          result = { pos, node }
+          return false
+        }
+        return true
+      })
+      return result
+    }
+
     const updateAttachmentUploadProgress = (uploadId, percent, filename) => {
       if (!editor?.value) return
       const view = editor.value.view
-      const found = findImagePosByTitle(view, `attachment:${uploadId}`)
+      const found = findAttachmentPosByUid(view, uploadId)
       if (!found) return
-      const imageType = view.state.schema.nodes.image
-      attachmentProgressTile(percent, filename).then((dataUrl) => {
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks)
-        view.dispatch(tr)
-      })
+      const tr = view.state.tr.setNodeMarkup(found.pos, found.node.type, { ...found.node.attrs, uploading: true, percent, filename: filename || found.node.attrs.filename }, found.node.marks)
+      view.dispatch(tr)
     }
 
     const finalizeUpload = (uploadId, finalUrl, finalTitle) => {
@@ -119,23 +136,37 @@ export default defineComponent({
       const found = findImagePosByTitle(view, uploadId)
       if (!found) return
       const imageType = view.state.schema.nodes.image
-      const newAttrs = { ...found.node.attrs, src: finalUrl, title: finalTitle || found.node.attrs.title }
-      const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks)
-      view.dispatch(tr)
+      // Preload the image so the progress disappears only when the image is ready.
+      const preload = new window.Image()
+      preload.onload = () => {
+        const newAttrs = { ...found.node.attrs, src: finalUrl, title: finalTitle || found.node.attrs.title }
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks)
+        view.dispatch(tr)
+      }
+      preload.onerror = () => {
+        // Fall back to immediate swap if preload fails
+        const newAttrs = { ...found.node.attrs, src: finalUrl, title: finalTitle || found.node.attrs.title }
+        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks)
+        view.dispatch(tr)
+      }
+      preload.src = finalUrl
     }
 
     const finalizeAttachment = (uploadId, url, filename, sizeLabel) => {
       if (!editor?.value) return
       const view = editor.value.view
-      const found = findImagePosByTitle(view, `attachment:${uploadId}`)
+      const found = findAttachmentPosByUid(view, uploadId)
       if (!found) return
-      const imageType = view.state.schema.nodes.image
-      const tilePromise = attachmentFinalTile(filename, sizeLabel)
-      const title = `attachment|${encodeURIComponent(filename || '')}|${encodeURIComponent(sizeLabel || '')}|${url}`
-      tilePromise.then((tile) => {
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: tile, title }, found.node.marks)
-        view.dispatch(tr)
-      })
+      const tr = view.state.tr.setNodeMarkup(found.pos, found.node.type, {
+        ...found.node.attrs,
+        href: url,
+        filename: filename || found.node.attrs.filename,
+        sizeLabel: sizeLabel || '',
+        uploading: false,
+        percent: 100,
+        error: false,
+      }, found.node.marks)
+      view.dispatch(tr)
     }
 
     const formatBytes = (bytes = 0) => {
@@ -216,13 +247,10 @@ export default defineComponent({
         try {
           if (!editor?.value) return
           const view = editor.value.view
-          const found = findImagePosByTitle(view, `attachment:${uploadId}`)
+          const found = findAttachmentPosByUid(view, uploadId)
           if (!found) return
-          const imageType = view.state.schema.nodes.image
-          renderTileToDataUrl(AttachmentErrorTile, { message: 'Upload failed' }).then((dataUrl) => {
-            const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks)
-            view.dispatch(tr)
-          })
+          const tr = view.state.tr.setNodeMarkup(found.pos, found.node.type, { ...found.node.attrs, uploading: false, error: true }, found.node.marks)
+          view.dispatch(tr)
         } catch (_) { /* noop */ }
       }
     }
