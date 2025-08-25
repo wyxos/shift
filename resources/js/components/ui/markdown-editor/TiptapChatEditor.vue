@@ -8,12 +8,12 @@ import axios from 'axios'
 import { renderTileToDataUrl } from './tiles/render'
 import ImageProgressTile from './tiles/ImageProgressTile.vue'
 import ImageErrorTile from './tiles/ImageErrorTile.vue'
-import { Attachment } from './attachment/Attachment'
+import Icon from '@/components/Icon.vue'
 
 export default defineComponent({
   name: 'TiptapChatEditor',
   components: { EditorContent },
-  setup: () => {
+  setup: (props, { expose }) => {
     const containerRef = ref(null)
     const isImageModalOpen = ref(false)
     const modalImageSrc = ref('')
@@ -24,12 +24,52 @@ export default defineComponent({
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, horizontalRule: false }),
         Image.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: 'Message…' }),
-        Attachment,
       ],
       content: '',
     })
 
     const createUploadId = () => `upload-${Math.random().toString(36).slice(2)}-${Date.now()}`
+
+    // External attachments tray state
+    const attachments = ref([])
+    const fileInputRef = ref(null)
+
+    const openFileDialog = () => {
+      const input = fileInputRef.value
+      if (input) input.click()
+    }
+
+    const onFileInputChange = (event) => {
+      const files = Array.from(event?.target?.files || [])
+      if (files.length) handleFiles(files)
+      if (event?.target) event.target.value = ''
+    }
+
+    const removeAttachment = (id) => {
+      attachments.value = attachments.value.filter(a => a.id !== id)
+    }
+
+    const handleFiles = (files) => {
+      files.forEach((file) => {
+        const id = createUploadId()
+        const isImage = !!file.type && file.type.startsWith('image/')
+        const previewUrl = isImage ? URL.createObjectURL(file) : ''
+        attachments.value.push({
+          id,
+          isImage,
+          filename: file.name,
+          sizeLabel: formatBytes(file.size),
+          previewUrl,
+          url: '',
+          progress: 0,
+          status: 'uploading',
+        })
+        uploadToTemp(file, id)
+      })
+    }
+
+    // Expose to parent (footer attach button)
+    expose({ openFileDialog, handleFiles })
 
     const imageProgressTile = async (percent = 0, label = 'Uploading...') => {
       return renderTileToDataUrl(ImageProgressTile, { percent, label })
@@ -98,15 +138,8 @@ export default defineComponent({
     }
 
     const updateUploadProgress = (uploadId, percent) => {
-      if (!editor?.value) return
-      const view = editor.value.view
-      const found = findImagePosByTitle(view, uploadId)
-      if (!found) return
-      const imageType = view.state.schema.nodes.image
-      imageProgressTile(percent, 'Uploading...').then((dataUrl) => {
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks)
-        view.dispatch(tr)
-      })
+      const item = attachments.value.find(a => a.id === uploadId)
+      if (item) item.progress = percent
     }
 
     const findAttachmentPosByUid = (view, uid) => {
@@ -177,7 +210,7 @@ export default defineComponent({
       return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${sizes[unitIndex]}`
     }
 
-    const uploadImage = async (file, uploadId) => {
+    const uploadToTemp = async (file, uploadId) => {
       if (!file) return
       try {
         const formData = new FormData()
@@ -200,20 +233,21 @@ export default defineComponent({
         const url = data.url
         const title = data.original_filename || file.name
         if (!url) throw new Error('No URL in response')
-        finalizeUpload(uploadId, url, title)
+        const item = attachments.value.find(a => a.id === uploadId)
+        if (item) {
+          item.url = url
+          item.filename = title || item.filename
+          item.progress = 100
+          item.status = 'done'
+          if (item.isImage) item.previewUrl = url
+        }
       } catch (error) {
         console.error('Upload failed', error)
-        try {
-          if (!editor?.value) return
-          const view = editor.value.view
-          const found = findImagePosByTitle(view, uploadId)
-          if (!found) return
-          const imageType = view.state.schema.nodes.image
-          renderTileToDataUrl(ImageErrorTile, { message: 'Upload failed' }).then((dataUrl) => {
-            const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks)
-            view.dispatch(tr)
-          })
-        } catch (_) { /* noop */ }
+        const item = attachments.value.find(a => a.id === uploadId)
+        if (item) {
+          item.status = 'error'
+          item.progress = 0
+        }
       }
     }
 
@@ -270,16 +304,7 @@ export default defineComponent({
         event.preventDefault()
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
         event.stopPropagation()
-        files.forEach((file) => {
-          const id = createUploadId()
-          if (file.type && file.type.startsWith('image/')) {
-            insertUploadPlaceholder(file, id)
-            uploadImage(file, id)
-          } else {
-            insertAttachmentPlaceholder(file, id)
-            uploadAttachment(file, id)
-          }
-        })
+        handleFiles(files)
       }
     }
 
@@ -292,16 +317,7 @@ export default defineComponent({
       if (!dataTransfer) return
       const files = Array.from(dataTransfer.files || [])
       if (files.length > 0) {
-        files.forEach((file) => {
-          const id = createUploadId()
-          if (file.type && file.type.startsWith('image/')) {
-            insertUploadPlaceholder(file, id)
-            uploadImage(file, id)
-          } else {
-            insertAttachmentPlaceholder(file, id)
-            uploadAttachment(file, id)
-          }
-        })
+        handleFiles(files)
       }
     }
 
@@ -364,7 +380,7 @@ export default defineComponent({
       editor?.value?.destroy?.()
     })
 
-    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal }
+    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal, attachments, fileInputRef, openFileDialog, onFileInputChange, handleFiles, removeAttachment }
   },
 })
 </script>
@@ -407,6 +423,51 @@ export default defineComponent({
 <template>
   <div ref="containerRef" class="tiptap-editor relative border-2 border-blue-200 rounded p-4">
     <EditorContent :editor="editor" />
+
+    <!-- Attachments tray below editor -->
+    <div v-if="attachments.length" class="mt-2 flex flex-wrap gap-2">
+      <div
+        v-for="item in attachments"
+        :key="item.id"
+        class="relative w-[200px] h-[200px] rounded border bg-muted/20 overflow-hidden"
+      >
+        <button
+          class="absolute right-1 top-1 z-10 rounded bg-black/50 text-white p-1"
+          type="button"
+          aria-label="Remove"
+          @click="removeAttachment(item.id)"
+        >
+          <Icon name="x" :size="14" />
+        </button>
+        <div class="w-full h-full flex items-center justify-center">
+          <img v-if="item.isImage && (item.previewUrl || item.url)" :src="item.previewUrl || item.url" class="w-full h-full object-cover" alt="preview" />
+          <div v-else class="flex flex-col items-center justify-center text-muted-foreground">
+            <Icon name="file" :size="48" />
+            <span class="mt-2 text-xs px-2 text-center truncate w-full">{{ item.filename }}</span>
+            <span class="text-[10px]">{{ item.sizeLabel }}</span>
+          </div>
+        </div>
+        <div v-if="item.status === 'uploading'" class="absolute left-0 right-0 bottom-0">
+          <div class="h-1 bg-muted">
+            <div class="h-1 bg-blue-500" :style="{ width: Math.max(0, Math.min(100, item.progress)) + '%' }" />
+          </div>
+        </div>
+        <div v-if="item.status === 'error'" class="absolute inset-0 bg-red-50/80 text-red-800 text-xs flex items-center justify-center">
+          Upload failed
+        </div>
+      </div>
+      <!-- Plus tile for adding more -->
+      <div
+        class="w-[200px] h-[200px] rounded border border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/20"
+        @click="openFileDialog"
+        @dragover.prevent
+        @dragenter.prevent
+        @drop.prevent="(e) => handleFiles(Array.from(e.dataTransfer?.files || []))"
+      >
+        <Icon name="plus" :size="24" />
+      </div>
+      <input ref="fileInputRef" type="file" class="hidden" multiple @change="onFileInputChange" />
+    </div>
   </div>
 
   <div
