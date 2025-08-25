@@ -50,14 +50,14 @@ const breadcrumbs: BreadcrumbItem[] = [
         <div class="p-4">
             <div class="rounded-md border-2 border-blue-500 bg-background">
                 <div class="p-2">
-                    <TiptapChatEditor />
+                    <TiptapChatEditor ref="tiptapRef" />
                 </div>
                 <div class="flex items-center justify-between gap-2 border-t px-2 py-1.5">
                     <div class="flex items-center gap-1.5">
                         <Button variant="ghost" size="sm" aria-label="Emoji">
                             <Icon name="smile" :size="18" />
                         </Button>
-                        <Button variant="ghost" size="sm" aria-label="Attach file">
+                        <Button variant="ghost" size="sm" aria-label="Attach file" @click="$refs.tiptapRef?.openFileDialog?.()">
                             <Icon name="paperclip" :size="18" />
                         </Button>
                         <Button variant="ghost" size="sm" aria-label="More">
