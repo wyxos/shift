@@ -78,7 +78,7 @@
 
             <div class="bg-background/95 rounded shadow-lg transition-all duration-300 ease-in-out min-w-[320px] min-h-[320px] sm:min-w-[360px] sm:min-h-[360px] md:min-w-[480px] md:min-h-[480px] max-w-[90vw] max-h-[90vh] p-2 flex flex-col items-center" :style="{ width: modalContainerW + 'px', height: modalContainerH + 'px' }">
                 <template v-if="attachments[activeAttachmentIndex].isImage">
-                    <div class="relative w-full flex items-center justify-center" :style="{ height: imageAreaH + 'px' }">
+                    <div class="relative w-full flex items-center justify-center mb-2" :style="{ height: imageAreaH + 'px' }">
                         <div v-if="modalImageLoading" class="absolute inset-0 flex items-center justify-center text-muted-foreground">
                             <Icon name="loader2" :size="24" class="animate-spin" />
                         </div>
@@ -99,7 +99,7 @@
                         </div>
                     </div>
                 </template>
-                <div class="mt-3 flex items-center justify-center gap-3" ref="navEl">
+                <div class="flex items-center justify-center gap-3" ref="navEl">
                     <Button size="icon" aria-label="Previous" @click="prevAttachment">
                         <Icon name="chevronLeft" :size="18" />
                     </Button>
