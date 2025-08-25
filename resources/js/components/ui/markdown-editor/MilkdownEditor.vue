@@ -7,6 +7,12 @@ import { nord } from "@milkdown/theme-nord";
 import { Milkdown, useEditor } from "@milkdown/vue";
 import axios from "axios";
 import { defineComponent, onMounted, onBeforeUnmount, ref } from "vue";
+import ImageProgressTile from './tiles/ImageProgressTile.vue';
+import AttachmentProgressTile from './tiles/AttachmentProgressTile.vue';
+import AttachmentFinalTile from './tiles/AttachmentFinalTile.vue';
+import ImageErrorTile from './tiles/ImageErrorTile.vue';
+import AttachmentErrorTile from './tiles/AttachmentErrorTile.vue';
+import { renderTileToDataUrl } from './tiles/render';
 
 export default defineComponent({
   name: "MilkdownEditor",
@@ -32,84 +38,19 @@ export default defineComponent({
     // Helper: create a unique ID for each upload placeholder
     const createUploadId = () => `upload-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 
-    // Helper: build a 200x200 SVG progress tile as a data URL
-    const progressTile = (percent = 0, label = "Uploading...") => {
-      const p = Math.max(0, Math.min(100, Math.round(percent)));
-      const barWidth = 160 * (p / 100);
-      const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
-  <defs>
-    <style>
-      .bg{fill:#f3f4f6;}
-      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
-      .bar-bg{fill:#e5e7eb;}
-      .bar{fill:#3b82f6;}
-      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#374151;font-size:14px;}
-    </style>
-  </defs>
-  <rect x='1' y='1' width='198' height='198' class='bg' />
-  <rect x='1' y='1' width='198' height='198' class='border' />
-  <rect x='20' y='120' width='160' height='12' rx='6' class='bar-bg'/>
-  <rect x='20' y='120' width='${barWidth}' height='12' rx='6' class='bar'/>
-  <text x='100' y='95' text-anchor='middle' class='txt'>${label}</text>
-  <text x='100' y='145' text-anchor='middle' class='txt'>${p}%</text>
-</svg>`;
-      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    // Helper: build a 200x200 SVG progress tile for images (externalized)
+    const progressTile = async (percent = 0, label = "Uploading...") => {
+      return renderTileToDataUrl(ImageProgressTile, { percent, label });
     };
 
     // Helper: build a 200x100 SVG progress tile for generic files (attachments)
-    const attachmentProgressTile = (percent = 0, filename = "Uploading...") => {
-      const p = Math.max(0, Math.min(100, Math.round(percent)));
-      const barWidth = 160 * (p / 100);
-      const name = (filename || '').slice(0, 24);
-      const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
-  <defs>
-    <style>
-      .bg{fill:#f9fafb;}
-      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
-      .bar-bg{fill:#e5e7eb;}
-      .bar{fill:#3b82f6;}
-      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#374151;font-size:12px;}
-    </style>
-  </defs>
-  <rect x='1' y='1' width='198' height='98' class='bg'/>
-  <rect x='1' y='1' width='198' height='98' class='border'/>
-  <!-- file icon -->
-  <rect x='14' y='18' width='28' height='34' rx='3' fill='#dbeafe' stroke='#93c5fd' stroke-width='2'/>
-  <polyline points='42,18 42,28 52,28' fill='none' stroke='#93c5fd' stroke-width='2'/>
-  <!-- filename -->
-  <text x='64' y='35' class='txt'>${name}</text>
-  <!-- progress bar -->
-  <rect x='64' y='52' width='122' height='8' rx='4' class='bar-bg'/>
-  <rect x='64' y='52' width='${barWidth}' height='8' rx='4' class='bar'/>
-  <text x='190' y='58' text-anchor='end' class='txt'>${p}%</text>
-</svg>`;
-      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const attachmentProgressTile = async (percent = 0, filename = "Uploading...") => {
+      return renderTileToDataUrl(AttachmentProgressTile, { percent, filename });
     };
 
     // Helper: build the final 200x100 tile for attachments with icon, name and size
-    const attachmentFinalTile = (filename = "file", sizeLabel = "") => {
-      const name = (filename || '').slice(0, 28);
-      const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
-  <defs>
-    <style>
-      .bg{fill:#f9fafb;}
-      .border{stroke:#d1d5db;stroke-width:2;fill:none;}
-      .txt{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial;fill:#111827;font-size:12px;}
-      .muted{fill:#6b7280;}
-    </style>
-  </defs>
-  <rect x='1' y='1' width='198' height='98' class='bg'/>
-  <rect x='1' y='1' width='198' height='98' class='border'/>
-  <!-- file icon -->
-  <rect x='14' y='20' width='32' height='40' rx='4' fill='#dbeafe' stroke='#93c5fd' stroke-width='2'/>
-  <polyline points='46,20 46,32 58,32' fill='none' stroke='#93c5fd' stroke-width='2'/>
-  <text x='64' y='38' class='txt'>${name}</text>
-  <text x='64' y='58' class='txt muted'>${sizeLabel}</text>
-</svg>`;
-      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const attachmentFinalTile = async (filename = "file", sizeLabel = "") => {
+      return renderTileToDataUrl(AttachmentFinalTile, { filename, sizeLabel });
     };
 
     // Insert a placeholder image with a unique uploadId in the title attr
@@ -122,13 +63,20 @@ export default defineComponent({
         const { from, to } = state.selection;
         const imageType = state.schema.nodes.image;
         if (!imageType) return;
-        const node = imageType.create({ src: progressTile(0), alt: file?.name || "image", title: uploadId });
+        const node = imageType.create({ src: '', alt: file?.name || "image", title: uploadId });
         const tr = state.tr.replaceRangeWith(from, to, node);
         dispatch(tr.scrollIntoView());
+        // async update placeholder src with Vue component-rendered SVG
+        progressTile(0, 'Uploading...').then((dataUrl) => {
+          const posFound = findImagePosByTitle(view, uploadId);
+          if (!posFound) return;
+          const imgType = view.state.schema.nodes.image;
+          const tr2 = view.state.tr.setNodeMarkup(posFound.pos, imgType, { ...posFound.node.attrs, src: dataUrl }, posFound.node.marks);
+          view.dispatch(tr2);
+        });
         view.focus();
       });
     };
-
     // Insert placeholder for attachments (non-images)
     const insertAttachmentPlaceholder = (file, uploadId) => {
       const instance = get?.();
@@ -139,9 +87,17 @@ export default defineComponent({
         const { from, to } = state.selection;
         const imageType = state.schema.nodes.image;
         if (!imageType) return;
-        const node = imageType.create({ src: attachmentProgressTile(0, file?.name || 'file'), alt: file?.name || 'file', title: `attachment:${uploadId}` });
+        const node = imageType.create({ src: '', alt: file?.name || 'file', title: `attachment:${uploadId}` });
         const tr = state.tr.replaceRangeWith(from, to, node);
         dispatch(tr.scrollIntoView());
+        // async update placeholder src
+        attachmentProgressTile(0, file?.name || 'file').then((dataUrl) => {
+          const posFound = findImagePosByTitle(view, `attachment:${uploadId}`);
+          if (!posFound) return;
+          const imgType = view.state.schema.nodes.image;
+          const tr2 = view.state.tr.setNodeMarkup(posFound.pos, imgType, { ...posFound.node.attrs, src: dataUrl }, posFound.node.marks);
+          view.dispatch(tr2);
+        });
         view.focus();
       });
     };
@@ -168,9 +124,11 @@ export default defineComponent({
         const found = findImagePosByTitle(view, uploadId);
         if (!found) return;
         const imageType = view.state.schema.nodes.image;
-        const newAttrs = { ...found.node.attrs, src: progressTile(percent) };
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
-        view.dispatch(tr);
+        // async render of progress component
+        progressTile(percent, 'Uploading...').then((dataUrl) => {
+          const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks);
+          view.dispatch(tr);
+        });
       });
     };
 
@@ -182,9 +140,10 @@ export default defineComponent({
         const found = findImagePosByTitle(view, `attachment:${uploadId}`);
         if (!found) return;
         const imageType = view.state.schema.nodes.image;
-        const newAttrs = { ...found.node.attrs, src: attachmentProgressTile(percent, filename) };
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
-        view.dispatch(tr);
+        attachmentProgressTile(percent, filename).then((dataUrl) => {
+          const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks);
+          view.dispatch(tr);
+        });
       });
     };
 
@@ -210,11 +169,12 @@ export default defineComponent({
         const found = findImagePosByTitle(view, `attachment:${uploadId}`);
         if (!found) return;
         const imageType = view.state.schema.nodes.image;
-        const tile = attachmentFinalTile(filename, sizeLabel);
+        const tilePromise = attachmentFinalTile(filename, sizeLabel);
         const title = `attachment|${encodeURIComponent(filename || '')}|${encodeURIComponent(sizeLabel || '')}|${url}`;
-        const newAttrs = { ...found.node.attrs, src: tile, title };
-        const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
-        view.dispatch(tr);
+        tilePromise.then((tile) => {
+          const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: tile, title }, found.node.marks);
+          view.dispatch(tr);
+        });
       });
     };
 
@@ -314,17 +274,11 @@ export default defineComponent({
               const found = findImagePosByTitle(view, uploadId);
               if (!found) return;
               const imageType = view.state.schema.nodes.image;
-              const errorSvg = (() => {
-                const svg = `<?xml version='1.0' encoding='UTF-8'?>
-<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
-  <rect x='1' y='1' width='198' height='198' fill='#FEF2F2' stroke='#FCA5A5' stroke-width='2'/>
-  <text x='100' y='100' text-anchor='middle' style='font-family: ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Ubuntu,\"Helvetica Neue\",Arial; fill:#B91C1C; font-size:14px;'>Upload failed</text>
-</svg>`;
-                return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-              })();
-              const newAttrs = { ...found.node.attrs, src: errorSvg };
-              const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
-              view.dispatch(tr);
+              renderTileToDataUrl(ImageErrorTile, { message: 'Upload failed' }).then((dataUrl) => {
+                const newAttrs = { ...found.node.attrs, src: dataUrl };
+                const tr = view.state.tr.setNodeMarkup(found.pos, imageType, newAttrs, found.node.marks);
+                view.dispatch(tr);
+              });
             });
           }
         } catch (_) { /* noop */ }
@@ -366,14 +320,10 @@ export default defineComponent({
               const found = findImagePosByTitle(view, `attachment:${uploadId}`);
               if (!found) return;
               const imageType = view.state.schema.nodes.image;
-              const svg = `<?xml version='1.0' encoding='UTF-8'?>
-<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'>
-  <rect x='1' y='1' width='198' height='98' fill='#FEF2F2' stroke='#FCA5A5' stroke-width='2'/>
-  <text x='100' y='54' text-anchor='middle' style='font-family: ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Ubuntu,\"Helvetica Neue\",Arial; fill:#B91C1C; font-size:12px;'>Upload failed</text>
-</svg>`;
-              const errorTile = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-              const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: errorTile }, found.node.marks);
-              view.dispatch(tr);
+              renderTileToDataUrl(AttachmentErrorTile, { message: 'Upload failed' }).then((dataUrl) => {
+                const tr = view.state.tr.setNodeMarkup(found.pos, imageType, { ...found.node.attrs, src: dataUrl }, found.node.marks);
+                view.dispatch(tr);
+              });
             });
           }
         } catch (_) { /* noop */ }
