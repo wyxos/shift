@@ -27,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                 </div>
                 <div class="flex items-center justify-between gap-2 border-t px-2 py-1.5">
                     <div class="flex items-center gap-1.5">
-                        <Button variant="ghost" size="sm" aria-label="Emoji">
+                        <Button variant="ghost" size="sm" aria-label="Emoji" @click="$refs.tiptapRef?.openEmoji?.()">
                             <Icon name="smile" :size="18" />
                         </Button>
                         <Button variant="ghost" size="sm" aria-label="Attach file">
