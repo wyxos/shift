@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 import { defineComponent, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -9,10 +9,11 @@ import { renderTileToDataUrl } from './tiles/render'
 import ImageProgressTile from './tiles/ImageProgressTile.vue'
 import ImageErrorTile from './tiles/ImageErrorTile.vue'
 import Icon from '@/components/Icon.vue'
+import { AttachmentsCapture } from './extensions/AttachmentsCapture'
 
 export default defineComponent({
   name: 'TiptapChatEditor',
-  components: { EditorContent },
+  components: { Icon, EditorContent },
   setup: (props, { expose }) => {
     const containerRef = ref(null)
     const isImageModalOpen = ref(false)
@@ -24,6 +25,7 @@ export default defineComponent({
         StarterKit.configure({ codeBlock: false, blockquote: false, heading: false, horizontalRule: false }),
         Image.configure({ inline: true, allowBase64: true }),
         Placeholder.configure({ placeholder: 'Message…' }),
+        AttachmentsCapture.configure({ onFiles: (files) => handleFiles(files) }),
       ],
       content: '',
     })
@@ -77,6 +79,7 @@ export default defineComponent({
     // Attachment chips are rendered via a custom TipTap NodeView using lucide icons.
     // Progress and final states are handled by node attributes; no SVG tiles.
 
+    // Inline image helpers below are unused for the tray flow, but kept for parity if needed later.
     const findImagePosByTitle = (view, titleValue) => {
       const imageType = view.state.schema.nodes.image
       let found = null
@@ -289,37 +292,10 @@ export default defineComponent({
       }
     }
 
-    const handlePaste = (event) => {
-      if (!event || !event.clipboardData) return
-      const items = event.clipboardData.items || []
-      const files = []
-      for (let index = 0; index < items.length; index++) {
-        const item = items[index]
-        if (item.kind === 'file') {
-          const file = item.getAsFile()
-          if (file) files.push(file)
-        }
-      }
-      if (files.length > 0) {
-        event.preventDefault()
-        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
-        event.stopPropagation()
-        handleFiles(files)
-      }
-    }
+    // Paste/Drop are handled by AttachmentsCapture extension; keep these only for reference.
+    const handlePaste = (_event: ClipboardEvent) => { /* handled by extension */ }
 
-    const handleDrop = (event) => {
-      if (!event) return
-      event.preventDefault()
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
-      event.stopPropagation()
-      const dataTransfer = event.dataTransfer
-      if (!dataTransfer) return
-      const files = Array.from(dataTransfer.files || [])
-      if (files.length > 0) {
-        handleFiles(files)
-      }
-    }
+    const handleDrop = (_event: DragEvent) => { /* handled by extension */ }
 
     const preventDefault = (event) => {
       if (!event) return
@@ -360,10 +336,7 @@ export default defineComponent({
     onMounted(() => {
       const element = containerRef.value
       if (!element) return
-      element.addEventListener('paste', handlePaste, true)
-      element.addEventListener('dragover', preventDefault, true)
-      element.addEventListener('dragenter', preventDefault, true)
-      element.addEventListener('drop', handleDrop, true)
+      // Paste/Drop are handled by the AttachmentsCapture extension.
       element.addEventListener('click', onClickInEditor, true)
       window.addEventListener('keydown', onKeydown)
     })
@@ -371,10 +344,6 @@ export default defineComponent({
     onBeforeUnmount(() => {
       const element = containerRef.value
       if (!element) return
-      element.removeEventListener('paste', handlePaste, true)
-      element.removeEventListener('dragover', preventDefault, true)
-      element.removeEventListener('dragenter', preventDefault, true)
-      element.removeEventListener('drop', handleDrop, true)
       element.removeEventListener('click', onClickInEditor, true)
       window.removeEventListener('keydown', onKeydown)
       editor?.value?.destroy?.()
@@ -425,9 +394,11 @@ export default defineComponent({
     <EditorContent :editor="editor" />
 
     <!-- Attachments tray below editor -->
-    <div v-if="attachments.length" class="mt-2 flex flex-wrap gap-2">
+    <div class="mt-2 flex flex-wrap gap-2">
+      <!-- visible items logic: first 3 files; if more than 5 total, show count tile as 4th -->
       <div
-        v-for="item in attachments"
+        v-for="(item, index) in attachments"
+        v-show="attachments.length <= 5 ? true : index < 3"
         :key="item.id"
         class="relative w-[200px] h-[200px] rounded border bg-muted/20 overflow-hidden"
       >
@@ -456,6 +427,11 @@ export default defineComponent({
           Upload failed
         </div>
       </div>
+      <!-- Count tile when more than 5 -->
+      <div v-if="attachments.length > 5" class="w-[200px] h-[200px] rounded border bg-muted/30 flex items-center justify-center">
+        <span class="text-2xl font-semibold">{{ attachments.length }}+</span>
+      </div>
+
       <!-- Plus tile for adding more -->
       <div
         class="w-[200px] h-[200px] rounded border border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/20"
