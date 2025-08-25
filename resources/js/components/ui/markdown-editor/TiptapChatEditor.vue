@@ -14,10 +14,14 @@ import { AttachmentsCapture } from './extensions/AttachmentsCapture'
 export default defineComponent({
   name: 'TiptapChatEditor',
   components: { Icon, EditorContent },
-  setup: (props, { expose }) => {
+  setup: (props, { expose, emit }) => {
     const containerRef = ref(null)
     const isImageModalOpen = ref(false)
     const modalImageSrc = ref('')
+
+    // Attachments modal state
+    const isAttachmentsModalOpen = ref(false)
+    const activeAttachmentIndex = ref<number | null>(null)
     const tempIdentifier = ref(Date.now().toString())
 
     const editor = useEditor({
@@ -28,6 +32,16 @@ export default defineComponent({
         AttachmentsCapture.configure({ onFiles: (files) => handleFiles(files) }),
       ],
       content: '',
+      editorProps: {
+        handleKeyDown: (_view, event) => {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            sendMessage()
+            return true
+          }
+          return false
+        },
+      },
     })
 
     const createUploadId = () => `upload-${Math.random().toString(36).slice(2)}-${Date.now()}`
@@ -71,7 +85,43 @@ export default defineComponent({
     }
 
     // Expose to parent (footer attach button)
-    expose({ openFileDialog, handleFiles })
+    const sendMessage = () => {
+      const payload = {
+        content: editor.value?.getJSON?.(),
+        html: editor.value?.getHTML?.(),
+        attachments: attachments.value.map(a => ({ id: a.id, url: a.url, filename: a.filename, isImage: a.isImage, sizeLabel: a.sizeLabel })),
+      }
+      // emit event
+      emit('send', payload)
+      // reset
+      editor.value?.commands?.clearContent?.(true)
+      attachments.value = []
+      closeAttachmentsModal()
+    }
+
+    expose({ openFileDialog, handleFiles, send: sendMessage })
+
+    // Modal helpers for attachments tray
+    const openAttachmentModalAt = (index: number) => {
+      if (!attachments.value.length) return
+      const clamped = Math.max(0, Math.min(index, attachments.value.length - 1))
+      activeAttachmentIndex.value = clamped
+      isAttachmentsModalOpen.value = true
+    }
+    const closeAttachmentsModal = () => {
+      isAttachmentsModalOpen.value = false
+      activeAttachmentIndex.value = null
+    }
+    const nextAttachment = () => {
+      if (activeAttachmentIndex.value === null) return
+      const len = attachments.value.length
+      activeAttachmentIndex.value = (activeAttachmentIndex.value + 1) % len
+    }
+    const prevAttachment = () => {
+      if (activeAttachmentIndex.value === null) return
+      const len = attachments.value.length
+      activeAttachmentIndex.value = (activeAttachmentIndex.value - 1 + len) % len
+    }
 
     const imageProgressTile = async (percent = 0, label = 'Uploading...') => {
       return renderTileToDataUrl(ImageProgressTile, { percent, label })
@@ -313,7 +363,14 @@ export default defineComponent({
       modalImageSrc.value = ''
     }
     const onKeydown = (event) => {
-      if (event.key === 'Escape') closeImageModal()
+      if (event.key === 'Escape') {
+        if (isAttachmentsModalOpen.value) return closeAttachmentsModal()
+        return closeImageModal()
+      }
+      if (isAttachmentsModalOpen.value) {
+        if (event.key === 'ArrowRight') return nextAttachment()
+        if (event.key === 'ArrowLeft') return prevAttachment()
+      }
     }
     const onClickInEditor = (event) => {
       const target = event.target
@@ -349,7 +406,7 @@ export default defineComponent({
       editor?.value?.destroy?.()
     })
 
-    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal, attachments, fileInputRef, openFileDialog, onFileInputChange, handleFiles, removeAttachment }
+    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal, attachments, fileInputRef, openFileDialog, onFileInputChange, handleFiles, removeAttachment, isAttachmentsModalOpen, activeAttachmentIndex, openAttachmentModalAt, closeAttachmentsModal, nextAttachment, prevAttachment }
   },
 })
 </script>
@@ -394,13 +451,14 @@ export default defineComponent({
     <EditorContent :editor="editor" />
 
     <!-- Attachments tray below editor -->
-    <div class="mt-2 flex flex-wrap gap-2">
+    <div v-if="attachments.length" class="mt-2 flex flex-wrap gap-2">
       <!-- visible items logic: first 3 files; if more than 5 total, show count tile as 4th -->
       <div
         v-for="(item, index) in attachments"
         v-show="attachments.length <= 5 ? true : index < 3"
         :key="item.id"
-        class="relative w-[200px] h-[200px] rounded border bg-muted/20 overflow-hidden"
+        class="relative w-[200px] h-[200px] rounded border bg-muted/20 overflow-hidden cursor-pointer"
+        @click="openAttachmentModalAt(index)"
       >
         <button
           class="absolute right-1 top-1 z-10 rounded bg-black/50 text-white p-1"
@@ -428,7 +486,7 @@ export default defineComponent({
         </div>
       </div>
       <!-- Count tile when more than 5 -->
-      <div v-if="attachments.length > 5" class="w-[200px] h-[200px] rounded border bg-muted/30 flex items-center justify-center">
+      <div v-if="attachments.length > 5" class="w-[200px] h-[200px] rounded border bg-muted/30 flex items-center justify-center cursor-pointer" @click="openAttachmentModalAt(3)">
         <span class="text-2xl font-semibold">{{ attachments.length }}+</span>
       </div>
 
@@ -446,9 +504,46 @@ export default defineComponent({
     </div>
   </div>
 
+  <!-- Attachments modal -->
+  <div
+    v-if="isAttachmentsModalOpen && activeAttachmentIndex !== null"
+    class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+    @click="closeAttachmentsModal"
+  >
+    <div class="relative max-w-[90vw] max-h-[90vh]" @click.stop>
+      <button class="absolute right-2 top-2 text-white" aria-label="Close" @click="closeAttachmentsModal">
+        <Icon name="x" :size="20" />
+      </button>
+
+      <button class="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 hover:bg-black/70 rounded-full p-2 border border-white/30" aria-label="Previous" @click="prevAttachment">
+        <Icon name="chevron-left" :size="32" />
+      </button>
+      <button class="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 hover:bg-black/70 rounded-full p-2 border border-white/30" aria-label="Next" @click="nextAttachment">
+        <Icon name="chevron-right" :size="32" />
+      </button>
+
+      <div class="bg-background/95 p-2 rounded shadow-lg">
+        <template v-if="attachments[activeAttachmentIndex].isImage">
+          <img :src="attachments[activeAttachmentIndex].url || attachments[activeAttachmentIndex].previewUrl" class="max-w-[85vw] max-h-[85vh] object-contain" alt="attachment" />
+        </template>
+        <template v-else>
+          <div class="w-[60vw] max-w-[720px] min-h-[200px] flex flex-col items-center justify-center text-white">
+            <Icon name="file" :size="64" />
+            <div class="mt-2 text-sm">{{ attachments[activeAttachmentIndex].filename }}</div>
+            <div class="text-xs opacity-80">{{ attachments[activeAttachmentIndex].sizeLabel }}</div>
+            <div class="mt-3">
+              <a v-if="attachments[activeAttachmentIndex].url" :href="attachments[activeAttachmentIndex].url" target="_blank" rel="noopener" class="underline">Open</a>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legacy image modal (inline editor images) -->
   <div
     v-if="isImageModalOpen"
-    class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
+    class="fixed inset-0 z-40 bg-black/70 flex items-center justify-center"
     @click="closeImageModal"
   >
     <img
