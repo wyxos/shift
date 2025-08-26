@@ -148,6 +148,25 @@ describe('TiptapChatEditor attachments modal sizing', () => {
     expect(modal.style.height).toBe('616px')
   })
 
+  it('does not open modal when clicking remove on attachment tile', async () => {
+    wrapper = mount(TiptapChatEditor)
+
+    // Seed tray with one image
+    wrapper.vm.attachments = [createImageAttachment('/will-remove.png')]
+    await nextTick()
+
+    // Click remove button
+    const removeBtn = wrapper.element.querySelector('[data-attachments-tray] button[aria-label="Remove"]') as HTMLButtonElement
+    expect(removeBtn).toBeTruthy()
+    removeBtn.click()
+    await nextTick()
+
+    // Ensure item removed and modal not opened
+    expect(wrapper.vm.attachments.length).toBe(0)
+    const overlayModal = document.querySelector('div.fixed.inset-0.z-50') as HTMLElement | null
+    expect(overlayModal).toBeNull()
+  })
+
   it('ignores clicks inside the attachments tray for the legacy image modal', async () => {
     wrapper = mount(TiptapChatEditor)
 

@@ -148,13 +148,10 @@ defineExpose({ onModalImageLoad, onModalImageError })
           </div>
         </template>
         <template v-else>
-          <div class="flex-1 w-full h-full min-h-[200px] flex flex-col items-center justify-center text-foreground">
+          <div class="flex-1 w-full h-full min-h-[200px] flex flex-col items-center justify-center text-foreground cursor-pointer select-none" @click="() => { const u = attachments[activeIndex].url; if (u) window.open(u, '_blank', 'noopener') }" title="Open attachment">
             <Icon name="file" :size="64" />
             <div class="mt-2 text-sm">{{ attachments[activeIndex].filename }}</div>
             <div class="text-xs opacity-80">{{ attachments[activeIndex].sizeLabel }}</div>
-            <div class="mt-3">
-              <a v-if="attachments[activeIndex].url" :href="attachments[activeIndex].url" target="_blank" rel="noopener" class="underline">Open</a>
-            </div>
           </div>
         </template>
         <div class="mt-3 flex items-center justify-center gap-3" ref="navEl">
