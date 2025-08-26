@@ -40,7 +40,7 @@ describe('Welcome.vue', () => {
     expect(wrapper.text()).toContain('Laravel has an incredibly rich ecosystem')
   })
 
-  it('shows login and register links when user is not authenticated', () => {
+  it('shows login and get started links when user is not authenticated', () => {
     const wrapper = mount(Welcome, {
       global: {
         mocks: {
@@ -56,7 +56,7 @@ describe('Welcome.vue', () => {
 
     const links = wrapper.findAll('a')
     expect(links.some(link => link.text().includes('Log in'))).toBe(true)
-    expect(links.some(link => link.text().includes('Register'))).toBe(true)
+    expect(links.some(link => link.text().includes('Get Started'))).toBe(true)
     expect(links.some(link => link.text().includes('Dashboard'))).toBe(false)
   })
 

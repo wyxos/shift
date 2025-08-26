@@ -26,11 +26,13 @@ describe('Home.vue', () => {
       }
     })
 
-    expect(wrapper.find('h1').text()).toBe('SHIFT')
-    expect(wrapper.find('p').text()).toContain('Service Hub for Integrated Framework Tasks')
+    const heading = wrapper.find('h1').text()
+    expect(heading).toContain('Streamline Task Management')
+    expect(heading).toContain('SHIFT')
+    expect(wrapper.text()).toContain('SHIFT is an open-source, modular task management system')
   })
 
-  it('shows login and register links when user is not authenticated', () => {
+  it('shows login and get started links when user is not authenticated', () => {
     const wrapper = mount(Home, {
       props: {
         auth: {
@@ -45,8 +47,8 @@ describe('Home.vue', () => {
     })
 
     const links = wrapper.findAll('a')
-    expect(links.some(link => link.text().includes('Log In'))).toBe(true)
-    expect(links.some(link => link.text().includes('Register'))).toBe(true)
+    expect(links.some(link => link.text().includes('Log in'))).toBe(true)
+    expect(links.some(link => link.text().includes('Get Started'))).toBe(true)
     expect(links.some(link => link.text().includes('Go to Dashboard'))).toBe(false)
   })
 
