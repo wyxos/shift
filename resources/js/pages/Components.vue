@@ -22,7 +22,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
         <!-- TipTap Editor with similar footer -->
         <div class="p-4">
-            <div class="rounded-md border-2 border-blue-500 bg-background">
+            <div class="rounded-md border-2 border-blue-500 bg-background relative" data-drop-scope>
                 <div class="p-2">
                     <TiptapChatEditor ref="tiptapRef" />
                 </div>

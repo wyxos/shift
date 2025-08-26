@@ -1,6 +1,6 @@
 <template>
 <!-- Parent drop scope wrapper -->
-<div data-drop-scope class="relative">
+<div class="relative">
   <!-- Drag-and-drop overlay spanning the designated drop scope (parent blue-500 border) -->
   <div
     v-if="dragActive"
@@ -257,9 +257,10 @@ export default defineComponent({
     const updateOverlayRect = () => {
       if (!dropScopeEl) return
       const r = dropScopeEl.getBoundingClientRect()
+      // Because the overlay uses position: fixed, use viewport coordinates directly
       overlayRect.value = {
-        top: r.top + window.scrollY,
-        left: r.left + window.scrollX,
+        top: r.top,
+        left: r.left,
         width: r.width,
         height: r.height,
       }
@@ -272,10 +273,52 @@ export default defineComponent({
       window.removeEventListener('resize', updateOverlayRect)
       window.removeEventListener('scroll', updateOverlayRect, true)
     }
+
+    // Ensure overlay shows/hides robustly, even when dragenter is flaky across browsers
+    const ensureOverlayVisible = () => {
+      if (!dragActive.value) {
+        dragActive.value = true
+        updateOverlayRect()
+        addOverlayWatchers()
+      } else {
+        updateOverlayRect()
+      }
+    }
+    const hideOverlay = () => {
+      dragCounter = 0
+      if (dragActive.value) dragActive.value = false
+      removeOverlayWatchers()
+    }
+
+    // Document-level dragover helps when ancestor dragenter doesn't consistently fire
+    const onDocDragOver = (e: DragEvent) => {
+      if (!dropScopeEl) return
+      if (!hasFiles(e)) return
+      const r = dropScopeEl.getBoundingClientRect()
+      const x = e.clientX
+      const y = e.clientY
+      const inside = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+      if (inside) {
+        ensureOverlayVisible()
+        // Prevent default to indicate we accept a drop when inside scope
+        e.preventDefault()
+      } else {
+        hideOverlay()
+      }
+    }
+    const onDocDrop = (_e: DragEvent) => {
+      hideOverlay()
+    }
     const hasFiles = (e: any) => {
       const dt = e?.dataTransfer || e?.clipboardData
       if (!dt) return false
       if (dt.files && dt.files.length > 0) return true
+      const items: any = (dt as any).items
+      if (items && items.length) {
+        for (let i = 0; i < items.length; i++) {
+          try { if (items[i]?.kind === 'file') return true } catch (_) { /* noop */ }
+        }
+      }
       if (Array.isArray(dt.types)) return dt.types.includes('Files')
       try { return dt.types?.contains?.('Files') } catch { return false }
     }
@@ -303,11 +346,16 @@ export default defineComponent({
     }
     const onDropOverlay = (e: DragEvent) => {
       if (!hasFiles(e)) return
+      // Always prevent default to avoid browser navigating to the file
       e.preventDefault()
       e.stopPropagation()
+
+      // Reset overlay state
       dragCounter = 0
       dragActive.value = false
       removeOverlayWatchers()
+
+      // Uniform behavior: attach files to the editor regardless of where the drop occurred
       const files = Array.from(e.dataTransfer?.files || [])
       if (files.length) handleFiles(files)
     }
@@ -602,6 +650,9 @@ export default defineComponent({
       dropScopeEl.addEventListener('dragover', onDragOver, true)
       dropScopeEl.addEventListener('dragleave', onDragLeave, true)
       dropScopeEl.addEventListener('drop', onDropOverlay, true)
+      // Document-level listeners to keep the overlay responsive while moving across children
+      document.addEventListener('dragover', onDocDragOver, true)
+      document.addEventListener('drop', onDocDrop, true)
     })
 
     onBeforeUnmount(() => {
@@ -615,6 +666,8 @@ export default defineComponent({
         dropScopeEl.removeEventListener('dragleave', onDragLeave, true)
         dropScopeEl.removeEventListener('drop', onDropOverlay, true)
       }
+      document.removeEventListener('dragover', onDocDragOver, true)
+      document.removeEventListener('drop', onDocDrop, true)
       editor?.value?.destroy?.()
     })
 
