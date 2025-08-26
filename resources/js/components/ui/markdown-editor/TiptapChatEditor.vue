@@ -1,6 +1,22 @@
 <template>
-    <div ref="containerRef" class="tiptap-editor relative border-2 border-blue-200 rounded p-4">
-        <EditorContent :editor="editor" />
+<!-- Parent drop scope wrapper -->
+<div data-drop-scope class="relative">
+  <!-- Drag-and-drop overlay spanning the designated drop scope (parent blue-500 border) -->
+  <div
+    v-if="dragActive"
+    class="pointer-events-none fixed z-40"
+    :style="{ top: overlayRect.top + 'px', left: overlayRect.left + 'px', width: overlayRect.width + 'px', height: overlayRect.height + 'px' }"
+  >
+    <div class="w-full h-full rounded border-2 border-dashed border-blue-400/80 bg-blue-50/60 dark:bg-blue-950/30 flex items-center justify-center">
+      <div class="flex items-center gap-2 text-blue-700 dark:text-blue-200">
+        <Icon name="upload" :size="18" />
+        <span class="text-sm font-medium">Drop files to upload</span>
+      </div>
+    </div>
+  </div>
+
+  <div ref="containerRef" class="tiptap-editor relative border-2 border-blue-200 rounded p-4" :class="{ 'border-blue-500 ring-2 ring-blue-300/50': dragActive }">
+    <EditorContent :editor="editor" />
 
         <!-- Attachments tray below editor -->
         <div v-if="attachments.length" class="mt-2 flex flex-wrap gap-2" data-attachments-tray>
@@ -16,7 +32,7 @@
                     class="absolute right-1 top-1 z-10 rounded bg-black/50 text-white p-1"
                     type="button"
                     aria-label="Remove"
-                    @click="removeAttachment(item.id)"
+                    @click.stop="removeAttachment(item.id)"
                 >
                     <Icon name="x" :size="14" />
                 </button>
@@ -46,24 +62,23 @@
             <div
                 class="w-[200px] h-[200px] rounded border border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/20"
                 @click="openFileDialog"
-                @dragover.prevent
-                @dragenter.prevent
-                @drop.prevent="(e) => handleFiles(Array.from(e.dataTransfer?.files || []))"
             >
                 <Icon name="plus" :size="24" />
             </div>
-            <input ref="fileInputRef" type="file" class="hidden" multiple @change="onFileInputChange" />
         </div>
-        <!-- Emoji picker popover -->
-        <div v-if="showEmojiPicker" class="absolute z-50 mt-2">
-            <div class="relative bg-background rounded-md shadow-lg border">
+        <!-- Emoji picker popover (triggered from footer CTA) -->
+    <div v-if="showEmojiPicker" class="absolute z-50 bottom-12 right-2">
+      <div class="relative bg-background rounded-md shadow-lg border">
                 <button class="absolute right-2 top-2" aria-label="Close emoji" @click="closeEmoji">
                     <Icon name="x" :size="14" />
                 </button>
                 <emoji-picker @emoji-click="onEmojiClick"></emoji-picker>
             </div>
         </div>
-    </div>
+    <!-- Always-present hidden file input for footer CTA and plus-tile -->
+    <input ref="fileInputRef" type="file" class="hidden" multiple @change="onFileInputChange" />
+  </div>
+</div>
 
   <!-- Attachments modal -->
   <AttachmentsModal
@@ -234,6 +249,71 @@ export default defineComponent({
     const attachmentsModalRef = ref<any | null>(null)
     const onModalImageLoad = (e: Event) => attachmentsModalRef.value?.onModalImageLoad?.(e)
     const onModalImageError = (e: Event) => attachmentsModalRef.value?.onModalImageError?.(e)
+
+    // Drag & Drop overlay controls
+    const dragActive = ref(false)
+    let dragCounter = 0
+    const overlayRect = ref({ top: 0, left: 0, width: 0, height: 0 })
+    const updateOverlayRect = () => {
+      if (!dropScopeEl) return
+      const r = dropScopeEl.getBoundingClientRect()
+      overlayRect.value = {
+        top: r.top + window.scrollY,
+        left: r.left + window.scrollX,
+        width: r.width,
+        height: r.height,
+      }
+    }
+    const addOverlayWatchers = () => {
+      window.addEventListener('resize', updateOverlayRect)
+      window.addEventListener('scroll', updateOverlayRect, true)
+    }
+    const removeOverlayWatchers = () => {
+      window.removeEventListener('resize', updateOverlayRect)
+      window.removeEventListener('scroll', updateOverlayRect, true)
+    }
+    const hasFiles = (e: any) => {
+      const dt = e?.dataTransfer || e?.clipboardData
+      if (!dt) return false
+      if (dt.files && dt.files.length > 0) return true
+      if (Array.isArray(dt.types)) return dt.types.includes('Files')
+      try { return dt.types?.contains?.('Files') } catch { return false }
+    }
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      dragCounter++
+      dragActive.value = true
+      updateOverlayRect()
+      addOverlayWatchers()
+      e.preventDefault()
+    }
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      dragActive.value = true
+      updateOverlayRect()
+    }
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      dragCounter = Math.max(0, dragCounter - 1)
+      if (dragCounter === 0) {
+        dragActive.value = false
+        removeOverlayWatchers()
+      }
+    }
+    const onDropOverlay = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      dragCounter = 0
+      dragActive.value = false
+      removeOverlayWatchers()
+      const files = Array.from(e.dataTransfer?.files || [])
+      if (files.length) handleFiles(files)
+    }
+
+    // Scope for DnD listeners (parent blue-500 border if available)
+    let dropScopeEl: HTMLElement | null = null
 
     const imageProgressTile = async (percent = 0, label = 'Uploading...') => {
       return renderTileToDataUrl(ImageProgressTile, { percent, label })
@@ -513,6 +593,15 @@ export default defineComponent({
       // Paste/Drop are handled by the AttachmentsCapture extension.
       element.addEventListener('click', onClickInEditor, true)
       window.addEventListener('keydown', onKeydown)
+      // Drag & Drop listeners on the parent blue-500 border region if possible
+      // Prefer an explicit drop scope marker on a parent wrapper
+      const markedScope = element.closest('[data-drop-scope]') as HTMLElement | null
+      dropScopeEl = markedScope || (element.parentElement as HTMLElement) || element
+      // Use capture phase so we can consume the event before ProseMirror sees it (avoid duplicates)
+      dropScopeEl.addEventListener('dragenter', onDragEnter, true)
+      dropScopeEl.addEventListener('dragover', onDragOver, true)
+      dropScopeEl.addEventListener('dragleave', onDragLeave, true)
+      dropScopeEl.addEventListener('drop', onDropOverlay, true)
     })
 
     onBeforeUnmount(() => {
@@ -520,10 +609,16 @@ export default defineComponent({
       if (!element) return
       element.removeEventListener('click', onClickInEditor, true)
       window.removeEventListener('keydown', onKeydown)
+      if (dropScopeEl) {
+        dropScopeEl.removeEventListener('dragenter', onDragEnter, true)
+        dropScopeEl.removeEventListener('dragover', onDragOver, true)
+        dropScopeEl.removeEventListener('dragleave', onDragLeave, true)
+        dropScopeEl.removeEventListener('drop', onDropOverlay, true)
+      }
       editor?.value?.destroy?.()
     })
 
-    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal, attachments, fileInputRef, openFileDialog, onFileInputChange, handleFiles, removeAttachment, isAttachmentsModalOpen, activeAttachmentIndex, openAttachmentModalAt, closeAttachmentsModal, nextAttachment, prevAttachment, attachmentsModalRef, onModalImageLoad, onModalImageError, showEmojiPicker, openEmoji, closeEmoji, onEmojiClick }
+    return { containerRef, editor, isImageModalOpen, modalImageSrc, closeImageModal, attachments, fileInputRef, openFileDialog, onFileInputChange, handleFiles, removeAttachment, isAttachmentsModalOpen, activeAttachmentIndex, openAttachmentModalAt, closeAttachmentsModal, nextAttachment, prevAttachment, attachmentsModalRef, onModalImageLoad, onModalImageError, showEmojiPicker, openEmoji, closeEmoji, onEmojiClick, dragActive }
   },
 })
 </script>

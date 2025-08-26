@@ -19,32 +19,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <!-- Editor with footer actions -->
-            <div class="rounded-md border-2 border-blue-500 bg-background">
-                <div class="p-2">
-                    <MilkdownEditorWrapper />
-                </div>
-                <div class="flex items-center justify-between gap-2 border-t px-2 py-1.5">
-                    <div class="flex items-center gap-1.5">
-                        <Button variant="ghost" size="sm" aria-label="Emoji" @click="$refs.tiptapRef?.openEmoji?.()">
-                            <Icon name="smile" :size="18" />
-                        </Button>
-                        <Button variant="ghost" size="sm" aria-label="Attach file">
-                            <Icon name="paperclip" :size="18" />
-                        </Button>
-                        <Button variant="ghost" size="sm" aria-label="More">
-                            <Icon name="plus" :size="18" />
-                        </Button>
-                    </div>
-                    <div class="flex items-center">
-                        <Button size="sm" aria-label="Send" @click="$refs.tiptapRef?.send?.()">
-                            <Icon name="send" :size="18" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- TipTap Editor with similar footer -->
         <div class="p-4">
