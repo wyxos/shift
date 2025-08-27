@@ -41,7 +41,7 @@ describe('Components.vue TipTap image drop/paste (step 1: insert local image)', 
     return wrapper.find('.ProseMirror')
   }
 
-  it('inserts image on drop', async () => {
+  it('inserts image on drop and typing starts on next line', async () => {
     const wrapper = mount(Components)
     await nextTick()
 
@@ -60,10 +60,18 @@ describe('Components.vue TipTap image drop/paste (step 1: insert local image)', 
     expect(imgs.length).toBeGreaterThan(0)
     expect(imgs[0].element.getAttribute('src') || '').toContain('blob:')
     expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
-    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
+
+    // Simulate typing "A" immediately after the image
+    ed.options.editorProps.handleTextInput(ed.view, ed.state.selection.from, ed.state.selection.to, 'A')
+    await nextTick()
+
+    // Expect a <br> (hard break) before the typed character
+    const html = editorEl.html()
+    expect(html).toContain('<br')
+    expect(editorEl.text()).toContain('A')
   })
 
-  it('inserts image on paste', async () => {
+  it('inserts image on paste and typing starts on next line', async () => {
     const wrapper = mount(Components)
     await nextTick()
 
@@ -86,6 +94,14 @@ describe('Components.vue TipTap image drop/paste (step 1: insert local image)', 
     const imgs = editorEl.findAll('img')
     expect(imgs.length).toBeGreaterThan(0)
     expect(imgs[0].element.getAttribute('src') || '').toContain('blob:')
+
+    // Simulate typing immediately after the image
+    ed.options.editorProps.handleTextInput(ed.view, ed.state.selection.from, ed.state.selection.to, 'B')
+    await nextTick()
+
+    const html = editorEl.html()
+    expect(html).toContain('<br')
+    expect(editorEl.text()).toContain('B')
   })
 })
 
