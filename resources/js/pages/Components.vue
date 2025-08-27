@@ -92,14 +92,15 @@ defineExpose({ editor })
   <Head title="Components" />
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
-      <div class="rounded border p-3">
-        <EditorContent data-testid="tiptap-editor" :editor="editor" />
-      </div>
+        <div class="relative">
+            <EditorContent data-testid="tiptap-editor" :editor="editor" />
+        </div>
     </div>
   </AppLayout>
 </template>
 
 <style>
+@reference "tailwindcss";
 /* Tile styling for images inside the editor */
 .ProseMirror img.editor-tile {
   width: 200px;
@@ -107,5 +108,9 @@ defineExpose({ editor })
   object-fit: cover;
   display: inline-block;
   margin: 4px;
+}
+
+.ProseMirror{
+    @apply pb-20 border-2 border-blue-500 p-4 rounded-lg;
 }
 </style>
