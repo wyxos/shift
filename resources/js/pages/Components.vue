@@ -5,6 +5,7 @@ import { Head } from '@inertiajs/vue3'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import { Markdown } from 'tiptap-markdown'
 import { ref } from 'vue'
 import Icon from '@/components/Icon.vue';
 
@@ -57,6 +58,11 @@ function handleFiles(editor: any, files: FileList | File[]) {
 const editor = useEditor({
   extensions: [
     StarterKit,
+    Markdown.configure({
+      html: true,
+      transformCopiedText: true,
+      transformPastedText: true,
+    }),
     Image.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
   ],
   content: '<p>Hello TipTap</p>',
