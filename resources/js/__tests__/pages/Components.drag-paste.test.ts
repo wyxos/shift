@@ -59,6 +59,8 @@ describe('Components.vue TipTap image drop/paste (step 1: insert local image)', 
     const imgs = editorEl.findAll('img')
     expect(imgs.length).toBeGreaterThan(0)
     expect(imgs[0].element.getAttribute('src') || '').toContain('blob:')
+    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
+    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
   })
 
   it('inserts image on paste', async () => {

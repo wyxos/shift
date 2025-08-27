@@ -23,7 +23,7 @@ function handleFiles(editor: any, files: FileList | File[]) {
 const editor = useEditor({
   extensions: [
     StarterKit,
-    Image.configure({ inline: true, allowBase64: true }),
+    Image.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
   ],
   content: '<p>Hello TipTap</p>',
   editorProps: {
@@ -74,3 +74,14 @@ defineExpose({ editor })
     </div>
   </AppLayout>
 </template>
+
+<style>
+/* Tile styling for images inside the editor */
+.ProseMirror img.editor-tile {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  display: inline-block;
+  margin: 4px;
+}
+</style>
