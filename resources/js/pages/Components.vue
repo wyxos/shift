@@ -12,7 +12,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function insertLocalImageFromFile(editor: any, file: File) {
   const url = URL.createObjectURL(file)
-  editor.chain().focus().insertContent({ type: 'image', attrs: { src: url, alt: file.name, title: '' } }).run()
+  const state = editor?.state
+  const $from = state?.selection?.$from
+  const before = $from?.nodeBefore
+  const after = $from?.nodeAfter
+  const isText = (n: any) => n && n.type && n.type.name === 'text'
+
+  const chain = editor.chain().focus()
+  if (isText(before)) chain.setHardBreak()
+  chain.insertContent({ type: 'image', attrs: { src: url, alt: file.name, title: '' } })
+  if (isText(after)) chain.setHardBreak()
+  chain.run()
 }
 
 function handleFiles(editor: any, files: FileList | File[]) {
