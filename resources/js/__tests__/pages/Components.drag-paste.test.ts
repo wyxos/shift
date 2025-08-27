@@ -42,6 +42,28 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
   }
 
   it('lists a non-image attachment on drop under the editor with size and remove CTA', async () => {
+    // mock canvas for placeholder tile
+    const proto: any = (HTMLCanvasElement as any).prototype
+    const origGetContext = proto.getContext
+    const origToDataURL = proto.toDataURL
+    proto.getContext = vi.fn(() => ({
+      fillStyle: '', strokeStyle: '', font: '', textAlign: '',
+      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+    }))
+    proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+
+    const wrapper = mount(Components)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+origGetContext = proto.getContext
+    const origToDataURL = proto.toDataURL
+    proto.getContext = vi.fn(() => ({
+      fillStyle: '', strokeStyle: '', font: '', textAlign: '',
+      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+    }))
+    proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+
     const wrapper = mount(Components)
     await nextTick()
 
@@ -120,7 +142,9 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
 
     const imgs = editorEl.findAll('img')
     expect(imgs.length).toBeGreaterThan(0)
-    expect(imgs[0].element.getAttribute('src') || '').toContain('blob:')
+    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
+    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
+    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
     expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
 
     // The editor HTML should contain a hard break separating text and image
@@ -133,6 +157,10 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
 
     // Expect typed character present
     expect(editorEl.text()).toContain('A')
+
+    // restore canvas mocks
+    proto.getContext = origGetContext
+    proto.toDataURL = origToDataURL
   })
 
   it('inserts image on paste next to text on its own line and typing starts on next line', async () => {
@@ -169,6 +197,10 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     await nextTick()
 
     expect(editorEl.text()).toContain('B')
+
+    // restore canvas mocks
+    proto.getContext = origGetContext
+    proto.toDataURL = origToDataURL
   })
 })
 
