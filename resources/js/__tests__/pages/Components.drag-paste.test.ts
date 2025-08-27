@@ -41,7 +41,7 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     return wrapper.find('.ProseMirror')
   }
 
-  it('lists a non-image attachment on drop under the editor', async () => {
+  it('lists a non-image attachment on drop under the editor with size and remove CTA', async () => {
     const wrapper = mount(Components)
     await nextTick()
 
@@ -60,10 +60,16 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     const list = wrapper.find('[data-testid="attachments-list"]')
     expect(list.exists()).toBe(true)
     const items = wrapper.findAll('[data-testid="attachment-item"]')
-    expect(items.some(i => i.text().includes('doc.txt'))).toBe(true)
+    const item = items.find(i => i.text().includes('doc.txt'))!
+    expect(item).toBeTruthy()
+    expect(item.text()).toContain('3 B')
+    // remove
+    await item.find('[data-testid="attachment-remove"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
   })
 
-  it('lists a non-image attachment on paste under the editor', async () => {
+  it('lists a non-image attachment on paste under the editor with size and remove CTA', async () => {
     const wrapper = mount(Components)
     await nextTick()
 
@@ -85,7 +91,13 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
 
     expect(editorEl.findAll('img').length).toBe(0)
     const items = wrapper.findAll('[data-testid="attachment-item"]')
-    expect(items.some(i => i.text().includes('readme.md'))).toBe(true)
+    const item = items.find(i => i.text().includes('readme.md'))!
+    expect(item).toBeTruthy()
+    expect(item.text()).toContain('3 B')
+    // remove
+    await item.find('[data-testid="attachment-remove"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
   })
 
   it('inserts image on drop next to text on its own line and typing starts on next line', async () => {

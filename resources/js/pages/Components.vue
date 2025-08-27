@@ -6,6 +6,7 @@ import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { ref } from 'vue'
+import Icon from '@/components/Icon.vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Components', href: '/components' },
@@ -13,6 +14,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 // Non-image attachments state
 const attachments = ref<{ name: string; size: number; type: string }[]>([])
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B','KB','MB','GB','TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  if (i === 0) return `${bytes} ${sizes[i]}`
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
+
+function removeAttachment(att: { name: string; size: number; type: string }) {
+  attachments.value = attachments.value.filter(a => !(a.name === att.name && a.size === att.size && a.type === att.type))
+}
 
 function insertLocalImageFromFile(editor: any, file: File) {
   const url = URL.createObjectURL(file)
@@ -104,13 +118,22 @@ defineExpose({ editor })
     <div class="p-4">
         <div class="relative">
             <EditorContent data-testid="tiptap-editor" class="mb-4" :editor="editor" />
-            <!-- non image attachments listed here -->
-            <ul v-if="attachments.length" data-testid="attachments-list" class="flex gap-4 flex-wrap">
-                <li v-for="att in attachments" :key="att.name + ':' + att.size" data-testid="attachment-item" class=" bg-gray-100 p-2 rounded w-60 ">
-                    <span class="truncated">{{ att.name }}</span>
-                </li>
-            </ul>
+            <div class="absolute bottom-2 w-full px-4">
+                // buttons
+            </div>
         </div>
+        <!-- non image attachments listed here -->
+        <ul v-if="attachments.length" data-testid="attachments-list" class="flex gap-4 flex-wrap">
+            <li v-for="att in attachments" :key="att.name + ':' + att.size" data-testid="attachment-item" class=" bg-gray-100 p-2 rounded w-60 flex items-center justify-between gap-2 ">
+                <div class="min-w-0">
+                    <div class="truncate" title="{{ att.name }}">{{ att.name }}</div>
+                    <div class="text-gray-500 text-xs">{{ formatBytes(att.size) }}</div>
+                </div>
+                <button type="button" class="text-red-600 text-xs hover:underline cursor-pointer" data-testid="attachment-remove" @click="removeAttachment(att)">
+                    <Icon name="x" class="inline-block mr-1" :size="12" />
+                </button>
+            </li>
+        </ul>
     </div>
   </AppLayout>
 </template>
