@@ -58,6 +58,20 @@ const editor = useEditor({
       }
       return false
     },
+    handleTextInput: (_view, from, to, text) => {
+      const ed: any = editor.value
+      if (!ed) return false
+      const state = ed.state
+      const $from = state.selection.$from
+      const before = $from.nodeBefore
+      const after = $from.nodeAfter
+      const isNextToImage = (n: any) => n && n.type && n.type.name === 'image'
+      if (isNextToImage(before) || isNextToImage(after)) {
+        ed.chain().focus().setHardBreak().insertContent(text).run()
+        return true
+      }
+      return false
+    },
   },
 })
 
