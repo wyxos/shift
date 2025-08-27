@@ -41,6 +41,53 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     return wrapper.find('.ProseMirror')
   }
 
+  it('lists a non-image attachment on drop under the editor', async () => {
+    const wrapper = mount(Components)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+    expect(editorEl.exists()).toBe(true)
+
+    const file = new File([new Uint8Array([1,2,3])], 'doc.txt', { type: 'text/plain' })
+
+    const ed: any = (wrapper.vm as any).editor
+    ed.options.editorProps.handleDrop(ed.view, { dataTransfer: { files: [file] }, preventDefault: () => {} } as any)
+
+    await nextTick()
+
+    // Should not insert an img; instead, list the attachment
+    expect(editorEl.findAll('img').length).toBe(0)
+    const list = wrapper.find('[data-testid="attachments-list"]')
+    expect(list.exists()).toBe(true)
+    const items = wrapper.findAll('[data-testid="attachment-item"]')
+    expect(items.some(i => i.text().includes('doc.txt'))).toBe(true)
+  })
+
+  it('lists a non-image attachment on paste under the editor', async () => {
+    const wrapper = mount(Components)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+    expect(editorEl.exists()).toBe(true)
+
+    const file = new File([new Uint8Array([1,2,3])], 'readme.md', { type: 'text/markdown' })
+
+    const ed: any = (wrapper.vm as any).editor
+    ed.options.editorProps.handlePaste(ed.view, {
+      clipboardData: {
+        files: [file],
+        items: [{ kind: 'file', type: 'text/markdown', getAsFile: () => file }],
+      },
+      preventDefault: () => {},
+    } as any)
+
+    await nextTick()
+
+    expect(editorEl.findAll('img').length).toBe(0)
+    const items = wrapper.findAll('[data-testid="attachment-item"]')
+    expect(items.some(i => i.text().includes('readme.md'))).toBe(true)
+  })
+
   it('inserts image on drop next to text on its own line and typing starts on next line', async () => {
     const wrapper = mount(Components)
     await nextTick()

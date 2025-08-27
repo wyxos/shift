@@ -5,10 +5,14 @@ import { Head } from '@inertiajs/vue3'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import { ref } from 'vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Components', href: '/components' },
 ]
+
+// Non-image attachments state
+const attachments = ref<{ name: string; size: number; type: string }[]>([])
 
 function insertLocalImageFromFile(editor: any, file: File) {
   const url = URL.createObjectURL(file)
@@ -27,7 +31,13 @@ function insertLocalImageFromFile(editor: any, file: File) {
 
 function handleFiles(editor: any, files: FileList | File[]) {
   const arr = Array.from(files || [])
-  arr.filter(f => f.type && f.type.startsWith('image/')).forEach(f => insertLocalImageFromFile(editor, f))
+  arr.forEach(f => {
+    if (f.type && f.type.startsWith('image/')) {
+      insertLocalImageFromFile(editor, f)
+    } else {
+      attachments.value.push({ name: f.name, size: f.size, type: f.type || 'application/octet-stream' })
+    }
+  })
 }
 
 const editor = useEditor({
@@ -93,7 +103,13 @@ defineExpose({ editor })
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
         <div class="relative">
-            <EditorContent data-testid="tiptap-editor" :editor="editor" />
+            <EditorContent data-testid="tiptap-editor" class="mb-4" :editor="editor" />
+            <!-- non image attachments listed here -->
+            <ul v-if="attachments.length" data-testid="attachments-list" class="flex gap-4 flex-wrap">
+                <li v-for="att in attachments" :key="att.name + ':' + att.size" data-testid="attachment-item" class=" bg-gray-100 p-2 rounded w-60 ">
+                    <span class="truncated">{{ att.name }}</span>
+                </li>
+            </ul>
         </div>
     </div>
   </AppLayout>
