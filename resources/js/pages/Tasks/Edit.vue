@@ -77,6 +77,8 @@ const {
     isMessageDeletable,
     deleteMessage,
     loadTaskThreads,
+    internalThreadTempIdentifier,
+    externalThreadTempIdentifier,
 } = useTaskThreads(props.task.id);
 
 const {
@@ -320,6 +322,7 @@ const submitForm = (): void => {
                         :thread-attachments="internalThreadAttachments"
                         :thread-upload-error="threadUploadError"
                         :truncate-filename="truncateFilename"
+                        :thread-temp-identifier="internalThreadTempIdentifier"
                         tab-type="internal"
                         @update:active-tab="activeTab = $event"
                         @update:new-message="internalNewMessage = $event"
@@ -344,6 +347,7 @@ const submitForm = (): void => {
                         :thread-attachments="externalThreadAttachments"
                         :thread-upload-error="threadUploadError"
                         :truncate-filename="truncateFilename"
+                        :thread-temp-identifier="externalThreadTempIdentifier"
                         tab-type="external"
                         @update:active-tab="activeTab = $event"
                         @update:new-message="externalNewMessage = $event"
@@ -353,7 +357,7 @@ const submitForm = (): void => {
                         @handle-drop="handleDrop"
                         @handle-thread-file-upload="handleThreadFileUpload"
                         @remove-thread-attachment="removeThreadAttachment"
-                        @send-message="sendMessage"
+                        @send-message="(e) => sendMessage(e, { tempIdentifierOverride: externalThreadTempIdentifier })"
                     />
                 </CardContent>
             </Card>

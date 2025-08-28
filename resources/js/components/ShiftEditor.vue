@@ -7,11 +7,12 @@ import { createLowlight } from 'lowlight'
 import jsLang from 'highlight.js/lib/languages/javascript'
 import tsLang from 'highlight.js/lib/languages/typescript'
 import jsonLang from 'highlight.js/lib/languages/json'
-import html from 'highlight.js/lib/languages/xml'
-import css from 'highlight.js/lib/languages/css'
-import php from 'highlight.js/lib/languages/php'
+import cssLang from 'highlight.js/lib/languages/css'
+import phpLang from 'highlight.js/lib/languages/php'
+import htmlLang from 'highlight.js/lib/languages/xml'
+import pythonLang from 'highlight.js/lib/languages/python'
 import ImageUpload from '@/extensions/imageUpload'
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import axios from 'axios'
 import { Paperclip, Send, Smile } from 'lucide-vue-next'
 import 'emoji-picker-element'
@@ -23,11 +24,14 @@ import 'highlight.js/styles/github.css'
 export type SentAttachment = Pick<AttachmentItem, 'name' | 'size' | 'type' | 'path' | 'status' | 'progress'>
 const emit = defineEmits<{ (e: 'send', payload: { html: string, attachments: SentAttachment[] }): void }>()
 
+// Props
+const props = defineProps<{ tempIdentifier?: string }>()
+
 // Non-image attachments state
 export type AttachmentItem = { id: string; name: string; size: number; type: string; progress: number; status: 'uploading' | 'done' | 'error'; path?: string }
 
 const attachments = ref<AttachmentItem[]>([])
-const tempIdentifier = ref<string>(Date.now().toString())
+const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString())
 const showEmoji = ref(false)
 
 // Configure lowlight with a few common languages
@@ -35,12 +39,15 @@ const lowlight = createLowlight()
 lowlight.register({ javascript: jsLang, js: jsLang })
 lowlight.register({ typescript: tsLang, ts: tsLang })
 lowlight.register({ json: jsonLang })
-// html
-lowlight.register({ html: html })
-// css
-lowlight.register({ css: css })
-// php
-lowlight.register({ php: php })
+lowlight.register({ css: cssLang })
+lowlight.register({ php: phpLang })
+lowlight.register({ html: htmlLang, xml: htmlLang })
+lowlight.register({ python: pythonLang, py: pythonLang })
+
+// Keep tempIdentifier in sync with prop if provided
+watch(() => props.tempIdentifier, (val) => {
+  if (val) tempIdentifier.value = String(val)
+})
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -246,8 +253,9 @@ defineExpose({ editor })
 }
 /* Code block base styling to make blocks stand out */
 .tiptap pre {
-  background: #0b1021; /* dark background to contrast token colors; override with theme if desired */
-  color: #e6e6e6;
+    @apply bg-gray-400;
+/*  background: #0b1021; !* dark background to contrast token colors; override with theme if desired *!
+  color: #e6e6e6;*/
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   margin: 1rem 0;
