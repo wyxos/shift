@@ -9,7 +9,9 @@ import { Paperclip, Send, Smile } from 'lucide-vue-next'
 import 'emoji-picker-element'
 
 // Emits
-const emit = defineEmits<{ (e: 'send', payload: { html: string }): void }>()
+// Include attachments in the payload so consumers can persist them alongside the content
+export type SentAttachment = Pick<AttachmentItem, 'name' | 'size' | 'type' | 'path' | 'status' | 'progress'>
+const emit = defineEmits<{ (e: 'send', payload: { html: string, attachments: SentAttachment[] }): void }>()
 
 // Non-image attachments state
 export type AttachmentItem = { id: string; name: string; size: number; type: string; progress: number; status: 'uploading' | 'done' | 'error'; path?: string }
@@ -146,9 +148,18 @@ function onEmojiClick(ev: Event) {
 
 function onSend() {
   const html = editor.value?.getHTML() ?? ''
-  emit('send', { html })
-  // Reset editor value
+  const toSend: SentAttachment[] = attachments.value.map(a => ({
+    name: a.name,
+    size: a.size,
+    type: a.type,
+    path: a.path,
+    status: a.status,
+    progress: a.progress,
+  }))
+  emit('send', { html, attachments: toSend })
+  // Reset editor value and clear attachments list
   editor.value?.commands.clearContent()
+  attachments.value = []
 }
 
 defineExpose({ editor })
