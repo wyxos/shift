@@ -24,8 +24,8 @@ export function useTaskThreads(taskId: number) {
     const activeTab: Ref<'internal' | 'external'> = ref('internal');
     const internalMessages: Ref<Message[]> = ref([]);
     const externalMessages: Ref<Message[]> = ref([]);
-    const internalNewMessage: Ref<string> = ref('');
-    const externalNewMessage: Ref<string> = ref('');
+    const internalNewMessage: Ref<string> = ref('Type a message...');
+    const externalNewMessage: Ref<string> = ref('Type a message...');
 
     // Refs for message containers to enable autoscrolling
     const internalMessagesContainer: Ref<HTMLElement | null> = ref(null);

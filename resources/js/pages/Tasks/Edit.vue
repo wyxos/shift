@@ -332,7 +332,7 @@ const submitForm = (): void => {
                         @handle-drop="handleDrop"
                         @handle-thread-file-upload="handleThreadFileUpload"
                         @remove-thread-attachment="removeThreadAttachment"
-                        @send-message="sendMessage"
+                        @send-message="(e) => sendMessage(e, { tempIdentifierOverride: internalThreadTempIdentifier })"
                     />
 
                     <TaskThreadTab
