@@ -92,6 +92,17 @@ class TaskThreadController extends Controller
             $this->processTemporaryAttachments($request->temp_identifier, $thread);
         }
 
+        // After moving attachments, replace temp URLs in content with final URLs
+        if ($request->filled('temp_identifier')) {
+            $thread->load('attachments');
+            $thread->content = $this->replaceTempUrlsInContent(
+                $thread->content,
+                $request->input('temp_identifier'),
+                $thread->attachments
+            );
+            $thread->save();
+        }
+
         // Get the thread with attachments
         $thread->load('attachments');
 
@@ -280,5 +291,28 @@ class TaskThreadController extends Controller
         $thread->delete();
 
         return response()->json(['message' => 'Thread message deleted successfully']);
+    }
+    /**
+     * Replace temp attachment URLs in HTML content with final download URLs.
+     */
+    private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
+    {
+        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+            return $content;
+        }
+
+        $out = $content;
+        foreach ($attachments as $attachment) {
+            $finalUrl = route('attachments.download', $attachment);
+            $basename = basename($attachment->path);
+            $quotedTemp = preg_quote($tempIdentifier, '#');
+            $quotedBase = preg_quote($basename, '#');
+            $patternRel = "#/attachments/temp/{$quotedTemp}/{$quotedBase}#";
+            $patternAbs = "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#";
+            // Replace absolute URLs first to avoid leaving a leading host before replacement
+            $out = preg_replace($patternAbs, $finalUrl, $out) ?? $out;
+            $out = preg_replace($patternRel, $finalUrl, $out) ?? $out;
+        }
+        return $out;
     }
 }
