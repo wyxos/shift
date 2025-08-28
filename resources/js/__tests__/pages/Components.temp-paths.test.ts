@@ -109,7 +109,8 @@ describe('Components.vue temp path rendering', () => {
 
     const file = new File([new Uint8Array([1,2,3])], 'dropped.png', { type: 'image/png' })
     const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handleDrop(ed.view, { dataTransfer: { files: [file] }, preventDefault: () => {} } as any)
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
+    ed.commands.insertFiles([file])
 
     await nextTick()
 
@@ -140,10 +141,8 @@ describe('Components.vue temp path rendering', () => {
 
     const file = new File([new Uint8Array([1,2,3])], 'pasted.png', { type: 'image/png' })
     const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handlePaste(ed.view, {
-      clipboardData: { files: [file], items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }] },
-      preventDefault: () => {},
-    } as any)
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
+    ed.commands.insertFiles([file])
 
     await nextTick()
 
@@ -169,7 +168,7 @@ describe('Components.vue temp path rendering', () => {
 
     const file = new File([new Uint8Array([1,2,3])], 'doc.txt', { type: 'text/plain' })
     const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handleDrop(ed.view, { dataTransfer: { files: [file] }, preventDefault: () => {} } as any)
+    ed.commands.insertFiles([file])
 
     await nextTick()
 
@@ -195,10 +194,7 @@ describe('Components.vue temp path rendering', () => {
 
     const file = new File([new Uint8Array([1,2,3])], 'readme.md', { type: 'text/markdown' })
     const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handlePaste(ed.view, {
-      clipboardData: { files: [file], items: [{ kind: 'file', type: 'text/markdown', getAsFile: () => file }] },
-      preventDefault: () => {},
-    } as any)
+    ed.commands.insertFiles([file])
 
     await nextTick()
 

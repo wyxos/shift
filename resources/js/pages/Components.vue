@@ -8,6 +8,7 @@ import TiptapImage from '@tiptap/extension-image'
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 import Icon from '@/components/Icon.vue';
+import ImageUpload from '@/extensions/imageUpload'
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Components', href: '/components' },
@@ -85,127 +86,8 @@ function renderProgressTile(percent: number, label = 'Uploading...'): string {
   return canvas.toDataURL('image/png')
 }
 
-function findImagePosByTitle(ed: any, title: string): number | null {
-  const state = ed?.state
-  if (!state) return null
-  let found: number | null = null
-  state.doc.descendants((node: any, pos: number) => {
-    if (node.type?.name === 'image' && node.attrs?.title === title) {
-      found = pos
-      return false
-    }
-    return true
-  })
-  return found
-}
-
-function insertUploadPlaceholderImage(editor: any, uploadId: string, filename: string) {
-  const state = editor?.state
-  const $from = state?.selection?.$from
-  const before = $from?.nodeBefore
-  const after = $from?.nodeAfter
-  const isText = (n: any) => n && n.type && n.type.name === 'text'
-
-  const chain = editor.chain().focus()
-  if (isText(before)) chain.setHardBreak()
-  chain.insertContent({ type: 'image', attrs: { src: renderProgressTile(0), alt: filename, title: uploadId } })
-  if (isText(after)) chain.setHardBreak()
-  chain.run()
-}
-
-async function uploadImage(file: File) {
-  const ed = editor.value
-  if (!ed) return
-  const uploadId = createUploadId()
-  console.debug('[editor] uploadImage start', { name: file.name, uploadId })
-  insertUploadPlaceholderImage(ed, uploadId, file.name)
-
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('temp_identifier', tempIdentifier.value)
-
-  try {
-    await axios.post(route('attachments.upload') as string, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (evt) => {
-        const total = evt.total || 0
-        const loaded = evt.loaded || 0
-        const percent = total > 0 ? (loaded / total) * 100 : 0
-        console.debug('[editor] upload progress', { uploadId, loaded, total, percent })
-        const pos = findImagePosByTitle(ed, uploadId)
-        if (pos != null) {
-          const { state, dispatch } = ed.view
-          const imageType = state.schema.nodes.image
-          const node = state.doc.nodeAt(pos)
-          if (node) {
-            const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: renderProgressTile(percent) }, node.marks)
-            dispatch(tr)
-          }
-        }
-      },
-    }).then(res => {
-      const data = res.data || {}
-      const finalUrl: string = buildTempUrl(data)
-      console.debug('[editor] upload success', { uploadId, data, finalUrl })
-      if (finalUrl) {
-        let done = false
-        const finishSwap = () => { done = true }
-        const trySwap = () => {
-          if (done) return
-          const pos = findImagePosByTitle(ed, uploadId)
-          console.debug('[editor] swapping placeholder to final image', { uploadId, pos, finalUrl })
-          if (pos != null) {
-            const { state, dispatch } = ed.view
-            const imageType = state.schema.nodes.image
-            const node = state.doc.nodeAt(pos)
-            if (node) {
-              const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: finalUrl, title: '' }, node.marks)
-              dispatch(tr)
-              finishSwap()
-            }
-          }
-        }
-        const ImgCtor: any = (globalThis as any).Image
-        const img = new ImgCtor()
-        // If cross-origin, still want onload to fire; we don't access pixels
-        img.onload = () => {
-          console.debug('[editor] image preload onload', { uploadId, finalUrl })
-          trySwap()
-        }
-        img.onerror = () => {
-          console.warn('[editor] image preload onerror', { uploadId, finalUrl })
-          // Fallback: still attempt to swap so the URL is used, even if preview fails
-          trySwap()
-        }
-        const timer: any = setTimeout(() => {
-          console.debug('[editor] image preload timeout fallback', { uploadId, finalUrl })
-          trySwap()
-        }, 2000)
-        // Ensure we mark done when swapped to avoid multiple updates
-        const origTrySwap = trySwap
-        const wrappedSwap = () => { origTrySwap(); clearTimeout(timer); finishSwap() }
-        // Rebind handlers to wrapped version to clear timer
-        img.onload = wrappedSwap
-        img.onerror = wrappedSwap
-        img.src = finalUrl
-      } else {
-        console.warn('[editor] no finalUrl returned from upload', { uploadId, data })
-      }
-    })
-  } catch (e) {
-    console.error('[editor] upload failed', { uploadId, error: e })
-    const pos = findImagePosByTitle(ed, uploadId)
-    if (pos != null) {
-      const { state, dispatch } = ed.view
-      const imageType = state.schema.nodes.image
-      const node = state.doc.nodeAt(pos)
-      if (node) {
-        const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: renderProgressTile(0, 'Upload failed') }, node.marks)
-        dispatch(tr)
-      }
-    }
-  }
-}
+// The image upload, placeholder rendering and typing-next-to-image logic
+// is implemented by the custom ImageUpload extension.
 
 async function uploadAttachment(file: File) {
   const id = createUploadId()
@@ -240,34 +122,28 @@ async function uploadAttachment(file: File) {
   }
 }
 
-function handleFiles(editor: any, files: FileList | File[]) {
-  const arr = Array.from(files || [])
-  arr.forEach(f => {
-    if (f.type && f.type.startsWith('image/')) {
-      uploadImage(f)
-    } else {
-      uploadAttachment(f)
-    }
-  })
-}
-
 const editor = useEditor({
   extensions: [
     StarterKit,
     TiptapImage.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
+    ImageUpload.configure({
+      getTempIdentifier: () => tempIdentifier.value,
+      onNonImageFile: (file: File) => uploadAttachment(file),
+      axios,
+    }),
   ],
   content: '<p>Hello TipTap</p>',
   editorProps: {
-    handleDrop: (view, event) => {
+    handleDrop: (_view, event) => {
       const dt = (event as DragEvent).dataTransfer
       if (dt?.files?.length) {
         event.preventDefault()
-        handleFiles(editor.value, dt.files)
+        editor.value?.commands.insertFiles(Array.from(dt.files))
         return true
       }
       return false
     },
-    handlePaste: (view, event) => {
+    handlePaste: (_view, event) => {
       const e = event as ClipboardEvent
       const files: File[] = []
       const cdFiles = e.clipboardData?.files
@@ -276,32 +152,22 @@ const editor = useEditor({
       } else {
         const items = e.clipboardData?.items || []
         for (const item of Array.from(items)) {
-          if (item.kind === 'file' && item.type.startsWith('image/')) {
-            const f = item.getAsFile()
+          const it = item as any
+          if (it.kind === 'file' && it.type?.startsWith('image/')) {
+            const f = it.getAsFile?.()
             if (f) files.push(f)
           }
         }
       }
       if (files.length) {
         e.preventDefault()
-        handleFiles(editor.value, files)
+        editor.value?.commands.insertFiles(files)
         return true
       }
       return false
     },
-    handleTextInput: (_view, from, to, text) => {
-      const ed: any = editor.value
-      if (!ed) return false
-      const state = ed.state
-      const $from = state.selection.$from
-      const before = $from.nodeBefore
-      const after = $from.nodeAfter
-      const isNextToImage = (n: any) => n && n.type && n.type.name === 'image'
-      if (isNextToImage(before) || isNextToImage(after)) {
-        ed.chain().focus().setHardBreak().insertContent(text).run()
-        return true
-      }
-      return false
+    handleTextInput: (_view, _from, _to, text) => {
+      return editor.value?.commands.typeText(text) ?? false
     },
   },
 })
