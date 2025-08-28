@@ -102,15 +102,17 @@ watch(() => props.message.content, () => highlight())
             </div>
         </div>
         <div :class="['flex', message.isCurrentUser ? 'justify-end' : 'justify-start']">
-            <div
-                :class="
+            <div class="flex flex-col gap-2 max-w-3/4 min-w-[200px]">
+                <div
+                    :class="
                     message.isCurrentUser
-                        ? 'rounded-br-none bg-blue-500 text-white'
+                        ? 'rounded-br-none bg-blue-200'
                         : 'rounded-bl-none bg-gray-200 text-gray-800'
                 "
-                class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
-            >
-                <div ref="contentRef" class="tiptap ProseMirror !max-h-none !h-auto" v-html="message.content"></div>
+                    class=" rounded-lg p-3 text-left tiptap ProseMirror !max-h-none !h-auto"
+                >
+                    <div ref="contentRef" class="" v-html="message.content"></div>
+                </div>
                 <!-- Display message attachments if any (excluding embedded ones) -->
                 <div v-if="filteredAttachments.length > 0" class="mt-2">
                     <p class="text-xs font-semibold">Attachments:</p>
