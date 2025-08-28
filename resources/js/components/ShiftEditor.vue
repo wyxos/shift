@@ -3,6 +3,7 @@ import ImageUpload from '@/extensions/imageUpload';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import TiptapImage from '@tiptap/extension-image';
 import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import axios from 'axios';
 import 'emoji-picker-element';
@@ -25,7 +26,7 @@ export type SentAttachment = Pick<AttachmentItem, 'name' | 'size' | 'type' | 'pa
 const emit = defineEmits<{ (e: 'send', payload: { html: string; attachments: SentAttachment[] }): void }>();
 
 // Props
-const props = defineProps<{ tempIdentifier?: string }>();
+const props = defineProps<{ tempIdentifier?: string; modelValue?: string; placeholder?: string }>();
 
 // Non-image attachments state
 export type AttachmentItem = {
@@ -59,6 +60,18 @@ watch(
         if (val) tempIdentifier.value = String(val);
     },
 );
+
+// Keep editor content in sync with external modelValue
+watch(
+  () => props.modelValue,
+  (val) => {
+    const current = editor.value?.getHTML() ?? ''
+    const next = val ?? ''
+    if (next !== current) {
+      editor.value?.commands.setContent(next, false)
+    }
+  }
+)
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
@@ -139,6 +152,10 @@ function onFileChosen(e: Event) {
 const editor = useEditor({
     extensions: [
         StarterKit.configure({ codeBlock: false }),
+        Placeholder.configure({
+            placeholder: props.placeholder ?? 'Type a message...',
+            includeChildren: true,
+        }),
         CodeBlockLowlight.configure({
             lowlight,
             HTMLAttributes: {
@@ -155,44 +172,58 @@ const editor = useEditor({
             axios,
         }),
     ],
-    content: '<p>Hello TipTap</p>',
-    editorProps: {
-        handleDrop: (_view, event) => {
-            const dt = (event as DragEvent).dataTransfer;
-            if (dt?.files?.length) {
-                event.preventDefault();
-                editor.value?.commands.insertFiles(Array.from(dt.files));
-                return true;
-            }
-            return false;
-        },
-        handlePaste: (_view, event) => {
-            const e = event as ClipboardEvent;
-            const files: File[] = [];
-            const cdFiles = e.clipboardData?.files;
-            if (cdFiles && cdFiles.length) {
-                files.push(...Array.from(cdFiles));
-            } else {
-                const items = e.clipboardData?.items || [];
-                for (const item of Array.from(items)) {
-                    const it = item as any;
-                    if (it.kind === 'file' && it.type?.startsWith('image/')) {
-                        const f = it.getAsFile?.();
-                        if (f) files.push(f);
-                    }
-                }
-            }
-            if (files.length) {
-                e.preventDefault();
-                editor.value?.commands.insertFiles(files);
-                return true;
-            }
-            return false;
-        },
-        handleTextInput: (_view, _from, _to, text) => {
-            return editor.value?.commands.typeText(text) ?? false;
-        },
+    content: props.modelValue ?? '',
+    onUpdate: () => {
+      const html = editor.value?.getHTML() ?? ''
+      emit('update:modelValue', html)
     },
+  editorProps: {
+    handleKeyDown: (_view, event) => {
+      const e = event as KeyboardEvent
+      // Enter sends the message; Shift+Enter inserts a newline
+      if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) {
+        e.preventDefault()
+        onSend()
+        return true
+      }
+      return false
+    },
+    handleDrop: (_view, event) => {
+      const dt = (event as DragEvent).dataTransfer
+      if (dt?.files?.length) {
+        event.preventDefault()
+        editor.value?.commands.insertFiles(Array.from(dt.files))
+        return true
+      }
+      return false
+    },
+    handlePaste: (_view, event) => {
+      const e = event as ClipboardEvent
+      const files: File[] = []
+      const cdFiles = e.clipboardData?.files
+      if (cdFiles && cdFiles.length) {
+        files.push(...Array.from(cdFiles))
+      } else {
+        const items = e.clipboardData?.items || []
+        for (const item of Array.from(items)) {
+          const it = item as any
+          if (it.kind === 'file' && it.type?.startsWith('image/')) {
+            const f = it.getAsFile?.()
+            if (f) files.push(f)
+          }
+        }
+      }
+      if (files.length) {
+        e.preventDefault()
+        editor.value?.commands.insertFiles(files)
+        return true
+      }
+      return false
+    },
+    handleTextInput: (_view, _from, _to, text) => {
+      return editor.value?.commands.typeText(text) ?? false
+    },
+  },
 });
 
 function onEmojiClick(ev: Event) {
@@ -215,6 +246,7 @@ function onSend() {
     emit('send', { html, attachments: toSend });
     // Reset editor value and clear attachments list
     editor.value?.commands.clearContent();
+    emit('update:modelValue', '');
     attachments.value = [];
 }
 
@@ -287,6 +319,14 @@ defineExpose({ editor });
     @apply rounded-lg border-2 border-blue-500 p-4;
     max-height: 600px;
     overflow-y: auto;
+}
+/* Placeholder styling */
+.ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #9ca3af; /* tailwind gray-400 */
+    pointer-events: none;
+    height: 0;
 }
 /* Code block base styling to make blocks stand out */
 .tiptap pre {

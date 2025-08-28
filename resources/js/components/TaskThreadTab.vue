@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import ShiftEditor from '@/components/ShiftEditor.vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 import { Paperclip, Send } from 'lucide-vue-next';
@@ -74,66 +73,10 @@ defineEmits<Emits>();
             />
         </div>
 
-        <!-- Thread attachments display (internal only) -->
-        <div v-if="tabType === 'internal' && threadAttachments.length > 0" class="mb-3">
-            <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
-            <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                <li
-                    v-for="file in threadAttachments"
-                    :key="file.path"
-                    class="flex items-center justify-between px-3 py-2 text-sm"
-                >
-                    <div class="flex items-center">
-                        <Paperclip :size="20" class="mr-2 text-gray-400" />
-                        <span>{{ truncateFilename(file.original_filename) }}</span>
-                    </div>
-                    <button class="text-red-600 hover:text-red-900" type="button" @click="$emit('removeThreadAttachment', file)">
-                        Remove
-                    </button>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Thread upload error message (internal only) -->
-        <div v-if="tabType === 'internal' && threadUploadError" class="mb-2 text-sm text-red-500">{{ threadUploadError }}</div>
-
-        <!-- Thread loading indicator (internal only) -->
-        <div v-if="tabType === 'internal' && isThreadUploading" class="mb-2 text-sm text-blue-500">Uploading attachment...</div>
-
-        <!-- Message input -->
+        <!-- Message input (ShiftEditor for both tabs) -->
         <div class="flex flex-col">
-            <div class="mb-2" v-if="tabType === 'internal'">
-                <MarkdownEditor
-                    :model-value="newMessage"
-                    :auto-grow="true"
-                    :class="['flex-grow', isDragging ? 'drag-over' : '']"
-                    height="200px"
-                    max-height="600px"
-                    placeholder="Type your message or drop files here..."
-                    @update:model-value="$emit('update:newMessage', $event)"
-                    @dragleave="$emit('handleDragLeave', $event, tabType)"
-                    @dragover="$emit('handleDragOver', $event, tabType)"
-                    @drop="$emit('handleDrop', $event, tabType)"
-                    @enter="$emit('sendMessage')"
-                />
-                <div class="mt-2 flex justify-end gap-2">
-                    <label
-                        class="flex cursor-pointer items-center bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                        <Paperclip :size="20" />
-                        <input class="hidden" multiple type="file" @change="$emit('handleThreadFileUpload', $event)" />
-                    </label>
-                    <button
-                        class="rounded-r-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        type="button"
-                        @click.prevent="$emit('sendMessage', $event)"
-                    >
-                        Send
-                    </button>
-                </div>
-            </div>
-            <div class="mb-2" v-else>
-                <ShiftEditor :temp-identifier="threadTempIdentifier" @send="(p) => { $emit('update:newMessage', p.html); $emit('sendMessage') }" />
+            <div class="mb-2">
+<ShiftEditor :model-value="newMessage" @update:model-value="$emit('update:newMessage', $event)" :temp-identifier="threadTempIdentifier" @send="$emit('sendMessage')" />
             </div>
         </div>
     </div>
