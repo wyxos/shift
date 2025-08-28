@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { h, nextTick } from 'vue'
-import Components from '@/pages/Components.vue'
+import ShiftEditor from '@/components/ShiftEditor.vue'
 
 // Mock AppLayout to keep template simple
 vi.mock('@/layouts/AppLayout.vue', () => ({
@@ -37,7 +37,7 @@ vi.mock('axios', () => ({
   },
 }))
 
-describe('Components.vue TipTap behaviours via commands', () => {
+describe('ShiftEditor TipTap behaviours via commands', () => {
   const originalCreateObjectURL = URL.createObjectURL
 
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('Components.vue TipTap behaviours via commands', () => {
     postMock.mockResolvedValue({ data: { path: 'tmp/doc.txt' } })
     deleteMock.mockResolvedValue({})
 
-    const wrapper = mount(Components)
+    const wrapper = mount(ShiftEditor)
     await nextTick()
 
     const editorEl = await waitForEditor(wrapper)
@@ -102,7 +102,7 @@ describe('Components.vue TipTap behaviours via commands', () => {
     postMock.mockResolvedValue({ data: { path: 'tmp/readme.md' } })
     deleteMock.mockResolvedValue({})
 
-    const wrapper = mount(Components)
+    const wrapper = mount(ShiftEditor)
     await nextTick()
 
     const editorEl = await waitForEditor(wrapper)
@@ -148,7 +148,7 @@ describe('Components.vue TipTap behaviours via commands', () => {
     }))
     proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 
-    const wrapper = mount(Components)
+    const wrapper = mount(ShiftEditor)
     await nextTick()
 
     const editorEl = await waitForEditor(wrapper)
@@ -193,7 +193,7 @@ describe('Components.vue TipTap behaviours via commands', () => {
     }))
     proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 
-    const wrapper = mount(Components)
+    const wrapper = mount(ShiftEditor)
     await nextTick()
 
     const editorEl = await waitForEditor(wrapper)
