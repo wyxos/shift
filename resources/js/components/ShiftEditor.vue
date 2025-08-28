@@ -178,16 +178,6 @@ const editor = useEditor({
       emit('update:modelValue', html)
     },
   editorProps: {
-    handleKeyDown: (_view, event) => {
-      const e = event as KeyboardEvent
-      // Enter sends the message; Shift+Enter inserts a newline
-      if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) {
-        e.preventDefault()
-        onSend()
-        return true
-      }
-      return false
-    },
     handleDrop: (_view, event) => {
       const dt = (event as DragEvent).dataTransfer
       if (dt?.files?.length) {
