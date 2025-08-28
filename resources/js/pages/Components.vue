@@ -313,11 +313,9 @@ defineExpose({ editor })
   <Head title="Components" />
   <AppLayout :breadcrumbs="breadcrumbs">
     <div class="p-4">
-        <div class="relative">
-            <EditorContent data-testid="tiptap-editor" class="mb-4" :editor="editor" />
-            <div class="absolute bottom-2 w-full px-4">
-                // buttons
-            </div>
+        <EditorContent data-testid="tiptap-editor" :editor="editor" />
+        <div class="px-4 mb-4">
+            // buttons
         </div>
         <!-- non image attachments listed here -->
             <ul v-if="attachments.length" data-testid="attachments-list" class="flex gap-4 flex-wrap">
