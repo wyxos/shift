@@ -257,7 +257,7 @@ defineExpose({ editor });
     <div>
         <EditorContent class="tiptap" data-testid="tiptap-editor" :editor="editor" />
 
-        <div class="mb-4 flex justify-end gap-4">
+        <div class="flex justify-end gap-4">
             <ul v-if="attachments.length" data-testid="attachments-list" class="flex flex-1 flex-wrap gap-4 p-2 px-4">
                 <li
                     v-for="att in attachments"
