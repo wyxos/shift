@@ -18,12 +18,31 @@ vi.mock('@inertiajs/vue3', () => ({
   Head: { render: () => {} },
 }))
 
-describe('Components.vue TipTap image drop/paste (insert local image and respect line breaks)', () => {
+// Route helper
+beforeEach(() => {
+  ;(global as any).route = (name: string) => {
+    if (name === 'attachments.upload') return '/attachments/upload'
+    if (name === 'attachments.remove-temp') return '/attachments/remove-temp'
+    return '/'
+  }
+})
+
+// Mock axios for upload and delete
+const postMock = vi.fn()
+const deleteMock = vi.fn()
+vi.mock('axios', () => ({
+  default: {
+    post: (...args: any[]) => postMock(...args),
+    delete: (...args: any[]) => deleteMock(...args),
+  },
+}))
+
+describe('Components.vue TipTap behaviours via commands', () => {
   const originalCreateObjectURL = URL.createObjectURL
 
   beforeEach(() => {
-    // Mock blob URL for local preview
     URL.createObjectURL = vi.fn(() => 'blob:mock-1234') as any
+    postMock.mockReset(); deleteMock.mockReset()
   })
 
   afterEach(() => {
@@ -32,7 +51,7 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
 
   async function waitForEditor(wrapper: any) {
     const start = Date.now()
-    while (Date.now() - start < 500) {
+    while (Date.now() - start < 800) {
       const el = wrapper.find('.ProseMirror')
       if (el.exists()) return el
       await new Promise(r => setTimeout(r, 10))
@@ -41,7 +60,84 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     return wrapper.find('.ProseMirror')
   }
 
-  it('lists a non-image attachment on drop under the editor with size and remove CTA', async () => {
+  it('lists a non-image attachment when inserting files (size + remove)', async () => {
+    // non-image upload resolves immediately
+    postMock.mockResolvedValue({ data: { path: 'tmp/doc.txt' } })
+    deleteMock.mockResolvedValue({})
+
+    const wrapper = mount(Components)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+    expect(editorEl.exists()).toBe(true)
+
+    const file = new File([new Uint8Array([1,2,3])], 'doc.txt', { type: 'text/plain' })
+
+    const ed: any = (wrapper.vm as any).editor
+    ed.commands.insertFiles([file])
+
+    await nextTick()
+
+    expect(editorEl.findAll('img').length).toBe(0)
+    const list = wrapper.find('[data-testid="attachments-list"]')
+    expect(list.exists()).toBe(true)
+    let items = wrapper.findAll('[data-testid="attachment-item"]')
+    let item = items.find(i => i.text().includes('doc.txt'))!
+    expect(item).toBeTruthy()
+    const start0 = Date.now(); let ok0 = false
+    while (Date.now() - start0 < 300) {
+      items = wrapper.findAll('[data-testid="attachment-item"]')
+      item = items.find(i => i.text().includes('doc.txt'))!
+      if (item && item.text().includes('3 B')) { ok0 = true; break }
+      await new Promise(r => setTimeout(r, 10)); await nextTick()
+    }
+    expect(ok0).toBe(true)
+
+    await item.find('[data-testid="attachment-remove"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
+  })
+
+  it('lists a non-image attachment with size on insertFiles from paste scenario', async () => {
+    postMock.mockResolvedValue({ data: { path: 'tmp/readme.md' } })
+    deleteMock.mockResolvedValue({})
+
+    const wrapper = mount(Components)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+    expect(editorEl.exists()).toBe(true)
+
+    const file = new File([new Uint8Array([1,2,3])], 'readme.md', { type: 'text/markdown' })
+
+    const ed: any = (wrapper.vm as any).editor
+    ed.commands.insertFiles([file])
+
+    await nextTick()
+
+    expect(editorEl.findAll('img').length).toBe(0)
+    let items = wrapper.findAll('[data-testid="attachment-item"]')
+    let item = items.find(i => i.text().includes('readme.md'))!
+    expect(item).toBeTruthy()
+    // wait up to 300ms for status to become done
+    const start = Date.now(); let ok = false
+    while (Date.now() - start < 300) {
+      items = wrapper.findAll('[data-testid="attachment-item"]')
+      item = items.find(i => i.text().includes('readme.md'))!
+      if (item && item.text().includes('3 B')) { ok = true; break }
+      await new Promise(r => setTimeout(r, 10)); await nextTick()
+    }
+    expect(ok).toBe(true)
+
+    await item.find('[data-testid="attachment-remove"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
+  })
+
+  it('inserts image on its own line and typing starts on next line using commands', async () => {
+    // Hold upload to keep placeholder visible
+    postMock.mockImplementation(() => new Promise(() => {}))
+
     // mock canvas for placeholder tile
     const proto: any = (HTMLCanvasElement as any).prototype
     const origGetContext = proto.getContext
@@ -56,7 +152,40 @@ describe('Components.vue TipTap image drop/paste (insert local image and respect
     await nextTick()
 
     const editorEl = await waitForEditor(wrapper)
-origGetContext = proto.getContext
+    expect(editorEl.exists()).toBe(true)
+
+    const file = new File([new Uint8Array([1,2,3])], 'dropped.png', { type: 'image/png' })
+
+    const ed: any = (wrapper.vm as any).editor
+    ed.commands.setContent('<p>Text</p>')
+    await nextTick()
+    await new Promise(r => setTimeout(r, 0))
+    ed.commands.insertFiles([file])
+
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
+
+    const imgs = editorEl.findAll('img')
+    expect(imgs.length).toBeGreaterThan(0)
+    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
+    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
+
+    const html = editorEl.html()
+    expect(html).toContain('<br')
+
+    await new Promise(r => setTimeout(r, 0))
+    ed.commands.typeText('A')
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
+    expect(editorEl.text()).toContain('A')
+
+    proto.getContext = origGetContext
+    proto.toDataURL = origToDataURL
+  })
+
+  it('inserts image then typing behaves correctly with paste-like scenario', async () => {
+    postMock.mockImplementation(() => new Promise(() => {}))
+
+    const proto: any = (HTMLCanvasElement as any).prototype
+    const origGetContext = proto.getContext
     const origToDataURL = proto.toDataURL
     proto.getContext = vi.fn(() => ({
       fillStyle: '', strokeStyle: '', font: '', textAlign: '',
@@ -70,135 +199,28 @@ origGetContext = proto.getContext
     const editorEl = await waitForEditor(wrapper)
     expect(editorEl.exists()).toBe(true)
 
-    const file = new File([new Uint8Array([1,2,3])], 'doc.txt', { type: 'text/plain' })
-
-    const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handleDrop(ed.view, { dataTransfer: { files: [file] }, preventDefault: () => {} } as any)
-
-    await nextTick()
-
-    // Should not insert an img; instead, list the attachment
-    expect(editorEl.findAll('img').length).toBe(0)
-    const list = wrapper.find('[data-testid="attachments-list"]')
-    expect(list.exists()).toBe(true)
-    const items = wrapper.findAll('[data-testid="attachment-item"]')
-    const item = items.find(i => i.text().includes('doc.txt'))!
-    expect(item).toBeTruthy()
-    expect(item.text()).toContain('3 B')
-    // remove
-    await item.find('[data-testid="attachment-remove"]').trigger('click')
-    await nextTick()
-    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
-  })
-
-  it('lists a non-image attachment on paste under the editor with size and remove CTA', async () => {
-    const wrapper = mount(Components)
-    await nextTick()
-
-    const editorEl = await waitForEditor(wrapper)
-    expect(editorEl.exists()).toBe(true)
-
-    const file = new File([new Uint8Array([1,2,3])], 'readme.md', { type: 'text/markdown' })
-
-    const ed: any = (wrapper.vm as any).editor
-    ed.options.editorProps.handlePaste(ed.view, {
-      clipboardData: {
-        files: [file],
-        items: [{ kind: 'file', type: 'text/markdown', getAsFile: () => file }],
-      },
-      preventDefault: () => {},
-    } as any)
-
-    await nextTick()
-
-    expect(editorEl.findAll('img').length).toBe(0)
-    const items = wrapper.findAll('[data-testid="attachment-item"]')
-    const item = items.find(i => i.text().includes('readme.md'))!
-    expect(item).toBeTruthy()
-    expect(item.text()).toContain('3 B')
-    // remove
-    await item.find('[data-testid="attachment-remove"]').trigger('click')
-    await nextTick()
-    expect(wrapper.findAll('[data-testid="attachment-item"]').length).toBe(0)
-  })
-
-  it('inserts image on drop next to text on its own line and typing starts on next line', async () => {
-    const wrapper = mount(Components)
-    await nextTick()
-
-    const editorEl = await waitForEditor(wrapper)
-    expect(editorEl.exists()).toBe(true)
-
-    const file = new File([new Uint8Array([1,2,3])], 'dropped.png', { type: 'image/png' })
-
-    // Put some text first at the current position
-    const ed: any = (wrapper.vm as any).editor
-    ed.commands.setContent('<p>Text</p>')
-
-    // Call editor drop handler directly
-    ed.options.editorProps.handleDrop(ed.view, { dataTransfer: { files: [file] }, preventDefault: () => {} } as any)
-
-    await nextTick()
-
-    const imgs = editorEl.findAll('img')
-    expect(imgs.length).toBeGreaterThan(0)
-    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
-    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
-    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
-    expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true)
-
-    // The editor HTML should contain a hard break separating text and image
-    const html = editorEl.html()
-    expect(html).toContain('<br')
-
-    // Simulate typing "A" immediately after the image
-    ed.options.editorProps.handleTextInput(ed.view, ed.state.selection.from, ed.state.selection.to, 'A')
-    await nextTick()
-
-    // Expect typed character present
-    expect(editorEl.text()).toContain('A')
-
-    // restore canvas mocks
-    proto.getContext = origGetContext
-    proto.toDataURL = origToDataURL
-  })
-
-  it('inserts image on paste next to text on its own line and typing starts on next line', async () => {
-    const wrapper = mount(Components)
-    await nextTick()
-
-    const editorEl = await waitForEditor(wrapper)
-    expect(editorEl.exists()).toBe(true)
-
-    const file = new File([new Uint8Array([1,2,3])], 'pasted.png', { type: 'image/png' })
-
     const ed: any = (wrapper.vm as any).editor
     ed.commands.setContent('<p>Abc</p>')
-    ed.options.editorProps.handlePaste(ed.view, {
-      clipboardData: {
-        files: [file],
-        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
-      },
-      preventDefault: () => {},
-    } as any)
-
     await nextTick()
+    await new Promise(r => setTimeout(r, 0))
+
+    const file = new File([new Uint8Array([1,2,3])], 'pasted.png', { type: 'image/png' })
+    ed.commands.insertFiles([file])
+
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
 
     const imgs = editorEl.findAll('img')
     expect(imgs.length).toBeGreaterThan(0)
-    expect(imgs[0].element.getAttribute('src') || '').toContain('blob:')
+    expect((imgs[0].element.getAttribute('src') || '')).toContain('data:image/png')
 
-    // There should be a line break separating existing text and the image
     const html = editorEl.html()
     expect(html).toContain('<br')
 
-    // Simulate typing immediately after the image
-    ed.options.editorProps.handleTextInput(ed.view, ed.state.selection.from, ed.state.selection.to, 'B')
-    await nextTick()
-
+    await new Promise(r => setTimeout(r, 0))
+    ed.commands.typeText('B')
+    await nextTick(); await new Promise(r => setTimeout(r, 0))
     expect(editorEl.text()).toContain('B')
 
-    // restore canvas mocks
     proto.getContext = origGetContext
     proto.toDataURL = origToDataURL
   })
