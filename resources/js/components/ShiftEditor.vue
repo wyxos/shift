@@ -308,7 +308,7 @@ defineExpose({ editor });
 
 <style>
 @reference "tailwindcss";
-.ProseMirror img.editor-tile {
+.ProseMirror img.editor-tile, .tiptap img.editor-tile {
     width: 200px;
     height: 200px;
     object-fit: cover;

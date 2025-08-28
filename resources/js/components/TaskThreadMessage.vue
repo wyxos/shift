@@ -110,7 +110,7 @@ watch(() => props.message.content, () => highlight())
                 "
                 class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
             >
-                <div ref="contentRef" class="markdown-content" v-html="renderMarkdown(message.content)"></div>
+                <div ref="contentRef" class="tiptap ProseMirror !max-h-none !h-auto" v-html="message.content"></div>
                 <!-- Display message attachments if any (excluding embedded ones) -->
                 <div v-if="filteredAttachments.length > 0" class="mt-2">
                     <p class="text-xs font-semibold">Attachments:</p>
