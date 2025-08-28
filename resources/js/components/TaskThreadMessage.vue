@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, defineEmits, onMounted, ref, watch, nextTick } from 'vue';
+import { defineProps, defineEmits, onMounted, ref, watch, nextTick, computed } from 'vue';
 import { Trash2, Paperclip } from 'lucide-vue-next';
 import hljs from 'highlight.js/lib/core'
 import jsLang from 'highlight.js/lib/languages/javascript'
@@ -50,6 +50,19 @@ const emit = defineEmits<Emits>();
 
 const contentRef = ref<HTMLElement | null>(null)
 
+// Filter out attachments already embedded in content (e.g., images inserted in the editor)
+const filteredAttachments = computed(() => {
+  const html = props.message?.content || ''
+  const list = Array.isArray(props.message?.attachments) ? props.message.attachments : []
+  return list.filter((att: any) => {
+    const id = String(att?.id ?? '')
+    if (!id) return true
+    // If the content contains the internal download route path with this id, treat as embedded
+    const marker = `/attachments/${id}/download`
+    return html.indexOf(marker) === -1
+  })
+})
+
 function highlight() {
   nextTick(() => {
     const root = contentRef.value
@@ -98,10 +111,10 @@ watch(() => props.message.content, () => highlight())
                 class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
             >
                 <div ref="contentRef" class="markdown-content" v-html="renderMarkdown(message.content)"></div>
-                <!-- Display message attachments if any -->
-                <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
+                <!-- Display message attachments if any (excluding embedded ones) -->
+                <div v-if="filteredAttachments.length > 0" class="mt-2">
                     <p class="text-xs font-semibold">Attachments:</p>
-                    <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
+                    <div v-for="attachment in filteredAttachments" :key="attachment.id" class="mt-1">
                         <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
                             <Paperclip :size="12" class="mr-1" />
                             {{ truncateFilename(attachment.original_filename) }}
