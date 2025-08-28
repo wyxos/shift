@@ -5,13 +5,18 @@ import TiptapImage from '@tiptap/extension-image'
 import ImageUpload from '@/extensions/imageUpload'
 import { ref, reactive } from 'vue'
 import axios from 'axios'
-import Icon from '@/components/Icon.vue'
+import { Paperclip, Send, Smile } from 'lucide-vue-next'
+import 'emoji-picker-element'
+
+// Emits
+const emit = defineEmits<{ (e: 'send', payload: { html: string }): void }>()
 
 // Non-image attachments state
 export type AttachmentItem = { id: string; name: string; size: number; type: string; progress: number; status: 'uploading' | 'done' | 'error'; path?: string }
 
 const attachments = ref<AttachmentItem[]>([])
 const tempIdentifier = ref<string>(Date.now().toString())
+const showEmoji = ref(false)
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -68,6 +73,20 @@ async function uploadAttachment(file: File) {
   }
 }
 
+// Attachment picker helpers
+const fileInput = ref<HTMLInputElement | null>(null)
+function openFilePicker() {
+  fileInput.value?.click()
+}
+function onFileChosen(e: Event) {
+  const files = (e.target as HTMLInputElement).files
+  if (!files?.length) return
+  // Requirement: anything attached via the attachment icon (image or non image)
+  // is listed below as attachments. So we treat all files as attachments here.
+  Array.from(files).forEach(uploadAttachment)
+  ;(e.target as HTMLInputElement).value = ''
+}
+
 const editor = useEditor({
   extensions: [
     StarterKit,
@@ -118,16 +137,44 @@ const editor = useEditor({
   },
 })
 
+function onEmojiClick(ev: Event) {
+  const unicode = (ev as CustomEvent).detail?.unicode || (ev as any).detail?.emoji?.unicode
+  if (!unicode || !editor.value) return
+  editor.value.chain().focus().insertContent(unicode).run()
+  showEmoji.value = false
+}
+
+function onSend() {
+  const html = editor.value?.getHTML() ?? ''
+  emit('send', { html })
+  // Reset editor value
+  editor.value?.commands.clearContent()
+}
+
 defineExpose({ editor })
 </script>
 
 <template>
   <div>
     <EditorContent data-testid="tiptap-editor" :editor="editor" />
-    <div class="px-4 mb-4">
-      <!-- toolbar placeholder -->
-      // buttons
+
+    <div class="px-4 mb-4 flex items-center gap-2">
+      <button type="button" data-testid="toolbar-emoji" class="p-1 rounded hover:bg-gray-100" @click="showEmoji = !showEmoji">
+        <Smile :size="18" />
+      </button>
+      <button type="button" data-testid="toolbar-attachment" class="p-1 rounded hover:bg-gray-100" @click="openFilePicker">
+        <Paperclip :size="18" />
+      </button>
+      <button type="button" data-testid="toolbar-send" class="ml-auto p-1 rounded hover:bg-gray-100 text-blue-600" @click="onSend">
+        <Send :size="18" />
+      </button>
+      <input ref="fileInput" data-testid="file-input" type="file" class="hidden" multiple @change="onFileChosen" />
     </div>
+
+    <div v-if="showEmoji" class="px-4 mb-2">
+      <emoji-picker data-testid="emoji-picker" @emoji-click="onEmojiClick"></emoji-picker>
+    </div>
+
     <ul v-if="attachments.length" data-testid="attachments-list" class="flex gap-4 flex-wrap">
       <li v-for="att in attachments" :key="att.id" data-testid="attachment-item" :data-temp-path="att.path" class=" bg-gray-100 p-2 rounded w-60 flex items-center justify-between gap-2 ">
         <div class="min-w-0">
@@ -140,9 +187,7 @@ defineExpose({ editor })
             <div class="h-1 bg-blue-500 transition-all" :style="{ width: (Math.max(1, att.progress)) + '%' }"></div>
           </div>
         </div>
-        <button type="button" class="text-red-600 text-xs hover:underline cursor-pointer" data-testid="attachment-remove" @click="removeAttachment(att)">
-          <Icon name="x" class="inline-block mr-1" :size="12" />
-        </button>
+        <button type="button" class="text-red-600 text-xs hover:underline cursor-pointer" data-testid="attachment-remove" @click="removeAttachment(att)">✕</button>
       </li>
     </ul>
   </div>
@@ -161,4 +206,3 @@ defineExpose({ editor })
   @apply pb-20 border-2 border-blue-500 p-4 rounded-lg;
 }
 </style>
-
