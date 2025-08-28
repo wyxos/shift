@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import ShiftEditor from '@/components/ShiftEditor.vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 import { Paperclip, Send } from 'lucide-vue-next';
 import type { Ref } from 'vue';
@@ -33,6 +34,7 @@ interface Props {
     renderMarkdown: (content: string) => string;
     isMessageDeletable: (createdAt?: string) => boolean;
     truncateFilename: (filename: string, maxLength?: number) => string;
+    threadTempIdentifier?: string;
 }
 
 interface Emits {
@@ -72,8 +74,8 @@ defineEmits<Emits>();
             />
         </div>
 
-        <!-- Thread attachments display -->
-        <div v-if="threadAttachments.length > 0" class="mb-3">
+        <!-- Thread attachments display (internal only) -->
+        <div v-if="tabType === 'internal' && threadAttachments.length > 0" class="mb-3">
             <h4 class="text-sm font-medium text-gray-700">Attachments:</h4>
             <ul class="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
                 <li
@@ -92,15 +94,15 @@ defineEmits<Emits>();
             </ul>
         </div>
 
-        <!-- Thread upload error message -->
-        <div v-if="threadUploadError" class="mb-2 text-sm text-red-500">{{ threadUploadError }}</div>
+        <!-- Thread upload error message (internal only) -->
+        <div v-if="tabType === 'internal' && threadUploadError" class="mb-2 text-sm text-red-500">{{ threadUploadError }}</div>
 
-        <!-- Thread loading indicator -->
-        <div v-if="isThreadUploading" class="mb-2 text-sm text-blue-500">Uploading attachment...</div>
+        <!-- Thread loading indicator (internal only) -->
+        <div v-if="tabType === 'internal' && isThreadUploading" class="mb-2 text-sm text-blue-500">Uploading attachment...</div>
 
-        <!-- Message input with attachment button -->
+        <!-- Message input -->
         <div class="flex flex-col">
-            <div class="mb-2">
+            <div class="mb-2" v-if="tabType === 'internal'">
                 <MarkdownEditor
                     :model-value="newMessage"
                     :auto-grow="true"
@@ -129,6 +131,9 @@ defineEmits<Emits>();
                         Send
                     </button>
                 </div>
+            </div>
+            <div class="mb-2" v-else>
+                <ShiftEditor :temp-identifier="threadTempIdentifier" @send="(p) => { $emit('update:newMessage', p.html); $emit('sendMessage') }" />
             </div>
         </div>
     </div>
