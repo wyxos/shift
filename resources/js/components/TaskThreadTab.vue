@@ -75,7 +75,7 @@ defineEmits<Emits>();
 
         <!-- Message input (ShiftEditor for both tabs) -->
         <div class="flex flex-col">
-            <div class="mb-2">
+            <div class="">
 <ShiftEditor :model-value="newMessage" @update:model-value="$emit('update:newMessage', $event)" :temp-identifier="threadTempIdentifier" @send="$emit('sendMessage')" />
             </div>
         </div>
