@@ -1,6 +1,27 @@
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue';
+import { defineProps, defineEmits, onMounted, ref, watch, nextTick } from 'vue';
 import { Trash2, Paperclip } from 'lucide-vue-next';
+import hljs from 'highlight.js/lib/core'
+import jsLang from 'highlight.js/lib/languages/javascript'
+import tsLang from 'highlight.js/lib/languages/typescript'
+import jsonLang from 'highlight.js/lib/languages/json'
+import cssLang from 'highlight.js/lib/languages/css'
+import phpLang from 'highlight.js/lib/languages/php'
+import xmlLang from 'highlight.js/lib/languages/xml'
+import pythonLang from 'highlight.js/lib/languages/python'
+import 'highlight.js/styles/github.css'
+
+hljs.registerLanguage('javascript', jsLang)
+hljs.registerLanguage('js', jsLang)
+hljs.registerLanguage('typescript', tsLang)
+hljs.registerLanguage('ts', tsLang)
+hljs.registerLanguage('json', jsonLang)
+hljs.registerLanguage('css', cssLang)
+hljs.registerLanguage('php', phpLang)
+hljs.registerLanguage('xml', xmlLang)
+hljs.registerLanguage('html', xmlLang)
+hljs.registerLanguage('python', pythonLang)
+hljs.registerLanguage('py', pythonLang)
 
 interface Message {
     id: number;
@@ -24,8 +45,23 @@ interface Emits {
     (e: 'deleteMessage', messageId: number, messageType: 'internal' | 'external'): void;
 }
 
-defineProps<Props>();
-defineEmits<Emits>();
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+const contentRef = ref<HTMLElement | null>(null)
+
+function highlight() {
+  nextTick(() => {
+    const root = contentRef.value
+    if (!root) return
+    root.querySelectorAll('pre code').forEach((el) => {
+      try { hljs.highlightElement(el as HTMLElement) } catch {}
+    })
+  })
+}
+
+onMounted(() => highlight())
+watch(() => props.message.content, () => highlight())
 </script>
 
 <template>
@@ -61,7 +97,7 @@ defineEmits<Emits>();
                 "
                 class="inline-block max-w-3/4 min-w-[200px] rounded-lg p-3 text-left"
             >
-                <div class="markdown-content" v-html="renderMarkdown(message.content)"></div>
+                <div ref="contentRef" class="markdown-content" v-html="renderMarkdown(message.content)"></div>
                 <!-- Display message attachments if any -->
                 <div v-if="message.attachments && message.attachments.length > 0" class="mt-2">
                     <p class="text-xs font-semibold">Attachments:</p>
