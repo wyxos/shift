@@ -4,6 +4,8 @@ use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 
@@ -177,10 +179,43 @@ test('external thread creation sends notification to multiple external users', f
         }
     );
 
-    Notification::assertSentOnDemand(
+Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) use ($anotherExternalUser) {
             return $notifiable->routes['mail'] === $anotherExternalUser->email;
         }
     );
+});
+
+
+test('internal thread replaces temp URLs in content with final download URLs', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    $file = UploadedFile::fake()->image('photo.png');
+
+    // Upload to temp storage
+    $upload = $this->actingAs($this->user)->post(route('attachments.upload'), [
+        'file' => $file,
+        'temp_identifier' => $tempIdentifier,
+    ]);
+    $upload->assertStatus(200);
+
+    $tempUrl = $upload->json('url');
+
+    // Create thread with content embedding the temp URL
+    $response = $this->actingAs($this->user)
+        ->postJson(route('task-threads.store', $this->task), [
+            'content' => '<p><img src="' . $tempUrl . '"></p>',
+            'type' => 'internal',
+            'temp_identifier' => $tempIdentifier,
+        ]);
+
+    $response->assertStatus(201);
+
+    $content = $response->json('thread.content');
+    $attachmentId = $response->json('thread.attachments.0.id');
+
+    expect($content)->not->toContain('/attachments/temp/');
+    expect($content)->toContain('/attachments/' . $attachmentId . '/download');
 });
