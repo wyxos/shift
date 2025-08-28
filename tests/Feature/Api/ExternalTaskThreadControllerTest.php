@@ -6,6 +6,7 @@ use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Notification;
 
 ;
@@ -81,8 +82,41 @@ test('external thread creation sends notifications to project users', function (
     $response->assertStatus(201);
 
     // Assert that notifications were sent to all project users
-    Notification::assertSentTo(
+Notification::assertSentTo(
         [$this->user, $projectUser1, $projectUser2],
         TaskThreadUpdated::class
     );
+});
+
+
+test('external API thread replaces temp URLs in content with final download URLs', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    // Create a temp file and metadata
+    $storedFilename = 'img_' . uniqid() . '.png';
+    $tempDir = 'temp_attachments/' . $tempIdentifier;
+    Storage::put($tempDir . '/' . $storedFilename, 'fake');
+    Storage::put($tempDir . '/' . $storedFilename . '.meta', json_encode(['original_filename' => 'photo.png']));
+
+    $content = '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $storedFilename . '"></p>';
+
+    $threadData = [
+        'content' => $content,
+        'type' => 'external',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+        'temp_identifier' => $tempIdentifier,
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+        ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
+
+    $response->assertStatus(201);
+
+    $out = $response->json('thread.content');
+    $attachmentId = $response->json('thread.attachments.0.id');
+
+    expect($out)->not->toContain('/attachments/temp/');
+    expect($out)->toContain('/attachments/' . $attachmentId . '/download');
 });
