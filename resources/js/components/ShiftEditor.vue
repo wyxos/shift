@@ -158,7 +158,7 @@ defineExpose({ editor })
   <div>
     <EditorContent data-testid="tiptap-editor" :editor="editor" />
 
-    <div class="px-4 mb-4 flex items-center gap-2">
+    <div class="p-2 px-4 mb-4 flex items-center justify-end gap-2">
       <button type="button" data-testid="toolbar-emoji" class="p-1 rounded hover:bg-gray-100" @click="showEmoji = !showEmoji">
         <Smile :size="18" />
       </button>
