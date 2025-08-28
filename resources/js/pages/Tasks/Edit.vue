@@ -429,21 +429,6 @@ const submitForm = (): void => {
     text-decoration: underline;
 }
 
-.markdown-content code {
-    background-color: rgba(0, 0, 0, 0.1);
-    padding: 0.2em 0.4em;
-    border-radius: 3px;
-    font-family: monospace;
-}
-
-.markdown-content pre {
-    background-color: rgba(0, 0, 0, 0.1);
-    padding: 1em;
-    border-radius: 5px;
-    overflow-x: auto;
-    margin-bottom: 1em;
-}
-
 .markdown-content blockquote {
     border-left: 4px solid #e2e8f0;
     padding-left: 1em;
