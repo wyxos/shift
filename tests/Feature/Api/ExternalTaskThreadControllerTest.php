@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ExternalUser;
+use App\Models\TaskThread;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
@@ -115,8 +116,14 @@ test('external API thread replaces temp URLs in content with final download URLs
     $response->assertStatus(201);
 
     $out = $response->json('thread.content');
-    $attachmentId = $response->json('thread.attachments.0.id');
+    $threadId = $response->json('thread.id');
+
+    $thread = TaskThread::find($threadId);
+    $attachmentId = optional($thread->attachments()->first())->id;
 
     expect($out)->not->toContain('/attachments/temp/');
     expect($out)->toContain('/attachments/' . $attachmentId . '/download');
+
+    // Embedded image should be excluded from attachments list in response
+    expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
