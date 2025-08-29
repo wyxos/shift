@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Http\UploadedFile;
 
 ;
 
@@ -174,5 +175,43 @@ test('external API thread replaces temp URLs in content with final download URLs
     expect($out)->toContain('/shift/api/attachments/' . $attachmentId . '/download');
 
     // Embedded image should be excluded from attachments list in response
+    expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
+});
+
+
+test('external API thread replaces encoded-space temp URLs with final API download URLs', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    $fileWithSpaces = UploadedFile::fake()->image('Proof of Address 20252707.jpg');
+
+    // Use internal upload endpoint to create the temp file and return an absolute, encoded URL
+    $upload = $this->post(route('attachments.upload'), [
+        'file' => $fileWithSpaces,
+        'temp_identifier' => $tempIdentifier,
+    ]);
+    $upload->assertStatus(200);
+    $tempUrl = $upload->json('url');
+
+    $threadData = [
+        'content' => '<p><img src="' . $tempUrl . '"></p>',
+        'type' => 'external',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+        'temp_identifier' => $tempIdentifier,
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+        ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
+
+    $response->assertStatus(201);
+
+    $out = $response->json('thread.content');
+    $threadId = $response->json('thread.id');
+    $thread = TaskThread::find($threadId);
+    $attachmentId = optional($thread->attachments()->first())->id;
+
+    expect($out)->not->toContain('/attachments/temp/');
+    expect($out)->toContain('/shift/api/attachments/' . $attachmentId . '/download');
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
