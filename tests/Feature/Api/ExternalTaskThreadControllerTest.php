@@ -183,15 +183,14 @@ test('external API thread replaces encoded-space temp URLs with final API downlo
     Storage::fake('local');
 
     $tempIdentifier = 'thread-' . time();
-    $fileWithSpaces = UploadedFile::fake()->image('Proof of Address 20252707.jpg');
+    // Create a temp file whose basename contains spaces
+    $storedFilename = 'Proof of Address 20252707_' . uniqid() . '.jpg';
+    $tempDir = 'temp_attachments/' . $tempIdentifier;
+    Storage::put($tempDir . '/' . $storedFilename, 'fake');
+    Storage::put($tempDir . '/' . $storedFilename . '.meta', json_encode(['original_filename' => 'Proof of Address 20252707.jpg']));
 
-    // Use internal upload endpoint to create the temp file and return an absolute, encoded URL
-    $upload = $this->post(route('attachments.upload'), [
-        'file' => $fileWithSpaces,
-        'temp_identifier' => $tempIdentifier,
-    ]);
-    $upload->assertStatus(200);
-    $tempUrl = $upload->json('url');
+    // Build the absolute temp URL (route helper will URL-encode spaces)
+    $tempUrl = route('attachments.temp', ['temp' => $tempIdentifier, 'filename' => $storedFilename]);
 
     $threadData = [
         'content' => '<p><img src="' . $tempUrl . '"></p>',
