@@ -55,8 +55,9 @@ class ExternalTaskThreadController extends Controller
                 $attachments = $thread->attachments()->get()
                     ->filter(function ($attachment) use ($content) {
                         // match against internal download URL present in content
-                        $downloadUrl = route('attachments.download', $attachment);
-                        return strpos($content, $downloadUrl) === false;
+                        $downloadUrlRel = route('attachments.download', $attachment, false);
+                        $downloadUrlAbs = url($downloadUrlRel);
+                        return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
                     })
                     ->map(function ($attachment) {
                         return [
@@ -81,7 +82,7 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
-                    'content' => $thread->content,
+                    'content' => $this->rewriteContentUrlsToApi($thread->content ?? ''),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $isCurrentUser,
                     'created_at' => $thread->created_at,
@@ -184,9 +185,10 @@ class ExternalTaskThreadController extends Controller
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
         $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
-            // check against internal download URL present in content
-            $downloadUrl = route('attachments.download', $attachment);
-            return strpos($content, $downloadUrl) === false;
+            // check against internal download URL present in content (relative or absolute)
+            $downloadUrlRel = route('attachments.download', $attachment, false);
+            $downloadUrlAbs = url($downloadUrlRel);
+            return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
         })->map(function ($attachment) {
             return [
                 'id' => $attachment->id,
@@ -201,7 +203,7 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-                'content' => $thread->content,
+                'content' => $this->rewriteContentUrlsToApi($thread->content ?? ''),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
@@ -310,7 +312,7 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-                'content' => $thread->content,
+                'content' => $this->rewriteContentUrlsToApi($thread->content ?? ''),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => $isCurrentUser,
                 'created_at' => $thread->created_at,
@@ -330,7 +332,7 @@ class ExternalTaskThreadController extends Controller
         $out = $content;
         foreach ($attachments as $attachment) {
             // For persisted HTML, use internal download route; API consumers should render attachments list
-            $finalUrl = route('attachments.download', $attachment);
+            $finalUrl = route('attachments.download', $attachment, false);
             $basename = basename($attachment->path);
             $quotedTemp = preg_quote($tempIdentifier, '#');
             $quotedBase = preg_quote($basename, '#');
@@ -340,6 +342,20 @@ class ExternalTaskThreadController extends Controller
             $out = preg_replace($patternAbs, $finalUrl, $out) ?? $out;
             $out = preg_replace($patternRel, $finalUrl, $out) ?? $out;
         }
+        return $out;
+    }
+
+    /**
+     * Rewrite any /attachments/{id}/download URLs (absolute or relative) in content to
+     * /shift/api/attachments/{id}/download for external API consumers.
+     */
+    private function rewriteContentUrlsToApi(string $content): string
+    {
+        if ($content === '') return $content;
+        // Absolute forms
+        $out = preg_replace('#https?://[^\"\']+/attachments/(\d+)/download#', '/shift/api/attachments/$1/download', $content) ?? $content;
+        // Relative forms
+        $out = preg_replace('#/attachments/(\d+)/download#', '/shift/api/attachments/$1/download', $out) ?? $out;
         return $out;
     }
 }
