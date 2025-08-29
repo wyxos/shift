@@ -337,11 +337,19 @@ class ExternalTaskThreadController extends Controller
             $basename = basename($attachment->path);
             $quotedTemp = preg_quote($tempIdentifier, '#');
             $quotedBase = preg_quote($basename, '#');
-            $patternRel = "#/attachments/temp/{$quotedTemp}/{$quotedBase}#";
-            $patternAbs = "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#";
-            // Replace absolute URLs first to avoid leaving a leading host before replacement
-            $out = preg_replace($patternAbs, $finalUrl, $out) ?? $out;
-            $out = preg_replace($patternRel, $finalUrl, $out) ?? $out;
+            $quotedBaseEnc = preg_quote(rawurlencode($basename), '#');
+
+            // Match both encoded and unencoded basenames, absolute and relative URLs
+            $patterns = [
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+            ];
+
+            foreach ($patterns as $pattern) {
+                $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
+            }
         }
         return $out;
     }
