@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ExternalUser;
+use App\Models\TaskThread;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
@@ -214,8 +215,15 @@ test('internal thread replaces temp URLs in content with final download URLs', f
     $response->assertStatus(201);
 
     $content = $response->json('thread.content');
-    $attachmentId = $response->json('thread.attachments.0.id');
+    $threadId = $response->json('thread.id');
+
+    // Fetch the persisted attachment ID from the database
+    $thread = TaskThread::find($threadId);
+    $attachmentId = optional($thread->attachments()->first())->id;
 
     expect($content)->not->toContain('/attachments/temp/');
     expect($content)->toContain('/attachments/' . $attachmentId . '/download');
+
+    // Since image is embedded in content, attachments list in response should exclude it
+    expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });

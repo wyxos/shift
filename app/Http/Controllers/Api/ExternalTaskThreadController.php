@@ -50,16 +50,24 @@ class ExternalTaskThreadController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($thread) {
-                $attachments = $thread->attachments()->get()->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        // Return SDK-facing download URL so the client can access via its own app
-                        'url' => '/shift/api/attachments/' . $attachment->id . '/download',
-                        'created_at' => $attachment->created_at,
-                    ];
-                });
+                // Filter out attachments that are already embedded in the content
+                $content = (string) ($thread->content ?? '');
+                $attachments = $thread->attachments()->get()
+                    ->filter(function ($attachment) use ($content) {
+                        // match against internal download URL present in content
+                        $downloadUrl = route('attachments.download', $attachment);
+                        return strpos($content, $downloadUrl) === false;
+                    })
+                    ->map(function ($attachment) {
+                        return [
+                            'id' => $attachment->id,
+                            'original_filename' => $attachment->original_filename,
+                            'path' => $attachment->path,
+                            // Return SDK-facing download URL so the client can access via its own app
+                            'url' => '/shift/api/attachments/' . $attachment->id . '/download',
+                            'created_at' => $attachment->created_at,
+                        ];
+                    });
 
                 // Determine if the current user is the sender
                 $isCurrentUser = false;
@@ -173,6 +181,23 @@ class ExternalTaskThreadController extends Controller
             );
         }
 
+        // Filter out attachments already embedded in the content for response
+        $content = (string) ($thread->content ?? '');
+        $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
+            // check against internal download URL present in content
+            $downloadUrl = route('attachments.download', $attachment);
+            return strpos($content, $downloadUrl) === false;
+        })->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                // Return SDK-facing download URL so the client can access via its own app
+                'url' => '/shift/api/attachments/' . $attachment->id . '/download',
+                'created_at' => $attachment->created_at,
+            ];
+        });
+
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
@@ -180,16 +205,7 @@ class ExternalTaskThreadController extends Controller
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
-                'attachments' => $thread->attachments->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        // Return SDK-facing download URL so the client can access via its own app
-                        'url' => '/shift/api/attachments/' . $attachment->id . '/download',
-                        'created_at' => $attachment->created_at,
-                    ];
-                }),
+                'attachments' => $responseAttachments,
             ],
         ], 201);
     }

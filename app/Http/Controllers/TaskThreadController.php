@@ -40,15 +40,22 @@ class TaskThreadController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($thread) {
-                $attachments = $thread->attachments()->get()->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                        'created_at' => $attachment->created_at,
-                    ];
-                });
+                // Filter out attachments that are already embedded in the content
+                $content = (string) ($thread->content ?? '');
+                $attachments = $thread->attachments()->get()
+                    ->filter(function ($attachment) use ($content) {
+                        $downloadUrl = route('attachments.download', $attachment);
+                        return strpos($content, $downloadUrl) === false;
+                    })
+                    ->map(function ($attachment) {
+                        return [
+                            'id' => $attachment->id,
+                            'original_filename' => $attachment->original_filename,
+                            'path' => $attachment->path,
+                            'url' => route('attachments.download', $attachment),
+                            'created_at' => $attachment->created_at,
+                        ];
+                    });
 
                 return [
                     'id' => $thread->id,
@@ -150,6 +157,21 @@ class TaskThreadController extends Controller
             }
         }
 
+        // Filter out attachments already embedded in the content for response
+        $content = (string) ($thread->content ?? '');
+        $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
+            $downloadUrl = route('attachments.download', $attachment);
+            return strpos($content, $downloadUrl) === false;
+        })->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => route('attachments.download', $attachment),
+                'created_at' => $attachment->created_at,
+            ];
+        });
+
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
@@ -157,15 +179,7 @@ class TaskThreadController extends Controller
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
-                'attachments' => $thread->attachments->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                        'created_at' => $attachment->created_at,
-                    ];
-                }),
+                'attachments' => $responseAttachments,
             ],
         ], 201);
     }
