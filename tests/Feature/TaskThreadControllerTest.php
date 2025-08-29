@@ -30,6 +30,49 @@ beforeEach(function () {
     $this->task->submitter()->associate($this->externalUser)->save();
 });
 
+
+test('internal thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    // Create temp files for two images and one pdf
+    $img1 = 'img_' . uniqid() . '.png';
+    $img2 = 'img_' . uniqid() . '.jpg';
+    $pdf1 = 'file_' . uniqid() . '.pdf';
+    $tempDir = 'temp_attachments/' . $tempIdentifier;
+    Storage::put($tempDir . '/' . $img1, 'fake');
+    Storage::put($tempDir . '/' . $img1 . '.meta', json_encode(['original_filename' => 'photo1.png']));
+    Storage::put($tempDir . '/' . $img2, 'fake');
+    Storage::put($tempDir . '/' . $img2 . '.meta', json_encode(['original_filename' => 'photo2.jpg']));
+    Storage::put($tempDir . '/' . $pdf1, 'fake');
+    Storage::put($tempDir . '/' . $pdf1 . '.meta', json_encode(['original_filename' => 'doc.pdf']));
+
+    // Content embeds only the two image temp URLs
+    $content = '<p>Here are two images:</p>'
+        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img1 . '"></p>'
+        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img2 . '"></p>';
+
+    // Create thread
+    $response = $this->actingAs($this->user)
+        ->postJson(route('task-threads.store', $this->task), [
+            'content' => $content,
+            'type' => 'internal',
+            'temp_identifier' => $tempIdentifier,
+        ]);
+
+    $response->assertStatus(201);
+
+    // Verify content has final download URLs, not temp
+    $finalContent = $response->json('thread.content');
+    expect($finalContent)->not->toContain('/attachments/temp/');
+
+    // Only the PDF should remain in attachments array
+    $attachments = $response->json('thread.attachments');
+    expect($attachments)->toBeArray();
+    expect(count($attachments))->toBe(1);
+    expect($attachments[0]['original_filename'])->toBe('doc.pdf');
+});
+
 test('external thread creation sends notification to external user in non production', function () {
     Notification::fake();
 

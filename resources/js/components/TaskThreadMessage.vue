@@ -84,7 +84,6 @@ watch(() => props.message.content, () => highlight())
                     <Trash2 :size="16" />
                 </button>
                 <p class="text-sm">
-                    <span class="font-semibold">{{ message.sender }} - </span>
                     <span class="mt-1 opacity-75">{{ message.timestamp }}</span>
                 </p>
             </div>
