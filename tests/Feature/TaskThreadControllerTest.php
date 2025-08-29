@@ -270,3 +270,39 @@ test('internal thread replaces temp URLs in content with final download URLs', f
     // Since image is embedded in content, attachments list in response should exclude it
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
+
+
+test('internal thread replaces temp URLs when filename contains spaces (encoded as %20)', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    $fileWithSpaces = UploadedFile::fake()->image('Proof of Address 20252707.jpg');
+
+    // Upload to temp storage to get an absolute, encoded temp URL
+    $upload = $this->actingAs($this->user)->post(route('attachments.upload'), [
+        'file' => $fileWithSpaces,
+        'temp_identifier' => $tempIdentifier,
+    ]);
+    $upload->assertStatus(200);
+
+    $tempUrl = $upload->json('url'); // will contain %20 in filename
+
+    // Create thread with content embedding the absolute temp URL
+    $response = $this->actingAs($this->user)
+        ->postJson(route('task-threads.store', $this->task), [
+            'content' => '<p><img src="' . $tempUrl . '"></p>',
+            'type' => 'internal',
+            'temp_identifier' => $tempIdentifier,
+        ]);
+
+    $response->assertStatus(201);
+
+    $content = $response->json('thread.content');
+    $threadId = $response->json('thread.id');
+    $thread = TaskThread::find($threadId);
+    $attachmentId = optional($thread->attachments()->first())->id;
+
+    expect($content)->not->toContain('/attachments/temp/');
+    expect($content)->toContain('/attachments/' . $attachmentId . '/download');
+    expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
+});
