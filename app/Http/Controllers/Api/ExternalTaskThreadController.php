@@ -68,7 +68,8 @@ class ExternalTaskThreadController extends Controller
                             'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                             'created_at' => $attachment->created_at,
                         ];
-                    });
+                    })
+                    ->values();
 
                 // Determine if the current user is the sender
                 $isCurrentUser = false;
@@ -198,7 +199,7 @@ class ExternalTaskThreadController extends Controller
                 'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         return response()->json([
             'thread' => [
@@ -297,7 +298,7 @@ class ExternalTaskThreadController extends Controller
                 'url' => '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         // Determine if the current user is the sender
         $isCurrentUser = false;

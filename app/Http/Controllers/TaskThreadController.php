@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TaskThreadController extends Controller
 {
@@ -46,7 +47,8 @@ class TaskThreadController extends Controller
                     ->filter(function ($attachment) use ($content) {
                         $downloadUrlRel = route('attachments.download', $attachment, false);
                         $downloadUrlAbs = url($downloadUrlRel);
-                        return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
+
+                        return Str::doesntContain($content, $downloadUrlRel);
                     })
                     ->map(function ($attachment) {
                         return [
@@ -56,7 +58,8 @@ class TaskThreadController extends Controller
                             'url' => route('attachments.download', $attachment),
                             'created_at' => $attachment->created_at,
                         ];
-                    });
+                    })
+                    ->values();
 
                 return [
                     'id' => $thread->id,
@@ -172,7 +175,7 @@ class TaskThreadController extends Controller
                 'url' => route('attachments.download', $attachment),
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         return response()->json([
             'thread' => [
@@ -259,7 +262,7 @@ class TaskThreadController extends Controller
                 'url' => route('attachments.download', $attachment),
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         return response()->json([
             'thread' => [
