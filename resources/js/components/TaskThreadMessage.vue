@@ -46,7 +46,6 @@ interface Emits {
 }
 
 const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
 
 const contentRef = ref<HTMLElement | null>(null)
 
