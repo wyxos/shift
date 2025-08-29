@@ -46,6 +46,55 @@ beforeEach(function () {
     $this->task->submitter()->associate($this->externalUser)->save();
 });
 
+
+test('external thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
+    Storage::fake('local');
+
+    $tempIdentifier = 'thread-' . time();
+    // Create temp files for two images and one pdf
+    $img1 = 'img_' . uniqid() . '.png';
+    $img2 = 'img_' . uniqid() . '.jpg';
+    $pdf1 = 'file_' . uniqid() . '.pdf';
+    $tempDir = 'temp_attachments/' . $tempIdentifier;
+    Storage::put($tempDir . '/' . $img1, 'fake');
+    Storage::put($tempDir . '/' . $img1 . '.meta', json_encode(['original_filename' => 'photo1.png']));
+    Storage::put($tempDir . '/' . $img2, 'fake');
+    Storage::put($tempDir . '/' . $img2 . '.meta', json_encode(['original_filename' => 'photo2.jpg']));
+    Storage::put($tempDir . '/' . $pdf1, 'fake');
+    Storage::put($tempDir . '/' . $pdf1 . '.meta', json_encode(['original_filename' => 'doc.pdf']));
+
+    // Content embeds only the two image temp URLs
+    $content = '<p>Here are two images:</p>'
+        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img1 . '"></p>'
+        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img2 . '"></p>';
+
+    $threadData = [
+        'content' => $content,
+        'type' => 'external',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+        'temp_identifier' => $tempIdentifier,
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+        ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
+
+    $response->assertStatus(201);
+
+    $finalContent = $response->json('thread.content');
+    expect($finalContent)->not->toContain('/attachments/temp/');
+
+    // Content URLs should be rewritten to API paths for images
+    // Find the first attachment id by querying the database if needed is overkill; the pattern match suffices
+    expect($finalContent)->toMatch('/\/shift\/api\/attachments\/[0-9]+\/download/');
+
+    // Only the PDF should remain in attachments array
+    $attachments = $response->json('thread.attachments');
+    expect($attachments)->toBeArray();
+    expect(count($attachments))->toBe(1);
+    expect($attachments[0]['original_filename'])->toBe('doc.pdf');
+});
+
 test('external thread creation sends notifications to project users', function () {
     Notification::fake();
 
@@ -122,7 +171,7 @@ test('external API thread replaces temp URLs in content with final download URLs
     $attachmentId = optional($thread->attachments()->first())->id;
 
     expect($out)->not->toContain('/attachments/temp/');
-    expect($out)->toContain('/attachments/' . $attachmentId . '/download');
+    expect($out)->toContain('/shift/api/attachments/' . $attachmentId . '/download');
 
     // Embedded image should be excluded from attachments list in response
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();

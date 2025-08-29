@@ -44,8 +44,9 @@ class TaskThreadController extends Controller
                 $content = (string) ($thread->content ?? '');
                 $attachments = $thread->attachments()->get()
                     ->filter(function ($attachment) use ($content) {
-                        $downloadUrl = route('attachments.download', $attachment);
-                        return strpos($content, $downloadUrl) === false;
+                        $downloadUrlRel = route('attachments.download', $attachment, false);
+                        $downloadUrlAbs = url($downloadUrlRel);
+                        return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
                     })
                     ->map(function ($attachment) {
                         return [
@@ -160,8 +161,9 @@ class TaskThreadController extends Controller
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
         $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
-            $downloadUrl = route('attachments.download', $attachment);
-            return strpos($content, $downloadUrl) === false;
+            $downloadUrlRel = route('attachments.download', $attachment, false);
+            $downloadUrlAbs = url($downloadUrlRel);
+            return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
         })->map(function ($attachment) {
             return [
                 'id' => $attachment->id,
@@ -317,7 +319,7 @@ class TaskThreadController extends Controller
 
         $out = $content;
         foreach ($attachments as $attachment) {
-            $finalUrl = route('attachments.download', $attachment);
+            $finalUrl = route('attachments.download', $attachment, false);
             $basename = basename($attachment->path);
             $quotedTemp = preg_quote($tempIdentifier, '#');
             $quotedBase = preg_quote($basename, '#');
