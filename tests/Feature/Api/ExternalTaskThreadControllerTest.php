@@ -83,11 +83,12 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
     $response->assertStatus(201);
 
     $finalContent = $response->json('thread.content');
+    $threadId = $response->json('thread.id');
     expect($finalContent)->not->toContain('/attachments/temp/');
 
-    // Content URLs should be rewritten to API paths for images
-    // Find the first attachment id by querying the database if needed is overkill; the pattern match suffices
-    expect($finalContent)->toMatch('/\/shift\/api\/attachments\/[0-9]+\/download/');
+    // Content URLs should be rewritten to signed thread asset URLs for images
+    // Expect URLs like /attachments/task_threads/{threadId}/{filename}?expiration=...
+    expect($finalContent)->toContain('/attachments/task_threads/' . $threadId . '/');
 
     // Only the PDF should remain in attachments array
     $attachments = $response->json('thread.attachments');
@@ -168,11 +169,9 @@ test('external API thread replaces temp URLs in content with final download URLs
     $out = $response->json('thread.content');
     $threadId = $response->json('thread.id');
 
-    $thread = TaskThread::find($threadId);
-    $attachmentId = optional($thread->attachments()->first())->id;
-
+    // Attachment IDs are no longer used in embedded content URLs for API threads.
     expect($out)->not->toContain('/attachments/temp/');
-    expect($out)->toContain('/shift/api/attachments/' . $attachmentId . '/download');
+    expect($out)->toContain('/attachments/task_threads/' . $threadId . '/');
 
     // Embedded image should be excluded from attachments list in response
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
@@ -207,10 +206,9 @@ test('external API thread replaces encoded-space temp URLs with final API downlo
 
     $out = $response->json('thread.content');
     $threadId = $response->json('thread.id');
-    $thread = TaskThread::find($threadId);
-    $attachmentId = optional($thread->attachments()->first())->id;
 
+    // Embedded content should reference the signed thread asset URL and not temp URLs
     expect($out)->not->toContain('/attachments/temp/');
-    expect($out)->toContain('/shift/api/attachments/' . $attachmentId . '/download');
+    expect($out)->toContain('/attachments/task_threads/' . $threadId . '/');
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
