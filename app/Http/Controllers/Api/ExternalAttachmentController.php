@@ -195,33 +195,35 @@ class ExternalAttachmentController extends Controller
      * Download an attachment.
      *
      * @param Attachment $attachment
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
      */
     public function download(Attachment $attachment)
     {
         // Check if the file exists
-        if (!Storage::exists($attachment->path)) {
-            return response()->json(['error' => 'File not found'], 404);
-        }
+//        if (!Storage::exists($attachment->path)) {
+//            return response()->json(['error' => 'File not found'], 404);
+//        }
 
-        // Check if the file is an image
-        $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
-        $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
+        return Storage::response($attachment->path, $attachment->original_filename);
 
-        if ($isImage) {
-            // For images, return an inline response
-            return response()->file(
-                Storage::path($attachment->path),
-                ['Content-Type' => $this->getMimeType($extension)]
-            );
-        } else {
-            // For non-images, return a download response
-            return response()->download(
-                Storage::path($attachment->path),
-                $attachment->original_filename,
-                ['Content-Type' => 'application/octet-stream']
-            );
-        }
+//        // Check if the file is an image
+//        $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
+//        $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
+//
+//        if ($isImage) {
+//            // For images, return an inline response
+//            return response()->file(
+//                Storage::path($attachment->path),
+//                ['Content-Type' => $this->getMimeType($extension)]
+//            );
+//        } else {
+//            // For non-images, return a download response
+//            return response()->download(
+//                Storage::path($attachment->path),
+//                $attachment->original_filename,
+//                ['Content-Type' => 'application/octet-stream']
+//            );
+//        }
     }
 
     /**
