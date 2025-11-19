@@ -16,7 +16,6 @@ class ExternalAttachmentController extends Controller
     /**
      * Upload a temporary attachment.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function upload(Request $request)
@@ -32,13 +31,13 @@ class ExternalAttachmentController extends Controller
 
         // Create temp directory if it doesn't exist
         $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             Storage::makeDirectory($tempPath);
         }
 
         // Generate a unique filename for storage
         $extension = $file->getClientOriginalExtension();
-        $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) . '_' . uniqid() . '.' . $extension;
+        $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.uniqid().'.'.$extension;
         $filePath = "{$tempPath}/{$storedFilename}";
 
         // Store the file
@@ -62,7 +61,6 @@ class ExternalAttachmentController extends Controller
     /**
      * Upload multiple attachments at once.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function uploadMultiple(Request $request)
@@ -78,7 +76,7 @@ class ExternalAttachmentController extends Controller
 
         // Create temp directory if it doesn't exist
         $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             Storage::makeDirectory($tempPath);
         }
 
@@ -87,7 +85,7 @@ class ExternalAttachmentController extends Controller
 
             // Generate a unique filename for storage
             $extension = $file->getClientOriginalExtension();
-            $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) . '_' . uniqid() . '.' . $extension;
+            $storedFilename = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)).'_'.uniqid().'.'.$extension;
             $filePath = "{$tempPath}/{$storedFilename}";
 
             // Store the file
@@ -114,7 +112,6 @@ class ExternalAttachmentController extends Controller
     /**
      * Remove a temporary attachment.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function removeTemp(Request $request)
@@ -126,7 +123,7 @@ class ExternalAttachmentController extends Controller
         $path = $request->input('path');
 
         // Security check to ensure we're only deleting from temp_attachments
-        if (!Str::startsWith($path, 'temp_attachments/')) {
+        if (! Str::startsWith($path, 'temp_attachments/')) {
             return response()->json(['error' => 'Invalid path'], 400);
         }
 
@@ -148,7 +145,6 @@ class ExternalAttachmentController extends Controller
     /**
      * List temporary attachments.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function listTemp(Request $request)
@@ -160,7 +156,7 @@ class ExternalAttachmentController extends Controller
         $tempIdentifier = $request->input('temp_identifier');
         $tempPath = "temp_attachments/{$tempIdentifier}";
 
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             return response()->json(['files' => []]);
         }
 
@@ -197,45 +193,55 @@ class ExternalAttachmentController extends Controller
     /**
      * Download an attachment.
      *
-     * @param Attachment $attachment
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
      */
     public function download(Attachment $attachment)
     {
         // Check if the file exists
-        if (!Storage::exists($attachment->path)) {
+        if (! Storage::exists($attachment->path)) {
             return response()->json(['error' => 'File not found'], 404);
         }
 
-        // Get the task that this attachment belongs to (either directly or through a thread)
-        $task = $this->getTaskFromAttachment($attachment);
+        // Check if this is an external user request (has project parameter and user context)
+        $isExternalUserRequest = request()->has('project') &&
+                                 request()->offsetGet('user.id') !== null &&
+                                 request()->offsetGet('user.environment') !== null &&
+                                 request()->offsetGet('user.url') !== null;
 
-        if (!$task) {
-            return response()->json(['error' => 'Attachment not associated with a task'], 404);
+        if ($isExternalUserRequest) {
+            // External user access control
+            // Get the task that this attachment belongs to (either directly or through a thread)
+            $task = $this->getTaskFromAttachment($attachment);
+
+            if (! $task) {
+                return response()->json(['error' => 'Attachment not associated with a task'], 404);
+            }
+
+            // Verify the task belongs to the project specified in the request
+            if ($task->project->token !== request('project')) {
+                return response()->json(['error' => 'Task not found in the specified project'], 404);
+            }
+
+            // Get the current external user
+            $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+                ->where('environment', request()->offsetGet('user.environment'))
+                ->where('url', request()->offsetGet('user.url'))
+                ->first();
+
+            if (! $externalUser) {
+                return response()->json(['error' => 'External user not found'], 404);
+            }
+
+            // Check if the external user is the submitter or has been granted access
+            $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+            $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+            if (! $isSubmitter && ! $hasAccess) {
+                return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
+            }
         }
-
-        // Verify the task belongs to the project specified in the request
-        if ($task->project->token !== request('project')) {
-            return response()->json(['error' => 'Task not found in the specified project'], 404);
-        }
-
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
-
-        if (!$externalUser) {
-            return response()->json(['error' => 'External user not found'], 404);
-        }
-
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (!$isSubmitter && !$hasAccess) {
-            return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
-        }
+        // For regular authenticated users, no additional access control is needed
+        // They can access attachments through normal Laravel authentication
 
         // Check if the file is an image
         $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
@@ -260,15 +266,12 @@ class ExternalAttachmentController extends Controller
     /**
      * Get the task associated with an attachment.
      * Attachments can belong to either a Task directly or a TaskThread (which belongs to a Task).
-     *
-     * @param Attachment $attachment
-     * @return Task|null
      */
     private function getTaskFromAttachment(Attachment $attachment): ?Task
     {
         $attachable = $attachment->attachable;
 
-        if (!$attachable) {
+        if (! $attachable) {
             return null;
         }
 
@@ -288,7 +291,7 @@ class ExternalAttachmentController extends Controller
     /**
      * Get the MIME type for a file extension.
      *
-     * @param string $extension
+     * @param  string  $extension
      * @return string
      */
     private function getMimeType($extension)
