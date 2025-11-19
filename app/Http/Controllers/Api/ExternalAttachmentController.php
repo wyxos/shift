@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
+use App\Models\ExternalUser;
+use App\Models\Task;
+use App\Models\TaskThread;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -204,6 +207,36 @@ class ExternalAttachmentController extends Controller
             return response()->json(['error' => 'File not found'], 404);
         }
 
+        // Get the task that this attachment belongs to (either directly or through a thread)
+        $task = $this->getTaskFromAttachment($attachment);
+
+        if (!$task) {
+            return response()->json(['error' => 'Attachment not associated with a task'], 404);
+        }
+
+        // Verify the task belongs to the project specified in the request
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        // Get the current external user
+        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
+            ->where('environment', request()->offsetGet('user.environment'))
+            ->where('url', request()->offsetGet('user.url'))
+            ->first();
+
+        if (!$externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        // Check if the external user is the submitter or has been granted access
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
+
+        if (!$isSubmitter && !$hasAccess) {
+            return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
+        }
+
         // Check if the file is an image
         $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
         $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
@@ -222,6 +255,34 @@ class ExternalAttachmentController extends Controller
                 ['Content-Type' => 'application/octet-stream']
             );
         }
+    }
+
+    /**
+     * Get the task associated with an attachment.
+     * Attachments can belong to either a Task directly or a TaskThread (which belongs to a Task).
+     *
+     * @param Attachment $attachment
+     * @return Task|null
+     */
+    private function getTaskFromAttachment(Attachment $attachment): ?Task
+    {
+        $attachable = $attachment->attachable;
+
+        if (!$attachable) {
+            return null;
+        }
+
+        // If the attachment belongs directly to a Task
+        if ($attachable instanceof Task) {
+            return $attachable;
+        }
+
+        // If the attachment belongs to a TaskThread, get the Task through the thread
+        if ($attachable instanceof TaskThread) {
+            return $attachable->task;
+        }
+
+        return null;
     }
 
     /**

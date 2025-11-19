@@ -98,11 +98,14 @@ class ExternalTaskController extends Controller
 
         // Format the attachments for the response
         $formattedAttachments = $task->attachments->map(function ($attachment) {
+            // Get the client's URL from request metadata or user data
+            $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
             return [
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => '/shift/api/attachments/' . $attachment->id . '/download',
+                // Return SDK-facing download URL pointing to the client's proxy route
+                'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
         });
