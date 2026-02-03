@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import MilkdownEditorWrapper from '@/components/ui/markdown-editor/MilkdownEditorWrapper.vue';
+import AppLayout from '@/layouts/AppLayout.vue'
+import { type BreadcrumbItem } from '@/types'
+import { Head } from '@inertiajs/vue3'
+import { ref, computed } from 'vue'
+import ShiftEditor from '@/components/ShiftEditor.vue'
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
+  { title: 'Components', href: '/components' },
+]
+
+const shiftRef = ref<InstanceType<typeof ShiftEditor> | null>(null)
+const editor = computed(() => shiftRef.value?.editor ?? null)
+
+defineExpose({ editor })
 </script>
 
 <template>
-    <Head title="Dashboard" />
-
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
-            <MilkdownEditorWrapper  />
-        </div>
-    </AppLayout>
+  <Head title="Components" />
+  <AppLayout :breadcrumbs="breadcrumbs">
+    <div class="p-4">
+      <ShiftEditor ref="shiftRef" />
+    </div>
+  </AppLayout>
 </template>
+
+<style>
+</style>
