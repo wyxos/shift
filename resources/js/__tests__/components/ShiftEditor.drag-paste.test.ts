@@ -179,8 +179,10 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
     const origGetContext = proto.getContext
     const origToDataURL = proto.toDataURL
     proto.getContext = vi.fn(() => ({
-      fillStyle: '', strokeStyle: '', font: '', textAlign: '',
+      fillStyle: '', strokeStyle: '', font: '', textAlign: '', lineWidth: 1, lineCap: '',
       fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(),
+      stroke: vi.fn(), arc: vi.fn(), fill: vi.fn(),
     }))
     proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 
@@ -233,8 +235,10 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
     const origGetContext = proto.getContext
     const origToDataURL = proto.toDataURL
     proto.getContext = vi.fn(() => ({
-      fillStyle: '', strokeStyle: '', font: '', textAlign: '',
+      fillStyle: '', strokeStyle: '', font: '', textAlign: '', lineWidth: 1, lineCap: '',
       fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(),
+      stroke: vi.fn(), arc: vi.fn(), fill: vi.fn(),
     }))
     proto.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 
