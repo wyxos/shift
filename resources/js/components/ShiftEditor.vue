@@ -16,7 +16,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile } from 'lucide-vue-next';
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
 
@@ -42,6 +42,7 @@ export type AttachmentItem = {
 const attachments = ref<AttachmentItem[]>([]);
 const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
 const showEmoji = ref(false);
+const hasUploadPlaceholder = ref(false);
 
 // Configure lowlight with a few common languages
 const lowlight = createLowlight();
@@ -176,6 +177,7 @@ const editor = useEditor({
     onUpdate: () => {
       const html = editor.value?.getHTML() ?? ''
       emit('update:modelValue', html)
+      hasUploadPlaceholder.value = hasImageUploadPlaceholders()
     },
   editorProps: {
     handleDrop: (_view, event) => {
@@ -216,6 +218,25 @@ const editor = useEditor({
   },
 });
 
+function hasImageUploadPlaceholders(): boolean {
+  const ed = editor.value
+  if (!ed) return false
+  let found = false
+  ed.state.doc.descendants((node: any) => {
+    if (node?.type?.name === 'image' && typeof node?.attrs?.title === 'string' && node.attrs.title.startsWith('upload-')) {
+      found = true
+      return false
+    }
+    return true
+  })
+  return found
+}
+
+const isUploading = computed(() => {
+  if (attachments.value.some((a) => a.status === 'uploading')) return true
+  return hasUploadPlaceholder.value
+})
+
 function onEmojiClick(ev: Event) {
     const unicode = (ev as CustomEvent).detail?.unicode || (ev as any).detail?.emoji?.unicode;
     if (!unicode || !editor.value) return;
@@ -224,6 +245,7 @@ function onEmojiClick(ev: Event) {
 }
 
 function onSend() {
+    if (isUploading.value) return;
     const html = editor.value?.getHTML() ?? '';
     const toSend: SentAttachment[] = attachments.value.map((a) => ({
         name: a.name,
@@ -283,7 +305,13 @@ defineExpose({ editor });
                 <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-gray-100" @click="openFilePicker">
                     <Paperclip :size="18" />
                 </button>
-                <button type="button" data-testid="toolbar-send" class="ml-auto rounded p-1 text-blue-600 hover:bg-gray-100" @click="onSend">
+                <button
+                    type="button"
+                    data-testid="toolbar-send"
+                    class="ml-auto rounded p-1 text-blue-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="isUploading"
+                    @click="onSend"
+                >
                     <Send :size="18" />
                 </button>
                 <input ref="fileInput" data-testid="file-input" type="file" class="hidden" multiple @change="onFileChosen" />
