@@ -15,7 +15,7 @@ import pythonLang from 'highlight.js/lib/languages/python';
 import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
-import { Paperclip, Send, Smile } from 'lucide-vue-next';
+import { FileImage, FileText, Paperclip, Send, Smile } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import { uploadChunkedFile, MAX_UPLOAD_BYTES } from '@/lib/chunkedUpload';
 // Optional: import a highlight.js theme for lowlight token colors
@@ -259,6 +259,11 @@ function onSend() {
     attachments.value = [];
 }
 
+function iconForAttachment(type: string) {
+    if (type?.startsWith('image/')) return FileImage;
+    return FileText;
+}
+
 defineExpose({ editor });
 </script>
 
@@ -266,36 +271,58 @@ defineExpose({ editor });
     <div>
         <EditorContent class="tiptap" data-testid="tiptap-editor" :editor="editor" />
 
-        <div class="flex justify-end gap-4">
-            <ul v-if="attachments.length" data-testid="attachments-list" class="flex flex-1 flex-wrap gap-4 p-2 px-4">
+        <div class="flex flex-col gap-2">
+            <ul
+                v-if="attachments.length"
+                data-testid="attachments-list"
+                class="divide-y divide-slate-200 rounded-md border border-slate-200 bg-slate-50/60"
+            >
                 <li
                     v-for="att in attachments"
                     :key="att.id"
                     data-testid="attachment-item"
                     :data-temp-path="att.path"
-                    class="flex w-60 items-center justify-between gap-2 rounded bg-gray-100 p-2"
+                    class="flex items-center justify-between gap-3 px-3 py-2"
                 >
-                    <div class="min-w-0">
-                        <div class="truncate" :title="att.name">{{ att.name }}</div>
-                        <div class="text-xs text-gray-500">
-                            <template v-if="att.status === 'uploading'">Uploading {{ att.progress }}%</template>
-                            <template v-else>{{ formatBytes(att.size) }}</template>
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-slate-200">
+                            <component :is="iconForAttachment(att.type)" :size="18" class="text-slate-600" />
                         </div>
-                        <div v-if="att.status === 'uploading'" class="mt-1 h-1 overflow-hidden rounded bg-gray-200">
-                            <div class="h-1 bg-blue-500 transition-all" :style="{ width: Math.max(1, att.progress) + '%' }"></div>
+                        <div class="min-w-0">
+                            <div class="truncate text-sm font-medium text-slate-900" :title="att.name">{{ att.name }}</div>
+                            <div class="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                                <template v-if="att.status === 'uploading'">
+                                    <span>Uploading</span>
+                                    <span class="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                                        {{ Math.max(1, att.progress) }}%
+                                    </span>
+                                </template>
+                                <template v-else-if="att.status === 'error'">
+                                    <span class="font-semibold text-red-600">Upload failed</span>
+                                </template>
+                                <template v-else>
+                                    <span>{{ formatBytes(att.size) }}</span>
+                                </template>
+                            </div>
+                            <div v-if="att.status === 'uploading'" class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                <div
+                                    class="h-1.5 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 transition-all"
+                                    :style="{ width: Math.max(1, att.progress) + '%' }"
+                                ></div>
+                            </div>
                         </div>
                     </div>
                     <button
                         type="button"
-                        class="cursor-pointer text-xs text-red-600 hover:underline"
+                        class="rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200/70 hover:text-slate-700"
                         data-testid="attachment-remove"
                         @click="removeAttachment(att)"
                     >
-                        ✕
+                        Remove
                     </button>
                 </li>
             </ul>
-            <div class="flex items-center justify-end gap-2 p-2 px-4">
+            <div class="flex items-center justify-end gap-2 p-2 px-1">
                 <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-gray-100" @click="showEmoji = !showEmoji">
                     <Smile :size="18" />
                 </button>
