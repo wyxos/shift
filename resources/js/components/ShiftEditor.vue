@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ImageUpload from '@/extensions/imageUpload';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import TiptapImage from '@tiptap/extension-image';
+import InlineImage from '@/extensions/inlineImage';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
@@ -163,7 +163,7 @@ const editor = useEditor({
                 'data-gramm': 'false', // helps disable Grammarly
             },
         }),
-        TiptapImage.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
+        InlineImage.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
         ImageUpload.configure({
             getTempIdentifier: () => tempIdentifier.value,
             onNonImageFile: (file: File) => uploadAttachment(file),
