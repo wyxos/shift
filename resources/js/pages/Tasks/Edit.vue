@@ -248,7 +248,7 @@ const submitForm = (): void => {
                                 >
                                     <div class="flex items-center">
                                         <Paperclip :size="20" class="mr-2 text-gray-400" />
-                                        <a :href="attachment.url" class="hover:text-blue-600" target="_blank">{{
+                                        <a :href="attachment.url" class="hover:text-blue-600" target="_blank" data-inertia-prevent>{{
                                             truncateFilename(attachment.original_filename)
                                         }}</a>
                                     </div>

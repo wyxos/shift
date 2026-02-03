@@ -103,7 +103,7 @@ watch(() => props.message.content, () => highlight())
                 <div v-if="(message.attachments || []).length > 0" class="mt-2">
                     <p class="text-xs font-semibold">Attachments:</p>
                     <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
-                        <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank">
+                        <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank" data-inertia-prevent>
                             <Paperclip :size="12" class="mr-1" />
                             {{ truncateFilename(attachment.original_filename) }}
                         </a>
