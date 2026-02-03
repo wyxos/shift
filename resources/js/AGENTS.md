@@ -22,6 +22,9 @@
   - ✅ DO: Keep task feature hooks in composables (examples: `resources/js/composables/useTaskThreads.ts`, `resources/js/composables/useTaskAttachments.ts`)
 - Tests:
   - ✅ DO: Add page/component tests under `resources/js/__tests__/**` (example: `resources/js/__tests__/pages/Dashboard.test.ts`)
+- Cross-repo UI parity:
+  - Keep shadcn/ui components and layout parity with the SDK UI (`../shift-sdk-package/`).
+  - If sidebar/header/layout styles change here, reflect them in the SDK UI.
 
 ## Touch Points / Key Files
 - App entry: `resources/js/app.ts`
@@ -35,4 +38,5 @@
 - Run a single test file: `npm run test -- resources/js/__tests__/pages/Dashboard.test.ts`
 
 ## Pre-PR Checks
-- `npm run format:check && npm run lint && npm run test && npm run build`
+- If JS/UI changes: `npm run format:check && npm run lint && npm run test`
+- If frontend assets change: `npm run build`
