@@ -17,29 +17,59 @@ function createUploadId() {
 }
 
 function renderProgressTile(percent: number, label = 'Uploading...'): string {
-  const w = 200, h = 100
+  const w = 200, h = 200
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | null
   if (!ctx) return ''
-  ctx.fillStyle = '#f3f4f6'
+  const safeLabel = String(label || 'Uploading...')
+  const isError = /fail|error/i.test(safeLabel)
+  const accent = isError ? '#ef4444' : '#3b82f6'
+
+  ctx.fillStyle = '#f8fafc'
   ctx.fillRect(0, 0, w, h)
-  ctx.strokeStyle = '#cbd5e1'
+  ctx.strokeStyle = '#e2e8f0'
   ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
-  ctx.fillStyle = '#374151'
-  ctx.font = '14px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(label, w / 2, 32)
-  ctx.fillStyle = '#e5e7eb'
-  const pbX = 20, pbY = 56, pbW = w - 40, pbH = 16
-  ctx.fillRect(pbX, pbY, pbW, pbH)
-  const pw = Math.max(0, Math.min(pbW, Math.round((percent / 100) * pbW)))
-  ctx.fillStyle = '#3b82f6'
-  ctx.fillRect(pbX, pbY, pw, pbH)
-  ctx.fillStyle = '#111827'
+
+  // Label
+  ctx.fillStyle = isError ? '#b91c1c' : '#334155'
   ctx.font = '12px sans-serif'
-  ctx.fillText(`${Math.max(0, Math.min(100, Math.round(percent)))}%`, w / 2, pbY + pbH + 18)
+  ctx.textAlign = 'center'
+  ctx.fillText(safeLabel, w / 2, 22)
+
+  // Image icon frame
+  const frameX = 60, frameY = 46, frameW = 80, frameH = 60
+  ctx.strokeStyle = '#cbd5e1'
+  ctx.strokeRect(frameX, frameY, frameW, frameH)
+  ctx.fillStyle = '#cbd5e1'
+  ctx.beginPath()
+  ctx.moveTo(frameX + 8, frameY + frameH - 8)
+  ctx.lineTo(frameX + 32, frameY + 28)
+  ctx.lineTo(frameX + 52, frameY + frameH - 8)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(frameX + 28, frameY + frameH - 8)
+  ctx.lineTo(frameX + 48, frameY + 40)
+  ctx.lineTo(frameX + 72, frameY + frameH - 8)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(frameX + 62, frameY + 18, 5, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Progress bar
+  ctx.fillStyle = '#e5e7eb'
+  const pbX = 20, pbY = 130, pbW = w - 40, pbH = 10
+  ctx.fillRect(pbX, pbY, pbW, pbH)
+  const pct = Math.max(0, Math.min(100, Math.round(percent)))
+  const pw = Math.max(0, Math.min(pbW, Math.round((pct / 100) * pbW)))
+  ctx.fillStyle = accent
+  ctx.fillRect(pbX, pbY, pw, pbH)
+  ctx.fillStyle = '#475569'
+  ctx.font = '12px sans-serif'
+  ctx.fillText(`${pct}%`, w / 2, pbY + pbH + 18)
   return canvas.toDataURL('image/png')
 }
 
