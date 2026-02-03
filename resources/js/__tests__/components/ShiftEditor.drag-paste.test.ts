@@ -21,7 +21,10 @@ vi.mock('@inertiajs/vue3', () => ({
 // Route helper
 beforeEach(() => {
   ;(global as any).route = (name: string) => {
-    if (name === 'attachments.upload') return '/attachments/upload'
+    if (name === 'attachments.upload-init') return '/attachments/upload-init'
+    if (name === 'attachments.upload-status') return '/attachments/upload-status'
+    if (name === 'attachments.upload-chunk') return '/attachments/upload-chunk'
+    if (name === 'attachments.upload-complete') return '/attachments/upload-complete'
     if (name === 'attachments.remove-temp') return '/attachments/remove-temp'
     return '/'
   }
@@ -29,10 +32,12 @@ beforeEach(() => {
 
 // Mock axios for upload and delete
 const postMock = vi.fn()
+const getMock = vi.fn()
 const deleteMock = vi.fn()
 vi.mock('axios', () => ({
   default: {
     post: (...args: any[]) => postMock(...args),
+    get: (...args: any[]) => getMock(...args),
     delete: (...args: any[]) => deleteMock(...args),
   },
 }))
@@ -42,7 +47,7 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
 
   beforeEach(() => {
     URL.createObjectURL = vi.fn(() => 'blob:mock-1234') as any
-    postMock.mockReset(); deleteMock.mockReset()
+    postMock.mockReset(); getMock.mockReset(); deleteMock.mockReset()
   })
 
   afterEach(() => {
@@ -61,8 +66,19 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
   }
 
   it('lists a non-image attachment when inserting files (size + remove)', async () => {
-    // non-image upload resolves immediately
-    postMock.mockResolvedValue({ data: { path: 'tmp/doc.txt' } })
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u1', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return Promise.resolve({ data: { ok: true } })
+      }
+      if (url === '/attachments/upload-complete') {
+        return Promise.resolve({ data: { path: 'tmp/doc.txt' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
     deleteMock.mockResolvedValue({})
 
     const wrapper = mount(ShiftEditor)
@@ -99,7 +115,19 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
   })
 
   it('lists a non-image attachment with size on insertFiles from paste scenario', async () => {
-    postMock.mockResolvedValue({ data: { path: 'tmp/readme.md' } })
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u2', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return Promise.resolve({ data: { ok: true } })
+      }
+      if (url === '/attachments/upload-complete') {
+        return Promise.resolve({ data: { path: 'tmp/readme.md' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
     deleteMock.mockResolvedValue({})
 
     const wrapper = mount(ShiftEditor)
@@ -135,8 +163,16 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
   })
 
   it('inserts image on its own line and typing starts on next line using commands', async () => {
-    // Hold upload to keep placeholder visible
-    postMock.mockImplementation(() => new Promise(() => {}))
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u3', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return new Promise(() => {})
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
 
     // mock canvas for placeholder tile
     const proto: any = (HTMLCanvasElement as any).prototype
@@ -182,7 +218,16 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
   })
 
   it('inserts image then typing behaves correctly with paste-like scenario', async () => {
-    postMock.mockImplementation(() => new Promise(() => {}))
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u4', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return new Promise(() => {})
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
 
     const proto: any = (HTMLCanvasElement as any).prototype
     const origGetContext = proto.getContext
@@ -225,4 +270,3 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
     proto.toDataURL = origToDataURL
   })
 })
-

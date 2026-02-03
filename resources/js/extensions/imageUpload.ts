@@ -1,6 +1,7 @@
 import { Extension } from '@tiptap/core'
 import type { Editor } from '@tiptap/core'
 import axiosDefault from 'axios'
+import { uploadChunkedFile } from '@/lib/chunkedUpload'
 
 export interface ImageUploadOptions {
   // Return the temp identifier used by the backend
@@ -91,29 +92,30 @@ async function uploadImage(editor: Editor, file: File, opts: Required<Pick<Image
   const uploadId = createUploadId()
   insertUploadPlaceholderImage(editor, uploadId, file.name)
 
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('temp_identifier', opts.getTempIdentifier())
-
-  await (opts.axios).post((route('attachments.upload') as string), formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: (evt) => {
-      const total = evt.total || 0
-      const loaded = evt.loaded || 0
-      const percent = total > 0 ? (loaded / total) * 100 : 0
-      const pos = findImagePosByTitle(editor, uploadId)
-      if (pos != null) {
-        const { state, dispatch } = (editor as any).view
-        const imageType = state.schema.nodes.image
-        const node = state.doc.nodeAt(pos)
-        if (node) {
-          const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: renderProgressTile(percent) }, node.marks)
-          setTimeout(() => dispatch(tr), 0)
-        }
+  const updateProgress = (percent: number) => {
+    const pos = findImagePosByTitle(editor, uploadId)
+    if (pos != null) {
+      const { state, dispatch } = (editor as any).view
+      const imageType = state.schema.nodes.image
+      const node = state.doc.nodeAt(pos)
+      if (node) {
+        const tr = state.tr.setNodeMarkup(
+          pos,
+          imageType,
+          { ...node.attrs, src: renderProgressTile(percent) },
+          node.marks
+        )
+        setTimeout(() => dispatch(tr), 0)
       }
-    },
-  }).then(res => {
-    const data = (res as any).data || {}
+    }
+  }
+
+  await uploadChunkedFile({
+    file,
+    tempIdentifier: opts.getTempIdentifier(),
+    axiosInstance: opts.axios,
+    onProgress: updateProgress,
+  }).then((data) => {
     const finalUrl: string = buildTempUrl(data)
     if (!finalUrl) return
 

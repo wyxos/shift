@@ -21,7 +21,7 @@ class ExternalAttachmentController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // 10MB max
+            'file' => 'required|file|max:40960', // 40MB max
             'temp_identifier' => 'required|string',
         ]);
 
@@ -67,7 +67,7 @@ class ExternalAttachmentController extends Controller
     {
         $request->validate([
             'attachments' => 'required|array',
-            'attachments.*' => 'file|max:10240', // 10MB max
+            'attachments.*' => 'file|max:40960', // 40MB max
             'temp_identifier' => 'required|string',
         ]);
 

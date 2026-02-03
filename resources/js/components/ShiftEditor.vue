@@ -17,6 +17,7 @@ import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
+import { uploadChunkedFile, MAX_UPLOAD_BYTES } from '@/lib/chunkedUpload';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
 
@@ -37,6 +38,7 @@ export type AttachmentItem = {
     progress: number;
     status: 'uploading' | 'done' | 'error';
     path?: string;
+    uploadId?: string;
 };
 
 const attachments = ref<AttachmentItem[]>([]);
@@ -111,23 +113,18 @@ async function uploadAttachment(file: File) {
     });
     attachments.value.push(att);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('temp_identifier', tempIdentifier.value);
-
     try {
-        const res = await axios.post(route('attachments.upload') as string, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            onUploadProgress: (evt: ProgressEvent) => {
-                const loaded = (evt as any).loaded ?? 0;
-                const total = (evt as any).total ?? file.size ?? 0;
-                if (total > 0) {
-                    const next = Math.max(0, Math.min(100, Math.round((loaded / total) * 100)));
-                    att.progress = Math.max(att.progress, next);
-                }
+        if (file.size > MAX_UPLOAD_BYTES) {
+            throw new Error('File exceeds 40MB limit');
+        }
+        const data = await uploadChunkedFile({
+            file,
+            tempIdentifier: tempIdentifier.value,
+            onProgress: (percent) => {
+                att.progress = Math.max(att.progress, percent);
             },
+            axiosInstance: axios,
         });
-        const data = res.data || {};
         att.status = 'done';
         att.progress = 100;
         att.path = data.path;

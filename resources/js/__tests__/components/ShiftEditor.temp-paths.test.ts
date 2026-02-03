@@ -16,7 +16,10 @@ vi.mock('@inertiajs/vue3', () => ({ Head: { render: () => {} } }))
 
 beforeEach(() => {
   ;(global as any).route = (name: string, params?: any) => {
-    if (name === 'attachments.upload') return '/attachments/upload'
+    if (name === 'attachments.upload-init') return '/attachments/upload-init'
+    if (name === 'attachments.upload-status') return '/attachments/upload-status'
+    if (name === 'attachments.upload-chunk') return '/attachments/upload-chunk'
+    if (name === 'attachments.upload-complete') return '/attachments/upload-complete'
     if (name === 'attachments.remove-temp') return '/attachments/remove-temp'
     if (name === 'attachments.temp') {
       const temp = params?.temp ?? ''
@@ -29,10 +32,12 @@ beforeEach(() => {
 
 // axios mock
 const postMock = vi.fn()
+const getMock = vi.fn()
 const deleteMock = vi.fn()
 vi.mock('axios', () => ({
   default: {
     post: (...args: any[]) => postMock(...args),
+    get: (...args: any[]) => getMock(...args),
     delete: (...args: any[]) => deleteMock(...args),
   },
 }))
@@ -42,7 +47,7 @@ describe('ShiftEditor temp path rendering', () => {
 
   beforeEach(() => {
     URL.createObjectURL = vi.fn(() => 'blob:mock-1234') as any
-    postMock.mockReset(); deleteMock.mockReset()
+    postMock.mockReset(); getMock.mockReset(); deleteMock.mockReset()
   })
   afterEach(() => {
     URL.createObjectURL = originalCreateObjectURL as any
@@ -60,8 +65,19 @@ describe('ShiftEditor temp path rendering', () => {
   }
 
 it('uses temp path as final img src after upload resolves', async () => {
-    // Simulate successful upload returning server temp path in backend format
-    postMock.mockResolvedValue({ data: { path: 'temp_attachments/TEMP123/foo.png' } })
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u1', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return Promise.resolve({ data: { ok: true } })
+      }
+      if (url === '/attachments/upload-complete') {
+        return Promise.resolve({ data: { path: 'temp_attachments/TEMP123/foo.png' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
 
     // mock canvas for placeholder tile
     const proto: any = (HTMLCanvasElement as any).prototype
@@ -113,7 +129,19 @@ it('uses temp path as final img src after upload resolves', async () => {
   })
 
 it('renders non-image attachment item with temp path after upload', async () => {
-    postMock.mockResolvedValue({ data: { path: 'temp_attachments/XYZ/manual.pdf' } })
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u2', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return Promise.resolve({ data: { ok: true } })
+      }
+      if (url === '/attachments/upload-complete') {
+        return Promise.resolve({ data: { path: 'temp_attachments/XYZ/manual.pdf' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
     deleteMock.mockResolvedValue({})
 
     const wrapper = mount(ShiftEditor)
@@ -140,4 +168,3 @@ const start = Date.now(); let itemOk = false
     expect(itemOk).toBe(true)
   })
 })
-
