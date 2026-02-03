@@ -147,11 +147,16 @@ async function uploadImage(editor: Editor, file: File, opts: Required<Pick<Image
       const imageType = state.schema.nodes.image
       const node = state.doc.nodeAt(pos)
       if (node) {
-        const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: renderProgressTile(0, 'Upload failed') }, node.marks)
-        setTimeout(() => dispatch(tr), 0)
-      }
+      const tr = state.tr.setNodeMarkup(
+        pos,
+        imageType,
+        { ...node.attrs, src: renderProgressTile(0, 'Upload failed'), title: '' },
+        node.marks
+      )
+      setTimeout(() => dispatch(tr), 0)
     }
-  })
+  }
+})
 }
 
 export const ImageUpload = Extension.create<ImageUploadOptions>({
@@ -202,4 +207,3 @@ export const ImageUpload = Extension.create<ImageUploadOptions>({
 })
 
 export default ImageUpload
-
