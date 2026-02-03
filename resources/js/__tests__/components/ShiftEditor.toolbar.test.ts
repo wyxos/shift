@@ -6,17 +6,28 @@ import ShiftEditor from '@/components/ShiftEditor.vue'
 // Basic route helper
 beforeEach(() => {
   ;(global as any).route = (name: string) => {
-    if (name === 'attachments.upload') return '/attachments/upload'
+    if (name === 'attachments.upload-init') return '/attachments/upload-init'
+    if (name === 'attachments.upload-status') return '/attachments/upload-status'
+    if (name === 'attachments.upload-chunk') return '/attachments/upload-chunk'
+    if (name === 'attachments.upload-complete') return '/attachments/upload-complete'
     if (name === 'attachments.remove-temp') return '/attachments/remove-temp'
     return '/'
   }
+  postMock.mockReset()
+  getMock.mockReset()
+  deleteMock.mockReset()
 })
 
 // Mock axios
 const postMock = vi.fn()
+const getMock = vi.fn()
 const deleteMock = vi.fn()
 vi.mock('axios', () => ({
-  default: { post: (...a: any[]) => postMock(...a), delete: (...a: any[]) => deleteMock(...a) },
+  default: {
+    post: (...a: any[]) => postMock(...a),
+    get: (...a: any[]) => getMock(...a),
+    delete: (...a: any[]) => deleteMock(...a),
+  },
 }))
 
 // Ensure emoji-picker web component is available
@@ -39,7 +50,19 @@ describe('ShiftEditor toolbar', () => {
   })
 
   it('adds files via attachment icon to attachments list (image and non-image)', async () => {
-    postMock.mockResolvedValue({ data: { path: 'temp_attachments/ATT/test.bin' } })
+    postMock.mockImplementation((url: string) => {
+      if (url === '/attachments/upload-init') {
+        return Promise.resolve({ data: { upload_id: 'u1', chunk_size: 5, total_chunks: 1, max_bytes: 41943040 } })
+      }
+      if (url === '/attachments/upload-chunk') {
+        return Promise.resolve({ data: { ok: true } })
+      }
+      if (url === '/attachments/upload-complete') {
+        return Promise.resolve({ data: { path: 'temp_attachments/ATT/test.bin' } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    getMock.mockResolvedValue({ data: { uploaded_chunks: [], total_chunks: 1, chunk_size: 5 } })
     const wrapper = mount(ShiftEditor)
     await nextTick()
 
@@ -80,4 +103,3 @@ describe('ShiftEditor toolbar', () => {
     expect(text).toBe('')
   })
 })
-
