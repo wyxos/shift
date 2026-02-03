@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 
 const props = defineProps<{
     metrics: {
@@ -25,6 +26,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+            <div class="flex items-center justify-end">
+                <Button as-child variant="outline">
+                    <Link href="/components">Milkdown Editor Sandbox</Link>
+                </Button>
+            </div>
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <div class="relative flex aspect-video flex-col items-center justify-center rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
                     <p class="text-3xl font-bold">{{ props.metrics.pending }}</p>
