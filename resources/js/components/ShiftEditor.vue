@@ -15,7 +15,7 @@ import pythonLang from 'highlight.js/lib/languages/python';
 import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
-import { FileImage, FileText, Paperclip, Send, Smile } from 'lucide-vue-next';
+import { FileImage, FileText, Paperclip, Send, Smile, X } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import { uploadChunkedFile, MAX_UPLOAD_BYTES } from '@/lib/chunkedUpload';
 // Optional: import a highlight.js theme for lowlight token colors
@@ -314,11 +314,13 @@ defineExpose({ editor });
                     </div>
                     <button
                         type="button"
-                        class="rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200/70 hover:text-slate-700"
+                        class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
                         data-testid="attachment-remove"
+                        aria-label="Remove attachment"
+                        title="Remove"
                         @click="removeAttachment(att)"
                     >
-                        Remove
+                        <X :size="14" />
                     </button>
                 </li>
             </ul>

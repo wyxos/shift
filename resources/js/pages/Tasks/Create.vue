@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
 import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
+import { X } from 'lucide-vue-next';
 
 // Function to truncate long filenames, showing part of the start and end
 function truncateFilename(filename, maxLength = 30) {
@@ -262,10 +263,12 @@ const removeFile = async (file) => {
                                 </div>
                                 <button
                                     type="button"
+                                    class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                                    aria-label="Remove attachment"
+                                    title="Remove"
                                     @click="removeFile(file)"
-                                    class="text-red-600 hover:text-red-900"
                                 >
-                                    Remove
+                                    <X :size="14" />
                                 </button>
                             </li>
                         </ul>

@@ -11,7 +11,7 @@ import { useTaskAttachments } from '@/composables/useTaskAttachments';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, onMounted } from 'vue';
-import { Paperclip } from 'lucide-vue-next';
+import { Paperclip, X } from 'lucide-vue-next';
 
 interface Props {
     project: {
@@ -252,8 +252,14 @@ const submitForm = (): void => {
                                             truncateFilename(attachment.original_filename)
                                         }}</a>
                                     </div>
-                                    <button class="text-red-600 hover:text-red-900" type="button" @click="deleteAttachment(attachment)">
-                                        Remove
+                                    <button
+                                        class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                                        type="button"
+                                        aria-label="Remove attachment"
+                                        title="Remove"
+                                        @click="deleteAttachment(attachment)"
+                                    >
+                                        <X :size="14" />
                                     </button>
                                 </li>
                             </ul>
@@ -288,7 +294,15 @@ const submitForm = (): void => {
                                             <Paperclip :size="20" class="mr-2 text-gray-400" />
                                             <span>{{ truncateFilename(file.original_filename) }}</span>
                                         </div>
-                                        <button class="text-red-600 hover:text-red-900" type="button" @click="removeFile(file)">Remove</button>
+                                        <button
+                                            class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-100 hover:text-red-700 hover:ring-red-300"
+                                            type="button"
+                                            aria-label="Remove attachment"
+                                            title="Remove"
+                                            @click="removeFile(file)"
+                                        >
+                                            <X :size="14" />
+                                        </button>
                                     </li>
                                 </ul>
                             </div>
