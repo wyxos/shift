@@ -10,6 +10,11 @@ use Illuminate\Support\Str;
 
 class AttachmentController extends Controller
 {
+    private const MAX_UPLOAD_BYTES = 41943040; // 40 MB
+    private const MAX_UPLOAD_KB = 40960;
+    private const CHUNK_SIZE_BYTES = 5242880; // 5 MB
+    private const CHUNK_SIZE_KB = 5120;
+
     /**
      * Upload a file to temporary storage.
      *
@@ -19,7 +24,7 @@ class AttachmentController extends Controller
     public function upload(Request $request)
     {
         $validator = validator($request->all(), [
-            'file' => 'required|file|max:10240', // 10MB max
+            'file' => 'required|file|max:'.self::MAX_UPLOAD_KB, // 40MB max
             'temp_identifier' => 'required|string',
         ]);
 
@@ -52,6 +57,205 @@ class AttachmentController extends Controller
         return response()->json([
             'original_filename' => $originalFilename,
             'path' => $path,
+            'url' => route('attachments.temp', [
+                'temp' => $tempIdentifier,
+                'filename' => $storedFilename,
+            ]),
+        ]);
+    }
+
+    /**
+     * Initialize a chunked upload session.
+     */
+    public function uploadInit(Request $request)
+    {
+        $data = $request->validate([
+            'filename' => 'required|string',
+            'size' => 'required|integer|min:1|max:'.self::MAX_UPLOAD_BYTES,
+            'temp_identifier' => 'required|string',
+            'mime_type' => 'nullable|string',
+        ]);
+
+        $uploadId = (string) Str::uuid();
+        $dir = "temp_chunks/{$uploadId}";
+        if (! Storage::exists($dir)) {
+            Storage::makeDirectory($dir);
+        }
+
+        $totalChunks = (int) ceil($data['size'] / self::CHUNK_SIZE_BYTES);
+        $meta = [
+            'original_filename' => $data['filename'],
+            'size' => (int) $data['size'],
+            'temp_identifier' => $data['temp_identifier'],
+            'mime_type' => $data['mime_type'] ?? null,
+            'chunk_size' => self::CHUNK_SIZE_BYTES,
+            'total_chunks' => $totalChunks,
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        Storage::put("{$dir}/meta.json", json_encode($meta));
+
+        return response()->json([
+            'upload_id' => $uploadId,
+            'chunk_size' => self::CHUNK_SIZE_BYTES,
+            'total_chunks' => $totalChunks,
+            'max_bytes' => self::MAX_UPLOAD_BYTES,
+        ]);
+    }
+
+    /**
+     * Return chunk upload status for resumable uploads.
+     */
+    public function uploadStatus(Request $request)
+    {
+        $data = $request->validate([
+            'upload_id' => 'required|string',
+        ]);
+
+        $uploadId = $this->sanitizeUploadId($data['upload_id']);
+        if (! $uploadId) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $metaPath = $this->chunkMetaPath($uploadId);
+        if (! Storage::exists($metaPath)) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $meta = json_decode(Storage::get($metaPath), true) ?: [];
+        $dir = $this->chunkDir($uploadId);
+        $files = Storage::files($dir);
+        $uploaded = [];
+
+        foreach ($files as $file) {
+            if (preg_match('/chunk_(\d+)\.part$/', $file, $m)) {
+                $uploaded[] = (int) $m[1];
+            }
+        }
+
+        sort($uploaded);
+
+        return response()->json([
+            'upload_id' => $uploadId,
+            'uploaded_chunks' => $uploaded,
+            'total_chunks' => (int) ($meta['total_chunks'] ?? 0),
+            'chunk_size' => (int) ($meta['chunk_size'] ?? self::CHUNK_SIZE_BYTES),
+        ]);
+    }
+
+    /**
+     * Upload a single chunk for an existing chunked upload session.
+     */
+    public function uploadChunk(Request $request)
+    {
+        $data = $request->validate([
+            'upload_id' => 'required|string',
+            'chunk_index' => 'required|integer|min:0',
+            'chunk' => 'required|file|max:'.self::CHUNK_SIZE_KB,
+        ]);
+
+        $uploadId = $this->sanitizeUploadId($data['upload_id']);
+        if (! $uploadId) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $meta = $this->readChunkMeta($uploadId);
+        if (! $meta) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $totalChunks = (int) ($meta['total_chunks'] ?? 0);
+        $chunkIndex = (int) $data['chunk_index'];
+        if ($chunkIndex < 0 || $chunkIndex >= $totalChunks) {
+            return response()->json(['error' => 'Invalid chunk index'], 422);
+        }
+
+        $dir = $this->chunkDir($uploadId);
+        if (! Storage::exists($dir)) {
+            Storage::makeDirectory($dir);
+        }
+
+        $file = $request->file('chunk');
+        Storage::putFileAs($dir, $file, "chunk_{$chunkIndex}.part");
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Complete a chunked upload and assemble the final file.
+     */
+    public function uploadComplete(Request $request)
+    {
+        $data = $request->validate([
+            'upload_id' => 'required|string',
+        ]);
+
+        $uploadId = $this->sanitizeUploadId($data['upload_id']);
+        if (! $uploadId) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $meta = $this->readChunkMeta($uploadId);
+        if (! $meta) {
+            return response()->json(['error' => 'Upload not found'], 404);
+        }
+
+        $dir = $this->chunkDir($uploadId);
+        $totalChunks = (int) ($meta['total_chunks'] ?? 0);
+        $missing = [];
+
+        for ($i = 0; $i < $totalChunks; $i++) {
+            if (! Storage::exists("{$dir}/chunk_{$i}.part")) {
+                $missing[] = $i;
+            }
+        }
+
+        if (! empty($missing)) {
+            return response()->json(['error' => 'Missing chunks', 'missing' => $missing], 409);
+        }
+
+        $tempIdentifier = (string) ($meta['temp_identifier'] ?? '');
+        if ($tempIdentifier === '') {
+            return response()->json(['error' => 'Missing temp identifier'], 422);
+        }
+
+        $originalFilename = (string) ($meta['original_filename'] ?? 'upload.bin');
+        $tempPath = "temp_attachments/{$tempIdentifier}";
+        if (! Storage::exists($tempPath)) {
+            Storage::makeDirectory($tempPath);
+        }
+
+        $baseName = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+        $storedFilename = $baseName.'_'.uniqid().($extension ? '.'.$extension : '');
+        $finalPath = "{$tempPath}/{$storedFilename}";
+
+        $finalAbs = Storage::path($finalPath);
+        $out = fopen($finalAbs, 'wb');
+        for ($i = 0; $i < $totalChunks; $i++) {
+            $chunkAbs = Storage::path("{$dir}/chunk_{$i}.part");
+            $in = fopen($chunkAbs, 'rb');
+            stream_copy_to_stream($in, $out);
+            fclose($in);
+        }
+        fclose($out);
+
+        $expectedSize = (int) ($meta['size'] ?? 0);
+        if ($expectedSize > 0 && filesize($finalAbs) !== $expectedSize) {
+            Storage::delete($finalPath);
+            return response()->json(['error' => 'File size mismatch'], 422);
+        }
+
+        $metadataPath = $tempPath.'/'.$storedFilename.'.meta';
+        Storage::put($metadataPath, json_encode([
+            'original_filename' => $originalFilename,
+        ]));
+
+        Storage::deleteDirectory($dir);
+
+        return response()->json([
+            'original_filename' => $originalFilename,
+            'path' => $finalPath,
             'url' => route('attachments.temp', [
                 'temp' => $tempIdentifier,
                 'filename' => $storedFilename,
@@ -113,6 +317,35 @@ class AttachmentController extends Controller
         }
 
         return response()->json(['files' => $fileData]);
+    }
+
+    private function sanitizeUploadId(string $uploadId): ?string
+    {
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $uploadId)) {
+            return null;
+        }
+
+        return $uploadId;
+    }
+
+    private function chunkDir(string $uploadId): string
+    {
+        return "temp_chunks/{$uploadId}";
+    }
+
+    private function chunkMetaPath(string $uploadId): string
+    {
+        return $this->chunkDir($uploadId).'/meta.json';
+    }
+
+    private function readChunkMeta(string $uploadId): ?array
+    {
+        $metaPath = $this->chunkMetaPath($uploadId);
+        if (! Storage::exists($metaPath)) {
+            return null;
+        }
+
+        return json_decode(Storage::get($metaPath), true) ?: null;
     }
 
     /**

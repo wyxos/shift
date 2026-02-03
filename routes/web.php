@@ -68,6 +68,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Attachments
     Route::post('attachments/upload', [AttachmentController::class, 'upload'])->name('attachments.upload');
+    Route::post('attachments/upload-init', [AttachmentController::class, 'uploadInit'])->name('attachments.upload-init');
+    Route::get('attachments/upload-status', [AttachmentController::class, 'uploadStatus'])->name('attachments.upload-status');
+    Route::post('attachments/upload-chunk', [AttachmentController::class, 'uploadChunk'])->name('attachments.upload-chunk');
+    Route::post('attachments/upload-complete', [AttachmentController::class, 'uploadComplete'])->name('attachments.upload-complete');
     Route::get('attachments/list-temp', [AttachmentController::class, 'listTempFiles'])->name('attachments.list-temp');
     Route::delete('attachments/remove-temp', [AttachmentController::class, 'removeTempFile'])->name('attachments.remove-temp');
     Route::get('tasks/{task}/attachments', [AttachmentController::class, 'listTaskAttachments'])->name('attachments.list-task');
