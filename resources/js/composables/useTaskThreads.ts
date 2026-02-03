@@ -158,7 +158,7 @@ export function useTaskThreads(taskId: number) {
     };
 
     // Function to send a new message
-    const sendMessage = async (event?: Event): Promise<void> => {
+    const sendMessage = async (event?: Event, opts?: { tempIdentifierOverride?: string }): Promise<void> => {
         if (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -167,13 +167,16 @@ export function useTaskThreads(taskId: number) {
         const messageContent = activeTab.value === 'internal' ? internalNewMessage.value : externalNewMessage.value;
         const currentAttachments = activeTab.value === 'internal' ? internalThreadAttachments.value : externalThreadAttachments.value;
 
-        if (!messageContent.trim() && currentAttachments.length === 0) return;
+        // Allow external editor (ShiftEditor) to force a temp identifier even if we didn't track attachments here
+        const tempIdToSend = opts?.tempIdentifierOverride ?? (currentAttachments.length > 0 ? currentThreadTempIdentifier.value : null);
+
+        if (!messageContent.trim() && !tempIdToSend) return;
 
         try {
             const response = await axios.post(route('task-threads.store', { task: taskId }), {
                 content: messageContent,
                 type: activeTab.value,
-                temp_identifier: currentAttachments.length > 0 ? currentThreadTempIdentifier.value : null,
+                temp_identifier: tempIdToSend,
             });
 
             const message: Message = {
@@ -298,6 +301,9 @@ export function useTaskThreads(taskId: number) {
         threadUploadError,
         isDraggingInternal,
         isDraggingExternal,
+        // expose identifiers so external editor can reuse
+        internalThreadTempIdentifier,
+        externalThreadTempIdentifier,
 
         // Methods
         renderMarkdown,

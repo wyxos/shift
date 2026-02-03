@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TaskThreadController extends Controller
 {
@@ -40,15 +41,25 @@ class TaskThreadController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($thread) {
-                $attachments = $thread->attachments()->get()->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                        'created_at' => $attachment->created_at,
-                    ];
-                });
+                // Filter out attachments that are already embedded in the content
+                $content = (string) ($thread->content ?? '');
+                $attachments = $thread->attachments()->get()
+                    ->filter(function ($attachment) use ($content) {
+                        $downloadUrlRel = route('attachments.download', $attachment, false);
+                        $downloadUrlAbs = url($downloadUrlRel);
+
+                        return Str::doesntContain($content, $downloadUrlRel);
+                    })
+                    ->map(function ($attachment) {
+                        return [
+                            'id' => $attachment->id,
+                            'original_filename' => $attachment->original_filename,
+                            'path' => $attachment->path,
+                            'url' => route('attachments.download', $attachment),
+                            'created_at' => $attachment->created_at,
+                        ];
+                    })
+                    ->values();
 
                 return [
                     'id' => $thread->id,
@@ -90,6 +101,17 @@ class TaskThreadController extends Controller
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
             $this->processTemporaryAttachments($request->temp_identifier, $thread);
+        }
+
+        // After moving attachments, replace temp URLs in content with final URLs
+        if ($request->filled('temp_identifier')) {
+            $thread->load('attachments');
+            $thread->content = $this->replaceTempUrlsInContent(
+                $thread->content,
+                $request->input('temp_identifier'),
+                $thread->attachments
+            );
+            $thread->save();
         }
 
         // Get the thread with attachments
@@ -139,6 +161,22 @@ class TaskThreadController extends Controller
             }
         }
 
+        // Filter out attachments already embedded in the content for response
+        $content = (string) ($thread->content ?? '');
+        $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
+            $downloadUrlRel = route('attachments.download', $attachment, false);
+            $downloadUrlAbs = url($downloadUrlRel);
+            return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
+        })->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => route('attachments.download', $attachment),
+                'created_at' => $attachment->created_at,
+            ];
+        })->values();
+
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
@@ -146,15 +184,7 @@ class TaskThreadController extends Controller
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
-                'attachments' => $thread->attachments->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                        'created_at' => $attachment->created_at,
-                    ];
-                }),
+                'attachments' => $responseAttachments,
             ],
         ], 201);
     }
@@ -232,7 +262,7 @@ class TaskThreadController extends Controller
                 'url' => route('attachments.download', $attachment),
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         return response()->json([
             'thread' => [
@@ -280,5 +310,36 @@ class TaskThreadController extends Controller
         $thread->delete();
 
         return response()->json(['message' => 'Thread message deleted successfully']);
+    }
+    /**
+     * Replace temp attachment URLs in HTML content with final download URLs.
+     */
+    private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
+    {
+        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+            return $content;
+        }
+
+        $out = $content;
+        foreach ($attachments as $attachment) {
+            $finalUrl = route('attachments.download', $attachment, false);
+            $basename = basename($attachment->path);
+            $quotedTemp = preg_quote($tempIdentifier, '#');
+            $quotedBase = preg_quote($basename, '#');
+            $quotedBaseEnc = preg_quote(rawurlencode($basename), '#');
+
+            // Match both encoded and unencoded basenames, absolute and relative URLs
+            $patterns = [
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+            ];
+
+            foreach ($patterns as $pattern) {
+                $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
+            }
+        }
+        return $out;
     }
 }

@@ -75,7 +75,7 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
-                    'content' => $thread->content,
+'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $isCurrentUser,
                     'created_at' => $thread->created_at,
@@ -130,6 +130,17 @@ class ExternalTaskThreadController extends Controller
             $this->processTemporaryAttachments($request->temp_identifier, $thread);
         }
 
+        // After moving attachments, replace temp URLs in content with final URLs (internal download route)
+        if ($request->filled('temp_identifier')) {
+            $thread->load('attachments');
+            $thread->content = $this->replaceTempUrlsInContent(
+                $thread->content,
+                $request->input('temp_identifier'),
+                $thread->attachments
+            );
+            $thread->save();
+        }
+
         // Get the thread with attachments
         $thread->load('attachments');
 
@@ -164,10 +175,27 @@ class ExternalTaskThreadController extends Controller
             );
         }
 
+        // Filter out attachments already embedded in the content for response
+        $content = (string) ($thread->content ?? '');
+        $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
+            // check against internal download URL present in content (relative or absolute)
+            $downloadUrlRel = route('attachments.download', $attachment, false);
+            $downloadUrlAbs = url($downloadUrlRel);
+            return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
+        })->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => $this->temporaryUrlForAttachment($attachment, 30),
+                'created_at' => $attachment->created_at,
+            ];
+        })->values();
+
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-                'content' => $thread->content,
+'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
@@ -274,7 +302,7 @@ class ExternalTaskThreadController extends Controller
                 'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
-        });
+        })->values();
 
         // Determine if the current user is the sender
         $isCurrentUser = false;
@@ -289,12 +317,114 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-                'content' => $thread->content,
+'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => $isCurrentUser,
                 'created_at' => $thread->created_at,
                 'attachments' => $attachments,
             ],
         ]);
+    }
+    /**
+     * Replace temp attachment URLs in HTML content with final download URLs.
+     */
+    private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
+    {
+        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+            return $content;
+        }
+
+        $out = $content;
+        foreach ($attachments as $attachment) {
+            // For persisted HTML, use internal download route; API consumers should render attachments list
+            $finalUrl = route('attachments.download', $attachment, false);
+            $basename = basename($attachment->path);
+            $quotedTemp = preg_quote($tempIdentifier, '#');
+            $quotedBase = preg_quote($basename, '#');
+            $quotedBaseEnc = preg_quote(rawurlencode($basename), '#');
+
+            // Match both encoded and unencoded basenames, absolute and relative URLs
+            $patterns = [
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+            ];
+
+            foreach ($patterns as $pattern) {
+                $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Generate a temporary URL for the given attachment.
+     * Falls back to the absolute download route if the disk does not support temporaryUrl.
+     */
+    private function temporaryUrlForAttachment(Attachment $attachment, int $minutes = 30): string
+    {
+        try {
+            return Storage::temporaryUrl($attachment->path, now()->addMinutes($minutes));
+        } catch (\Throwable $e) {
+            return url(route('attachments.download', $attachment, false));
+        }
+    }
+
+    /**
+     * Rewrite any attachment download URLs in HTML content to temporary URLs for external consumption.
+     * Supports both internal and API-style URLs, absolute and relative.
+     */
+    private function rewriteContentUrlsToTemporaryUrls(string $content, int $minutes = 30): string
+    {
+        if ($content === '') {
+            return $content;
+        }
+
+        // Collect unique attachment IDs referenced in the content
+        $patterns = [
+            '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
+            '#/attachments/(\\d+)/download#',
+            '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
+            '#/shift/api/attachments/(\\d+)/download#',
+        ];
+
+        $ids = [];
+        foreach ($patterns as $pattern) {
+            if (preg_match_all($pattern, $content, $m)) {
+                foreach ($m[1] as $id) {
+                    $ids[] = (int) $id;
+                }
+            }
+        }
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if (!$ids) {
+            return $content;
+        }
+
+        $map = Attachment::whereIn('id', $ids)->get()->keyBy('id');
+
+        $replace = function (string $pattern, string $html) use ($map, $minutes) {
+            return preg_replace_callback($pattern, function ($m) use ($map, $minutes) {
+                $id = (int) $m[1];
+                $attachment = $map->get($id);
+                if (!$attachment) {
+                    return $m[0];
+                }
+                try {
+                    return Storage::temporaryUrl($attachment->path, now()->addMinutes($minutes));
+                } catch (\Throwable $e) {
+                    return url(route('attachments.download', $attachment, false));
+                }
+            }, $html) ?? $html;
+        };
+
+        $out = $content;
+        foreach ($patterns as $pattern) {
+            $out = $replace($pattern, $out);
+        }
+
+        return $out;
     }
 }
