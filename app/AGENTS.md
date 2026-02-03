@@ -39,4 +39,6 @@
 - SDK expects `project` token and `user.*`/`metadata.*` fields in external API payloads (see `app/Http/Controllers/Api/ExternalTaskController.php`).
 
 ## Pre-PR Checks
-- `vendor/bin/pint && ./vendor/bin/phpunit`
+- `vendor/bin/pint`
+- `composer test` (uses `php artisan test` / PHPUnit)
+- If API contract changes: update SDK + relevant `AGENTS.md`/`README.md`
