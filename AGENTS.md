@@ -39,6 +39,11 @@
 - Keep API changes backwards-compatible when possible (SDK consumers).
 - PHP style: Pint (`vendor/bin/pint`).
 - JS style: Prettier + ESLint (`npm run format`, `npm run lint`).
+- Cross-repo alignment is mandatory:
+  - Any change in SHIFT that affects SDK routes, payloads, assets, or UI parity must be reflected in `../shift-sdk-package/`.
+  - Any SDK change that affects portal routes, payloads, or UI parity must be reflected here.
+- Documentation upkeep:
+  - If behavior or workflows change, update relevant `AGENTS.md` and `README.md`.
 
 ## Security & Secrets
 - Never commit `.env` or real tokens/keys.
@@ -62,8 +67,9 @@
 - Search frontend (skip deps): `rg -n "ThingToFind" resources/js --hidden --glob "!node_modules/**"`
 
 ## Definition of Done
-- `./vendor/bin/phpunit` passes
+- PHP tests: `composer test` (uses `php artisan test` / PHPUnit)
 - `vendor/bin/pint` is clean
-- `npm run format:check` and `npm run lint` are clean
-- `npm run build` succeeds
+- JS checks: `npm run format:check` and `npm run lint`
+- JS tests (when JS changes): `npm run test`
+- `npm run build` succeeds when frontend assets or UI changes
 - If external API changed: SDK updated in `../shift-sdk-package/`
