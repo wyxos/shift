@@ -1,5 +1,9 @@
 # SHIFT (Portal)
 
+## PROFILE.md (Required)
+- Read and follow `PROFILE.md` in this repo before making changes.
+- Its guidance on quality, naming, and refactoring is mandatory for all work.
+
 ## Project Snapshot
 - Repo type: single Laravel app (Portal) with external API consumed by the PHP SDK.
 - Stack: PHP 8.2+ (Laravel 12, Sanctum), Vue 3 + Inertia, Vite, Tailwind, PHPUnit, Laravel Pint, ESLint + Prettier, Vitest.
