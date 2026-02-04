@@ -43,12 +43,6 @@ import { Head, Link } from '@inertiajs/vue3';
                             >
                                 Log in
                             </Link>
-                            <Link
-                                :href="route('register')"
-                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-                            >
-                                Get Started
-                            </Link>
                         </template>
                     </div>
                 </div>

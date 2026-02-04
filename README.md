@@ -30,6 +30,10 @@ SHIFT is a task management system built with Laravel 12 and Vue 3. It provides a
 - Composer
 - MySQL/PostgreSQL
 
+### Registration
+
+Registration is temporarily disabled. Create users via seeding or the database, or re-enable routes in `routes/auth.php` when you want public signups.
+
 ### Installation
 
 ```bash
