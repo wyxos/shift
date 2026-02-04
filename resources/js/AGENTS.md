@@ -1,5 +1,9 @@
 # SHIFT Frontend (`resources/js/`)
 
+## PROFILE.md (Required)
+- Read and follow `PROFILE.md` in the repo root before making frontend changes.
+- Its guidance on quality, naming, and refactoring is mandatory for all work.
+
 ## Package Identity
 - Vue 3 + Inertia UI for the SHIFT portal.
 - Unit tests live in `resources/js/__tests__/**` (Vitest).

@@ -42,9 +42,6 @@ const stars = 0 // optionally fetch from GitHub API later
                             <Link :href="route('login')" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
                                 Log in
                             </Link>
-                            <Link :href="route('register')" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-                                Get Started
-                            </Link>
                         </div>
                         <div v-else>
                             <Link :href="route('dashboard')" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors">
@@ -68,9 +65,6 @@ const stars = 0 // optionally fetch from GitHub API later
                     Designed to streamline task tracking and project collaboration across multiple teams and applications.
                 </p>
                 <div class="mt-10 flex items-center justify-center gap-x-6">
-                    <Link v-if="!auth?.user" :href="route('register')" class="rounded-lg bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
-                        Get Started
-                    </Link>
                     <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
                         Go to Dashboard
                     </Link>
@@ -175,9 +169,6 @@ const stars = 0 // optionally fetch from GitHub API later
                     SHIFT is completely open source and free to use. Deploy it on your own infrastructure and take full control of your task management.
                 </p>
                 <div class="mt-10 flex items-center justify-center gap-x-6">
-                    <Link v-if="!auth?.user" :href="route('register')" class="rounded-lg bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
-                        Start Managing Tasks
-                    </Link>
                     <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
                         Go to Dashboard
                     </Link>

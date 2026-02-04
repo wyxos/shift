@@ -7,14 +7,10 @@ use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Wyxos\ShiftShared\ChunkedUploadConfig;
 
 class AttachmentController extends Controller
 {
-    private const MAX_UPLOAD_BYTES = 41943040; // 40 MB
-    private const MAX_UPLOAD_KB = 40960;
-    private const CHUNK_SIZE_BYTES = 5242880; // 5 MB
-    private const CHUNK_SIZE_KB = 5120;
-
     /**
      * Upload a file to temporary storage.
      *
@@ -24,7 +20,7 @@ class AttachmentController extends Controller
     public function upload(Request $request)
     {
         $validator = validator($request->all(), [
-            'file' => 'required|file|max:'.self::MAX_UPLOAD_KB, // 40MB max
+            'file' => 'required|file|max:'.ChunkedUploadConfig::MAX_UPLOAD_KB, // 40MB max
             'temp_identifier' => 'required|string',
         ]);
 
@@ -71,7 +67,7 @@ class AttachmentController extends Controller
     {
         $data = $request->validate([
             'filename' => 'required|string',
-            'size' => 'required|integer|min:1|max:'.self::MAX_UPLOAD_BYTES,
+            'size' => 'required|integer|min:1|max:'.ChunkedUploadConfig::MAX_UPLOAD_BYTES,
             'temp_identifier' => 'required|string',
             'mime_type' => 'nullable|string',
         ]);
@@ -82,13 +78,13 @@ class AttachmentController extends Controller
             Storage::makeDirectory($dir);
         }
 
-        $totalChunks = (int) ceil($data['size'] / self::CHUNK_SIZE_BYTES);
+        $totalChunks = (int) ceil($data['size'] / ChunkedUploadConfig::CHUNK_SIZE_BYTES);
         $meta = [
             'original_filename' => $data['filename'],
             'size' => (int) $data['size'],
             'temp_identifier' => $data['temp_identifier'],
             'mime_type' => $data['mime_type'] ?? null,
-            'chunk_size' => self::CHUNK_SIZE_BYTES,
+            'chunk_size' => ChunkedUploadConfig::CHUNK_SIZE_BYTES,
             'total_chunks' => $totalChunks,
             'created_at' => now()->toIso8601String(),
         ];
@@ -97,9 +93,9 @@ class AttachmentController extends Controller
 
         return response()->json([
             'upload_id' => $uploadId,
-            'chunk_size' => self::CHUNK_SIZE_BYTES,
+            'chunk_size' => ChunkedUploadConfig::CHUNK_SIZE_BYTES,
             'total_chunks' => $totalChunks,
-            'max_bytes' => self::MAX_UPLOAD_BYTES,
+            'max_bytes' => ChunkedUploadConfig::MAX_UPLOAD_BYTES,
         ]);
     }
 
@@ -139,7 +135,7 @@ class AttachmentController extends Controller
             'upload_id' => $uploadId,
             'uploaded_chunks' => $uploaded,
             'total_chunks' => (int) ($meta['total_chunks'] ?? 0),
-            'chunk_size' => (int) ($meta['chunk_size'] ?? self::CHUNK_SIZE_BYTES),
+            'chunk_size' => (int) ($meta['chunk_size'] ?? ChunkedUploadConfig::CHUNK_SIZE_BYTES),
         ]);
     }
 
@@ -151,7 +147,7 @@ class AttachmentController extends Controller
         $data = $request->validate([
             'upload_id' => 'required|string',
             'chunk_index' => 'required|integer|min:0',
-            'chunk' => 'required|file|max:'.self::CHUNK_SIZE_KB,
+            'chunk' => 'required|file|max:'.ChunkedUploadConfig::CHUNK_SIZE_KB,
         ]);
 
         $uploadId = $this->sanitizeUploadId($data['upload_id']);
