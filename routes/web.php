@@ -9,6 +9,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -84,6 +85,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');
     Route::get('external-users/{externalUser}/edit', [ExternalUserController::class, 'edit'])->name('external-users.edit');
     Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
+
+    // Users
+    Route::get('users', [UserController::class, 'index'])->name('users.index');
 
     // Notifications
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');

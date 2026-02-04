@@ -27,9 +27,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // attachments (already use api.attachments.* names)
     Route::post('/attachments/upload', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'upload'])->name('api.attachments.upload');
+    Route::post('/attachments/upload-init', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadInit'])->name('api.attachments.upload-init');
+    Route::get('/attachments/upload-status', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadStatus'])->name('api.attachments.upload-status');
+    Route::post('/attachments/upload-chunk', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadChunk'])->name('api.attachments.upload-chunk');
+    Route::post('/attachments/upload-complete', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadComplete'])->name('api.attachments.upload-complete');
     Route::post('/attachments/upload-multiple', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'uploadMultiple'])->name('api.attachments.upload-multiple');
     Route::delete('/attachments/remove-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'removeTemp'])->name('api.attachments.remove-temp');
     Route::get('/attachments/list-temp', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'listTemp'])->name('api.attachments.list-temp');
+    Route::get('/attachments/temp/{temp}/{filename}', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'showTemp'])
+        ->where('filename', '.*')
+        ->name('api.attachments.temp');
 });
 
 Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'download'])->name('api.attachments.download');

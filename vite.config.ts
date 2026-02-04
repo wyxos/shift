@@ -29,7 +29,22 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),
+            '@shared': path.resolve(__dirname, '../shift-sdk-package/packages/shift-shared-ui/src'),
+            '@tiptap': path.resolve(__dirname, './node_modules/@tiptap'),
+            'highlight.js': path.resolve(__dirname, './node_modules/highlight.js'),
+            lowlight: path.resolve(__dirname, './node_modules/lowlight'),
+            'emoji-picker-element': path.resolve(__dirname, './node_modules/emoji-picker-element'),
+            'lucide-vue-next': path.resolve(__dirname, './node_modules/lucide-vue-next'),
+            axios: path.resolve(__dirname, './node_modules/axios'),
             'ziggy-js': resolve(__dirname, 'vendor/tightenco/ziggy'),
+        },
+    },
+    server: {
+        fs: {
+            allow: [
+                path.resolve(__dirname),
+                path.resolve(__dirname, '../shift-sdk-package/packages/shift-shared-ui'),
+            ],
         },
     },
 });
