@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Wyxos\ShiftShared\ChunkedUploadConfig;
 
 ;
 
@@ -87,8 +88,8 @@ test('upload validates required fields', function () {
 });
 
 test('upload validates file size', function () {
-    // Create a file larger than the 10MB limit
-    $file = UploadedFile::fake()->create('large-document.pdf', 11000);
+    // Create a file larger than the configured max upload size
+    $file = UploadedFile::fake()->create('large-document.pdf', ChunkedUploadConfig::MAX_UPLOAD_KB + 1);
 
     $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
         ->withHeader('Accept', 'application/json')
@@ -274,9 +275,7 @@ test('download returns error for missing file', function () {
     $response = $this->actingAs($this->user)
         ->get(route('api.attachments.download', $this->attachment));
 
-    // Current controller uses Storage::response which throws if the file is missing.
-    // Assert we get a non-success response (server error). If behavior changes to 404 later,
-    // this assertion can be tightened.
+    // Assert we get a non-success response when the file is missing.
     expect($response->status())->toBeGreaterThanOrEqual(400);
 });
 

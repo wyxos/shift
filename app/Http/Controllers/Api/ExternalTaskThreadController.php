@@ -50,18 +50,27 @@ class ExternalTaskThreadController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($thread) {
-                $attachments = $thread->attachments()->get()->map(function ($attachment) {
-                    // Get the client's URL from request metadata or user data
-                    $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        // Return SDK-facing download URL pointing to the client's proxy route
-                        'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
-                        'created_at' => $attachment->created_at,
-                    ];
-                });
+                $content = (string) ($thread->content ?? '');
+                $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+
+                $attachments = $thread->attachments()->get()
+                    ->filter(function ($attachment) use ($content) {
+                        $downloadUrlRel = route('attachments.download', $attachment, false);
+                        $downloadUrlAbs = url($downloadUrlRel);
+
+                        return ! str_contains($content, $downloadUrlRel) && ! str_contains($content, $downloadUrlAbs);
+                    })
+                    ->map(function ($attachment) use ($clientUrl) {
+                        return [
+                            'id' => $attachment->id,
+                            'original_filename' => $attachment->original_filename,
+                            'path' => $attachment->path,
+                            // Return SDK-facing download URL pointing to the client's proxy route
+                            'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
+                            'created_at' => $attachment->created_at,
+                        ];
+                    })
+                    ->values();
 
                 // Determine if the current user is the sender
                 $isCurrentUser = false;
@@ -75,7 +84,7 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
-'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
+                    'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $isCurrentUser,
                     'created_at' => $thread->created_at,
@@ -177,17 +186,19 @@ class ExternalTaskThreadController extends Controller
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
+        $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
         $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
             // check against internal download URL present in content (relative or absolute)
             $downloadUrlRel = route('attachments.download', $attachment, false);
             $downloadUrlAbs = url($downloadUrlRel);
             return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
-        })->map(function ($attachment) {
+        })->map(function ($attachment) use ($clientUrl) {
             return [
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
-                'url' => $this->temporaryUrlForAttachment($attachment, 30),
+                // Return SDK-facing download URL pointing to the client's proxy route
+                'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
                 'created_at' => $attachment->created_at,
             ];
         })->values();
@@ -195,22 +206,11 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
+                'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
-                'attachments' => $thread->attachments->map(function ($attachment) {
-                    // Get the client's URL from request metadata or user data
-                    $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        // Return SDK-facing download URL pointing to the client's proxy route
-                        'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
-                        'created_at' => $attachment->created_at,
-                    ];
-                }),
+                'attachments' => $responseAttachments,
             ],
         ], 201);
     }
