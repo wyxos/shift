@@ -470,28 +470,7 @@ class ExternalAttachmentController extends Controller
         // For regular authenticated users, no additional access control is needed
         // They can access attachments through normal Laravel authentication
 
-        // Check if the file is an image
-        $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
-        $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
-
-//        // Check if the file is an image
-//        $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
-//        $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
-//
-//        if ($isImage) {
-//            // For images, return an inline response
-//            return response()->file(
-//                Storage::path($attachment->path),
-//                ['Content-Type' => $this->getMimeType($extension)]
-//            );
-//        } else {
-//            // For non-images, return a download response
-//            return response()->download(
-//                Storage::path($attachment->path),
-//                $attachment->original_filename,
-//                ['Content-Type' => 'application/octet-stream']
-//            );
-//        }
+        return Storage::response($attachment->path, $attachment->original_filename);
     }
 
     /**
