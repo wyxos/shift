@@ -3,12 +3,11 @@
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
-use App\Notifications\ProjectUserRegisteredNotification;
 use Illuminate\Support\Facades\Notification;
 
 ;
 
-test('project owner receives notification when user registers following invite', function () {
+test('project owner is not notified when registration is disabled', function () {
     Notification::fake();
 
     // Create a project owner
@@ -31,7 +30,7 @@ test('project owner receives notification when user registers following invite',
         'registration_status' => 'pending',
     ]);
 
-    // Simulate the user registering via the invitation
+    // Attempt registration via the invitation (disabled)
     $response = $this->post('/register', [
         'name' => $invitedUserName,
         'email' => $invitedUserEmail,
@@ -40,29 +39,15 @@ test('project owner receives notification when user registers following invite',
         'project_id' => $project->id,
     ]);
 
-    // Assert the user was registered and redirected to the projects page
-    $this->assertAuthenticated();
-    $response->assertRedirect(route('projects.index', ['highlight' => $project->id], false));
+    $response->assertStatus(404);
+    $this->assertGuest();
 
-    // Assert the project user record was updated
+    // Assert the project user record was not updated
     $this->assertDatabaseHas('project_users', [
         'project_id' => $project->id,
         'user_email' => $invitedUserEmail,
-        'registration_status' => 'registered',
+        'registration_status' => 'pending',
     ]);
 
-    // Assert that the project owner received the notification
-    Notification::assertSentTo(
-        $projectOwner,
-        ProjectUserRegisteredNotification::class,
-        function ($notification, $channels) use ($project, $invitedUserEmail, $projectOwner) {
-            $mailData = $notification->toMail($projectOwner);
-            $arrayData = $notification->toArray($projectOwner);
-
-            // Check that the notification contains the correct information
-            return $arrayData['project_id'] === $project->id &&
-                $arrayData['user_email'] === $invitedUserEmail &&
-                str_contains($mailData->subject, 'New User Registration');
-        }
-    );
+    Notification::assertNothingSent();
 });
