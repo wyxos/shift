@@ -65,10 +65,10 @@ vi.mock('@/components/ui/card', () => ({
 vi.mock('lucide-vue-next', () => ({
   CheckCircle2: { render: () => h('span') },
   FolderKanban: { render: () => h('span') },
+  Github: { render: () => h('span') },
   MessageSquare: { render: () => h('span') },
   Paperclip: { render: () => h('span') },
   Plug: { render: () => h('span') },
-  ShieldCheck: { render: () => h('span') },
 }))
 
 describe('Home.vue', () => {
@@ -82,11 +82,11 @@ describe('Home.vue', () => {
     })
 
     const heading = wrapper.find('h1').text()
-    expect(heading).toContain('SHIFT keeps client work moving')
+    expect(heading).toContain('SHIFT keeps client work on track')
     expect(wrapper.text()).toContain('organizations, clients, projects, and tasks')
   })
 
-  it('shows login and GitHub links when user is not authenticated', () => {
+  it('shows login link and GitHub icon when user is not authenticated', () => {
     const wrapper = mount(Home, {
       props: {
         auth: {
@@ -102,7 +102,7 @@ describe('Home.vue', () => {
 
     const links = wrapper.findAll('a')
     expect(links.some((link) => link.text().includes('Log in'))).toBe(true)
-    expect(links.some((link) => link.text().includes('View on GitHub'))).toBe(true)
+    expect(links.some((link) => link.attributes('href')?.includes('github.com/wyxos/shift'))).toBe(true)
     expect(links.some((link) => link.text().includes('Go to Dashboard'))).toBe(false)
   })
 
