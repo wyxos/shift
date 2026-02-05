@@ -65,7 +65,7 @@ const stars = 0 // optionally fetch from GitHub API later
                     Designed to streamline task tracking and project collaboration across multiple teams and applications.
                 </p>
                 <div class="mt-10 flex items-center justify-center gap-x-6">
-                    <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
+                    <Link v-if="auth?.user" :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
                         Go to Dashboard
                     </Link>
                     <a href="https://github.com/wyxos/shift" target="_blank" class="text-base font-semibold leading-6 text-slate-900 dark:text-slate-100 hover:text-slate-600 dark:hover:text-slate-400 transition-colors">
@@ -169,7 +169,7 @@ const stars = 0 // optionally fetch from GitHub API later
                     SHIFT is completely open source and free to use. Deploy it on your own infrastructure and take full control of your task management.
                 </p>
                 <div class="mt-10 flex items-center justify-center gap-x-6">
-                    <Link v-else :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
+                    <Link v-if="auth?.user" :href="route('dashboard')" class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
                         Go to Dashboard
                     </Link>
                     <a href="https://github.com/wyxos/shift" target="_blank" class="text-base font-semibold leading-6 text-slate-900 dark:text-slate-100 hover:text-slate-600 dark:hover:text-slate-400 transition-colors">

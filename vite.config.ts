@@ -2,8 +2,13 @@ import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
 import tailwindcss from "@tailwindcss/vite";
+import fs from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+
+const sharedUiPath = path.resolve(__dirname, '../shift-sdk-package/packages/shift-shared-ui/src');
+const localSharedUiPath = path.resolve(__dirname, './resources/js/shared');
+const sharedUiAlias = fs.existsSync(sharedUiPath) ? sharedUiPath : localSharedUiPath;
 
 export default defineConfig({
     plugins: [
@@ -29,7 +34,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),
-            '@shared': path.resolve(__dirname, '../shift-sdk-package/packages/shift-shared-ui/src'),
+            '@shared': sharedUiAlias,
             '@tiptap': path.resolve(__dirname, './node_modules/@tiptap'),
             'highlight.js': path.resolve(__dirname, './node_modules/highlight.js'),
             lowlight: path.resolve(__dirname, './node_modules/lowlight'),
@@ -43,7 +48,8 @@ export default defineConfig({
         fs: {
             allow: [
                 path.resolve(__dirname),
-                path.resolve(__dirname, '../shift-sdk-package/packages/shift-shared-ui'),
+                sharedUiPath,
+                localSharedUiPath,
             ],
         },
     },
