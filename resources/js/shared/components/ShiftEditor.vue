@@ -308,7 +308,7 @@ defineExpose({ editor: editor.value });
 
 <template>
     <div>
-        <EditorContent class="tiptap" data-testid="tiptap-editor" :editor="editor?.value" :style="editorStyle" />
+        <EditorContent class="tiptap" data-testid="tiptap-editor" :editor="editor" :style="editorStyle" />
 
         <div class="flex flex-col gap-2">
             <ul

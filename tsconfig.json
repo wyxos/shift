@@ -35,7 +35,7 @@
         // "baseUrl": "./",                                  /* Specify the base directory to resolve non-relative module names. */
         "paths": {
             /* Specify a set of entries that re-map imports to additional lookup locations. */ "@/*": ["./resources/js/*"],
-            "@shared/*": ["../shift-sdk-package/packages/shift-shared-ui/src/*"],
+            "@shared/*": ["./resources/js/shared/*"],
             "@tiptap/*": ["./node_modules/@tiptap/*"],
             "highlight.js/*": ["./node_modules/highlight.js/*"],
             "lowlight": ["./node_modules/lowlight"],
@@ -131,8 +131,8 @@
         "resources/js/**/*.d.ts",
         "resources/js/**/*.tsx", 
         "resources/js/**/*.vue",
-        "../shift-sdk-package/packages/shift-shared-ui/src/**/*.ts",
-        "../shift-sdk-package/packages/shift-shared-ui/src/**/*.d.ts",
-        "../shift-sdk-package/packages/shift-shared-ui/src/**/*.vue"
+        "./resources/js/shared/**/*.ts",
+        "./resources/js/shared/**/*.d.ts",
+        "./resources/js/shared/**/*.vue"
     ]
 }
