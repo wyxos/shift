@@ -1,15 +1,15 @@
 <script lang="ts" setup>
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Head, Link } from '@inertiajs/vue3'
-import { CheckCircle2, FolderKanban, Github, MessageSquare, Paperclip, Plug } from 'lucide-vue-next'
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Head, Link } from '@inertiajs/vue3';
+import { CheckCircle2, FolderKanban, Github, MessageSquare, Paperclip, Plug } from 'lucide-vue-next';
 
 defineProps<{
     auth?: {
-        user: any | null
-    }
-}>()
+        user: any | null;
+    };
+}>();
 </script>
 
 <template>
@@ -30,24 +30,19 @@ defineProps<{
         <meta content="website" property="og:type" />
     </Head>
 
-    <div class="min-h-screen bg-background text-foreground">
-        <div class="border-b bg-background/90 backdrop-blur">
+    <div class="bg-background text-foreground min-h-screen">
+        <div class="bg-background/90 border-b backdrop-blur">
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
                 <div class="flex items-center gap-3">
-                    <img
-                        alt="SHIFT logo"
-                        class="h-8 w-auto"
-                        src="/brand/shift-logo.svg"
-                    />
+                    <img alt="SHIFT logo" class="h-8 w-auto" src="/brand/shift-logo.svg" />
                     <div class="flex flex-col leading-none">
                         <span class="text-sm font-semibold">SHIFT</span>
-                        <span class="text-xs text-muted-foreground">Task operations</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
                     <Button as-child class="h-9 w-9" size="icon" variant="ghost">
                         <a aria-label="GitHub" href="https://github.com/wyxos/shift" rel="noreferrer" target="_blank">
-                            <Github class="size-4 text-muted-foreground" />
+                            <Github class="text-muted-foreground size-4" />
                         </a>
                     </Button>
                     <Button v-if="auth?.user" as-child size="sm">
@@ -70,10 +65,8 @@ defineProps<{
                         Built for client work
                     </Badge>
                     <div class="space-y-4">
-                        <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">
-                            SHIFT keeps client work on track.
-                        </h1>
-                        <p class="text-lg text-muted-foreground">
+                        <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">SHIFT keeps client work on track.</h1>
+                        <p class="text-muted-foreground text-lg">
                             Capture requests, track delivery, and keep context together across organizations, clients, projects, and tasks.
                         </p>
                     </div>
@@ -99,30 +92,30 @@ defineProps<{
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="flex items-start gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
                                 <p class="text-sm font-medium">Requests stop getting lost</p>
-                                <p class="text-sm text-muted-foreground">Every request becomes a tracked task with clear status.</p>
+                                <p class="text-muted-foreground text-sm">Every request becomes a tracked task with clear status.</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
                                 <p class="text-sm font-medium">Ownership stays visible</p>
-                                <p class="text-sm text-muted-foreground">Know who owns what across clients and projects.</p>
+                                <p class="text-muted-foreground text-sm">Know who owns what across clients and projects.</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
                                 <p class="text-sm font-medium">Context lives with the work</p>
-                                <p class="text-sm text-muted-foreground">Threads and files stay attached to each task.</p>
+                                <p class="text-muted-foreground text-sm">Threads and files stay attached to each task.</p>
                             </div>
                         </div>
                     </CardContent>
@@ -132,7 +125,7 @@ defineProps<{
             <section id="workflow" class="space-y-8">
                 <div class="space-y-2">
                     <h2 class="text-2xl font-semibold">A workflow that matches client delivery</h2>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-muted-foreground text-sm">
                         SHIFT mirrors how agencies and teams actually ship work, so scope and accountability stay clear.
                     </p>
                 </div>
@@ -168,7 +161,7 @@ defineProps<{
                 <Card>
                     <CardHeader>
                         <div class="flex items-center gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <MessageSquare class="size-4 text-blue-600" />
                             </div>
                             <div>
@@ -177,14 +170,14 @@ defineProps<{
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent class="text-sm text-muted-foreground">
+                    <CardContent class="text-muted-foreground text-sm">
                         Keep internal and client-facing conversations in one place so there is no lost context.
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
                         <div class="flex items-center gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <Paperclip class="size-4 text-blue-600" />
                             </div>
                             <div>
@@ -193,14 +186,14 @@ defineProps<{
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent class="text-sm text-muted-foreground">
+                    <CardContent class="text-muted-foreground text-sm">
                         Briefs, screenshots, and deliverables live alongside the task they belong to.
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
                         <div class="flex items-center gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <FolderKanban class="size-4 text-blue-600" />
                             </div>
                             <div>
@@ -209,7 +202,7 @@ defineProps<{
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent class="text-sm text-muted-foreground">
+                    <CardContent class="text-muted-foreground text-sm">
                         A clean dashboard makes it easy to report and prioritize the work that matters.
                     </CardContent>
                 </Card>
@@ -227,9 +220,9 @@ defineProps<{
                         <CardTitle class="text-base">API + SDK ready</CardTitle>
                         <CardDescription>Connect intake while keeping the portal as the source of truth.</CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-4 text-sm text-muted-foreground">
+                    <CardContent class="text-muted-foreground space-y-4 text-sm">
                         <div class="flex items-start gap-3">
-                            <div class="flex size-9 items-center justify-center rounded-lg border border-blue-100/70 bg-background">
+                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
                                 <Plug class="size-4 text-blue-600" />
                             </div>
                             <span>Route external requests into SHIFT with consistent structure.</span>
@@ -240,12 +233,12 @@ defineProps<{
         </main>
 
         <footer class="border-t">
-            <div class="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <div
+                class="text-muted-foreground mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-8 text-sm sm:flex-row sm:items-center sm:justify-between"
+            >
                 <span>© 2025 SHIFT. Open source under MIT License.</span>
                 <div class="flex items-center gap-4">
-                    <a class="hover:text-foreground" href="https://wyxos.com" rel="noreferrer" target="_blank">
-                        Wyxos
-                    </a>
+                    <a class="hover:text-foreground" href="https://wyxos.com" rel="noreferrer" target="_blank"> Wyxos </a>
                 </div>
             </div>
         </footer>
