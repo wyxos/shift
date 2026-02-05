@@ -6,6 +6,15 @@
         "artisan",
         "boost:mcp"
       ]
+    },
+    "herd": {
+      "command": "php",
+      "args": [
+        "herd-mcp.phar"
+      ],
+      "env": {
+        "SITE_PATH": "."
+      }
     }
   }
 }

@@ -1,9 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { h, nextTick } from 'vue'
-import Components from '@/pages/Components.vue'
+import ComponentsPage from '@/pages/Components.vue'
 
-// Mock AppLayout to avoid layout complexity
 vi.mock('@/layouts/AppLayout.vue', () => ({
   default: {
     props: ['breadcrumbs'],
@@ -13,16 +12,31 @@ vi.mock('@/layouts/AppLayout.vue', () => ({
   },
 }))
 
-// Mock Inertia Head component
 vi.mock('@inertiajs/vue3', () => ({
   Head: { render: () => {} },
 }))
 
-describe('Components.vue (TipTap)', () => {
-  it('renders TipTap editor container', async () => {
-    const wrapper = mount(Components)
-    await nextTick()
-    expect(wrapper.find('[data-testid="tiptap-editor"]').exists()).toBe(true)
-  })
+beforeEach(() => {
+  ;(global as any).route = () => '/'
 })
 
+async function waitForEditor(wrapper: ReturnType<typeof mount>) {
+  const start = Date.now()
+  while (Date.now() - start < 800) {
+    const el = wrapper.find('.ProseMirror')
+    if (el.exists()) return el
+    await new Promise((r) => setTimeout(r, 10))
+    await nextTick()
+  }
+  return wrapper.find('.ProseMirror')
+}
+
+describe('Components page', () => {
+  it('renders the ShiftEditor text area', async () => {
+    const wrapper = mount(ComponentsPage)
+    await nextTick()
+
+    const editorEl = await waitForEditor(wrapper)
+    expect(editorEl.exists()).toBe(true)
+  })
+})
