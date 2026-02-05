@@ -33,12 +33,6 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
       '@shared': fileURLToPath(new URL('./resources/js/shared', import.meta.url)),
-      '@tiptap': fileURLToPath(new URL('./node_modules/@tiptap', import.meta.url)),
-      'highlight.js': fileURLToPath(new URL('./node_modules/highlight.js', import.meta.url)),
-      lowlight: fileURLToPath(new URL('./node_modules/lowlight', import.meta.url)),
-      'emoji-picker-element': fileURLToPath(new URL('./node_modules/emoji-picker-element', import.meta.url)),
-      'lucide-vue-next': fileURLToPath(new URL('./node_modules/lucide-vue-next', import.meta.url)),
-      axios: fileURLToPath(new URL('./node_modules/axios', import.meta.url)),
     },
   },
 })
