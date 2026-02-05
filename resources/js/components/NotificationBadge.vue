@@ -7,8 +7,25 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from '@inertiajs/vue3';
 
+type NotificationData = {
+  task_title?: string;
+  type?: string;
+  project_name?: string;
+  user_name?: string;
+  organisation_name?: string;
+  url?: string;
+  task_id?: number | string;
+};
+
+type NotificationItem = {
+  id: number | string;
+  type: string;
+  data: NotificationData | string;
+  created_at?: string;
+};
+
 const unreadCount = ref(0);
-const notifications = ref([]);
+const notifications = ref<NotificationItem[]>([]);
 const loading = ref(true);
 
 const fetchNotifications = async () => {
@@ -24,11 +41,11 @@ const fetchNotifications = async () => {
   }
 };
 
-const markAsRead = async (id) => {
+const markAsRead = async (id: NotificationItem['id']) => {
   try {
     await axios.post(route('notifications.mark-as-read', { id }));
     // Remove the notification from the list
-    notifications.value = notifications.value.filter(notification => notification.id !== id);
+    notifications.value = notifications.value.filter((notification) => notification.id !== id);
     // Decrement the unread count
     unreadCount.value--;
   } catch (error) {
@@ -58,7 +75,7 @@ onMounted(() => {
 });
 
 // Format notification title based on type
-const getNotificationTitle = (notification) => {
+const getNotificationTitle = (notification: NotificationItem) => {
   const type = notification.type;
   // Handle both string and object data formats
   const data = typeof notification.data === 'string'
@@ -84,7 +101,7 @@ const getNotificationTitle = (notification) => {
 };
 
 // Get notification URL
-const getNotificationUrl = (notification) => {
+const getNotificationUrl = (notification: NotificationItem) => {
   // Handle both string and object data formats
   const data = typeof notification.data === 'string'
     ? JSON.parse(notification.data)
