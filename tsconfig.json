@@ -36,12 +36,6 @@
         "paths": {
             /* Specify a set of entries that re-map imports to additional lookup locations. */ "@/*": ["./resources/js/*"],
             "@shared/*": ["./resources/js/shared/*"],
-            "@tiptap/*": ["./node_modules/@tiptap/*"],
-            "highlight.js/*": ["./node_modules/highlight.js/*"],
-            "lowlight": ["./node_modules/lowlight"],
-            "emoji-picker-element": ["./node_modules/emoji-picker-element"],
-            "lucide-vue-next": ["./node_modules/lucide-vue-next"],
-            "axios": ["./node_modules/axios"],
             "ziggy-js": ["./vendor/tightenco/ziggy"]
         },
         // "rootDirs": [],                                   /* Allow multiple folders to be treated as one when resolving modules. */
