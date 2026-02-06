@@ -7,7 +7,7 @@ use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Wyxos\ShiftShared\ChunkedUploadConfig;
+use Shift\Core\ChunkedUploadConfig;
 
 class AttachmentController extends Controller
 {

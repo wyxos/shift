@@ -16,7 +16,7 @@
         "laravel/tinker": "^2.10.1",
         "sentry/sentry-laravel": "^4.15",
         "tightenco/ziggy": "^2.4",
-        "wyxos/shift-shared": "*"
+        "wyxos/shift-core": "^0.1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -43,15 +43,6 @@
             "Tests\\": "tests/"
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../shift-sdk-package/packages/shift-shared",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
