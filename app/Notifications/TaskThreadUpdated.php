@@ -2,15 +2,11 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
-use Illuminate\Support\Str;
+use Shift\Core\Notifications\TaskThreadUpdated as CoreTaskThreadUpdated;
 
-class TaskThreadUpdated extends Notification implements ShouldQueue
+class TaskThreadUpdated extends CoreTaskThreadUpdated implements ShouldQueue
 {
-    use Queueable;
 
     /**
      * Create a new notification instance.
@@ -28,24 +24,6 @@ class TaskThreadUpdated extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
-    }
-
-    /**
-     * Get the mail representation of the notification.
-     */
-    public function toMail(object $notifiable): MailMessage
-    {
-        $taskTitle = $this->data['task_title'] ?? 'Task #' . $this->data['task_id'];
-        $threadType = ucfirst($this->data['type']) . ' thread';
-        $snippet = Str::limit($this->data['content'], 120);
-        $url = $this->data['url'];
-
-        return (new MailMessage)
-            ->subject("New reply in {$threadType} for {$taskTitle}")
-            ->line("A new message was posted.")
-            ->line("Preview: \"{$snippet}\"")
-            ->action('View Thread', $url)
-            ->line('Please do not reply to this email directly.');
     }
 
     /**
