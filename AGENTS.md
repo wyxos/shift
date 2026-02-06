@@ -12,6 +12,9 @@
 
 ## Related Repos (cross-repo awareness)
 - SDK workspace on this machine: `../shift-sdk-package/` (contains the SDK source + local dev harness).
+- Shared core PHP package (source-of-truth): `../shift-core` (`wyxos/shift-core`)
+  - Local dev override (no toggling): `composer config --global repositories.shift-core path /absolute/path/to/shift-core`
+  - Use `composer config --global repositories.shift-core.options.symlink true` to symlink instead of copy.
 - SDK purpose (`wyxos/shift-php`):
   - Provides `/shift/**` dashboard UI (served from built SPA assets).
   - Provides `/shift/api/**` proxy endpoints that call back to this portal’s external API.
