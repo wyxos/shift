@@ -621,9 +621,11 @@ class ExternalTaskController extends Controller
 
         $patterns = [
             '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
-            '#/attachments/(\\d+)/download#',
+            // Only match truly-relative URLs, not the path portion of an absolute URL.
+            '#(?<![A-Za-z0-9])/attachments/(\\d+)/download#',
             '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
-            '#/shift/api/attachments/(\\d+)/download#',
+            // Only match truly-relative URLs, not the path portion of an absolute URL.
+            '#(?<![A-Za-z0-9])/shift/api/attachments/(\\d+)/download#',
         ];
 
         $replace = function (string $pattern, string $html) use ($clientBase) {
