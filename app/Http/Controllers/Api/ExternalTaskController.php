@@ -113,6 +113,8 @@ class ExternalTaskController extends Controller
         // Add the formatted attachments to the task
         $task = $task->toArray();
         $task['attachments'] = $formattedAttachments;
+        $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+        $task['description'] = $this->rewriteContentUrlsToClientProxyUrls((string) ($task['description'] ?? ''), (string) $clientUrl);
 
         return response()->json($task);
     }
@@ -137,6 +139,10 @@ class ExternalTaskController extends Controller
             'metadata.environment' => 'nullable|string|max:255',
             'temp_identifier' => 'nullable|string',
         ]);
+
+        if (isset($attributes['description'])) {
+            $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
+        }
 
         $task = Task::create([
             ...$attributes,
@@ -203,9 +209,8 @@ class ExternalTaskController extends Controller
                         }
                     }
 
-                    // Generate a unique filename for storage
-                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    // Keep the temp filename stable so we can rewrite inline HTML URLs reliably.
+                    $storedFilename = basename($file);
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
@@ -228,6 +233,17 @@ class ExternalTaskController extends Controller
                 // Remove the temp directory
                 Storage::deleteDirectory($tempPath);
             }
+        }
+
+        // If this task included inline attachments, rewrite temp URLs to stable download routes.
+        if (!empty($attributes['temp_identifier'])) {
+            $task->load('attachments');
+            $task->description = $this->replaceTempUrlsInContent(
+                (string) ($task->description ?? ''),
+                (string) $attributes['temp_identifier'],
+                $task->attachments
+            );
+            $task->save();
         }
 
         return response()->json($task, 201);
@@ -302,6 +318,10 @@ class ExternalTaskController extends Controller
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
         ]);
 
+        if (isset($attributes['description'])) {
+            $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
+        }
+
         $task->update([
             ...$attributes,
             'status' => $attributes['status'] ?? $task->status,
@@ -359,9 +379,8 @@ class ExternalTaskController extends Controller
                         }
                     }
 
-                    // Generate a unique filename for storage
-                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    // Keep the temp filename stable so we can rewrite inline HTML URLs reliably.
+                    $storedFilename = basename($file);
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
@@ -384,6 +403,17 @@ class ExternalTaskController extends Controller
                 // Remove the temp directory
                 Storage::deleteDirectory($tempPath);
             }
+        }
+
+        // If this update included inline attachments, rewrite temp URLs to stable download routes.
+        if (!empty($attributes['temp_identifier'])) {
+            $task->load('attachments');
+            $task->description = $this->replaceTempUrlsInContent(
+                (string) ($task->description ?? ''),
+                (string) $attributes['temp_identifier'],
+                $task->attachments
+            );
+            $task->save();
         }
 
         return response()->json($task, 200);
@@ -499,5 +529,115 @@ class ExternalTaskController extends Controller
             'priority' => $task->priority,
             'message' => 'Task priority updated successfully'
         ]);
+    }
+
+    /**
+     * Replace temp attachment URLs in HTML content with final download URLs.
+     *
+     * External SDK clients embed images via their proxy route:
+     * `/shift/api/attachments/temp/{temp}/{filename}`.
+     * After we move files to permanent storage, rewrite those URLs to the internal
+     * download route (`/attachments/{id}/download`), then rewrite to the client SDK
+     * proxy URL at read time (see rewriteContentUrlsToClientProxyUrls()).
+     */
+    private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
+    {
+        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+            return $content;
+        }
+
+        $out = $content;
+        foreach ($attachments as $attachment) {
+            $finalUrl = route('attachments.download', $attachment, false);
+            $basename = basename((string) $attachment->path);
+            $quotedTemp = preg_quote($tempIdentifier, '#');
+            $quotedBase = preg_quote($basename, '#');
+            $quotedBaseEnc = preg_quote(rawurlencode($basename), '#');
+
+            $patterns = [
+                // SDK proxy route (absolute + relative)
+                "#https?://[^\\s\"'<>]+/shift/api/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/shift/api/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/shift/api/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/shift/api/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                // Portal-style temp route (absolute + relative)
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+            ];
+
+            foreach ($patterns as $pattern) {
+                $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Normalize any attachment download URLs found in content to the internal download route.
+     *
+     * This ensures we never persist client-specific hostnames in task descriptions.
+     */
+    private function normalizeDownloadUrlsToInternal(string $content): string
+    {
+        if ($content === '') {
+            return $content;
+        }
+
+        $patterns = [
+            '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
+            '#/shift/api/attachments/(\\d+)/download#',
+            '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
+            '#/attachments/(\\d+)/download#',
+        ];
+
+        $replace = function (string $pattern, string $html) {
+            return preg_replace_callback($pattern, function ($m) {
+                $id = (int) $m[1];
+                return route('attachments.download', ['attachment' => $id], false);
+            }, $html) ?? $html;
+        };
+
+        $out = $content;
+        foreach ($patterns as $pattern) {
+            $out = $replace($pattern, $out);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Rewrite any internal attachment download URLs in HTML content to the client SDK proxy URL.
+     */
+    private function rewriteContentUrlsToClientProxyUrls(string $content, string $clientUrl): string
+    {
+        if ($content === '' || $clientUrl === '') {
+            return $content;
+        }
+
+        $clientBase = rtrim($clientUrl, '/');
+
+        $patterns = [
+            '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
+            '#/attachments/(\\d+)/download#',
+            '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
+            '#/shift/api/attachments/(\\d+)/download#',
+        ];
+
+        $replace = function (string $pattern, string $html) use ($clientBase) {
+            return preg_replace_callback($pattern, function ($m) use ($clientBase) {
+                $id = (int) $m[1];
+                return $clientBase . '/shift/api/attachments/' . $id . '/download';
+            }, $html) ?? $html;
+        };
+
+        $out = $content;
+        foreach ($patterns as $pattern) {
+            $out = $replace($pattern, $out);
+        }
+
+        return $out;
     }
 }
