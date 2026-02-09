@@ -5,6 +5,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskMetadata;
 use App\Models\User;
+use App\Models\Attachment;
 
 ;
 
@@ -99,6 +100,36 @@ test('show returns task details', function () {
         'title' => 'Test Task',
         'project_id' => $this->project->id,
     ]);
+});
+
+test('show rewrites attachment urls without duplicating the client host', function () {
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'Task With Inline Image',
+    ]);
+    $task->submitter()->associate($this->externalUser)->save();
+
+    $attachment = Attachment::create([
+        'attachable_id' => $task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'screenshot.png',
+        'path' => "attachments/{$task->id}/screenshot.png",
+    ]);
+
+    // Persist an absolute internal download URL; the API should rewrite to the client SDK proxy URL once.
+    $task->description = '<p><img src="https://example.com/attachments/' . $attachment->id . '/download" /></p>';
+    $task->save();
+
+    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+        ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+        ]));
+
+    $response->assertStatus(200);
+    $desc = (string) ($response->json('description') ?? '');
+    expect($desc)->toContain('https://example.com/shift/api/attachments/' . $attachment->id . '/download');
+    expect($desc)->not->toContain('https://example.comhttps://example.com');
 });
 
 test('show returns 404 for task in different project', function () {
