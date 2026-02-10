@@ -299,7 +299,7 @@ async function fetchThreads(taskId: number) {
     threadError.value = null;
     try {
         const response = await axios.get(route('task-threads.index', { task: taskId }));
-        const list = Array.isArray(response.data?.internal) ? response.data.internal : [];
+        const list = Array.isArray(response.data?.external) ? response.data.external : [];
         threadMessages.value = list.map(mapThreadToMessage);
         scrollCommentsToBottomSoon();
     } catch (e: any) {
@@ -409,7 +409,7 @@ async function handleThreadSend(payload: { html: string }) {
         threadSending.value = true;
         const response = await axios.post(route('task-threads.store', { task: editTask.value.id }), {
             content: html,
-            type: 'internal',
+            type: 'external',
             temp_identifier: threadTempIdentifier.value,
         });
 
