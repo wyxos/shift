@@ -1,23 +1,19 @@
 <?php
 
 use App\Models\ExternalUser;
-use App\Models\TaskThread;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Http\UploadedFile;
-
-;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     // Create a project with an API token
     $this->user = User::factory()->create();
     $this->project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
     $this->project->generateApiToken();
     $this->token = $this->user->createToken('test-token')->plainTextToken;
@@ -47,27 +43,26 @@ beforeEach(function () {
     $this->task->submitter()->associate($this->externalUser)->save();
 });
 
-
 test('external thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     // Create temp files for two images and one pdf
-    $img1 = 'img_' . uniqid() . '.png';
-    $img2 = 'img_' . uniqid() . '.jpg';
-    $pdf1 = 'file_' . uniqid() . '.pdf';
-    $tempDir = 'temp_attachments/' . $tempIdentifier;
-    Storage::put($tempDir . '/' . $img1, 'fake');
-    Storage::put($tempDir . '/' . $img1 . '.meta', json_encode(['original_filename' => 'photo1.png']));
-    Storage::put($tempDir . '/' . $img2, 'fake');
-    Storage::put($tempDir . '/' . $img2 . '.meta', json_encode(['original_filename' => 'photo2.jpg']));
-    Storage::put($tempDir . '/' . $pdf1, 'fake');
-    Storage::put($tempDir . '/' . $pdf1 . '.meta', json_encode(['original_filename' => 'doc.pdf']));
+    $img1 = 'img_'.uniqid().'.png';
+    $img2 = 'img_'.uniqid().'.jpg';
+    $pdf1 = 'file_'.uniqid().'.pdf';
+    $tempDir = 'temp_attachments/'.$tempIdentifier;
+    Storage::put($tempDir.'/'.$img1, 'fake');
+    Storage::put($tempDir.'/'.$img1.'.meta', json_encode(['original_filename' => 'photo1.png']));
+    Storage::put($tempDir.'/'.$img2, 'fake');
+    Storage::put($tempDir.'/'.$img2.'.meta', json_encode(['original_filename' => 'photo2.jpg']));
+    Storage::put($tempDir.'/'.$pdf1, 'fake');
+    Storage::put($tempDir.'/'.$pdf1.'.meta', json_encode(['original_filename' => 'doc.pdf']));
 
     // Content embeds only the two image temp URLs
     $content = '<p>Here are two images:</p>'
-        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img1 . '"></p>'
-        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img2 . '"></p>';
+        .'<p><img src="/attachments/temp/'.$tempIdentifier.'/'.$img1.'"></p>'
+        .'<p><img src="/attachments/temp/'.$tempIdentifier.'/'.$img2.'"></p>';
 
     $threadData = [
         'content' => $content,
@@ -77,7 +72,7 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
         'temp_identifier' => $tempIdentifier,
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
 
     $response->assertStatus(201);
@@ -85,10 +80,12 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
     $finalContent = $response->json('thread.content');
     $threadId = $response->json('thread.id');
     expect($finalContent)->not->toContain('/attachments/temp/');
+    expect($finalContent)->not->toContain('/shift/api/attachments/temp/');
 
-    // Content URLs should be rewritten to signed thread asset URLs for images
-    // Expect URLs like /attachments/task_threads/{threadId}/{filename}?expiration=...
-    expect($finalContent)->toContain('/attachments/task_threads/' . $threadId . '/');
+    // Content URLs should be rewritten to the client SDK proxy route for embedded images.
+    // Example: https://example.com/shift/api/attachments/{id}/download
+    expect($finalContent)->toContain('/shift/api/attachments/');
+    expect($finalContent)->toContain('/download');
 
     // Only the PDF should remain in attachments array
     $attachments = $response->json('thread.attachments');
@@ -110,7 +107,7 @@ test('external thread creation sends notifications to project users', function (
         'user_id' => $projectUser1->id,
         'user_email' => $projectUser1->email,
         'user_name' => $projectUser1->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     ProjectUser::factory()->create([
@@ -118,7 +115,7 @@ test('external thread creation sends notifications to project users', function (
         'user_id' => $projectUser2->id,
         'user_email' => $projectUser2->email,
         'user_name' => $projectUser2->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     $threadData = [
@@ -128,30 +125,29 @@ test('external thread creation sends notifications to project users', function (
         'user' => $this->externalUserData,
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
 
     $response->assertStatus(201);
 
     // Assert that notifications were sent to all project users
-Notification::assertSentTo(
+    Notification::assertSentTo(
         [$this->user, $projectUser1, $projectUser2],
         TaskThreadUpdated::class
     );
 });
 
-
 test('external API thread replaces temp URLs in content with final download URLs', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     // Create a temp file and metadata
-    $storedFilename = 'img_' . uniqid() . '.png';
-    $tempDir = 'temp_attachments/' . $tempIdentifier;
-    Storage::put($tempDir . '/' . $storedFilename, 'fake');
-    Storage::put($tempDir . '/' . $storedFilename . '.meta', json_encode(['original_filename' => 'photo.png']));
+    $storedFilename = 'img_'.uniqid().'.png';
+    $tempDir = 'temp_attachments/'.$tempIdentifier;
+    Storage::put($tempDir.'/'.$storedFilename, 'fake');
+    Storage::put($tempDir.'/'.$storedFilename.'.meta', json_encode(['original_filename' => 'photo.png']));
 
-    $content = '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $storedFilename . '"></p>';
+    $content = '<p><img src="/attachments/temp/'.$tempIdentifier.'/'.$storedFilename.'"></p>';
 
     $threadData = [
         'content' => $content,
@@ -161,7 +157,7 @@ test('external API thread replaces temp URLs in content with final download URLs
         'temp_identifier' => $tempIdentifier,
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
 
     $response->assertStatus(201);
@@ -169,37 +165,37 @@ test('external API thread replaces temp URLs in content with final download URLs
     $out = $response->json('thread.content');
     $threadId = $response->json('thread.id');
 
-    // Attachment IDs are no longer used in embedded content URLs for API threads.
     expect($out)->not->toContain('/attachments/temp/');
-    expect($out)->toContain('/attachments/task_threads/' . $threadId . '/');
+    expect($out)->not->toContain('/shift/api/attachments/temp/');
+    expect($out)->toContain('/shift/api/attachments/');
+    expect($out)->toContain('/download');
 
     // Embedded image should be excluded from attachments list in response
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
 
-
 test('external API thread replaces encoded-space temp URLs with final API download URLs', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     // Create a temp file whose basename contains spaces
-    $storedFilename = 'Proof of Address 20252707_' . uniqid() . '.jpg';
-    $tempDir = 'temp_attachments/' . $tempIdentifier;
-    Storage::put($tempDir . '/' . $storedFilename, 'fake');
-    Storage::put($tempDir . '/' . $storedFilename . '.meta', json_encode(['original_filename' => 'Proof of Address 20252707.jpg']));
+    $storedFilename = 'Proof of Address 20252707_'.uniqid().'.jpg';
+    $tempDir = 'temp_attachments/'.$tempIdentifier;
+    Storage::put($tempDir.'/'.$storedFilename, 'fake');
+    Storage::put($tempDir.'/'.$storedFilename.'.meta', json_encode(['original_filename' => 'Proof of Address 20252707.jpg']));
 
     // Build the absolute temp URL (route helper will URL-encode spaces)
     $tempUrl = route('attachments.temp', ['temp' => $tempIdentifier, 'filename' => $storedFilename]);
 
     $threadData = [
-        'content' => '<p><img src="' . $tempUrl . '"></p>',
+        'content' => '<p><img src="'.$tempUrl.'"></p>',
         'type' => 'external',
         'project' => $this->project->token,
         'user' => $this->externalUserData,
         'temp_identifier' => $tempIdentifier,
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
 
     $response->assertStatus(201);
@@ -209,6 +205,8 @@ test('external API thread replaces encoded-space temp URLs with final API downlo
 
     // Embedded content should reference the signed thread asset URL and not temp URLs
     expect($out)->not->toContain('/attachments/temp/');
-    expect($out)->toContain('/attachments/task_threads/' . $threadId . '/');
+    expect($out)->not->toContain('/shift/api/attachments/temp/');
+    expect($out)->toContain('/shift/api/attachments/');
+    expect($out)->toContain('/download');
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
