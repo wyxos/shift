@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Task;
-use App\Models\TaskThread;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
+use App\Models\Task;
+use App\Models\TaskThread;
 use App\Notifications\TaskThreadUpdated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
@@ -19,7 +18,6 @@ class ExternalTaskThreadController extends Controller
     /**
      * Get all threads for a task.
      *
-     * @param Task $task
      * @return JsonResponse
      */
     public function index(Task $task)
@@ -39,8 +37,6 @@ class ExternalTaskThreadController extends Controller
     /**
      * Get threads by type for a task.
      *
-     * @param Task $task
-     * @param string $type
      * @return array
      */
     private function getThreadsByType(Task $task, string $type)
@@ -66,7 +62,7 @@ class ExternalTaskThreadController extends Controller
                             'original_filename' => $attachment->original_filename,
                             'path' => $attachment->path,
                             // Return SDK-facing download URL pointing to the client's proxy route
-                            'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
+                            'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
                             'created_at' => $attachment->created_at,
                         ];
                     })
@@ -84,7 +80,7 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
-                    'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
+                    'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $isCurrentUser,
                     'created_at' => $thread->created_at,
@@ -97,8 +93,6 @@ class ExternalTaskThreadController extends Controller
     /**
      * Store a new thread message.
      *
-     * @param Request $request
-     * @param Task $task
      * @return JsonResponse
      */
     public function store(Request $request, Task $task)
@@ -159,13 +153,13 @@ class ExternalTaskThreadController extends Controller
         // Add project users
         $projectUsers = $task->project->projectUser()->with('user')->get();
         foreach ($projectUsers as $projectUser) {
-            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
+            if ($projectUser->user && ! $usersToNotify->contains('id', $projectUser->user->id)) {
                 $usersToNotify->push($projectUser->user);
             }
         }
 
         // Add the project author if not already included
-        if ($task->project->author && !$usersToNotify->contains('id', $task->project->author->id)) {
+        if ($task->project->author && ! $usersToNotify->contains('id', $task->project->author->id)) {
             $usersToNotify->push($task->project->author);
         }
 
@@ -191,6 +185,7 @@ class ExternalTaskThreadController extends Controller
             // check against internal download URL present in content (relative or absolute)
             $downloadUrlRel = route('attachments.download', $attachment, false);
             $downloadUrlAbs = url($downloadUrlRel);
+
             return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
         })->map(function ($attachment) use ($clientUrl) {
             return [
@@ -198,7 +193,7 @@ class ExternalTaskThreadController extends Controller
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
                 // Return SDK-facing download URL pointing to the client's proxy route
-                'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
+                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
                 'created_at' => $attachment->created_at,
             ];
         })->values();
@@ -206,7 +201,7 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-                'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
+                'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
@@ -218,15 +213,14 @@ class ExternalTaskThreadController extends Controller
     /**
      * Process temporary attachments and associate them with the thread.
      *
-     * @param string $tempIdentifier
-     * @param TaskThread $thread
+     * @param  string  $tempIdentifier
      * @return void
      */
     private function processTemporaryAttachments($tempIdentifier, TaskThread $thread)
     {
         $tempPath = "temp_attachments/{$tempIdentifier}";
 
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             return;
         }
 
@@ -239,7 +233,7 @@ class ExternalTaskThreadController extends Controller
             }
 
             // Get original filename from metadata
-            $metadataPath = $file . '.meta';
+            $metadataPath = $file.'.meta';
             $originalFilename = basename($file);
 
             if (Storage::exists($metadataPath)) {
@@ -250,7 +244,7 @@ class ExternalTaskThreadController extends Controller
             }
 
             // Move file to permanent storage
-            $newPath = "attachments/task_threads/{$thread->id}/" . basename($file);
+            $newPath = "attachments/task_threads/{$thread->id}/".basename($file);
             Storage::move($file, $newPath);
 
             // Create attachment record
@@ -274,8 +268,7 @@ class ExternalTaskThreadController extends Controller
     /**
      * Get a specific thread message.
      *
-     * @param Task $task
-     * @param TaskThread $thread
+     * @param  TaskThread  $thread
      * @return JsonResponse
      */
     public function show(Task $task, $threadId)
@@ -294,12 +287,13 @@ class ExternalTaskThreadController extends Controller
         $attachments = $thread->attachments()->get()->map(function ($attachment) {
             // Get the client's URL from request metadata or user data
             $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+
             return [
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
                 // Return SDK-facing download URL pointing to the client's proxy route
-                'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
+                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
                 'created_at' => $attachment->created_at,
             ];
         })->values();
@@ -317,7 +311,10 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
-'content' => $this->rewriteContentUrlsToTemporaryUrls($thread->content ?? ''),
+                'content' => $this->rewriteContentUrlsToClientProxyUrls(
+                    $thread->content ?? '',
+                    (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'))
+                ),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => $isCurrentUser,
                 'created_at' => $thread->created_at,
@@ -325,12 +322,13 @@ class ExternalTaskThreadController extends Controller
             ],
         ]);
     }
+
     /**
      * Replace temp attachment URLs in HTML content with final download URLs.
      */
     private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
     {
-        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+        if (empty($content) || empty($tempIdentifier) || ! $attachments || $attachments->isEmpty()) {
             return $content;
         }
 
@@ -345,6 +343,11 @@ class ExternalTaskThreadController extends Controller
 
             // Match both encoded and unencoded basenames, absolute and relative URLs
             $patterns = [
+                // SDK proxy route (absolute + relative)
+                "#https?://[^\\s\"'<>]+/shift/api/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/shift/api/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/shift/api/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/shift/api/attachments/temp/{$quotedTemp}/{$quotedBase}#",
                 "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
                 "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
                 "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
@@ -355,68 +358,35 @@ class ExternalTaskThreadController extends Controller
                 $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
             }
         }
+
         return $out;
     }
 
     /**
-     * Generate a temporary URL for the given attachment.
-     * Falls back to the absolute download route if the disk does not support temporaryUrl.
+     * Rewrite any attachment download URLs in HTML content to the client SDK proxy URL.
      */
-    private function temporaryUrlForAttachment(Attachment $attachment, int $minutes = 30): string
+    private function rewriteContentUrlsToClientProxyUrls(string $content, string $clientUrl): string
     {
-        try {
-            return Storage::temporaryUrl($attachment->path, now()->addMinutes($minutes));
-        } catch (\Throwable $e) {
-            return url(route('attachments.download', $attachment, false));
-        }
-    }
-
-    /**
-     * Rewrite any attachment download URLs in HTML content to temporary URLs for external consumption.
-     * Supports both internal and API-style URLs, absolute and relative.
-     */
-    private function rewriteContentUrlsToTemporaryUrls(string $content, int $minutes = 30): string
-    {
-        if ($content === '') {
+        if ($content === '' || $clientUrl === '') {
             return $content;
         }
 
-        // Collect unique attachment IDs referenced in the content
+        $clientBase = rtrim($clientUrl, '/');
+
         $patterns = [
             '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
-            '#/attachments/(\\d+)/download#',
+            // Only match truly-relative URLs, not the path portion of an absolute URL.
+            '#(?<![A-Za-z0-9])/attachments/(\\d+)/download#',
             '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
-            '#/shift/api/attachments/(\\d+)/download#',
+            // Only match truly-relative URLs, not the path portion of an absolute URL.
+            '#(?<![A-Za-z0-9])/shift/api/attachments/(\\d+)/download#',
         ];
 
-        $ids = [];
-        foreach ($patterns as $pattern) {
-            if (preg_match_all($pattern, $content, $m)) {
-                foreach ($m[1] as $id) {
-                    $ids[] = (int) $id;
-                }
-            }
-        }
-        $ids = array_values(array_unique(array_filter($ids)));
-
-        if (!$ids) {
-            return $content;
-        }
-
-        $map = Attachment::whereIn('id', $ids)->get()->keyBy('id');
-
-        $replace = function (string $pattern, string $html) use ($map, $minutes) {
-            return preg_replace_callback($pattern, function ($m) use ($map, $minutes) {
+        $replace = function (string $pattern, string $html) use ($clientBase) {
+            return preg_replace_callback($pattern, function ($m) use ($clientBase) {
                 $id = (int) $m[1];
-                $attachment = $map->get($id);
-                if (!$attachment) {
-                    return $m[0];
-                }
-                try {
-                    return Storage::temporaryUrl($attachment->path, now()->addMinutes($minutes));
-                } catch (\Throwable $e) {
-                    return url(route('attachments.download', $attachment, false));
-                }
+
+                return $clientBase.'/shift/api/attachments/'.$id.'/download';
             }, $html) ?? $html;
         };
 
