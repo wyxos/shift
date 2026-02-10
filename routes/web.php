@@ -51,6 +51,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // tasks
     Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('tasks-v2', [TaskController::class, 'indexV2'])->name('tasks.v2');
     Route::get('tasks/create', [TaskController::class, 'create'])->name('tasks.create');
     Route::get('tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
 

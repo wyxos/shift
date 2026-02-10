@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Project;
-use App\Models\ProjectUser;
-use App\Models\Task;
-use App\Models\Attachment;
-use App\Models\User;
 use App\Jobs\NotifyExternalUser;
+use App\Models\Attachment;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -18,67 +18,87 @@ use Inertia\Response;
 
 class TaskController extends Controller
 {
+    private function visibleTasksQuery(): Builder
+    {
+        $userId = auth()->id();
+
+        return Task::query()
+            ->where(function ($query) use ($userId) {
+                $query
+                    ->whereHas('project.projectUser', function ($query) use ($userId) {
+                        $query->where('user_id', $userId);
+                    })
+                    ->orWhereHas('project', function ($query) use ($userId) {
+                        $query->where('author_id', $userId);
+                    })
+                    ->orWhereHas('project.organisation', function ($query) use ($userId) {
+                        $query->where('author_id', $userId);
+                    })
+                    ->orWhereHas('project.client.organisation', function ($query) use ($userId) {
+                        $query->where('author_id', $userId);
+                    })
+                    ->orWhereHasMorph('submitter', [User::class], function ($query) use ($userId) {
+                        $query->where('users.id', $userId);
+                    });
+            });
+    }
+
+    private function normalizeListFilter(mixed $value): array
+    {
+        if (is_array($value)) {
+            $list = array_values(array_filter($value, fn ($item) => filled($item)));
+
+            return array_map('strval', $list);
+        }
+
+        if (filled($value)) {
+            return [strval($value)];
+        }
+
+        return [];
+    }
+
+    private function applyIndexFilters(Builder $query, array $filters): void
+    {
+        if (filled($filters['search'] ?? null)) {
+            $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$filters['search'].'%']);
+        }
+
+        if (filled($filters['project_id'] ?? null)) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        $priorities = $this->normalizeListFilter($filters['priority'] ?? null);
+        if (! empty($priorities)) {
+            $query->whereIn('priority', $priorities);
+        }
+
+        $statuses = $this->normalizeListFilter($filters['status'] ?? null);
+        if (! empty($statuses)) {
+            $query->whereIn('status', $statuses);
+        }
+    }
+
     public function index()
     {
-        $tasks = Task::query()
+        $query = $this->visibleTasksQuery()
             ->with(['submitter', 'metadata', 'project.organisation', 'project.client'])
-            ->where(function ($query) {
-                $query
-                    ->whereHas('project.projectUser', function ($query) {
-                        $query->where('user_id', auth()->user()->id);
-                    })
-                    ->orWhereHas('project', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhereHas('project.organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhereHas('project.client.organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhereHasMorph('submitter', [User::class], function ($query) {
-                        $query->where('users.id', auth()->user()->id);
-                    });
-            })
-            ->latest()
-            ->when(
-                request('search'),
-                fn($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
-            )
-            ->when(
-                request('project_id'),
-                fn($query) => $query->where('project_id', request('project_id'))
-            )
-            ->when(
-                request('priority'),
-                fn($query) => $query->where('priority', request('priority'))
-            )
-            ->when(
-                request('status'),
-                function ($query) {
-                    $status = request('status');
-                    if (is_array($status)) {
-                        $status = array_filter($status, fn($s) => filled($s));
-                        if (count($status) > 0) {
-                            $query->whereIn('status', $status);
-                        }
-                    } else {
-                        $query->where('status', $status);
-                    }
-                }
-            )
-            ->paginate(10)
-            ->withQueryString();
+            ->latest();
+
+        $this->applyIndexFilters($query, request()->only(['search', 'project_id', 'priority', 'status']));
+
+        $tasks = $query->paginate(10)->withQueryString();
 
         $tasks->through(function (Task $task) {
             $task->is_external = $task->isExternallySubmitted();
+
             return $task;
         });
 
         // Get projects for the filter dropdown (same as in create method)
         $projects = Project::where(function ($query) {
             $query->where(
-                fn($query) => $query
+                fn ($query) => $query
                     ->whereHas('client.organisation', function ($query) {
                         $query->where('author_id', auth()->user()->id);
                     })->orWhereHas('organisation', function ($query) {
@@ -99,6 +119,34 @@ class TaskController extends Controller
             ]);
     }
 
+    public function indexV2()
+    {
+        $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+
+        $selectedStatuses = $this->normalizeListFilter(request('status'));
+        if (empty($selectedStatuses)) {
+            $selectedStatuses = $defaultStatuses;
+        }
+
+        $query = $this->visibleTasksQuery()
+            ->latest();
+
+        // V2 (for now) is intentionally "list + filters" only.
+        // Keep server filtering limited to status (like the SDK UI),
+        // and handle search/priority filtering client-side.
+        $query->whereIn('status', $selectedStatuses);
+
+        $tasks = $query->get(['id', 'title', 'status', 'priority']);
+
+        return inertia('Tasks/IndexV2')
+            ->with([
+                'filters' => [
+                    'status' => $selectedStatuses,
+                ],
+                'tasks' => $tasks,
+            ]);
+    }
+
     // create task
 
     public function edit(Task $task)
@@ -107,7 +155,7 @@ class TaskController extends Controller
 
         // Check if task was submitted by an external user
         $isExternallySubmitted = $task->isExternallySubmitted();
-        
+
         if ($isExternallySubmitted) {
             // If submitted by external user, only show external users from the same environment
             $submitterEnvironment = $task->submitter->environment;
@@ -135,7 +183,7 @@ class TaskController extends Controller
                         'path' => $attachment->path,
                         'url' => route('attachments.download', $attachment),
                     ];
-                })
+                }),
             ]);
     }
 
@@ -144,6 +192,7 @@ class TaskController extends Controller
     public function destroy(Task $task)
     {
         $task->delete();
+
         return redirect()->route('tasks.index')->with('success', 'Task deleted successfully.');
     }
 
@@ -205,7 +254,7 @@ class TaskController extends Controller
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
-                if (!Storage::exists($permanentPath)) {
+                if (! Storage::exists($permanentPath)) {
                     Storage::makeDirectory($permanentPath);
                 }
 
@@ -217,7 +266,7 @@ class TaskController extends Controller
                     }
 
                     // Try to get original filename from metadata
-                    $metadataPath = $file . '.meta';
+                    $metadataPath = $file.'.meta';
                     $originalFilename = basename($file);
 
                     if (Storage::exists($metadataPath)) {
@@ -229,7 +278,7 @@ class TaskController extends Controller
 
                     // Generate a unique filename for storage
                     $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME).'_'.uniqid().'.'.$extension;
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
@@ -258,7 +307,7 @@ class TaskController extends Controller
     {
         $projects = Project::where(function ($query) {
             $query->where(
-                fn($query) => $query->whereHas('client.organisation', function ($query) {
+                fn ($query) => $query->whereHas('client.organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
                 })->orWhereHas('organisation', function ($query) {
                     $query->where('author_id', auth()->user()->id);
@@ -277,7 +326,7 @@ class TaskController extends Controller
 
         return inertia('Tasks/Create')
             ->with([
-                'projects' => $projects
+                'projects' => $projects,
             ]);
     }
 
@@ -303,7 +352,7 @@ class TaskController extends Controller
         $task->submitter()->associate(auth()->user())->save();
 
         // Assign external users to the task if provided
-        if (isset($attributes['external_user_ids']) && !empty($attributes['external_user_ids'])) {
+        if (isset($attributes['external_user_ids']) && ! empty($attributes['external_user_ids'])) {
             $task->externalUsers()->attach($attributes['external_user_ids']);
         }
 
@@ -322,7 +371,7 @@ class TaskController extends Controller
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
-                if (!Storage::exists($permanentPath)) {
+                if (! Storage::exists($permanentPath)) {
                     Storage::makeDirectory($permanentPath);
                 }
 
@@ -334,7 +383,7 @@ class TaskController extends Controller
                     }
 
                     // Try to get original filename from metadata
-                    $metadataPath = $file . '.meta';
+                    $metadataPath = $file.'.meta';
                     $originalFilename = basename($file);
 
                     if (Storage::exists($metadataPath)) {
@@ -346,7 +395,7 @@ class TaskController extends Controller
 
                     // Generate a unique filename for storage
                     $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME) . '_' . uniqid() . '.' . $extension;
+                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME).'_'.uniqid().'.'.$extension;
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
                     // Move the file
@@ -374,7 +423,6 @@ class TaskController extends Controller
      * Excludes the creator of the task from receiving notifications.
      * Also notifies external users attached to the task.
      *
-     * @param Task $task
      * @return void
      */
     protected function sendTaskCreationNotifications(Task $task)
@@ -400,7 +448,7 @@ class TaskController extends Controller
         foreach ($project->projectUser as $projectUser) {
             if ($projectUser->user &&
                 $projectUser->user->id !== $creatorId &&
-                !$usersToNotify->contains('id', $projectUser->user->id)) {
+                ! $usersToNotify->contains('id', $projectUser->user->id)) {
                 $usersToNotify->push($projectUser->user);
             }
         }
@@ -423,15 +471,13 @@ class TaskController extends Controller
     {
         return inertia('Tasks/Show')
             ->with([
-                'task' => $task
+                'task' => $task,
             ]);
     }
 
     /**
      * Update the status of a task.
      *
-     * @param Task $task
-     * @param Request $request
      * @return Response|RedirectResponse
      */
     public function toggleStatus(Task $task, Request $request)
@@ -445,15 +491,13 @@ class TaskController extends Controller
 
         return back()->with([
             'status' => $task->status,
-            'message' => 'Task status updated successfully'
+            'message' => 'Task status updated successfully',
         ]);
     }
 
     /**
      * Update the priority of a task.
      *
-     * @param Task $task
-     * @param Request $request
      * @return Response|RedirectResponse
      */
     public function togglePriority(Task $task, Request $request)
@@ -467,7 +511,7 @@ class TaskController extends Controller
 
         return back()->with([
             'priority' => $task->priority,
-            'message' => 'Task priority updated successfully'
+            'message' => 'Task priority updated successfully',
         ]);
     }
 }
