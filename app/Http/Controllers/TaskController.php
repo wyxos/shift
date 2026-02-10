@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -79,6 +80,98 @@ class TaskController extends Controller
         }
     }
 
+    private function ensureTaskVisible(Task $task): void
+    {
+        if (! $this->visibleTasksQuery()->whereKey($task->id)->exists()) {
+            abort(404);
+        }
+    }
+
+    /**
+     * Move all temp attachments for a given identifier to this task, preserving basenames
+     * so we can safely swap temp URLs in rich HTML.
+     */
+    private function persistTempAttachmentsForTask(Task $task, string $tempIdentifier)
+    {
+        $tempPath = "temp_attachments/{$tempIdentifier}";
+
+        if (! Storage::exists($tempPath)) {
+            return collect();
+        }
+
+        $files = Storage::files($tempPath);
+        $created = collect();
+
+        $permanentPath = "attachments/{$task->id}";
+        if (! Storage::exists($permanentPath)) {
+            Storage::makeDirectory($permanentPath);
+        }
+
+        foreach ($files as $file) {
+            if (Str::endsWith($file, '.meta')) {
+                continue;
+            }
+
+            $metadataPath = $file.'.meta';
+            $originalFilename = basename($file);
+
+            if (Storage::exists($metadataPath)) {
+                $metadata = json_decode(Storage::get($metadataPath), true);
+                if (isset($metadata['original_filename'])) {
+                    $originalFilename = $metadata['original_filename'];
+                }
+            }
+
+            $storedFilename = basename($file);
+            $newPath = "{$permanentPath}/{$storedFilename}";
+
+            Storage::move($file, $newPath);
+
+            $created->push(Attachment::create([
+                'attachable_id' => $task->id,
+                'attachable_type' => Task::class,
+                'original_filename' => $originalFilename,
+                'path' => $newPath,
+            ]));
+        }
+
+        Storage::deleteDirectory($tempPath);
+
+        return $created;
+    }
+
+    /**
+     * Replace temp attachment URLs in HTML content with final download URLs.
+     */
+    private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
+    {
+        if (empty($content) || empty($tempIdentifier) || ! $attachments || $attachments->isEmpty()) {
+            return $content;
+        }
+
+        $out = $content;
+        foreach ($attachments as $attachment) {
+            $finalUrl = route('attachments.download', $attachment, false);
+            $basename = basename($attachment->path);
+            $quotedTemp = preg_quote($tempIdentifier, '#');
+            $quotedBase = preg_quote($basename, '#');
+            $quotedBaseEnc = preg_quote(rawurlencode($basename), '#');
+
+            $patterns = [
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#https?://[^\\s\"'<>]+/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBaseEnc}#",
+                "#/attachments/temp/{$quotedTemp}/{$quotedBase}#",
+            ];
+
+            foreach ($patterns as $pattern) {
+                $out = preg_replace($pattern, $finalUrl, $out) ?? $out;
+            }
+        }
+
+        return $out;
+    }
+
     public function index()
     {
         $query = $this->visibleTasksQuery()
@@ -145,6 +238,112 @@ class TaskController extends Controller
                 ],
                 'tasks' => $tasks,
             ]);
+    }
+
+    public function showV2(Task $task): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+
+        $task->load(['submitter', 'attachments']);
+
+        $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
+
+        return response()->json([
+            'id' => $task->id,
+            'title' => $task->title,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'description' => $task->description,
+            'is_owner' => $isOwner,
+            'submitter' => $task->submitter ? [
+                'name' => $task->submitter->name ?? null,
+                'email' => $task->submitter->email ?? null,
+            ] : null,
+            'attachments' => $task->attachments->map(function ($attachment) {
+                return [
+                    'id' => $attachment->id,
+                    'original_filename' => $attachment->original_filename,
+                    'path' => $attachment->path,
+                    'url' => route('attachments.download', $attachment),
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function updateV2(Request $request, Task $task): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+
+        $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
+        if (! $isOwner) {
+            return response()->json(['error' => 'You cannot edit this task'], 403);
+        }
+
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'required|string|in:low,medium,high',
+            'temp_identifier' => 'nullable|string',
+            'deleted_attachment_ids' => 'nullable|array',
+            'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
+        ]);
+
+        $task->title = $attributes['title'];
+        $task->priority = $attributes['priority'];
+        $task->description = $attributes['description'] ?? null;
+        $task->save();
+
+        if (! empty($attributes['deleted_attachment_ids'])) {
+            foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
+                $attachment = Attachment::find($attachmentId);
+
+                if ($attachment && $attachment->attachable_id === $task->id && $attachment->attachable_type === Task::class) {
+                    if (Storage::exists($attachment->path)) {
+                        Storage::delete($attachment->path);
+                    }
+                    $attachment->delete();
+                }
+            }
+        }
+
+        if (! empty($attributes['temp_identifier'])) {
+            $created = $this->persistTempAttachmentsForTask($task, $attributes['temp_identifier']);
+
+            if ($task->description) {
+                $task->description = $this->replaceTempUrlsInContent($task->description, $attributes['temp_identifier'], $created);
+                $task->save();
+            }
+        }
+
+        $task->load('attachments');
+
+        return response()->json([
+            'ok' => true,
+            'task' => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'priority' => $task->priority,
+                'status' => $task->status,
+                'description' => $task->description,
+                'attachments' => $task->attachments->map(function ($attachment) {
+                    return [
+                        'id' => $attachment->id,
+                        'original_filename' => $attachment->original_filename,
+                        'path' => $attachment->path,
+                        'url' => route('attachments.download', $attachment),
+                    ];
+                })->values(),
+            ],
+        ]);
+    }
+
+    public function destroyV2(Task $task): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+
+        $task->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     // create task

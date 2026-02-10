@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ExternalUserController;
 use App\Http\Controllers\NotificationController;
@@ -7,7 +8,6 @@ use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
-use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +52,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // tasks
     Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::get('tasks-v2', [TaskController::class, 'indexV2'])->name('tasks.v2');
+    Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])->name('tasks.v2.show');
+    Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
+    Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
     Route::get('tasks/create', [TaskController::class, 'create'])->name('tasks.create');
     Route::get('tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
 
