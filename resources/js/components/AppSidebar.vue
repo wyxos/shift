@@ -19,6 +19,11 @@ const mainNavItems: NavItem[] = [
         href: '/tasks',
         icon: Folder,
     },
+    {
+        title: 'Tasks V2',
+        href: '/tasks-v2',
+        icon: Folder,
+    },
 
     // {
     //     title: 'Reports',
