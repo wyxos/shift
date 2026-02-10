@@ -1,82 +1,48 @@
-import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { h } from 'vue'
-import Welcome from '@/pages/Welcome.vue'
+import Welcome from '@/pages/Welcome.vue';
+import { mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { h } from 'vue';
 
-// Mock Inertia components
-vi.mock('@inertiajs/vue3', () => ({
-  Head: {
-    render: () => {},
-  },
-  Link: {
-    props: ['href'],
-    render() {
-      return h('a', { href: this.href || '#' }, this.$slots.default?.())
-    }
-  }
-}))
-
-// Mock the $page.props.auth object
-const mockAuth = {
-  user: null
-}
+// Welcome.vue is a thin wrapper around Home.vue; test that it forwards $page.props.auth.
+vi.mock('@/pages/Home.vue', () => ({
+    default: {
+        props: ['auth'],
+        render() {
+            return h('div', { 'data-test': 'home' }, this.auth?.user ? 'authed' : 'anon');
+        },
+    },
+}));
 
 describe('Welcome.vue', () => {
-  it('renders welcome page correctly', () => {
-    const wrapper = mount(Welcome, {
-      global: {
-        mocks: {
-          $page: {
-            props: {
-              auth: mockAuth
-            }
-          },
-          route: (name) => `/${name}`
-        }
-      }
-    })
+    it('forwards $page.props.auth into Home', () => {
+        const wrapper = mount(Welcome, {
+            global: {
+                mocks: {
+                    $page: {
+                        props: {
+                            auth: { user: null },
+                        },
+                    },
+                },
+            },
+        });
 
-    expect(wrapper.find('h1').text()).toContain("Let's get started")
-    expect(wrapper.text()).toContain('Laravel has an incredibly rich ecosystem')
-  })
+        expect(wrapper.find('[data-test="home"]').text()).toBe('anon');
+    });
 
-  it('shows login and get started links when user is not authenticated', () => {
-    const wrapper = mount(Welcome, {
-      global: {
-        mocks: {
-          $page: {
-            props: {
-              auth: { user: null }
-            }
-          },
-          route: (name) => `/${name}`
-        }
-      }
-    })
+    it('forwards authenticated user into Home', () => {
+        const wrapper = mount(Welcome, {
+            global: {
+                mocks: {
+                    $page: {
+                        props: {
+                            auth: { user: { id: 1 } },
+                        },
+                    },
+                },
+            },
+        });
 
-    const links = wrapper.findAll('a')
-    expect(links.some(link => link.text().includes('Log in'))).toBe(true)
-    expect(links.some(link => link.text().includes('Get Started'))).toBe(true)
-    expect(links.some(link => link.text().includes('Dashboard'))).toBe(false)
-  })
-
-  it('shows dashboard link when user is authenticated', () => {
-    const wrapper = mount(Welcome, {
-      global: {
-        mocks: {
-          $page: {
-            props: {
-              auth: { user: { id: 1, name: 'Test User' } }
-            }
-          },
-          route: (name) => `/${name}`
-        }
-      }
-    })
-
-    const links = wrapper.findAll('a')
-    expect(links.some(link => link.text().includes('Dashboard'))).toBe(true)
-    expect(links.some(link => link.text().includes('Log in'))).toBe(false)
-    expect(links.some(link => link.text().includes('Register'))).toBe(false)
-  })
-})
+        expect(wrapper.find('[data-test="home"]').text()).toBe('authed');
+    });
+});

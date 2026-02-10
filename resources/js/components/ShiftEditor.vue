@@ -1,15 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import SharedShiftEditor from '@shared/components/ShiftEditor.vue'
+import SharedShiftEditor from '@shared/components/ShiftEditor.vue';
+import { computed, ref } from 'vue';
 
-defineOptions({ inheritAttrs: false })
+defineOptions({ inheritAttrs: false });
 
-const innerRef = ref<InstanceType<typeof SharedShiftEditor> | null>(null)
-const editor = computed(() => innerRef.value?.editor ?? null)
+const innerRef = ref<InstanceType<typeof SharedShiftEditor> | null>(null);
+const editor = computed(() => innerRef.value?.editor ?? null);
 
-defineExpose({ editor })
+const emit = defineEmits<{
+    (e: 'send', payload: any): void;
+    (e: 'update:modelValue', value: string): void;
+    (e: 'uploading', value: boolean): void;
+}>();
+
+defineExpose({ editor });
 </script>
 
 <template>
-  <SharedShiftEditor ref="innerRef" v-bind="$attrs" />
+    <SharedShiftEditor
+        ref="innerRef"
+        v-bind="$attrs"
+        @send="emit('send', $event)"
+        @update:modelValue="emit('update:modelValue', $event)"
+        @uploading="emit('uploading', $event)"
+    />
 </template>

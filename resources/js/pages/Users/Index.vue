@@ -104,12 +104,8 @@ function formatDate(value?: string) {
                 </o-table-column>
 
                 <o-table-column v-slot="{ row }" field="email_verified_at" label="Verified">
-                    <span v-if="row.email_verified_at" class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                        Verified
-                    </span>
-                    <span v-else class="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
-                        Unverified
-                    </span>
+                    <span v-if="row.email_verified_at" class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800"> Verified </span>
+                    <span v-else class="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800"> Unverified </span>
                 </o-table-column>
 
                 <o-table-column v-slot="{ row }" field="created_at" label="Created">

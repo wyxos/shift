@@ -3,7 +3,6 @@ import InputError from '@/components/InputError.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
 
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ defineProps({
     token: {
         type: String,
         default: '',
-    }
+    },
 });
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -45,7 +44,7 @@ const createApiToken = () => {
             <div class="space-y-6">
                 <HeadingSmall title="Create API Token" description="Create a new personal access token to use with the SHIFT API." />
 
-                <div v-if="token" class="p-4 bg-green-100 text-green-800 rounded">
+                <div v-if="token" class="rounded bg-green-100 p-4 text-green-800">
                     <p class="font-semibold">Here is your new API token. Copy it now! It won't be shown again.</p>
                     <p class="mt-2 break-all">{{ token }}</p>
                 </div>
@@ -53,13 +52,7 @@ const createApiToken = () => {
                 <form @submit.prevent="createApiToken" class="space-y-6">
                     <div>
                         <Label for="name" value="Token Name" />
-                        <Input
-                            id="name"
-                            v-model="form.name"
-                            type="text"
-                            class="mt-1 block w-full"
-                            autocomplete="off"
-                        />
+                        <Input id="name" v-model="form.name" type="text" class="mt-1 block w-full" autocomplete="off" />
                         <InputError :message="form.errors.name" class="mt-2" />
                     </div>
 
