@@ -124,7 +124,6 @@ function buildTempUrl(data: any, resolveTempUrl?: (data: any) => string): string
         try {
             const m = String(data.path).match(/^temp_attachments\/([^/]+)\/(.+)$/);
             if (m && typeof route === 'function') {
-                // @ts-expect-error Ziggy global route() is not typed in this module
                 return route('attachments.temp', { temp: m[1], filename: m[2] }) as string;
             }
         } catch {}
