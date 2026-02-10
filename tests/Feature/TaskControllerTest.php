@@ -2,13 +2,8 @@
 
 use App\Models\ExternalUser;
 use App\Models\Project;
-use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
-use App\Notifications\TaskCreationNotification;
-use Illuminate\Support\Facades\Notification;
-
-;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -17,7 +12,7 @@ beforeEach(function () {
 test('index displays tasks', function () {
     // Create a project owned by the user
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // Create tasks for the project
@@ -40,13 +35,40 @@ test('index displays tasks', function () {
     );
 });
 
+test('tasks v2 defaults to excluding completed tasks', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $pendingTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+    ]);
+    $completedTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'completed',
+    ]);
+
+    $pendingTask->submitter()->associate($this->user)->save();
+    $completedTask->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)->get(route('tasks.v2'));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/IndexV2')
+        ->has('tasks', 1)
+        ->where('filters.status', ['pending', 'in-progress', 'awaiting-feedback'])
+    );
+});
+
 test('index filters tasks by project', function () {
     // Create two projects owned by the user
     $project1 = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
     $project2 = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // Create tasks for each project
@@ -88,7 +110,7 @@ test('create displays form', function () {
 
 test('store creates new task', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $taskData = [
@@ -96,7 +118,7 @@ test('store creates new task', function () {
         'description' => 'Test Description',
         'project_id' => $project->id,
         'priority' => 'high',
-        'status' => 'pending'
+        'status' => 'pending',
     ];
 
     $response = $this->actingAs($this->user)
@@ -110,7 +132,7 @@ test('store creates new task', function () {
         'description' => 'Test Description',
         'project_id' => $project->id,
         'priority' => 'high',
-        'status' => 'pending'
+        'status' => 'pending',
     ]);
 
     // Check that the submitter is set correctly
@@ -121,7 +143,7 @@ test('store creates new task', function () {
 
 test('edit displays form', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
@@ -142,21 +164,21 @@ test('edit displays form', function () {
 
 test('update updates task', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
         'title' => 'Original Title',
         'status' => 'pending',
-        'priority' => 'low'
+        'priority' => 'low',
     ]);
     $task->submitter()->associate($this->user)->save();
 
     $updateData = [
         'title' => 'Updated Title',
         'status' => 'in-progress',
-        'priority' => 'high'
+        'priority' => 'high',
     ];
 
     $response = $this->actingAs($this->user)
@@ -169,13 +191,13 @@ test('update updates task', function () {
         'id' => $task->id,
         'title' => 'Updated Title',
         'status' => 'in-progress',
-        'priority' => 'high'
+        'priority' => 'high',
     ]);
 });
 
 test('destroy deletes task', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
@@ -214,15 +236,15 @@ test('destroy deletes task', function () {
 
     // Verify task is deleted
     $this->assertDatabaseMissing('tasks', [
-        'id' => $task->id
+        'id' => $task->id,
     ]);
 
     // Verify attachments are deleted from database
     $this->assertDatabaseMissing('attachments', [
-        'id' => $attachment1->id
+        'id' => $attachment1->id,
     ]);
     $this->assertDatabaseMissing('attachments', [
-        'id' => $attachment2->id
+        'id' => $attachment2->id,
     ]);
 
     // Verify files are deleted from storage
@@ -232,18 +254,18 @@ test('destroy deletes task', function () {
 
 test('toggle status updates task status', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
-        'status' => 'pending'
+        'status' => 'pending',
     ]);
     $task->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)
         ->patch(route('tasks.toggle-status', $task), [
-            'status' => 'completed'
+            'status' => 'completed',
         ]);
 
     $response->assertRedirect();
@@ -252,24 +274,24 @@ test('toggle status updates task status', function () {
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
-        'status' => 'completed'
+        'status' => 'completed',
     ]);
 });
 
 test('toggle status updates task status to awaiting feedback', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
-        'status' => 'pending'
+        'status' => 'pending',
     ]);
     $task->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)
         ->patch(route('tasks.toggle-status', $task), [
-            'status' => 'awaiting-feedback'
+            'status' => 'awaiting-feedback',
         ]);
 
     $response->assertRedirect();
@@ -278,24 +300,24 @@ test('toggle status updates task status to awaiting feedback', function () {
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
-        'status' => 'awaiting-feedback'
+        'status' => 'awaiting-feedback',
     ]);
 });
 
 test('toggle priority updates task priority', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
-        'priority' => 'low'
+        'priority' => 'low',
     ]);
     $task->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)
         ->patch(route('tasks.toggle-priority', $task), [
-            'priority' => 'high'
+            'priority' => 'high',
         ]);
 
     $response->assertRedirect();
@@ -304,7 +326,7 @@ test('toggle priority updates task priority', function () {
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
-        'priority' => 'high'
+        'priority' => 'high',
     ]);
 });
 
@@ -313,7 +335,7 @@ test('task creation sends notifications', function () {
 
     // Create a project owned by the user
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // Create additional users with access to the project
@@ -326,7 +348,7 @@ test('task creation sends notifications', function () {
         'user_id' => $projectUser1->id,
         'user_email' => $projectUser1->email,
         'user_name' => $projectUser1->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     \App\Models\ProjectUser::factory()->create([
@@ -334,7 +356,7 @@ test('task creation sends notifications', function () {
         'user_id' => $projectUser2->id,
         'user_email' => $projectUser2->email,
         'user_name' => $projectUser2->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     // Create a task for the project
@@ -343,7 +365,7 @@ test('task creation sends notifications', function () {
         'description' => 'This task should trigger notifications',
         'project_id' => $project->id,
         'priority' => 'high',
-        'status' => 'pending'
+        'status' => 'pending',
     ];
 
     $response = $this->actingAs($this->user)
@@ -370,19 +392,19 @@ test('task creation sends notifications', function () {
 
 test('edit shows all external users for internal task', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // Create external users with different environments
     $externalUser1 = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
-        'name' => 'Production User'
+        'name' => 'Production User',
     ]);
     $externalUser2 = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'environment' => 'staging',
-        'name' => 'Staging User'
+        'name' => 'Staging User',
     ]);
 
     // Create a task submitted by an internal user
@@ -405,24 +427,24 @@ test('edit shows all external users for internal task', function () {
 
 test('edit shows only same environment external users for external task', function () {
     $project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // Create external users with different environments
     $externalUser1 = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
-        'name' => 'Production User'
+        'name' => 'Production User',
     ]);
     $externalUser2 = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'environment' => 'staging',
-        'name' => 'Staging User'
+        'name' => 'Staging User',
     ]);
     $externalUser3 = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
-        'name' => 'Another Production User'
+        'name' => 'Another Production User',
     ]);
 
     // Create a task submitted by an external user from production
