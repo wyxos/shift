@@ -1,44 +1,44 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
-import { Button } from '@/components/ui/button';
-import { ref, watch } from 'vue';
-import debounce from 'lodash/debounce';
+import DeleteDialog from '@/components/DeleteDialog.vue';
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
-    AlertDialogDescription,
     AlertDialogContent,
+    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import DeleteDialog from '@/components/DeleteDialog.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
 import axios from 'axios';
+import debounce from 'lodash/debounce';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
     projects: {
         type: Object,
-        required: true
+        required: true,
     },
     clients: {
         type: Object,
-        required: true
+        required: true,
     },
     organisations: {
         type: Object,
-        required: true
+        required: true,
     },
     filters: {
         type: Object,
-        required: true
-    }
-})
+        required: true,
+    },
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -53,17 +53,16 @@ const search = ref(props.filters.search);
 
 const title = `Projects` + (search.value ? ` - ${search.value}` : '');
 
-function openEditModal(project: { id: number, name: string }) {
+function openEditModal(project: { id: number; name: string }) {
     editForm.id = project.id;
     editForm.name = project.name;
     editDialogOpen.value = true;
 }
 
-function openDeleteModal(project: { id: number, name: string }) {
+function openDeleteModal(project: { id: number; name: string }) {
     deleteForm.id = project.id;
     deleteForm.isActive = true;
 }
-
 
 const editForm = useForm<{
     id: number | null;
@@ -82,7 +81,7 @@ const createForm = useForm<{
     name: '',
     client_id: null,
     organisation_id: null,
-    isActive: false
+    isActive: false,
 });
 
 // Function to submit the form
@@ -95,7 +94,7 @@ function submitCreateForm() {
         onError: () => {
             // Keep the modal open when there are validation errors
             createForm.isActive = true;
-        }
+        },
     });
 }
 
@@ -104,7 +103,7 @@ const deleteForm = useForm<{
     isActive: boolean;
 }>({
     id: null,
-    isActive: false
+    isActive: false,
 });
 
 const grantAccessForm = useForm<{
@@ -180,18 +179,18 @@ function grantAccess() {
     }
 }
 
-function openManageUsersModal(project: { id: number, name: string }) {
+function openManageUsersModal(project: { id: number; name: string }) {
     manageUsersForm.project_id = project.id;
     manageUsersForm.project_name = project.name;
 
     // Fetch users with access to the project
     fetch(`/projects/${project.id}/users`)
-        .then(response => response.json())
-        .then(data => {
+        .then((response) => response.json())
+        .then((data) => {
             manageUsersForm.users = data;
             manageUsersForm.isOpen = true;
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('Error fetching users:', error);
         });
 }
@@ -208,7 +207,7 @@ function removeAccess(projectUser: { id: number }) {
     }
 }
 
-function openApiTokenModal(project: { id: number, name: string, token?: string }) {
+function openApiTokenModal(project: { id: number; name: string; token?: string }) {
     apiTokenForm.project_id = project.id;
     apiTokenForm.project_name = project.name;
     apiTokenForm.token = project.token || '';
@@ -217,11 +216,10 @@ function openApiTokenModal(project: { id: number, name: string, token?: string }
 
 function generateApiToken() {
     if (apiTokenForm.project_id) {
-        axios.post(`/projects/${apiTokenForm.project_id}/api-token`)
-            .then((response) => {
-                apiTokenForm.token = response.data.token;
-                apiTokenForm.errors = {}; // Clear any previous errors
-            });
+        axios.post(`/projects/${apiTokenForm.project_id}/api-token`).then((response) => {
+            apiTokenForm.token = response.data.token;
+            apiTokenForm.errors = {}; // Clear any previous errors
+        });
     }
 }
 
@@ -235,21 +233,29 @@ function reset() {
 }
 
 // Handle string "null" values from select elements
-watch(() => createForm.client_id, value => {
-    if (value === "null") {
-        createForm.client_id = null;
-    }
-});
+watch(
+    () => createForm.client_id,
+    (value) => {
+        if (value === 'null') {
+            createForm.client_id = null;
+        }
+    },
+);
 
-watch(() => createForm.organisation_id, value => {
-    if (value === "null") {
-        createForm.organisation_id = null;
-    }
-});
+watch(
+    () => createForm.organisation_id,
+    (value) => {
+        if (value === 'null') {
+            createForm.organisation_id = null;
+        }
+    },
+);
 
-watch(search, value => debounce(() => {
-    router.get('/projects', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
-}, 300)());
+watch(search, (value) =>
+    debounce(() => {
+        router.get('/projects', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
+    }, 300)(),
+);
 </script>
 
 <template>
@@ -257,31 +263,40 @@ watch(search, value => debounce(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-
             <div class="flex gap-4">
-                <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+                <Input type="text" placeholder="Search..." class="mb-4 rounded border p-2" v-model="search" />
 
                 <Button @click="reset">Reset</Button>
 
-                <Button @click="createForm.isActive = true">
-                    <i class="fas fa-plus"></i> Add Project
-                </Button>
+                <Button @click="createForm.isActive = true"> <i class="fas fa-plus"></i> Add Project </Button>
             </div>
 
-            <o-table :data="projects.data" :paginated="true" :per-page="projects.per_page" :current-page="projects.current_page"
-                     backend-pagination :total="projects.total"
-                     @page-change="onPageChange">
-                <o-table-column v-slot="{row}">
+            <o-table
+                :data="projects.data"
+                :paginated="true"
+                :per-page="projects.per_page"
+                :current-page="projects.current_page"
+                backend-pagination
+                :total="projects.total"
+                @page-change="onPageChange"
+            >
+                <o-table-column v-slot="{ row }">
                     {{ row.name }}
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
-                    <div class="flex gap-2 justify-end">
+                    <div class="flex justify-end gap-2">
                         <!-- Only show grant access button for project owners -->
-                        <Button v-if="row.isOwner" variant="outline" @click="() => {
-                            grantAccessForm.project_id = row.id;
-                            grantAccessForm.project_name = row.name;
-                            grantAccessForm.isOpen = true;
-                        }">
+                        <Button
+                            v-if="row.isOwner"
+                            variant="outline"
+                            @click="
+                                () => {
+                                    grantAccessForm.project_id = row.id;
+                                    grantAccessForm.project_name = row.name;
+                                    grantAccessForm.isOpen = true;
+                                }
+                            "
+                        >
                             <i class="fas fa-key"></i>
                         </Button>
                         <!-- Show users button for all users with access -->
@@ -309,18 +324,10 @@ watch(search, value => debounce(() => {
         </div>
 
         <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
-            <template #title>
-                Delete Project
-            </template>
-            <template #description>
-                Are you sure you want to delete this project? This action cannot be undone.
-            </template>
-            <template #cancel>
-                Cancel
-            </template>
-            <template #confirm>
-                Confirm
-            </template>
+            <template #title> Delete Project </template>
+            <template #description> Are you sure you want to delete this project? This action cannot be undone. </template>
+            <template #cancel> Cancel </template>
+            <template #confirm> Confirm </template>
         </DeleteDialog>
 
         <!-- Create Modal -->
@@ -332,26 +339,22 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Create Project</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Add a new project.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Add a new project. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4">
                     <input
                         v-model="createForm.name"
                         type="text"
-                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         placeholder="Project Name"
                     />
 
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                        Select either a client or an organisation for this project
-                    </div>
+                    <div class="mb-2 text-sm text-gray-500 dark:text-gray-400">Select either a client or an organisation for this project</div>
 
                     <select
                         v-model="createForm.client_id"
-                        class="border rounded px-4 py-2 mb-2 disabled:bg-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                        class="mb-2 rounded border px-4 py-2 disabled:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                         :disabled="createForm.organisation_id !== null"
                     >
                         <option :value="null">Select Client (Optional)</option>
@@ -362,7 +365,7 @@ watch(search, value => debounce(() => {
 
                     <select
                         v-model="createForm.organisation_id"
-                        class="border rounded px-4 py-2 disabled:bg-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                        class="rounded border px-4 py-2 disabled:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                         :disabled="createForm.client_id !== null"
                     >
                         <option :value="null">Select Organisation (Optional)</option>
@@ -372,17 +375,21 @@ watch(search, value => debounce(() => {
                     </select>
                 </div>
 
-
                 <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in createForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                <div v-for="(error, key) in createForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
                     {{ error }}
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="() => {
-                        createForm.isActive = false;
-                        createForm.reset();
-                    }">Cancel</AlertDialogCancel>
+                    <AlertDialogCancel
+                        @click="
+                            () => {
+                                createForm.isActive = false;
+                                createForm.reset();
+                            }
+                        "
+                        >Cancel</AlertDialogCancel
+                    >
                     <Button @click="submitCreateForm" :disabled="createForm.processing">Create</Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -397,22 +404,20 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Project</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Update project information.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Update project information. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4">
                     <input
                         v-model="editForm.name"
                         type="text"
-                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         placeholder="Project Name"
                     />
                 </div>
 
                 <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in editForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                <div v-for="(error, key) in editForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
                     {{ error }}
                 </div>
 
@@ -432,28 +437,26 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Grant Project Access</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Grant a user access to {{ grantAccessForm.project_name }}
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Grant a user access to {{ grantAccessForm.project_name }} </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4">
                     <input
                         v-model="grantAccessForm.email"
                         type="email"
-                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         placeholder="User Email"
                     />
                     <input
                         v-model="grantAccessForm.name"
                         type="text"
-                        class="border rounded px-4 py-2 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         placeholder="User Name"
                     />
                 </div>
 
                 <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in grantAccessForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                <div v-for="(error, key) in grantAccessForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
                     {{ error }}
                 </div>
 
@@ -473,26 +476,27 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Manage Project Access</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Users with access to {{ manageUsersForm.project_name }}
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Users with access to {{ manageUsersForm.project_name }} </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4 max-h-96 overflow-y-auto">
+                <div class="flex max-h-96 flex-col gap-4 overflow-y-auto p-4">
                     <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500 dark:text-gray-400">
                         No users have access to this project.
                     </div>
-                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex justify-between items-center p-2 border-b dark:border-gray-700">
+                    <div
+                        v-else
+                        v-for="user in manageUsersForm.users"
+                        :key="user.id"
+                        class="flex items-center justify-between border-b p-2 dark:border-gray-700"
+                    >
                         <div>
                             <div class="font-semibold dark:text-white">{{ user.user_name }}</div>
                             <div class="text-sm text-gray-500 dark:text-gray-400">{{ user.user_email }}</div>
-                            <div class="text-xs mt-1" :class="user.registration_status === 'registered' ? 'text-green-500' : 'text-amber-500'">
+                            <div class="mt-1 text-xs" :class="user.registration_status === 'registered' ? 'text-green-500' : 'text-amber-500'">
                                 {{ user.registration_status === 'registered' ? 'Registered' : 'Pending Registration' }}
                             </div>
                         </div>
-                        <Button variant="destructive" size="sm" @click="removeAccess(user)">
-                            <i class="fas fa-trash mr-1"></i> Remove
-                        </Button>
+                        <Button variant="destructive" size="sm" @click="removeAccess(user)"> <i class="fas fa-trash mr-1"></i> Remove </Button>
                     </div>
                 </div>
 
@@ -511,32 +515,28 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Project API Token</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Manage API token for {{ apiTokenForm.project_name }}
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Manage API token for {{ apiTokenForm.project_name }} </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4">
-                    <div v-if="apiTokenForm.token" class="bg-gray-100 dark:bg-gray-700 p-4 rounded break-all">
-                        <div class="font-semibold mb-2 dark:text-white">Current API Token:</div>
+                    <div v-if="apiTokenForm.token" class="rounded bg-gray-100 p-4 break-all dark:bg-gray-700">
+                        <div class="mb-2 font-semibold dark:text-white">Current API Token:</div>
                         <div class="text-sm dark:text-gray-300">{{ apiTokenForm.token }}</div>
                     </div>
-                    <div v-else class="text-gray-500 dark:text-gray-400 italic">
-                        No API token has been generated for this project yet.
-                    </div>
+                    <div v-else class="text-gray-500 italic dark:text-gray-400">No API token has been generated for this project yet.</div>
 
                     <Button @click="generateApiToken" class="mt-2" :disabled="apiTokenForm.processing">
                         {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
                     </Button>
 
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                         <p>This token will be used by the Shift SDK to authenticate with this project.</p>
                         <p class="mt-1">Regenerating the token will invalidate any existing SDK installations using the old token.</p>
                     </div>
                 </div>
 
                 <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in apiTokenForm.errors" :key="key" class="text-red-500 mt-2 mb-2 px-4">
+                <div v-for="(error, key) in apiTokenForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
                     {{ error }}
                 </div>
 

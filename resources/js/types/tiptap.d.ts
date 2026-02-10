@@ -1,10 +1,10 @@
-import '@tiptap/core'
+import '@tiptap/core';
 
 declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    imageUpload: {
-      insertFiles: (files: File[]) => ReturnType
-      typeText: (text: string) => ReturnType
+    interface Commands<ReturnType> {
+        imageUpload: {
+            insertFiles: (files: File[]) => ReturnType;
+            typeText: (text: string) => ReturnType;
+        };
     }
-  }
 }

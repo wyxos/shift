@@ -5,10 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel)](https://laravel.com)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vue.js)](https://vuejs.org)
-[![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
+[![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php)](https://php.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://typescriptlang.org)
 
-SHIFT is a task management system built with Laravel 12 and Vue 3. It provides a clean interface for managing tasks across organizations, clients, and projects with role-based access control.
+SHIFT is an open-source task tracking portal built with Laravel 12 and Vue 3.
+
+Its current focus is a common pain point in client work: letting clients post issues/bugs/requests against Laravel projects without having to learn (or be invited into) your internal tracking tool.
+
+Longer-term, the goal is to add integrations and adapters for other frameworks while keeping the core workflow (orgs → clients → projects → tasks) consistent.
 
 ## Features
 
@@ -25,8 +29,8 @@ SHIFT is a task management system built with Laravel 12 and Vue 3. It provides a
 ## Quick Start
 
 ### Prerequisites
-- PHP 8.1+
-- Node.js 16+
+- PHP 8.3+
+- Node.js 18+
 - Composer
 - MySQL/PostgreSQL
 
@@ -56,25 +60,16 @@ php artisan migrate --seed
 npm run build
 
 # Start the development server
-php artisan serve
+composer dev
 ```
 
 Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded admin account.
-
-### Docker Setup
-
-```bash
-# Clone and start with Docker
-git clone https://github.com/wyxos/shift.git
-cd shift
-docker-compose up -d
-```
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Laravel 12 with PHP 8.2+
+- **Backend**: Laravel 12 with PHP 8.3+
 - **Frontend**: Vue 3 with TypeScript and Inertia.js
 - **Styling**: Tailwind CSS
 - **Database**: MySQL/PostgreSQL

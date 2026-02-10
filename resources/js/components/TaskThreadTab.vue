@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
-import TaskThreadMessage from './TaskThreadMessage.vue';
-import { Paperclip, Send } from 'lucide-vue-next';
 import type { Ref } from 'vue';
+import TaskThreadMessage from './TaskThreadMessage.vue';
 
 interface Message {
     id: number;
@@ -52,13 +51,12 @@ const props = defineProps<Props>();
 defineEmits<Emits>();
 
 // Assign messages container element to the passed-in ref
-import type { Ref as VueRef } from 'vue'
 const setMessagesContainer = (el: Element | null) => {
-  const target: any = (props as any).messagesContainer
-  if (target && typeof target === 'object' && 'value' in target) {
-    target.value = (el as HTMLElement | null)
-  }
-}
+    const target: any = (props as any).messagesContainer;
+    if (target && typeof target === 'object' && 'value' in target) {
+        target.value = el as HTMLElement | null;
+    }
+};
 </script>
 
 <template>
@@ -69,7 +67,7 @@ const setMessagesContainer = (el: Element | null) => {
     >
         <h4>{{ tabType === 'internal' ? 'Internal' : 'External' }}</h4>
         <!-- Messages container with fixed height and scrolling -->
-<div :ref="setMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
+        <div :ref="setMessagesContainer" class="mb-4 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
             <TaskThreadMessage
                 v-for="message in messages"
                 :key="message.id"
@@ -85,7 +83,12 @@ const setMessagesContainer = (el: Element | null) => {
         <!-- Message input (ShiftEditor for both tabs) -->
         <div class="flex flex-col">
             <div class="">
-<ShiftEditor :model-value="newMessage" @update:model-value="$emit('update:newMessage', $event)" :temp-identifier="threadTempIdentifier" @send="$emit('sendMessage')" />
+                <ShiftEditor
+                    :model-value="newMessage"
+                    @update:model-value="$emit('update:newMessage', $event)"
+                    :temp-identifier="threadTempIdentifier"
+                    @send="$emit('sendMessage')"
+                />
             </div>
         </div>
     </div>

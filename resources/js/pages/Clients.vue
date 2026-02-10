@@ -1,39 +1,39 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
-import { Button } from '@/components/ui/button';
-import { ref, watch, computed } from 'vue';
-import debounce from 'lodash/debounce';
+import DeleteDialog from '@/components/DeleteDialog.vue';
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
-    AlertDialogDescription,
     AlertDialogContent,
+    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import DeleteDialog from '@/components/DeleteDialog.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
+import debounce from 'lodash/debounce';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     clients: {
         type: Object,
-        required: true
+        required: true,
     },
     organisations: {
         type: Object,
-        required: true
+        required: true,
     },
     filters: {
         type: Object,
-        required: true
-    }
-})
+        required: true,
+    },
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -48,12 +48,12 @@ const search = ref(props.filters.search);
 
 const title = `Clients` + (search.value ? ` - ${search.value}` : '');
 
-function openEditModal(client: { id: number, name: string }) {
+function openEditModal(client: { id: number; name: string }) {
     editForm.id = client.id;
     editForm.name = client.name;
     editDialogOpen.value = true;
 }
-function openDeleteModal(client: { id: number, name: string }) {
+function openDeleteModal(client: { id: number; name: string }) {
     deleteForm.id = client.id;
     deleteForm.isActive = true;
 }
@@ -73,7 +73,7 @@ const createForm = useForm<{
 }>({
     name: '',
     organisation_id: null,
-    isActive: false
+    isActive: false,
 });
 
 // Computed property for other create form errors (not related to specific fields)
@@ -91,7 +91,7 @@ const deleteForm = useForm<{
     isActive: boolean;
 }>({
     id: null,
-    isActive: false
+    isActive: false,
 });
 
 function submitCreateForm() {
@@ -103,7 +103,7 @@ function submitCreateForm() {
         onError: () => {
             // Keep the modal open when there are validation errors
             createForm.isActive = true;
-        }
+        },
     });
 }
 
@@ -138,9 +138,11 @@ function reset() {
     router.get('/clients', { search: '' }, { preserveState: true, preserveScroll: true });
 }
 
-watch(search, value => debounce(() => {
-    router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
-}, 300)());
+watch(search, (value) =>
+    debounce(() => {
+        router.get('/clients', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
+    }, 300)(),
+);
 </script>
 
 <template>
@@ -148,25 +150,28 @@ watch(search, value => debounce(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-
             <div class="flex gap-4">
-                <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+                <Input type="text" placeholder="Search..." class="mb-4 rounded border p-2" v-model="search" />
 
                 <Button @click="reset">Reset</Button>
 
-                <Button @click="createForm.isActive = true">
-                    <i class="fas fa-plus"></i> Add Client
-                </Button>
+                <Button @click="createForm.isActive = true"> <i class="fas fa-plus"></i> Add Client </Button>
             </div>
 
-            <o-table :data="clients.data" :paginated="true" :per-page="clients.per_page" :current-page="clients.current_page"
-                     backend-pagination :total="clients.total"
-                     @page-change="onPageChange">
-                <o-table-column v-slot="{row}">
+            <o-table
+                :data="clients.data"
+                :paginated="true"
+                :per-page="clients.per_page"
+                :current-page="clients.current_page"
+                backend-pagination
+                :total="clients.total"
+                @page-change="onPageChange"
+            >
+                <o-table-column v-slot="{ row }">
                     {{ row.name }}
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
-                    <div class="flex gap-2 justify-end">
+                    <div class="flex justify-end gap-2">
                         <Button variant="outline" @click="openEditModal(row)">
                             <i class="fas fa-edit"></i>
                         </Button>
@@ -185,18 +190,10 @@ watch(search, value => debounce(() => {
         </div>
 
         <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
-            <template #title>
-                Delete Client
-            </template>
-            <template #description>
-                Are you sure you want to delete this client? This action cannot be undone.
-            </template>
-            <template #cancel>
-                Cancel
-            </template>
-            <template #confirm>
-                Confirm
-            </template>
+            <template #title> Delete Client </template>
+            <template #description> Are you sure you want to delete this client? This action cannot be undone. </template>
+            <template #cancel> Cancel </template>
+            <template #confirm> Confirm </template>
         </DeleteDialog>
 
         <!-- Create Modal -->
@@ -208,30 +205,23 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Create Client</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Add a new client.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Add a new client. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4">
-                    <input
-                        v-model="createForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Client Name"
-                    />
-                    <div v-if="createForm.errors.name" class="text-red-500 mt-1">{{ createForm.errors.name }}</div>
+                    <input v-model="createForm.name" type="text" class="rounded border px-4 py-2" placeholder="Client Name" />
+                    <div v-if="createForm.errors.name" class="mt-1 text-red-500">{{ createForm.errors.name }}</div>
 
-                    <select v-model="createForm.organisation_id" class="border rounded px-4 py-2 disabled:bg-gray-200">
+                    <select v-model="createForm.organisation_id" class="rounded border px-4 py-2 disabled:bg-gray-200">
                         <option :value="null">Select Organisation</option>
                         <option v-for="organisation in props.organisations" :key="organisation.id" :value="organisation.id">
                             {{ organisation.name }}
                         </option>
                     </select>
-                    <div v-if="createForm.errors.organisation_id" class="text-red-500 mt-1">{{ createForm.errors.organisation_id }}</div>
+                    <div v-if="createForm.errors.organisation_id" class="mt-1 text-red-500">{{ createForm.errors.organisation_id }}</div>
 
                     <!-- Display any other errors -->
-                    <div v-for="(error, key) in otherCreateErrors" :key="key" class="text-red-500 mt-2">
+                    <div v-for="(error, key) in otherCreateErrors" :key="key" class="mt-2 text-red-500">
                         {{ error }}
                     </div>
                 </div>
@@ -252,18 +242,11 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Client</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Update client information.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Update client information. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4">
-                    <input
-                        v-model="editForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Client Name"
-                    />
+                    <input v-model="editForm.name" type="text" class="rounded border px-4 py-2" placeholder="Client Name" />
                 </div>
 
                 <AlertDialogFooter>

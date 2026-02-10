@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { defineProps, defineEmits, onMounted, ref, watch, nextTick, computed } from 'vue';
-import { Trash2, Paperclip } from 'lucide-vue-next';
-import hljs from 'highlight.js/lib/core'
-import jsLang from 'highlight.js/lib/languages/javascript'
-import tsLang from 'highlight.js/lib/languages/typescript'
-import jsonLang from 'highlight.js/lib/languages/json'
-import cssLang from 'highlight.js/lib/languages/css'
-import phpLang from 'highlight.js/lib/languages/php'
-import xmlLang from 'highlight.js/lib/languages/xml'
-import pythonLang from 'highlight.js/lib/languages/python'
-import 'highlight.js/styles/github.css'
+import hljs from 'highlight.js/lib/core';
+import cssLang from 'highlight.js/lib/languages/css';
+import jsLang from 'highlight.js/lib/languages/javascript';
+import jsonLang from 'highlight.js/lib/languages/json';
+import phpLang from 'highlight.js/lib/languages/php';
+import pythonLang from 'highlight.js/lib/languages/python';
+import tsLang from 'highlight.js/lib/languages/typescript';
+import xmlLang from 'highlight.js/lib/languages/xml';
+import 'highlight.js/styles/github.css';
+import { Paperclip, Trash2 } from 'lucide-vue-next';
+import { defineProps, nextTick, onMounted, ref, watch } from 'vue';
 
-hljs.registerLanguage('javascript', jsLang)
-hljs.registerLanguage('js', jsLang)
-hljs.registerLanguage('typescript', tsLang)
-hljs.registerLanguage('ts', tsLang)
-hljs.registerLanguage('json', jsonLang)
-hljs.registerLanguage('css', cssLang)
-hljs.registerLanguage('php', phpLang)
-hljs.registerLanguage('xml', xmlLang)
-hljs.registerLanguage('html', xmlLang)
-hljs.registerLanguage('python', pythonLang)
-hljs.registerLanguage('py', pythonLang)
+hljs.registerLanguage('javascript', jsLang);
+hljs.registerLanguage('js', jsLang);
+hljs.registerLanguage('typescript', tsLang);
+hljs.registerLanguage('ts', tsLang);
+hljs.registerLanguage('json', jsonLang);
+hljs.registerLanguage('css', cssLang);
+hljs.registerLanguage('php', phpLang);
+hljs.registerLanguage('xml', xmlLang);
+hljs.registerLanguage('html', xmlLang);
+hljs.registerLanguage('python', pythonLang);
+hljs.registerLanguage('py', pythonLang);
 
 interface Message {
     id: number;
@@ -46,22 +46,27 @@ interface Emits {
 }
 
 const props = defineProps<Props>();
+defineEmits<Emits>();
 
-const contentRef = ref<HTMLElement | null>(null)
-
+const contentRef = ref<HTMLElement | null>(null);
 
 function highlight() {
-  nextTick(() => {
-    const root = contentRef.value
-    if (!root) return
-    root.querySelectorAll('pre code').forEach((el) => {
-      try { hljs.highlightElement(el as HTMLElement) } catch {}
-    })
-  })
+    nextTick(() => {
+        const root = contentRef.value;
+        if (!root) return;
+        root.querySelectorAll('pre code').forEach((el) => {
+            try {
+                hljs.highlightElement(el as HTMLElement);
+            } catch {}
+        });
+    });
 }
 
-onMounted(() => highlight())
-watch(() => props.message.content, () => highlight())
+onMounted(() => highlight());
+watch(
+    () => props.message.content,
+    () => highlight(),
+);
 </script>
 
 <template>
@@ -88,14 +93,10 @@ watch(() => props.message.content, () => highlight())
             </div>
         </div>
         <div :class="['flex', message.isCurrentUser ? 'justify-end' : 'justify-start']">
-            <div class="flex flex-col gap-2 max-w-3/4 min-w-[200px]">
+            <div class="flex max-w-3/4 min-w-[200px] flex-col gap-2">
                 <div
-                    :class="
-                    message.isCurrentUser
-                        ? 'rounded-br-none bg-blue-200'
-                        : 'rounded-bl-none bg-gray-200 text-gray-800'
-                "
-                    class=" rounded-lg p-3 text-left tiptap ProseMirror !max-h-none !h-auto"
+                    :class="message.isCurrentUser ? 'rounded-br-none bg-blue-200' : 'rounded-bl-none bg-gray-200 text-gray-800'"
+                    class="tiptap ProseMirror !h-auto !max-h-none rounded-lg p-3 text-left"
                 >
                     <div ref="contentRef" class="" v-html="message.content"></div>
                 </div>
