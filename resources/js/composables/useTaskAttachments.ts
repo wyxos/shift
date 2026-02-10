@@ -1,6 +1,6 @@
-import { ref } from 'vue';
 import axios from 'axios';
 import type { Ref } from 'vue';
+import { ref } from 'vue';
 
 interface AttachmentFile {
     path: string;
@@ -36,7 +36,9 @@ export function useTaskAttachments(initialAttachments: ExistingAttachment[] = []
         const startChars = Math.floor((maxLength - 3 - extension.length) / 2);
         const endChars = Math.ceil((maxLength - 3 - extension.length) / 2);
 
-        return nameWithoutExtension.substring(0, startChars) + '...' + nameWithoutExtension.substring(nameWithoutExtension.length - endChars) + extension;
+        return (
+            nameWithoutExtension.substring(0, startChars) + '...' + nameWithoutExtension.substring(nameWithoutExtension.length - endChars) + extension
+        );
     }
 
     // Handle file upload

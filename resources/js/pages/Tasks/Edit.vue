@@ -1,17 +1,17 @@
 <script lang="ts" setup>
+import TaskThreadTab from '@/components/TaskThreadTab.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
-import AppLayout from '@/layouts/AppLayout.vue';
-import TaskThreadTab from '@/components/TaskThreadTab.vue';
-import { useTaskThreads } from '@/composables/useTaskThreads';
 import { useTaskAttachments } from '@/composables/useTaskAttachments';
+import { useTaskThreads } from '@/composables/useTaskThreads';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
-import { computed, onMounted } from 'vue';
 import { Paperclip, X } from 'lucide-vue-next';
+import { computed, onMounted } from 'vue';
 
 interface Props {
     project: {
@@ -116,11 +116,6 @@ const otherErrors = computed(() => {
         }, {});
 });
 
-// Check if task was submitted by an external user
-const isTaskExternallySubmitted = computed(() => {
-    return props.task.submitter_type === 'App\\Models\\ExternalUser';
-});
-
 // Load any previously uploaded files and task threads
 onMounted(() => {
     loadTempFiles();
@@ -223,7 +218,7 @@ const submitForm = (): void => {
                                     <label :for="'external-user-' + externalUser.id" class="ml-2 block text-sm text-gray-900">
                                         {{ externalUser.name || 'User ' + externalUser.external_id }}
                                         <span v-if="externalUser.email" class="ml-1 text-xs text-gray-500">({{ externalUser.email }})</span>
-                                        <span class="ml-1 text-xs text-blue-600 font-medium">[{{ externalUser.environment }}]</span>
+                                        <span class="ml-1 text-xs font-medium text-blue-600">[{{ externalUser.environment }}]</span>
                                     </label>
                                 </div>
                             </div>
@@ -380,7 +375,6 @@ const submitForm = (): void => {
 </template>
 
 <style>
-
 /* Drag and drop styles */
 .drag-over {
     border: 2px dashed #3182ce !important;

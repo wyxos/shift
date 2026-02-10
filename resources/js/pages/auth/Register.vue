@@ -11,20 +11,20 @@ import { LoaderCircle } from 'lucide-vue-next';
 const props = defineProps({
     email: {
         type: String,
-        default: ''
+        default: '',
     },
     name: {
         type: String,
-        default: ''
+        default: '',
     },
     project_id: {
         type: [String, Number],
-        default: null
+        default: null,
     },
     organisation_id: {
         type: [String, Number],
-        default: null
-    }
+        default: null,
+    },
 });
 
 const form = useForm({
@@ -33,7 +33,7 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     project_id: props.project_id,
-    organisation_id: props.organisation_id
+    organisation_id: props.organisation_id,
 });
 
 const submit = () => {
@@ -108,7 +108,7 @@ const submit = () => {
                 </Button>
             </div>
 
-            <div class="text-center text-sm text-muted-foreground">
+            <div class="text-muted-foreground text-center text-sm">
                 Already have an account?
                 <TextLink :href="route('login')" class="underline underline-offset-4" :tabindex="6">Log in</TextLink>
             </div>

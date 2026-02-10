@@ -1,12 +1,12 @@
 <script lang="ts" setup>
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
 import debounce from 'lodash/debounce';
 import { onMounted, ref, watch } from 'vue';
-import { Input } from '@/components/ui/input';
 
 const props = defineProps({
     externalUsers: {
@@ -115,9 +115,7 @@ watch(search, (value) =>
                     <span v-if="row.project" class="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
                         {{ row.project.name }}
                     </span>
-                    <span v-else class="text-gray-500">
-                        No project assigned
-                    </span>
+                    <span v-else class="text-gray-500"> No project assigned </span>
                 </o-table-column>
 
                 <o-table-column v-slot="{ row }" label="Actions">

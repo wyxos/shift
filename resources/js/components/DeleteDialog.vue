@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import {
     AlertDialog,
-    AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-    AlertDialogFooter, AlertDialogHeader,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger
+    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ref, watch } from 'vue';
 
@@ -21,9 +25,12 @@ const emits = defineEmits(['cancel', 'confirm']);
 const open = ref(props.isOpen);
 
 // Watch the prop and sync it
-watch(() => props.isOpen, (newVal) => {
-    open.value = newVal;
-});
+watch(
+    () => props.isOpen,
+    (newVal) => {
+        open.value = newVal;
+    },
+);
 </script>
 
 <template>
@@ -35,26 +42,18 @@ watch(() => props.isOpen, (newVal) => {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>
-                    <slot name="title">
-                        Delete Record
-                    </slot>
+                    <slot name="title"> Delete Record </slot>
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                    <slot name="description">
-                        Are you sure you want to delete this record? This action cannot be undone.
-                    </slot>
+                    <slot name="description"> Are you sure you want to delete this record? This action cannot be undone. </slot>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel @click="emits('cancel')">
-                    <slot name="cancel">
-                        Cancel
-                    </slot>
+                    <slot name="cancel"> Cancel </slot>
                 </AlertDialogCancel>
                 <AlertDialogAction @click="emits('confirm')" class="bg-red-500">
-                    <slot name="confirm">
-                        Delete
-                    </slot>
+                    <slot name="confirm"> Delete </slot>
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

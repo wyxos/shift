@@ -1,35 +1,35 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import {OTable, OTableColumn} from '@oruga-ui/oruga-next';
-import { Button } from '@/components/ui/button';
-import { ref, watch, computed } from 'vue';
-import debounce from 'lodash/debounce';
+import DeleteDialog from '@/components/DeleteDialog.vue';
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
-    AlertDialogDescription,
     AlertDialogContent,
+    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import DeleteDialog from '@/components/DeleteDialog.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
+import debounce from 'lodash/debounce';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     organisations: {
         type: Object,
-        required: true
+        required: true,
     },
     filters: {
         type: Object,
-        required: true
-    }
-})
+        required: true,
+    },
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -45,18 +45,18 @@ const search = ref(props.filters.search);
 
 const title = `Organisations` + (search.value ? ` - ${search.value}` : '');
 
-function openEditModal(organisation: { id: number, name: string }) {
+function openEditModal(organisation: { id: number; name: string }) {
     editForm.id = organisation.id;
     editForm.name = organisation.name;
     editDialogOpen.value = true;
 }
 
-function openDeleteModal(organisation: { id: number, name: string }) {
+function openDeleteModal(organisation: { id: number; name: string }) {
     deleteForm.id = organisation.id;
     deleteForm.isActive = true;
 }
 
-function openInviteModal(organisation: { id: number, name: string }) {
+function openInviteModal(organisation: { id: number; name: string }) {
     inviteForm.organisation_id = organisation.id;
     inviteForm.organisation_name = organisation.name;
     inviteDialogOpen.value = true;
@@ -75,7 +75,7 @@ const createForm = useForm<{
     isActive: boolean;
 }>({
     name: '',
-    isActive: false
+    isActive: false,
 });
 
 const deleteForm = useForm<{
@@ -83,7 +83,7 @@ const deleteForm = useForm<{
     isActive: boolean;
 }>({
     id: null,
-    isActive: false
+    isActive: false,
 });
 
 const inviteForm = useForm<{
@@ -129,7 +129,7 @@ function submitCreateForm() {
         onError: () => {
             // Keep the modal open when there are validation errors
             createForm.isActive = true;
-        }
+        },
     });
 }
 
@@ -171,18 +171,18 @@ function inviteUser() {
     }
 }
 
-function openManageUsersModal(organisation: { id: number, name: string }) {
+function openManageUsersModal(organisation: { id: number; name: string }) {
     manageUsersForm.organisation_id = organisation.id;
     manageUsersForm.organisation_name = organisation.name;
 
     // Fetch users with access to the organisation
     fetch(`/organisations/${organisation.id}/users`)
-        .then(response => response.json())
-        .then(data => {
+        .then((response) => response.json())
+        .then((data) => {
             manageUsersForm.users = data;
             manageUsersForm.isOpen = true;
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('Error fetching users:', error);
         });
 }
@@ -208,9 +208,11 @@ function reset() {
     router.get('/organisations', { search: '' }, { preserveState: true, preserveScroll: true });
 }
 
-watch(search, value => debounce(() => {
-    router.get('/organisations', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
-}, 300)());
+watch(search, (value) =>
+    debounce(() => {
+        router.get('/organisations', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
+    }, 300)(),
+);
 </script>
 
 <template>
@@ -218,25 +220,28 @@ watch(search, value => debounce(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-
             <div class="flex gap-4">
-                <Input type="text" placeholder="Search..." class="mb-4 p-2 border rounded" v-model="search" />
+                <Input type="text" placeholder="Search..." class="mb-4 rounded border p-2" v-model="search" />
 
                 <Button @click="reset">Reset</Button>
 
-                <Button @click="createForm.isActive = true">
-                    <i class="fas fa-plus"></i> Add Organisation
-                </Button>
+                <Button @click="createForm.isActive = true"> <i class="fas fa-plus"></i> Add Organisation </Button>
             </div>
 
-            <o-table :data="organisations.data" :paginated="true" :per-page="organisations.per_page" :current-page="organisations.current_page"
-                     backend-pagination :total="organisations.total"
-                     @page-change="onPageChange">
-                <o-table-column v-slot="{row}">
+            <o-table
+                :data="organisations.data"
+                :paginated="true"
+                :per-page="organisations.per_page"
+                :current-page="organisations.current_page"
+                backend-pagination
+                :total="organisations.total"
+                @page-change="onPageChange"
+            >
+                <o-table-column v-slot="{ row }">
                     {{ row.name }}
                 </o-table-column>
                 <o-table-column v-slot="{ row }">
-                    <div class="flex gap-2 justify-end">
+                    <div class="flex justify-end gap-2">
                         <Button variant="outline" @click="openInviteModal(row)">
                             <i class="fas fa-user-plus"></i>
                         </Button>
@@ -261,18 +266,10 @@ watch(search, value => debounce(() => {
         </div>
 
         <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
-            <template #title>
-                Delete Organisation
-            </template>
-            <template #description>
-                Are you sure you want to delete this organisation? This action cannot be undone.
-            </template>
-            <template #cancel>
-                Cancel
-            </template>
-            <template #confirm>
-                Confirm
-            </template>
+            <template #title> Delete Organisation </template>
+            <template #description> Are you sure you want to delete this organisation? This action cannot be undone. </template>
+            <template #cancel> Cancel </template>
+            <template #confirm> Confirm </template>
         </DeleteDialog>
 
         <!-- Create Modal -->
@@ -284,21 +281,14 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Create Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Add a new organisation.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Add a new organisation. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4">
-                    <input
-                        v-model="createForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Organisation Name"
-                    />
+                    <input v-model="createForm.name" type="text" class="rounded border px-4 py-2" placeholder="Organisation Name" />
 
                     <!-- Display server-side validation errors -->
-                    <div v-for="(error, key) in createForm.errors" :key="key" class="text-red-500 mt-2">
+                    <div v-for="(error, key) in createForm.errors" :key="key" class="mt-2 text-red-500">
                         {{ error }}
                     </div>
                 </div>
@@ -319,21 +309,14 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Update organisation information.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Update organisation information. </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4">
-                    <input
-                        v-model="editForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="Organisation Name"
-                    />
+                    <input v-model="editForm.name" type="text" class="rounded border px-4 py-2" placeholder="Organisation Name" />
 
                     <!-- Display server-side validation errors -->
-                    <div v-for="(error, key) in editForm.errors" :key="key" class="text-red-500 mt-2">
+                    <div v-for="(error, key) in editForm.errors" :key="key" class="mt-2 text-red-500">
                         {{ error }}
                     </div>
                 </div>
@@ -354,30 +337,18 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Invite User to Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Invite a user to join {{ inviteForm.organisation_name }}
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Invite a user to join {{ inviteForm.organisation_name }} </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div class="flex flex-col gap-4 p-4">
-                    <input
-                        v-model="inviteForm.email"
-                        type="email"
-                        class="border rounded px-4 py-2"
-                        placeholder="User Email"
-                    />
-                    <div v-if="inviteForm.errors.email" class="text-red-500 mt-1">{{ inviteForm.errors.email }}</div>
+                    <input v-model="inviteForm.email" type="email" class="rounded border px-4 py-2" placeholder="User Email" />
+                    <div v-if="inviteForm.errors.email" class="mt-1 text-red-500">{{ inviteForm.errors.email }}</div>
 
-                    <input
-                        v-model="inviteForm.name"
-                        type="text"
-                        class="border rounded px-4 py-2"
-                        placeholder="User Name"
-                    />
-                    <div v-if="inviteForm.errors.name" class="text-red-500 mt-1">{{ inviteForm.errors.name }}</div>
+                    <input v-model="inviteForm.name" type="text" class="rounded border px-4 py-2" placeholder="User Name" />
+                    <div v-if="inviteForm.errors.name" class="mt-1 text-red-500">{{ inviteForm.errors.name }}</div>
 
                     <!-- Display any other errors -->
-                    <div v-for="(error, key) in otherInviteErrors" :key="key" class="text-red-500 mt-2">
+                    <div v-for="(error, key) in otherInviteErrors" :key="key" class="mt-2 text-red-500">
                         {{ error }}
                     </div>
                 </div>
@@ -398,28 +369,22 @@ watch(search, value => debounce(() => {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Manage Organisation Access</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Users with access to {{ manageUsersForm.organisation_name }}
-                    </AlertDialogDescription>
+                    <AlertDialogDescription> Users with access to {{ manageUsersForm.organisation_name }} </AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4 max-h-96 overflow-y-auto">
+                <div class="flex max-h-96 flex-col gap-4 overflow-y-auto p-4">
                     <!-- Display server-side validation errors -->
-                    <div v-for="(error, key) in manageUsersForm.errors" :key="key" class="text-red-500 mt-2 mb-2">
+                    <div v-for="(error, key) in manageUsersForm.errors" :key="key" class="mt-2 mb-2 text-red-500">
                         {{ error }}
                     </div>
 
-                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500">
-                        No users have access to this organisation.
-                    </div>
-                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex justify-between items-center p-2 border-b">
+                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500">No users have access to this organisation.</div>
+                    <div v-else v-for="user in manageUsersForm.users" :key="user.id" class="flex items-center justify-between border-b p-2">
                         <div>
                             <div class="font-semibold">{{ user.user_name }}</div>
                             <div class="text-sm text-gray-500">{{ user.user_email }}</div>
                         </div>
-                        <Button variant="destructive" size="sm" @click="removeAccess(user)">
-                            <i class="fas fa-trash mr-1"></i> Remove
-                        </Button>
+                        <Button variant="destructive" size="sm" @click="removeAccess(user)"> <i class="fas fa-trash mr-1"></i> Remove </Button>
                     </div>
                 </div>
 

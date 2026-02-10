@@ -62,8 +62,12 @@ const statusOptions = [
 ];
 const selectedStatuses = ref(
     Array.isArray(props.filters.status)
-        ? (props.filters.status.length ? props.filters.status : statusOptions.map(o => o.value))
-        : (props.filters.status ? [props.filters.status] : statusOptions.map(o => o.value))
+        ? props.filters.status.length
+            ? props.filters.status
+            : statusOptions.map((o) => o.value)
+        : props.filters.status
+          ? [props.filters.status]
+          : statusOptions.map((o) => o.value),
 );
 
 const title = `Tasks` + (search.value ? ` - ${search.value}` : '');
@@ -115,7 +119,7 @@ function reset() {
     search.value = '';
     projectId.value = '';
     priority.value = '';
-    selectedStatuses.value = statusOptions.map(o => o.value);
+    selectedStatuses.value = statusOptions.map((o) => o.value);
     router.get(
         '/tasks',
         { search: '', project_id: '', priority: '', status: '' },
@@ -201,27 +205,29 @@ watch(priority, (value) =>
 );
 
 // Watch for changes in status checkboxes
-watch(selectedStatuses, (values) =>
-    debounce(() => {
-        router.get(
-            '/tasks',
-            {
-                search: search.value,
-                project_id: projectId.value,
-                priority: priority.value,
-                status: values,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                onSuccess: () => {
-                    refreshTaskList();
+watch(
+    selectedStatuses,
+    (values) =>
+        debounce(() => {
+            router.get(
+                '/tasks',
+                {
+                    search: search.value,
+                    project_id: projectId.value,
+                    priority: priority.value,
+                    status: values,
                 },
-            },
-        );
-    }, 300)(),
-    { deep: true }
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onSuccess: () => {
+                        refreshTaskList();
+                    },
+                },
+            );
+        }, 300)(),
+    { deep: true },
 );
 
 // Status options

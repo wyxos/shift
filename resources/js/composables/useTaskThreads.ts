@@ -1,7 +1,7 @@
-import { ref, computed, nextTick } from 'vue';
 import axios from 'axios';
 import { marked } from 'marked';
 import type { Ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 interface Message {
     id: number;
@@ -257,28 +257,32 @@ export function useTaskThreads(taskId: number) {
             const response = await axios.get(route('task-threads.index', { task: taskId }));
 
             if (response.data.internal && Array.isArray(response.data.internal)) {
-                internalMessages.value = response.data.internal.map((thread: any): Message => ({
-                    id: thread.id,
-                    sender: thread.sender_name,
-                    content: thread.content,
-                    timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    isCurrentUser: thread.is_current_user,
-                    attachments: thread.attachments || [],
-                    created_at: thread.created_at,
-                }));
+                internalMessages.value = response.data.internal.map(
+                    (thread: any): Message => ({
+                        id: thread.id,
+                        sender: thread.sender_name,
+                        content: thread.content,
+                        timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        isCurrentUser: thread.is_current_user,
+                        attachments: thread.attachments || [],
+                        created_at: thread.created_at,
+                    }),
+                );
                 scrollToBottom(internalMessagesContainer.value);
             }
 
             if (response.data.external && Array.isArray(response.data.external)) {
-                externalMessages.value = response.data.external.map((thread: any): Message => ({
-                    id: thread.id,
-                    sender: thread.sender_name,
-                    content: thread.content,
-                    timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    isCurrentUser: thread.is_current_user,
-                    attachments: thread.attachments || [],
-                    created_at: thread.created_at,
-                }));
+                externalMessages.value = response.data.external.map(
+                    (thread: any): Message => ({
+                        id: thread.id,
+                        sender: thread.sender_name,
+                        content: thread.content,
+                        timestamp: new Date(thread.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        isCurrentUser: thread.is_current_user,
+                        attachments: thread.attachments || [],
+                        created_at: thread.created_at,
+                    }),
+                );
                 scrollToBottom(externalMessagesContainer.value);
             }
         } catch (error) {
