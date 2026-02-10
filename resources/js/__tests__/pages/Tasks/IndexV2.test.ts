@@ -19,6 +19,7 @@ vi.mock('@/components/ui/button', () => ({
             return h(
                 'button',
                 {
+                    ...this.$attrs,
                     class: `button ${this.variant || ''} ${this.size || ''}`,
                     disabled: this.disabled,
                 },
@@ -120,15 +121,44 @@ vi.mock('@/components/ui/sheet', () => ({
     },
 }));
 
+vi.mock('@/components/ui/select', () => ({
+    Select: {
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
+        render() {
+            return h(
+                'select',
+                {
+                    value: this.modelValue,
+                    onChange: (e) => this.$emit('update:modelValue', (e.target as HTMLSelectElement).value),
+                },
+                this.$slots.default?.(),
+            );
+        },
+    },
+}));
+
+vi.mock('@/components/ShiftEditor.vue', () => ({
+    default: {
+        props: ['modelValue'],
+        emits: ['update:modelValue', 'send', 'uploading'],
+        render() {
+            return h('div', { class: 'shift-editor-stub' });
+        },
+    },
+}));
+
+vi.mock('@/components/ui/image-lightbox', () => ({
+    ImageLightbox: {
+        render() {
+            return h('div', { class: 'image-lightbox-stub' });
+        },
+    },
+}));
+
 vi.mock('@inertiajs/vue3', () => ({
     Head: {
         render: () => null,
-    },
-    Link: {
-        props: ['href'],
-        render() {
-            return h('a', { href: this.href }, this.$slots.default?.());
-        },
     },
     router: {
         get: vi.fn(),
@@ -157,6 +187,11 @@ describe('Tasks/IndexV2.vue', () => {
         expect(rows).toHaveLength(2);
         expect(wrapper.text()).toContain('Auth issue');
         expect(wrapper.text()).toContain('UI polish');
+
+        for (const row of rows) {
+            expect(row.find('button[title="Edit"]').exists()).toBe(true);
+            expect(row.find('button[title="Delete"]').exists()).toBe(true);
+        }
     });
 
     it('has filter controls', () => {
