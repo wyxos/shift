@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Input } from '@/components/ui/input';
+import { Head, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { Button } from '@/components/ui/button';
 
 const props = defineProps({
     externalUser: {
         type: Object,
-        required: true
+        required: true,
     },
     projects: {
         type: Array,
-        required: true
-    }
+        required: true,
+    },
 });
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,7 +25,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Edit External User',
         href: `/external-users/${props.externalUser.id}/edit`,
-    }
+    },
 ];
 
 const title = `Edit External User`;
@@ -60,13 +60,13 @@ const submitForm = () => {
                 <div class="mb-4">
                     <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
                     <Input v-model="form.name" type="text" id="name" required />
-                    <div v-if="form.errors.name" class="text-red-500 text-sm mt-1">{{ form.errors.name }}</div>
+                    <div v-if="form.errors.name" class="mt-1 text-sm text-red-500">{{ form.errors.name }}</div>
                 </div>
 
                 <div class="mb-4">
                     <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
                     <Input v-model="form.email" type="email" id="email" />
-                    <div v-if="form.errors.email" class="text-red-500 text-sm mt-1">{{ form.errors.email }}</div>
+                    <div v-if="form.errors.email" class="mt-1 text-sm text-red-500">{{ form.errors.email }}</div>
                 </div>
 
                 <div class="mb-4">
@@ -74,18 +74,18 @@ const submitForm = () => {
                     <select
                         v-model="form.project_id"
                         id="project_id"
-                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                        class="mt-1 block w-full rounded-md border-gray-300 py-2 pr-10 pl-3 text-base focus:border-blue-500 focus:ring-blue-500 focus:outline-none sm:text-sm"
                     >
                         <option :value="null">No Project</option>
                         <option v-for="project in projects" :key="project.id" :value="project.id">
                             {{ project.name }}
                         </option>
                     </select>
-                    <div v-if="form.errors.project_id" class="text-red-500 text-sm mt-1">{{ form.errors.project_id }}</div>
+                    <div v-if="form.errors.project_id" class="mt-1 text-sm text-red-500">{{ form.errors.project_id }}</div>
                 </div>
 
                 <!-- Display any other errors -->
-                <div v-for="(error, key) in otherErrors" :key="key" class="text-red-500 text-sm mb-4">
+                <div v-for="(error, key) in otherErrors" :key="key" class="mb-4 text-sm text-red-500">
                     {{ error }}
                 </div>
 

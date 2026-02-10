@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/vue3';
-import { CheckCircle2, FolderKanban, Github, MessageSquare, Paperclip, Plug } from 'lucide-vue-next';
+import { CheckCircle2, Github } from 'lucide-vue-next';
 
 defineProps<{
     auth?: {
@@ -13,18 +13,15 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="SHIFT - Task Operations for Client Work">
+    <Head title="Open Source Client Issue Intake">
         <meta
-            content="SHIFT is an open-source task operations platform for client work. Organize delivery across organizations, clients, projects, and tasks with clear ownership and shared context."
+            content="An open-source portal for client issue and request intake. Built for Laravel projects today, with room to grow into other frameworks."
             name="description"
         />
+        <meta content="client intake, issue tracking, task tracking, open source, Laravel, organizations, clients, projects, tasks" name="keywords" />
+        <meta content="Open Source Client Issue Intake" property="og:title" />
         <meta
-            content="task management, client delivery, project tracking, open source, organizations, projects, tasks, threads, attachments"
-            name="keywords"
-        />
-        <meta content="SHIFT - Task Operations for Client Work" property="og:title" />
-        <meta
-            content="Organize delivery across organizations, clients, projects, and tasks with clear ownership and shared context."
+            content="An open-source portal for client issue and request intake. Built for Laravel projects today, with room to grow into other frameworks."
             property="og:description"
         />
         <meta content="website" property="og:type" />
@@ -34,16 +31,17 @@ defineProps<{
         <div class="bg-background/90 border-b backdrop-blur">
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
                 <div class="flex items-center gap-3">
-                    <img alt="SHIFT logo" class="h-8 w-auto" src="/brand/shift-logo.svg" />
-                    <div class="flex flex-col leading-none">
-                        <span class="text-sm font-semibold">SHIFT</span>
-                    </div>
+                    <img alt="Logo" class="h-8 w-auto" src="/brand/shift-logo.svg" />
+                    <span class="text-muted-foreground text-sm font-semibold">Client intake</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <Button as-child class="h-9 w-9" size="icon" variant="ghost">
                         <a aria-label="GitHub" href="https://github.com/wyxos/shift" rel="noreferrer" target="_blank">
                             <Github class="text-muted-foreground size-4" />
                         </a>
+                    </Button>
+                    <Button as-child size="sm" variant="ghost">
+                        <a href="https://wyxos.com" rel="noreferrer" target="_blank">Wyxos</a>
                     </Button>
                     <Button v-if="auth?.user" as-child size="sm">
                         <Link :href="route('dashboard')">Go to Dashboard</Link>
@@ -62,13 +60,16 @@ defineProps<{
                         class="w-fit border-blue-200/70 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200"
                         variant="outline"
                     >
-                        Built for client work
+                        Open source
                     </Badge>
                     <div class="space-y-4">
-                        <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">SHIFT keeps client work on track.</h1>
+                        <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">SHIFT</h1>
                         <p class="text-muted-foreground text-lg">
-                            Capture requests, track delivery, and keep context together across organizations, clients, projects, and tasks.
+                            An open-source tool that currently aims to remove the friction of asking clients to learn a tracking tool just to post
+                            issues, bugs, and requests on your Laravel projects. Keep the work structured across organizations, clients, projects, and
+                            tasks.
                         </p>
+                        <p class="text-muted-foreground text-sm">Current focus: Laravel projects. Roadmap: integrations for other frameworks.</p>
                     </div>
                     <div class="flex flex-wrap gap-3">
                         <Button v-if="!auth?.user" as-child class="bg-blue-600 text-white hover:bg-blue-700" size="lg">
@@ -80,15 +81,18 @@ defineProps<{
                             size="lg"
                             variant="outline"
                         >
-                            <a href="#workflow">See how it works</a>
+                            <a href="https://github.com/wyxos/shift" rel="noreferrer" target="_blank">GitHub</a>
+                        </Button>
+                        <Button as-child size="lg" variant="outline">
+                            <a href="https://wyxos.com" rel="noreferrer" target="_blank">wyxos.com</a>
                         </Button>
                     </div>
                 </div>
 
                 <Card class="border-blue-100/70 bg-blue-50/20 shadow-none dark:border-blue-500/20 dark:bg-blue-500/5">
                     <CardHeader>
-                        <CardTitle class="text-base">What SHIFT solves</CardTitle>
-                        <CardDescription>Less chaos, clearer delivery, better visibility.</CardDescription>
+                        <CardTitle class="text-base">What this solves</CardTitle>
+                        <CardDescription>Client intake without forcing a tool switch.</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="flex items-start gap-3">
@@ -96,8 +100,8 @@ defineProps<{
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
-                                <p class="text-sm font-medium">Requests stop getting lost</p>
-                                <p class="text-muted-foreground text-sm">Every request becomes a tracked task with clear status.</p>
+                                <p class="text-sm font-medium">Clients can submit issues easily</p>
+                                <p class="text-muted-foreground text-sm">A simple flow to report bugs and requests against real projects.</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
@@ -105,8 +109,8 @@ defineProps<{
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
-                                <p class="text-sm font-medium">Ownership stays visible</p>
-                                <p class="text-muted-foreground text-sm">Know who owns what across clients and projects.</p>
+                                <p class="text-sm font-medium">Work stays structured</p>
+                                <p class="text-muted-foreground text-sm">Organize delivery across organizations, clients, projects, and tasks.</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
@@ -114,20 +118,18 @@ defineProps<{
                                 <CheckCircle2 class="size-4 text-blue-600" />
                             </div>
                             <div>
-                                <p class="text-sm font-medium">Context lives with the work</p>
-                                <p class="text-muted-foreground text-sm">Threads and files stay attached to each task.</p>
+                                <p class="text-sm font-medium">Context stays attached</p>
+                                <p class="text-muted-foreground text-sm">Threads and attachments live with each task, not in scattered chats.</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             </section>
 
-            <section id="workflow" class="space-y-8">
+            <section class="space-y-8">
                 <div class="space-y-2">
-                    <h2 class="text-2xl font-semibold">A workflow that matches client delivery</h2>
-                    <p class="text-muted-foreground text-sm">
-                        SHIFT mirrors how agencies and teams actually ship work, so scope and accountability stay clear.
-                    </p>
+                    <h2 class="text-2xl font-semibold">A structure that matches client delivery</h2>
+                    <p class="text-muted-foreground text-sm">Designed around how agencies and teams deliver work: orgs, clients, projects, tasks.</p>
                 </div>
                 <div class="grid gap-6 lg:grid-cols-4">
                     <Card>
@@ -157,76 +159,22 @@ defineProps<{
                 </div>
             </section>
 
-            <section class="grid gap-6 lg:grid-cols-3">
-                <Card>
-                    <CardHeader>
-                        <div class="flex items-center gap-3">
-                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
-                                <MessageSquare class="size-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <CardTitle class="text-base">Threaded updates</CardTitle>
-                                <CardDescription>Every decision stays attached to the task.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="text-muted-foreground text-sm">
-                        Keep internal and client-facing conversations in one place so there is no lost context.
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <div class="flex items-center gap-3">
-                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
-                                <Paperclip class="size-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <CardTitle class="text-base">Attachments included</CardTitle>
-                                <CardDescription>Files stay with the work.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="text-muted-foreground text-sm">
-                        Briefs, screenshots, and deliverables live alongside the task they belong to.
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <div class="flex items-center gap-3">
-                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
-                                <FolderKanban class="size-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <CardTitle class="text-base">Status clarity</CardTitle>
-                                <CardDescription>Know what is pending, active, and done.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="text-muted-foreground text-sm">
-                        A clean dashboard makes it easy to report and prioritize the work that matters.
-                    </CardContent>
-                </Card>
-            </section>
-
             <section class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
                 <div class="space-y-4">
-                    <h2 class="text-2xl font-semibold">Bring work in from client tools</h2>
+                    <h2 class="text-2xl font-semibold">Where this is headed</h2>
                     <p class="text-muted-foreground">
-                        SHIFT can accept tasks from external systems so clients can submit work without changing their workflow.
+                        The goal is to make client issue intake feel native for Laravel teams today, then expand with integrations and adapters for
+                        other frameworks.
                     </p>
                 </div>
                 <Card class="border-blue-100/70 bg-blue-50/20 shadow-none dark:border-blue-500/20 dark:bg-blue-500/5">
                     <CardHeader>
-                        <CardTitle class="text-base">API + SDK ready</CardTitle>
-                        <CardDescription>Connect intake while keeping the portal as the source of truth.</CardDescription>
+                        <CardTitle class="text-base">Open source, practical scope</CardTitle>
+                        <CardDescription>Ship value now, evolve later.</CardDescription>
                     </CardHeader>
-                    <CardContent class="text-muted-foreground space-y-4 text-sm">
-                        <div class="flex items-start gap-3">
-                            <div class="bg-background flex size-9 items-center justify-center rounded-lg border border-blue-100/70">
-                                <Plug class="size-4 text-blue-600" />
-                            </div>
-                            <span>Route external requests into SHIFT with consistent structure.</span>
-                        </div>
+                    <CardContent class="text-muted-foreground space-y-2 text-sm">
+                        <p>1. Solve the client intake problem for Laravel projects.</p>
+                        <p>2. Add framework integrations over time, without changing the core workflow.</p>
                     </CardContent>
                 </Card>
             </section>
@@ -236,9 +184,10 @@ defineProps<{
             <div
                 class="text-muted-foreground mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-8 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
-                <span>© 2025 SHIFT. Open source under MIT License.</span>
+                <span>Open source under the MIT License.</span>
                 <div class="flex items-center gap-4">
-                    <a class="hover:text-foreground" href="https://wyxos.com" rel="noreferrer" target="_blank"> Wyxos </a>
+                    <a class="hover:text-foreground" href="https://wyxos.com" rel="noreferrer" target="_blank">wyxos.com</a>
+                    <a class="hover:text-foreground" href="https://github.com/wyxos/shift" rel="noreferrer" target="_blank">GitHub</a>
                 </div>
             </div>
         </footer>

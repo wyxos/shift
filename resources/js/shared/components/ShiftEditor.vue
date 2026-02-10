@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import ImageUpload from '../extensions/imageUpload';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import InlineImage from '../extensions/inlineImage';
-import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import axios, { type AxiosInstance } from 'axios';
 import 'emoji-picker-element';
@@ -17,31 +15,33 @@ import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { FileImage, FileText, Paperclip, Send, Smile, X } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
-import { uploadChunkedFile, MAX_UPLOAD_BYTES, type UploadEndpoints } from '../lib/chunkedUpload';
+import ImageUpload from '../extensions/imageUpload';
+import InlineImage from '../extensions/inlineImage';
+import { MAX_UPLOAD_BYTES, uploadChunkedFile, type UploadEndpoints } from '../lib/chunkedUpload';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
 
-declare const route: undefined | ((name: string, params?: Record<string, unknown>) => string)
+declare const route: undefined | ((name: string, params?: Record<string, unknown>) => string);
 
 // Emits
 // Include attachments in the payload so consumers can persist them alongside the content
 export type SentAttachment = Pick<AttachmentItem, 'name' | 'size' | 'type' | 'path' | 'status' | 'progress'>;
 const emit = defineEmits<{
-  (e: 'send', payload: { html: string; attachments: SentAttachment[] }): void
-  (e: 'update:modelValue', value: string): void
-  (e: 'uploading', value: boolean): void
+    (e: 'send', payload: { html: string; attachments: SentAttachment[] }): void;
+    (e: 'update:modelValue', value: string): void;
+    (e: 'uploading', value: boolean): void;
 }>();
 
 // Props
 const props = defineProps<{
-  tempIdentifier?: string;
-  modelValue?: string;
-  placeholder?: string;
-  minHeight?: number | string;
-  axiosInstance?: AxiosInstance | typeof axios;
-  uploadEndpoints?: UploadEndpoints;
-  removeTempUrl?: string;
-  resolveTempUrl?: (data: any) => string;
+    tempIdentifier?: string;
+    modelValue?: string;
+    placeholder?: string;
+    minHeight?: number | string;
+    axiosInstance?: AxiosInstance | typeof axios;
+    uploadEndpoints?: UploadEndpoints;
+    removeTempUrl?: string;
+    resolveTempUrl?: (data: any) => string;
 }>();
 
 // Non-image attachments state
@@ -61,7 +61,7 @@ const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString()
 const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
 
-const axiosClient = computed(() => props.axiosInstance ?? axios)
+const axiosClient = computed(() => props.axiosInstance ?? axios);
 
 // Configure lowlight with a few common languages
 const lowlight = createLowlight();
@@ -83,15 +83,15 @@ watch(
 
 // Keep editor content in sync with external modelValue
 watch(
-  () => props.modelValue,
-  (val) => {
-    const current = editor.value?.getHTML() ?? ''
-    const next = val ?? ''
-    if (next !== current) {
-      editor.value?.commands.setContent(next, false)
-    }
-  }
-)
+    () => props.modelValue,
+    (val) => {
+        const current = editor.value?.getHTML() ?? '';
+        const next = val ?? '';
+        if (next !== current) {
+            editor.value?.commands.setContent(next, false);
+        }
+    },
+);
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
@@ -103,20 +103,20 @@ function formatBytes(bytes: number): string {
 }
 
 function resolveRemoveTempUrl(): string | null {
-  if (props.removeTempUrl) return props.removeTempUrl
-  if (typeof route === 'function') {
-    return route('attachments.remove-temp') as string
-  }
-  return null
+    if (props.removeTempUrl) return props.removeTempUrl;
+    if (typeof route === 'function') {
+        return route('attachments.remove-temp') as string;
+    }
+    return null;
 }
 
 async function removeAttachment(att: AttachmentItem) {
     try {
-        const removeUrl = resolveRemoveTempUrl()
+        const removeUrl = resolveRemoveTempUrl();
         if (att.path && removeUrl) {
             await axiosClient.value.delete(removeUrl, { params: { path: att.path } });
         }
-    } catch (e) {
+    } catch {
         // ignore
     } finally {
         attachments.value = attachments.value.filter((a) => a.id !== att.id);
@@ -155,7 +155,7 @@ async function uploadAttachment(file: File) {
         att.status = 'done';
         att.progress = 100;
         att.path = data.path;
-    } catch (e) {
+    } catch {
         att.status = 'error';
     }
 }
@@ -201,71 +201,75 @@ const editor = useEditor({
     ],
     content: props.modelValue ?? '',
     onUpdate: () => {
-      const html = editor.value?.getHTML() ?? ''
-      emit('update:modelValue', html)
-      hasUploadPlaceholder.value = hasImageUploadPlaceholders()
+        const html = editor.value?.getHTML() ?? '';
+        emit('update:modelValue', html);
+        hasUploadPlaceholder.value = hasImageUploadPlaceholders();
     },
-  editorProps: {
-    handleDrop: (_view: any, event: DragEvent) => {
-      const dt = event.dataTransfer
-      if (dt?.files?.length) {
-        event.preventDefault()
-        editor.value?.commands.insertFiles(Array.from(dt.files))
-        return true
-      }
-      return false
+    editorProps: {
+        handleDrop: (_view: any, event: DragEvent) => {
+            const dt = event.dataTransfer;
+            if (dt?.files?.length) {
+                event.preventDefault();
+                editor.value?.commands.insertFiles(Array.from(dt.files));
+                return true;
+            }
+            return false;
+        },
+        handlePaste: (_view: any, event: ClipboardEvent) => {
+            const e = event;
+            const files: File[] = [];
+            const cdFiles = e.clipboardData?.files;
+            if (cdFiles && cdFiles.length) {
+                files.push(...Array.from(cdFiles));
+            } else {
+                const items = e.clipboardData?.items || [];
+                for (const item of Array.from(items)) {
+                    const it = item as any;
+                    if (it.kind === 'file' && it.type?.startsWith('image/')) {
+                        const f = it.getAsFile?.();
+                        if (f) files.push(f);
+                    }
+                }
+            }
+            if (files.length) {
+                e.preventDefault();
+                editor.value?.commands.insertFiles(files);
+                return true;
+            }
+            return false;
+        },
+        handleTextInput: (_view: any, _from: number, _to: number, text: string) => {
+            return editor.value?.commands.typeText(text) ?? false;
+        },
     },
-    handlePaste: (_view: any, event: ClipboardEvent) => {
-      const e = event
-      const files: File[] = []
-      const cdFiles = e.clipboardData?.files
-      if (cdFiles && cdFiles.length) {
-        files.push(...Array.from(cdFiles))
-      } else {
-        const items = e.clipboardData?.items || []
-        for (const item of Array.from(items)) {
-          const it = item as any
-          if (it.kind === 'file' && it.type?.startsWith('image/')) {
-            const f = it.getAsFile?.()
-            if (f) files.push(f)
-          }
-        }
-      }
-      if (files.length) {
-        e.preventDefault()
-        editor.value?.commands.insertFiles(files)
-        return true
-      }
-      return false
-    },
-    handleTextInput: (_view: any, _from: number, _to: number, text: string) => {
-      return editor.value?.commands.typeText(text) ?? false
-    },
-  },
 });
 
 function hasImageUploadPlaceholders(): boolean {
-  const ed = editor.value
-  if (!ed) return false
-  let found = false
-  ed.state.doc.descendants((node: any) => {
-    if (node?.type?.name === 'image' && typeof node?.attrs?.title === 'string' && node.attrs.title.startsWith('upload-')) {
-      found = true
-      return false
-    }
-    return true
-  })
-  return found
+    const ed = editor.value;
+    if (!ed) return false;
+    let found = false;
+    ed.state.doc.descendants((node: any) => {
+        if (node?.type?.name === 'image' && typeof node?.attrs?.title === 'string' && node.attrs.title.startsWith('upload-')) {
+            found = true;
+            return false;
+        }
+        return true;
+    });
+    return found;
 }
 
 const isUploading = computed(() => {
-  if (attachments.value.some((a) => a.status === 'uploading')) return true
-  return hasUploadPlaceholder.value
-})
+    if (attachments.value.some((a) => a.status === 'uploading')) return true;
+    return hasUploadPlaceholder.value;
+});
 
-watch(isUploading, (value) => {
-  emit('uploading', value)
-}, { immediate: true })
+watch(
+    isUploading,
+    (value) => {
+        emit('uploading', value);
+    },
+    { immediate: true },
+);
 
 function onEmojiClick(ev: Event) {
     const unicode = (ev as CustomEvent).detail?.unicode || (ev as any).detail?.emoji?.unicode;
@@ -298,12 +302,13 @@ function iconForAttachment(type: string) {
 }
 
 const editorStyle = computed(() => {
-  if (!props.minHeight) return undefined
-  const value = typeof props.minHeight === 'number' ? `${props.minHeight}px` : props.minHeight
-  return { '--editor-min-height': value }
-})
+    if (!props.minHeight) return undefined;
+    const value = typeof props.minHeight === 'number' ? `${props.minHeight}px` : props.minHeight;
+    return { '--editor-min-height': value };
+});
 
-defineExpose({ editor: editor.value });
+// Expose the ref so parents (and tests) can observe the editor once it initializes.
+defineExpose({ editor });
 </script>
 
 <template>
@@ -391,7 +396,8 @@ defineExpose({ editor: editor.value });
 
 <style>
 @reference "tailwindcss";
-.ProseMirror img.editor-tile, .tiptap img.editor-tile {
+.ProseMirror img.editor-tile,
+.tiptap img.editor-tile {
     width: 200px;
     height: 200px;
     object-fit: cover;
