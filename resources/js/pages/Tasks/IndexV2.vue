@@ -32,6 +32,7 @@ type TaskAttachment = {
 
 type TaskDetail = Task & {
     description?: string;
+    created_at?: string;
     submitter?: { name?: string; email?: string } | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
@@ -268,12 +269,24 @@ function formatThreadTime(value: any): string {
     if (!value) return '';
     const date = value instanceof Date ? value : new Date(String(value));
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString(undefined, {
-        month: 'short',
-        day: '2-digit',
+
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startYesterday = new Date(startToday);
+    startYesterday.setDate(startToday.getDate() - 1);
+
+    const time = new Intl.DateTimeFormat('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
-    });
+        hour12: false,
+    }).format(date);
+
+    if (date >= startToday) return time;
+    if (date >= startYesterday && date < startToday) return `Yesterday - ${time}`;
+
+    const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit' }).format(date);
+    const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(date);
+    return `${day} ${month} ${time}`;
 }
 
 function mapThreadToMessage(thread: any): ThreadMessage {
@@ -639,6 +652,8 @@ function getPriorityLabel(value: string) {
                         <div v-else-if="editError" class="text-destructive py-8 text-center">{{ editError }}</div>
                         <div v-else-if="editTask" class="grid h-full gap-6 lg:grid-cols-2">
                             <div class="space-y-6 overflow-auto pr-1">
+                                <div v-if="editTask.created_at" class="text-muted-foreground text-xs">Created {{ formatThreadTime(editTask.created_at) }}</div>
+
                                 <div class="space-y-2">
                                     <Label>Task</Label>
                                     <template v-if="isOwner">

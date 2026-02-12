@@ -62,6 +62,27 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     );
 });
 
+test('tasks v2 show includes created_at', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Created at task',
+        'status' => 'pending',
+        'priority' => 'medium',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+
+    $response->assertOk();
+    $response->assertJsonPath('id', $task->id);
+    $response->assertJsonStructure(['created_at']);
+    expect($response->json('created_at'))->toBeString()->not->toBeEmpty();
+});
+
 test('index filters tasks by project', function () {
     // Create two projects owned by the user
     $project1 = Project::factory()->create([
