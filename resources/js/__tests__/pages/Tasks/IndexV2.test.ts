@@ -1,7 +1,18 @@
 import IndexV2 from '@/pages/Tasks/IndexV2.vue';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
+
+const axiosGetMock = vi.fn();
+
+vi.mock('axios', () => ({
+    default: {
+        get: (...args: any[]) => axiosGetMock(...args),
+        put: vi.fn(),
+        post: vi.fn(),
+        delete: vi.fn(),
+    },
+}));
 
 vi.mock('@/layouts/AppLayout.vue', () => ({
     default: {
@@ -167,6 +178,8 @@ vi.mock('@inertiajs/vue3', () => ({
 
 describe('Tasks/IndexV2.vue', () => {
     it('renders header + task rows', () => {
+        axiosGetMock.mockReset();
+
         const wrapper = mount(IndexV2, {
             props: {
                 tasks: [
@@ -195,6 +208,8 @@ describe('Tasks/IndexV2.vue', () => {
     });
 
     it('has filter controls', () => {
+        axiosGetMock.mockReset();
+
         const wrapper = mount(IndexV2, {
             props: {
                 tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
@@ -206,5 +221,42 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.find('input[placeholder="Search by title"]').exists()).toBe(true);
         expect(wrapper.findAll('input[type="checkbox"]').length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('shows task created timestamp in the edit sheet', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Created');
+        expect(wrapper.text()).toContain('17:40');
     });
 });
