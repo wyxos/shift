@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'index'])->name('task-threads.index');
         Route::post('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'store'])->name('task-threads.store');
         Route::get('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'show'])->name('task-threads.show');
+        Route::put('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'update'])->name('task-threads.update');
     });
 
     // attachments (already use api.attachments.* names)

@@ -1,14 +1,15 @@
 import IndexV2 from '@/pages/Tasks/IndexV2.vue';
-import { mount, flushPromises } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 
 const axiosGetMock = vi.fn();
+const axiosPutMock = vi.fn();
 
 vi.mock('axios', () => ({
     default: {
         get: (...args: any[]) => axiosGetMock(...args),
-        put: vi.fn(),
+        put: (...args: any[]) => axiosPutMock(...args),
         post: vi.fn(),
         delete: vi.fn(),
     },
@@ -258,5 +259,79 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.text()).toContain('Created');
         expect(wrapper.text()).toContain('17:40');
+    });
+
+    it('allows the comment owner to edit their comment', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockReset();
+        axiosPutMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    external: [
+                        {
+                            id: 11,
+                            sender_name: 'You',
+                            is_current_user: true,
+                            content: '<p>Second</p>',
+                            created_at: '2026-02-09T12:01:00Z',
+                            attachments: [],
+                        },
+                    ],
+                },
+            });
+
+        axiosPutMock.mockResolvedValueOnce({
+            data: {
+                thread: {
+                    id: 11,
+                    sender_name: 'You',
+                    is_current_user: true,
+                    content: '<p>Edited</p>',
+                    created_at: '2026-02-09T12:01:00Z',
+                    attachments: [],
+                },
+            },
+        });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="comment-edit-11"]').exists()).toBe(true);
+        await wrapper.get('[data-testid="comment-edit-11"]').trigger('click');
+        await wrapper.vm.$nextTick();
+
+        await wrapper.get('[data-testid="comment-save-11"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosPutMock).toHaveBeenCalledWith(
+            '/task-threads.update',
+            expect.objectContaining({ content: '<p>Second</p>', temp_identifier: expect.any(String) }),
+        );
+        expect(wrapper.text()).toContain('Edited');
     });
 });
