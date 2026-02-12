@@ -155,7 +155,19 @@ vi.mock('@/components/ShiftEditor.vue', () => ({
         props: ['modelValue'],
         emits: ['update:modelValue', 'send', 'uploading'],
         render() {
-            return h('div', { class: 'shift-editor-stub' });
+            return h(
+                'div',
+                { ...this.$attrs, class: 'shift-editor-stub' },
+                h(
+                    'button',
+                    {
+                        type: 'button',
+                        'data-testid': 'stub-send',
+                        onClick: () => this.$emit('send', { html: this.modelValue ?? '<p>hello</p>', attachments: [] }),
+                    },
+                    'send',
+                ),
+            );
         },
     },
 }));
@@ -321,11 +333,11 @@ describe('Tasks/IndexV2.vue', () => {
         await wrapper.find('button[title="Edit"]').trigger('click');
         await flushPromises();
 
-        expect(wrapper.find('[data-testid="comment-edit-11"]').exists()).toBe(true);
-        await wrapper.get('[data-testid="comment-edit-11"]').trigger('click');
+        await wrapper.get('[data-testid="comment-bubble-11"]').trigger('dblclick');
         await wrapper.vm.$nextTick();
 
-        await wrapper.get('[data-testid="comment-save-11"]').trigger('click');
+        const commentsEditor = wrapper.get('[data-testid="comments-editor"]');
+        await commentsEditor.get('[data-testid="stub-send"]').trigger('click');
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith(

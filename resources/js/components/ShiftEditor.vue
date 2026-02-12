@@ -6,6 +6,7 @@ defineOptions({ inheritAttrs: false });
 
 const innerRef = ref<InstanceType<typeof SharedShiftEditor> | null>(null);
 const editor = computed(() => innerRef.value?.editor ?? null);
+const reset = () => innerRef.value?.reset?.();
 
 const emit = defineEmits<{
     (e: 'send', payload: any): void;
@@ -13,7 +14,7 @@ const emit = defineEmits<{
     (e: 'uploading', value: boolean): void;
 }>();
 
-defineExpose({ editor });
+defineExpose({ editor, reset });
 </script>
 
 <template>
