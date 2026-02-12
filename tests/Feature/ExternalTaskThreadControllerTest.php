@@ -81,3 +81,49 @@ test('external thread update is forbidden for non owner', function () {
 
     $response->assertStatus(403);
 });
+
+test('external thread creator can delete their message via api', function () {
+    $thread = new TaskThread([
+        'task_id' => $this->task->id,
+        'type' => 'external',
+        'content' => '<p>To delete</p>',
+        'sender_name' => $this->externalUser->name,
+    ]);
+    $thread->sender()->associate($this->externalUser);
+    $thread->save();
+
+    $response = $this->deleteJson(route('api.task-threads.destroy', ['task' => $this->task->id, 'threadId' => $thread->id]), [
+        'project' => $this->projectToken,
+        'user' => [
+            'id' => $this->externalUser->external_id,
+            'environment' => $this->externalUser->environment,
+            'url' => $this->externalUser->url,
+        ],
+    ]);
+
+    $response->assertOk();
+    expect(TaskThread::query()->whereKey($thread->id)->exists())->toBeFalse();
+});
+
+test('external thread delete is forbidden for non owner', function () {
+    $thread = new TaskThread([
+        'task_id' => $this->task->id,
+        'type' => 'external',
+        'content' => '<p>To delete</p>',
+        'sender_name' => $this->externalUser->name,
+    ]);
+    $thread->sender()->associate($this->externalUser);
+    $thread->save();
+
+    $response = $this->deleteJson(route('api.task-threads.destroy', ['task' => $this->task->id, 'threadId' => $thread->id]), [
+        'project' => $this->projectToken,
+        'user' => [
+            'id' => 'different-user',
+            'environment' => $this->externalUser->environment,
+            'url' => $this->externalUser->url,
+        ],
+    ]);
+
+    $response->assertStatus(403);
+    expect(TaskThread::query()->whereKey($thread->id)->exists())->toBeTrue();
+});
