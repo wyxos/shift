@@ -14,6 +14,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Filter, Pencil, Trash2 } from 'lucide-vue-next';
+import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type Task = {
@@ -162,12 +163,14 @@ const threadSending = ref(false);
 const threadError = ref<string | null>(null);
 const threadMessages = ref<ThreadMessage[]>([]);
 
+const threadComposerRef = ref<InstanceType<typeof ShiftEditor> | null>(null);
+const threadComposerHtml = ref('');
+const threadComposerUploading = ref(false);
 const threadEditingId = ref<number | null>(null);
-const threadEditHtml = ref('');
-const threadEditTempIdentifier = ref(Date.now().toString());
-const threadEditUploading = ref(false);
 const threadEditSaving = ref(false);
 const threadEditError = ref<string | null>(null);
+const lastTouchTapAt = ref(0);
+const lastTouchTapId = ref<number | null>(null);
 
 const commentsScrollRef = ref<HTMLElement | null>(null);
 
@@ -409,8 +412,38 @@ function removeAttachmentFromTask(attachmentId: number) {
 
 async function handleThreadSend(payload: { html: string }) {
     if (!editTask.value) return;
+    if (threadComposerUploading.value) return;
+    if (threadSending.value || threadEditSaving.value) return;
     const html = payload?.html?.trim();
     if (!html) return;
+
+    if (threadEditingId.value) {
+        threadEditSaving.value = true;
+        threadEditError.value = null;
+        try {
+            const response = await axios.put(route('task-threads.update', { task: editTask.value.id, thread: threadEditingId.value }), {
+                content: html,
+                temp_identifier: threadTempIdentifier.value,
+            });
+
+            const thread = response.data?.thread ?? response.data;
+            const serverMsg = mapThreadToMessage(thread);
+            threadMessages.value = threadMessages.value.map((m) =>
+                m.id === threadEditingId.value ? { ...m, content: serverMsg.content, attachments: serverMsg.attachments } : m,
+            );
+
+            threadEditingId.value = null;
+            threadTempIdentifier.value = Date.now().toString();
+            threadComposerHtml.value = '';
+            threadComposerRef.value?.reset?.();
+            scrollCommentsToBottomSoon();
+        } catch (e: any) {
+            threadEditError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to update comment';
+        } finally {
+            threadEditSaving.value = false;
+        }
+        return;
+    }
 
     const localId = `local-${Date.now()}`;
     const optimistic: ThreadMessage = {
@@ -437,6 +470,8 @@ async function handleThreadSend(payload: { html: string }) {
         const serverMsg = mapThreadToMessage(thread);
         threadMessages.value = [...threadMessages.value.filter((m) => m.clientId !== localId), serverMsg];
         threadTempIdentifier.value = Date.now().toString();
+        threadComposerHtml.value = '';
+        threadComposerRef.value?.reset?.();
         scrollCommentsToBottomSoon();
     } catch (e: any) {
         threadMessages.value = threadMessages.value.map((m) =>
@@ -453,47 +488,70 @@ function startThreadEdit(message: ThreadMessage) {
     if (!message.id || !message.isYou || message.pending) return;
 
     threadEditingId.value = message.id;
-    threadEditHtml.value = message.content;
-    threadEditTempIdentifier.value = Date.now().toString();
     threadEditError.value = null;
-    threadEditUploading.value = false;
+    threadTempIdentifier.value = Date.now().toString();
+    threadComposerHtml.value = message.content;
+
+    void nextTick().then(() => {
+        threadComposerRef.value?.editor?.chain().focus().run();
+        scrollCommentsToBottomSoon();
+    });
 }
 
 function cancelThreadEdit() {
     threadEditingId.value = null;
-    threadEditHtml.value = '';
-    threadEditTempIdentifier.value = Date.now().toString();
+    threadComposerHtml.value = '';
     threadEditError.value = null;
-    threadEditUploading.value = false;
     threadEditSaving.value = false;
+    threadTempIdentifier.value = Date.now().toString();
+    threadComposerRef.value?.reset?.();
 }
 
-async function saveThreadEdit(htmlOverride?: string) {
+function shouldIgnoreEditGesture(event: Event): boolean {
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    if (target.closest('img')) return true;
+    if (target.closest('a')) return true;
+    if (target.closest('button')) return true;
+    return false;
+}
+
+function onMessageDblClick(message: ThreadMessage, event: MouseEvent) {
+    if (shouldIgnoreEditGesture(event)) return;
+    startThreadEdit(message);
+}
+
+function onMessageTouchEnd(message: ThreadMessage, event: TouchEvent) {
+    if (shouldIgnoreEditGesture(event)) return;
+    if (!message.isYou || !message.id || message.pending) return;
+
+    const now = Date.now();
+    const within = now - lastTouchTapAt.value < 320;
+    const same = lastTouchTapId.value === message.id;
+
+    lastTouchTapAt.value = now;
+    lastTouchTapId.value = message.id;
+
+    if (within && same) {
+        startThreadEdit(message);
+        lastTouchTapAt.value = 0;
+        lastTouchTapId.value = null;
+    }
+}
+
+async function deleteThreadMessage(message: ThreadMessage) {
     if (!editTask.value) return;
-    if (!threadEditingId.value) return;
+    if (!message.id || !message.isYou || message.pending) return;
+    if (!confirm('Delete this message?')) return;
 
-    const html = (htmlOverride ?? threadEditHtml.value)?.trim();
-    if (!html) return;
-
-    threadEditSaving.value = true;
-    threadEditError.value = null;
     try {
-        const response = await axios.put(route('task-threads.update', { task: editTask.value.id, thread: threadEditingId.value }), {
-            content: html,
-            temp_identifier: threadEditTempIdentifier.value,
-        });
-
-        const thread = response.data?.thread ?? response.data;
-        const serverMsg = mapThreadToMessage(thread);
-        threadMessages.value = threadMessages.value.map((m) =>
-            m.id === threadEditingId.value ? { ...m, content: serverMsg.content, attachments: serverMsg.attachments } : m,
-        );
-        cancelThreadEdit();
-        scrollCommentsToBottomSoon();
+        await axios.delete(route('task-threads.destroy', { task: editTask.value.id, thread: message.id }));
+        threadMessages.value = threadMessages.value.filter((m) => m.id !== message.id);
+        if (threadEditingId.value === message.id) {
+            cancelThreadEdit();
+        }
     } catch (e: any) {
-        threadEditError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to update comment';
-    } finally {
-        threadEditSaving.value = false;
+        threadError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete comment';
     }
 }
 
@@ -831,65 +889,22 @@ function getPriorityLabel(value: string) {
                                         class="flex"
                                     >
                                         <div class="max-w-[86%]">
-                                            <div class="relative">
-                                                <Button
-                                                    v-if="message.isYou && message.id && !message.pending && threadEditingId !== message.id"
-                                                    :data-testid="`comment-edit-${message.id}`"
-                                                    class="absolute top-0 right-0 z-10 h-7 w-7 translate-x-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-                                                    size="icon"
-                                                    title="Edit comment"
-                                                    type="button"
-                                                    variant="ghost"
-                                                    @click="startThreadEdit(message)"
-                                                >
-                                                    <Pencil class="h-3.5 w-3.5" />
-                                                </Button>
-                                                <div
-                                                    :class="
-                                                        message.isYou
-                                                            ? 'rounded-br-md bg-sky-600 text-white'
-                                                            : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
-                                                    "
-                                                    class="rounded-2xl px-3 py-2 text-sm shadow-sm"
-                                                >
-                                                    <div v-if="!message.isYou" class="text-foreground/80 mb-1 text-[11px] font-semibold">
-                                                        {{ message.author }}
-                                                    </div>
-                                                    <template v-if="threadEditingId === message.id">
-                                                        <ShiftEditor
-                                                            v-model="threadEditHtml"
-                                                            :clear-on-send="false"
-                                                            :temp-identifier="threadEditTempIdentifier"
-                                                            class="mt-2"
-                                                            data-testid="comment-edit-editor"
-                                                            placeholder="Edit comment..."
-                                                            @send="saveThreadEdit($event?.html)"
-                                                            @uploading="threadEditUploading = $event"
-                                                        />
-                                                        <div class="mt-2 flex items-center justify-end gap-2">
-                                                            <Button
-                                                                :data-testid="`comment-cancel-${message.id}`"
-                                                                size="sm"
-                                                                type="button"
-                                                                variant="ghost"
-                                                                @click="cancelThreadEdit"
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                :data-testid="`comment-save-${message.id}`"
-                                                                :disabled="threadEditSaving || threadEditUploading"
-                                                                size="sm"
-                                                                type="button"
-                                                                variant="default"
-                                                                @click="saveThreadEdit()"
-                                                            >
-                                                                Save
-                                                            </Button>
+                                            <ContextMenuRoot>
+                                                <ContextMenuTrigger as-child>
+                                                    <div
+                                                        :data-testid="message.id ? `comment-bubble-${message.id}` : undefined"
+                                                        :class="
+                                                            message.isYou
+                                                                ? 'rounded-br-md bg-sky-600 text-white'
+                                                                : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
+                                                        "
+                                                        class="rounded-2xl px-3 py-2 text-sm shadow-sm"
+                                                        @dblclick="onMessageDblClick(message, $event)"
+                                                        @touchend="onMessageTouchEnd(message, $event)"
+                                                    >
+                                                        <div v-if="!message.isYou" class="text-foreground/80 mb-1 text-[11px] font-semibold">
+                                                            {{ message.author }}
                                                         </div>
-                                                        <div v-if="threadEditError" class="text-destructive mt-2 text-xs">{{ threadEditError }}</div>
-                                                    </template>
-                                                    <template v-else>
                                                         <div
                                                             class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
                                                             v-html="message.content"
@@ -906,9 +921,30 @@ function getPriorityLabel(value: string) {
                                                                 {{ attachment.original_filename }}
                                                             </a>
                                                         </div>
-                                                    </template>
-                                                </div>
-                                            </div>
+                                                    </div>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuPortal>
+                                                    <ContextMenuContent
+                                                        class="bg-popover text-popover-foreground z-50 min-w-[10rem] overflow-hidden rounded-md border p-1 shadow-md"
+                                                    >
+                                                        <ContextMenuItem
+                                                            v-if="message.isYou && message.id && !message.pending"
+                                                            class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                                            @select="startThreadEdit(message)"
+                                                        >
+                                                            Edit
+                                                        </ContextMenuItem>
+                                                        <ContextMenuSeparator class="bg-border -mx-1 my-1 h-px" />
+                                                        <ContextMenuItem
+                                                            v-if="message.isYou && message.id && !message.pending"
+                                                            class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                                            @select="deleteThreadMessage(message)"
+                                                        >
+                                                            Delete
+                                                        </ContextMenuItem>
+                                                    </ContextMenuContent>
+                                                </ContextMenuPortal>
+                                            </ContextMenuRoot>
                                             <div :class="message.isYou ? 'text-right' : 'text-left'" class="text-muted-foreground mt-1 text-[11px]">
                                                 {{ message.time }}
                                             </div>
@@ -917,11 +953,23 @@ function getPriorityLabel(value: string) {
                                 </div>
 
                                 <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
-                                    <Label class="text-muted-foreground mb-2 block text-xs">Reply</Label>
+                                    <div
+                                        v-if="threadEditingId"
+                                        class="bg-muted/40 mb-2 flex items-center justify-between rounded-md border px-3 py-2"
+                                    >
+                                        <div class="text-muted-foreground text-xs">Editing message</div>
+                                        <Button size="sm" type="button" variant="ghost" @click="cancelThreadEdit">Cancel</Button>
+                                    </div>
+                                    <div v-if="threadEditError" class="text-destructive mb-2 text-xs">{{ threadEditError }}</div>
+                                    <Label class="text-muted-foreground mb-2 block text-xs">{{ threadEditingId ? 'Edit' : 'Reply' }}</Label>
                                     <ShiftEditor
+                                        ref="threadComposerRef"
+                                        v-model="threadComposerHtml"
+                                        :clear-on-send="false"
                                         :temp-identifier="threadTempIdentifier"
                                         data-testid="comments-editor"
-                                        placeholder="Write a comment..."
+                                        :placeholder="threadEditingId ? 'Edit your comment...' : 'Write a comment...'"
+                                        @uploading="threadComposerUploading = $event"
                                         @send="handleThreadSend"
                                     />
                                 </div>

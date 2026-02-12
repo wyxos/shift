@@ -406,6 +406,41 @@ class ExternalTaskThreadController extends Controller
     }
 
     /**
+     * Delete the specified thread.
+     *
+     * Only the creator of the comment (external user) can delete their comment.
+     */
+    public function destroy(Task $task, $threadId): JsonResponse
+    {
+        // Ensure the task belongs to the project specified in the request
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        /** @var TaskThread $thread */
+        $thread = TaskThread::findOrFail($threadId);
+
+        if ($thread->task_id !== $task->id) {
+            return response()->json(['error' => 'Thread does not belong to this task'], 403);
+        }
+
+        if (! $this->isThreadOwnedByCurrentExternalUser($thread)) {
+            return response()->json(['error' => 'You can only delete your own messages'], 403);
+        }
+
+        foreach ($thread->attachments as $attachment) {
+            if (Storage::exists($attachment->path)) {
+                Storage::delete($attachment->path);
+            }
+            $attachment->delete();
+        }
+
+        $thread->delete();
+
+        return response()->json(['message' => 'Thread message deleted successfully']);
+    }
+
+    /**
      * Replace temp attachment URLs in HTML content with final download URLs.
      */
     private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
