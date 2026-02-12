@@ -254,6 +254,7 @@ class TaskController extends Controller
             'status' => $task->status,
             'priority' => $task->priority,
             'description' => $task->description,
+            'created_at' => $task->created_at?->toIso8601String(),
             'is_owner' => $isOwner,
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,
