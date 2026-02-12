@@ -324,6 +324,88 @@ class ExternalTaskThreadController extends Controller
     }
 
     /**
+     * Update the specified thread.
+     *
+     * Only the creator of the comment (external user) can edit their comment.
+     */
+    public function update(Request $request, Task $task, $threadId): JsonResponse
+    {
+        // Ensure the task belongs to the project specified in the request
+        if ($task->project->token !== request('project')) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        $request->validate([
+            'content' => 'required|string',
+            'temp_identifier' => 'nullable|string',
+        ]);
+
+        /** @var TaskThread $thread */
+        $thread = TaskThread::findOrFail($threadId);
+
+        if ($thread->task_id !== $task->id) {
+            return response()->json(['error' => 'Thread does not belong to this task'], 403);
+        }
+
+        if (! $this->isThreadOwnedByCurrentExternalUser($thread)) {
+            return response()->json(['error' => 'You can only edit your own messages'], 403);
+        }
+
+        $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+
+        // Normalize any client-proxy attachment download URLs back to the internal download route before persisting.
+        $thread->content = $this->normalizeAttachmentUrlsToInternalDownloadRoute($request->input('content', ''));
+        $thread->save();
+
+        // Process any temporary attachments
+        if ($request->has('temp_identifier')) {
+            $this->processTemporaryAttachments($request->temp_identifier, $thread);
+        }
+
+        // After moving attachments, replace temp URLs in content with final URLs (internal download route)
+        if ($request->filled('temp_identifier')) {
+            $thread->load('attachments');
+            $thread->content = $this->replaceTempUrlsInContent(
+                $thread->content ?? '',
+                $request->input('temp_identifier'),
+                $thread->attachments
+            );
+            $thread->save();
+        }
+
+        $thread->load('attachments');
+
+        // Filter out attachments already embedded in the content for response
+        $content = (string) ($thread->content ?? '');
+        $responseAttachments = $thread->attachments->filter(function ($attachment) use ($content) {
+            $downloadUrlRel = route('attachments.download', $attachment, false);
+            $downloadUrlAbs = url($downloadUrlRel);
+
+            return strpos($content, $downloadUrlRel) === false && strpos($content, $downloadUrlAbs) === false;
+        })->map(function ($attachment) use ($clientUrl) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                // Return SDK-facing download URL pointing to the client's proxy route
+                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
+                'created_at' => $attachment->created_at,
+            ];
+        })->values();
+
+        return response()->json([
+            'thread' => [
+                'id' => $thread->id,
+                'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
+                'sender_name' => $thread->sender_name,
+                'is_current_user' => true,
+                'created_at' => $thread->created_at,
+                'attachments' => $responseAttachments,
+            ],
+        ]);
+    }
+
+    /**
      * Replace temp attachment URLs in HTML content with final download URLs.
      */
     private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
@@ -393,6 +475,50 @@ class ExternalTaskThreadController extends Controller
         $out = $content;
         foreach ($patterns as $pattern) {
             $out = $replace($pattern, $out);
+        }
+
+        return $out;
+    }
+
+    private function isThreadOwnedByCurrentExternalUser(TaskThread $thread): bool
+    {
+        if ($thread->sender_type !== ExternalUser::class) {
+            return false;
+        }
+
+        $externalUser = $thread->sender;
+
+        return (bool) ($externalUser &&
+            $externalUser->external_id == request('user.id') &&
+            $externalUser->environment == request('user.environment') &&
+            $externalUser->url == request('user.url'));
+    }
+
+    /**
+     * Convert any client "proxy" attachment download URLs back to the internal download route.
+     */
+    private function normalizeAttachmentUrlsToInternalDownloadRoute(string $content): string
+    {
+        if ($content === '') {
+            return $content;
+        }
+
+        $patterns = [
+            // Absolute proxy download URL
+            '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
+            // Relative proxy download URL
+            '#(?<![A-Za-z0-9])/shift/api/attachments/(\\d+)/download#',
+            // Absolute internal download URL (normalize to relative)
+            '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
+        ];
+
+        $out = $content;
+        foreach ($patterns as $pattern) {
+            $out = preg_replace_callback($pattern, function ($m) {
+                $id = (int) $m[1];
+
+                return '/attachments/'.$id.'/download';
+            }, $out) ?? $out;
         }
 
         return $out;
