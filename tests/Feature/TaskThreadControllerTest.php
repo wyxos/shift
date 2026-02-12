@@ -1,16 +1,14 @@
 <?php
 
 use App\Models\ExternalUser;
-use App\Models\TaskThread;
 use App\Models\Task;
+use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
-
-;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     // Create a user
@@ -30,27 +28,26 @@ beforeEach(function () {
     $this->task->submitter()->associate($this->externalUser)->save();
 });
 
-
 test('internal thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     // Create temp files for two images and one pdf
-    $img1 = 'img_' . uniqid() . '.png';
-    $img2 = 'img_' . uniqid() . '.jpg';
-    $pdf1 = 'file_' . uniqid() . '.pdf';
-    $tempDir = 'temp_attachments/' . $tempIdentifier;
-    Storage::put($tempDir . '/' . $img1, 'fake');
-    Storage::put($tempDir . '/' . $img1 . '.meta', json_encode(['original_filename' => 'photo1.png']));
-    Storage::put($tempDir . '/' . $img2, 'fake');
-    Storage::put($tempDir . '/' . $img2 . '.meta', json_encode(['original_filename' => 'photo2.jpg']));
-    Storage::put($tempDir . '/' . $pdf1, 'fake');
-    Storage::put($tempDir . '/' . $pdf1 . '.meta', json_encode(['original_filename' => 'doc.pdf']));
+    $img1 = 'img_'.uniqid().'.png';
+    $img2 = 'img_'.uniqid().'.jpg';
+    $pdf1 = 'file_'.uniqid().'.pdf';
+    $tempDir = 'temp_attachments/'.$tempIdentifier;
+    Storage::put($tempDir.'/'.$img1, 'fake');
+    Storage::put($tempDir.'/'.$img1.'.meta', json_encode(['original_filename' => 'photo1.png']));
+    Storage::put($tempDir.'/'.$img2, 'fake');
+    Storage::put($tempDir.'/'.$img2.'.meta', json_encode(['original_filename' => 'photo2.jpg']));
+    Storage::put($tempDir.'/'.$pdf1, 'fake');
+    Storage::put($tempDir.'/'.$pdf1.'.meta', json_encode(['original_filename' => 'doc.pdf']));
 
     // Content embeds only the two image temp URLs
     $content = '<p>Here are two images:</p>'
-        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img1 . '"></p>'
-        . '<p><img src="/attachments/temp/' . $tempIdentifier . '/' . $img2 . '"></p>';
+        .'<p><img src="/attachments/temp/'.$tempIdentifier.'/'.$img1.'"></p>'
+        .'<p><img src="/attachments/temp/'.$tempIdentifier.'/'.$img2.'"></p>';
 
     // Create thread
     $response = $this->actingAs($this->user)
@@ -80,8 +77,8 @@ test('external thread creation sends notification to external user in non produc
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => false // This will trigger the notification
-        ], 200)
+            'production' => false, // This will trigger the notification
+        ], 200),
     ]);
 
     // Create a thread message as the authenticated user
@@ -109,8 +106,8 @@ test('external thread creation does not send notification in production', functi
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => true // This will prevent the notification
-        ], 200)
+            'production' => true, // This will prevent the notification
+        ], 200),
     ]);
 
     // Create a thread message as the authenticated user
@@ -157,8 +154,8 @@ test('external thread creation with non external submitter sends notification to
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => false // This will trigger the notification
-        ], 200)
+            'production' => false, // This will trigger the notification
+        ], 200),
     ]);
 
     // Create a thread message as the authenticated user
@@ -198,12 +195,12 @@ test('external thread creation sends notification to multiple external users', f
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => false // This will trigger the notification
+            'production' => false, // This will trigger the notification
         ], 200),
         'https://another-example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => false // This will trigger the notification
-        ], 200)
+            'production' => false, // This will trigger the notification
+        ], 200),
     ]);
 
     // Create a thread message as the authenticated user
@@ -223,7 +220,7 @@ test('external thread creation sends notification to multiple external users', f
         }
     );
 
-Notification::assertSentOnDemand(
+    Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) use ($anotherExternalUser) {
             return $notifiable->routes['mail'] === $anotherExternalUser->email;
@@ -231,11 +228,10 @@ Notification::assertSentOnDemand(
     );
 });
 
-
 test('internal thread replaces temp URLs in content with final download URLs', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     $file = UploadedFile::fake()->image('photo.png');
 
     // Upload to temp storage
@@ -250,7 +246,7 @@ test('internal thread replaces temp URLs in content with final download URLs', f
     // Create thread with content embedding the temp URL
     $response = $this->actingAs($this->user)
         ->postJson(route('task-threads.store', $this->task), [
-            'content' => '<p><img src="' . $tempUrl . '"></p>',
+            'content' => '<p><img src="'.$tempUrl.'"></p>',
             'type' => 'internal',
             'temp_identifier' => $tempIdentifier,
         ]);
@@ -265,17 +261,16 @@ test('internal thread replaces temp URLs in content with final download URLs', f
     $attachmentId = optional($thread->attachments()->first())->id;
 
     expect($content)->not->toContain('/attachments/temp/');
-    expect($content)->toContain('/attachments/' . $attachmentId . '/download');
+    expect($content)->toContain('/attachments/'.$attachmentId.'/download');
 
     // Since image is embedded in content, attachments list in response should exclude it
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
 });
 
-
 test('internal thread replaces temp URLs when filename contains spaces (encoded as %20)', function () {
     Storage::fake('local');
 
-    $tempIdentifier = 'thread-' . time();
+    $tempIdentifier = 'thread-'.time();
     $fileWithSpaces = UploadedFile::fake()->image('Proof of Address 20252707.jpg');
 
     // Upload to temp storage to get an absolute, encoded temp URL
@@ -290,7 +285,7 @@ test('internal thread replaces temp URLs when filename contains spaces (encoded 
     // Create thread with content embedding the absolute temp URL
     $response = $this->actingAs($this->user)
         ->postJson(route('task-threads.store', $this->task), [
-            'content' => '<p><img src="' . $tempUrl . '"></p>',
+            'content' => '<p><img src="'.$tempUrl.'"></p>',
             'type' => 'internal',
             'temp_identifier' => $tempIdentifier,
         ]);
@@ -303,6 +298,44 @@ test('internal thread replaces temp URLs when filename contains spaces (encoded 
     $attachmentId = optional($thread->attachments()->first())->id;
 
     expect($content)->not->toContain('/attachments/temp/');
-    expect($content)->toContain('/attachments/' . $attachmentId . '/download');
+    expect($content)->toContain('/attachments/'.$attachmentId.'/download');
     expect($response->json('thread.attachments'))->toBeArray()->toBeEmpty();
+});
+
+test('thread creator can update their message', function () {
+    $thread = new TaskThread([
+        'task_id' => $this->task->id,
+        'type' => 'external',
+        'content' => '<p>Before</p>',
+        'sender_name' => $this->user->name,
+    ]);
+    $thread->sender()->associate($this->user);
+    $thread->save();
+
+    $response = $this->actingAs($this->user)->putJson(route('task-threads.update', ['task' => $this->task->id, 'thread' => $thread->id]), [
+        'content' => '<p>After</p>',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('thread.id'))->toBe($thread->id);
+    expect($response->json('thread.content'))->toBe('<p>After</p>');
+});
+
+test('non creator cannot update a message', function () {
+    $thread = new TaskThread([
+        'task_id' => $this->task->id,
+        'type' => 'external',
+        'content' => '<p>Before</p>',
+        'sender_name' => $this->user->name,
+    ]);
+    $thread->sender()->associate($this->user);
+    $thread->save();
+
+    $other = User::factory()->create();
+
+    $response = $this->actingAs($other)->putJson(route('task-threads.update', ['task' => $this->task->id, 'thread' => $thread->id]), [
+        'content' => '<p>Hack</p>',
+    ]);
+
+    $response->assertStatus(403);
 });

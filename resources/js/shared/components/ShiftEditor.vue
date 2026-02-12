@@ -33,16 +33,22 @@ const emit = defineEmits<{
 }>();
 
 // Props
-const props = defineProps<{
-    tempIdentifier?: string;
-    modelValue?: string;
-    placeholder?: string;
-    minHeight?: number | string;
-    axiosInstance?: AxiosInstance | typeof axios;
-    uploadEndpoints?: UploadEndpoints;
-    removeTempUrl?: string;
-    resolveTempUrl?: (data: any) => string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        tempIdentifier?: string;
+        modelValue?: string;
+        placeholder?: string;
+        minHeight?: number | string;
+        axiosInstance?: AxiosInstance | typeof axios;
+        uploadEndpoints?: UploadEndpoints;
+        removeTempUrl?: string;
+        resolveTempUrl?: (data: any) => string;
+        clearOnSend?: boolean;
+    }>(),
+    {
+        clearOnSend: true,
+    },
+);
 
 // Non-image attachments state
 export type AttachmentItem = {
@@ -290,6 +296,11 @@ function onSend() {
         progress: a.progress,
     }));
     emit('send', { html, attachments: toSend });
+
+    if (props.clearOnSend === false) {
+        return;
+    }
+
     // Reset editor value and clear attachments list
     editor.value?.commands.clearContent();
     emit('update:modelValue', '');
