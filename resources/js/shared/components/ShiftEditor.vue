@@ -302,9 +302,7 @@ function onSend() {
     }
 
     // Reset editor value and clear attachments list
-    editor.value?.commands.clearContent();
-    emit('update:modelValue', '');
-    attachments.value = [];
+    reset();
 }
 
 function iconForAttachment(type: string) {
@@ -318,8 +316,14 @@ const editorStyle = computed(() => {
     return { '--editor-min-height': value };
 });
 
-// Expose the ref so parents (and tests) can observe the editor once it initializes.
-defineExpose({ editor });
+function reset() {
+    editor.value?.commands.clearContent();
+    emit('update:modelValue', '');
+    attachments.value = [];
+}
+
+// Expose the ref so parents (and tests) can observe / control the editor once it initializes.
+defineExpose({ editor, reset });
 </script>
 
 <template>
