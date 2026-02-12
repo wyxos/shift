@@ -25,6 +25,7 @@ interface Props {
         project_id: number;
         status: string;
         priority: string;
+        created_at?: string;
         submitter_type?: string;
         submitter?: any;
     };
@@ -51,6 +52,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const title = 'Edit Task';
+
+const formatCreatedAt = (value?: string): string => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startYesterday = new Date(startToday);
+    startYesterday.setDate(startToday.getDate() - 1);
+
+    const time = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).format(date);
+
+    if (date >= startToday) return time;
+    if (date >= startYesterday && date < startToday) return `Yesterday - ${time}`;
+
+    const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit' }).format(date);
+    const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(date);
+    return `${day} ${month} ${time}`;
+};
 
 // Use composables for threads and attachments
 const {
@@ -138,6 +163,7 @@ const submitForm = (): void => {
                 <Card>
                     <CardHeader>
                         <CardTitle>Edit Task</CardTitle>
+                        <p v-if="props.task.created_at" class="text-xs text-gray-500">Created {{ formatCreatedAt(props.task.created_at) }}</p>
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="mb-4">
