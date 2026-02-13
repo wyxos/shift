@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
 use App\Models\Project;
@@ -15,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Response;
 
 class TaskController extends Controller
@@ -283,7 +286,7 @@ class TaskController extends Controller
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'priority' => 'required|string|in:low,medium,high',
+            'priority' => ['required', Rule::enum(TaskPriority::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -404,8 +407,8 @@ class TaskController extends Controller
         $attributes = request()->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string|in:pending,in-progress,completed,awaiting-feedback',
-            'priority' => 'nullable|string|in:low,medium,high',
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -538,8 +541,8 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
-            'status' => 'nullable|string|in:pending,in-progress,completed,awaiting-feedback',
-            'priority' => 'nullable|string|in:low,medium,high',
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'temp_identifier' => 'nullable|string',
             'external_user_ids' => 'nullable|array',
             'external_user_ids.*' => 'exists:external_users,id',
@@ -682,8 +685,10 @@ class TaskController extends Controller
      */
     public function toggleStatus(Task $task, Request $request)
     {
+        $this->ensureTaskVisible($task);
+
         $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in-progress,completed,awaiting-feedback',
+            'status' => ['required', Rule::enum(TaskStatus::class)],
         ]);
 
         $task->status = $validatedData['status'];
@@ -702,8 +707,10 @@ class TaskController extends Controller
      */
     public function togglePriority(Task $task, Request $request)
     {
+        $this->ensureTaskVisible($task);
+
         $validatedData = $request->validate([
-            'priority' => 'required|string|in:low,medium,high',
+            'priority' => ['required', Rule::enum(TaskPriority::class)],
         ]);
 
         $task->priority = $validatedData['priority'];

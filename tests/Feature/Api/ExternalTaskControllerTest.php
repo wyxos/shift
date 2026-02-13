@@ -1,13 +1,10 @@
 <?php
 
+use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
-use App\Models\TaskMetadata;
 use App\Models\User;
-use App\Models\Attachment;
-
-;
 
 beforeEach(function () {
     // Create a user and generate a token for API access
@@ -17,7 +14,7 @@ beforeEach(function () {
     // Create a project with a token for API access
     $this->project = Project::factory()->create([
         'token' => 'test-project-token',
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     // External user data
@@ -26,7 +23,7 @@ beforeEach(function () {
         'name' => 'External User',
         'email' => 'external@example.com',
         'environment' => 'testing',
-        'url' => 'https://example.com'
+        'url' => 'https://example.com',
     ];
 
     // Create an external user
@@ -35,7 +32,7 @@ beforeEach(function () {
         'name' => $this->externalUserData['name'],
         'email' => $this->externalUserData['email'],
         'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url']
+        'url' => $this->externalUserData['url'],
     ]);
 });
 
@@ -57,7 +54,7 @@ test('index returns tasks for external user', function () {
         'name' => 'Other User',
         'email' => 'other@example.com',
         'environment' => 'testing',
-        'url' => 'https://other.com'
+        'url' => 'https://other.com',
     ]);
 
     $task3 = Task::factory()->create([
@@ -65,10 +62,10 @@ test('index returns tasks for external user', function () {
     ]);
     $task3->submitter()->associate($otherExternalUser)->save();
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson('/api/tasks?' . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData
+            'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(200);
@@ -85,13 +82,13 @@ test('show returns task details', function () {
 
     $task->metadata()->create([
         'url' => 'https://example.com/task/123',
-        'environment' => 'testing'
+        'environment' => 'testing',
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData
+            'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(200);
@@ -117,25 +114,25 @@ test('show rewrites attachment urls without duplicating the client host', functi
     ]);
 
     // Persist an absolute internal download URL; the API should rewrite to the client SDK proxy URL once.
-    $task->description = '<p><img src="https://example.com/attachments/' . $attachment->id . '/download" /></p>';
+    $task->description = '<p><img src="https://example.com/attachments/'.$attachment->id.'/download" /></p>';
     $task->save();
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
             'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(200);
     $desc = (string) ($response->json('description') ?? '');
-    expect($desc)->toContain('https://example.com/shift/api/attachments/' . $attachment->id . '/download');
+    expect($desc)->toContain('https://example.com/shift/api/attachments/'.$attachment->id.'/download');
     expect($desc)->not->toContain('https://example.comhttps://example.com');
 });
 
 test('show returns 404 for task in different project', function () {
     // Create another project
     $otherProject = Project::factory()->create([
-        'token' => 'other-project-token'
+        'token' => 'other-project-token',
     ]);
 
     // Create a task in the other project
@@ -144,10 +141,10 @@ test('show returns 404 for task in different project', function () {
     ]);
     $task->submitter()->associate($this->externalUser)->save();
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token, // Using the original project token
-            'user' => $this->externalUserData
+            'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(404);
@@ -163,11 +160,11 @@ test('store creates new task', function () {
         'user' => $this->externalUserData,
         'metadata' => [
             'url' => 'https://example.com/task/new',
-            'environment' => 'testing'
-        ]
+            'environment' => 'testing',
+        ],
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/tasks', $taskData);
 
     $response->assertStatus(201);
@@ -212,10 +209,10 @@ test('update updates task', function () {
             'id' => $this->externalUser->external_id,
             'environment' => $this->externalUser->environment,
             'url' => $this->externalUser->url,
-        ]
+        ],
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->putJson("/api/tasks/{$task->id}", $updateData);
 
     $response->assertStatus(200);
@@ -242,7 +239,7 @@ test('update returns 403 for unauthorized user', function () {
         'name' => 'Other User',
         'email' => 'other@example.com',
         'environment' => 'testing',
-        'url' => 'https://other.com'
+        'url' => 'https://other.com',
     ]);
 
     $task = Task::factory()->create([
@@ -257,10 +254,10 @@ test('update returns 403 for unauthorized user', function () {
             'id' => $this->externalUser->external_id, // Different user than the submitter
             'environment' => $this->externalUser->environment,
             'url' => $this->externalUser->url,
-        ]
+        ],
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->putJson("/api/tasks/{$task->id}", $updateData);
 
     $response->assertStatus(403);
@@ -296,32 +293,32 @@ test('destroy deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertExists($attachment1->path);
     \Illuminate\Support\Facades\Storage::assertExists($attachment2->path);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->deleteJson("/api/tasks/{$task->id}?" . http_build_query([
-        'project' => $this->project->token,
-        'user' => [
-            'id' => $this->externalUser->external_id,
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
-        ]
-    ]));
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => [
+                'id' => $this->externalUser->external_id,
+                'environment' => $this->externalUser->environment,
+                'url' => $this->externalUser->url,
+            ],
+        ]));
 
     $response->assertStatus(200);
     $response->assertJson([
-        'message' => 'Task deleted successfully'
+        'message' => 'Task deleted successfully',
     ]);
 
     // Verify task is deleted
     $this->assertDatabaseMissing('tasks', [
-        'id' => $task->id
+        'id' => $task->id,
     ]);
 
     // Verify attachments are deleted from database
     $this->assertDatabaseMissing('attachments', [
-        'id' => $attachment1->id
+        'id' => $attachment1->id,
     ]);
     $this->assertDatabaseMissing('attachments', [
-        'id' => $attachment2->id
+        'id' => $attachment2->id,
     ]);
 
     // Verify files are deleted from storage
@@ -336,7 +333,7 @@ test('destroy returns 403 for unauthorized user', function () {
         'name' => 'Other User',
         'email' => 'other@example.com',
         'environment' => 'testing',
-        'url' => 'https://other.com'
+        'url' => 'https://other.com',
     ]);
 
     $task = Task::factory()->create([
@@ -344,15 +341,15 @@ test('destroy returns 403 for unauthorized user', function () {
     ]);
     $task->submitter()->associate($otherExternalUser)->save();
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->deleteJson("/api/tasks/{$task->id}?" . http_build_query([
-        'project' => $this->project->token,
-        'user' => [
-            'id' => $this->externalUser->external_id, // Different user than the submitter
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
-        ]
-    ]));
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => [
+                'id' => $this->externalUser->external_id, // Different user than the submitter
+                'environment' => $this->externalUser->environment,
+                'url' => $this->externalUser->url,
+            ],
+        ]));
 
     $response->assertStatus(403);
 });
@@ -370,7 +367,7 @@ test('external task creation sends notifications to all relevant users', functio
         'user_id' => $projectUser1->id,
         'user_email' => $projectUser1->email,
         'user_name' => $projectUser1->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     \App\Models\ProjectUser::factory()->create([
@@ -378,7 +375,7 @@ test('external task creation sends notifications to all relevant users', functio
         'user_id' => $projectUser2->id,
         'user_email' => $projectUser2->email,
         'user_name' => $projectUser2->name,
-        'registration_status' => 'registered'
+        'registration_status' => 'registered',
     ]);
 
     $taskData = [
@@ -390,11 +387,11 @@ test('external task creation sends notifications to all relevant users', functio
         'user' => $this->externalUserData,
         'metadata' => [
             'url' => 'https://example.com/task/notification-test',
-            'environment' => 'testing'
-        ]
+            'environment' => 'testing',
+        ],
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/tasks', $taskData);
 
     $response->assertStatus(201);
@@ -413,7 +410,7 @@ test('index returns tasks with granted access', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
-        'project_id' => $this->project->id
+        'project_id' => $this->project->id,
     ]);
 
     // Create a task submitted by the other external user
@@ -426,10 +423,10 @@ test('index returns tasks with granted access', function () {
     // Grant access to our external user
     $task->externalUsers()->attach($this->externalUser->id);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson('/api/tasks?' . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData
+            'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(200);
@@ -444,7 +441,7 @@ test('show returns task with granted access', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
-        'project_id' => $this->project->id
+        'project_id' => $this->project->id,
     ]);
 
     // Create a task submitted by the other external user
@@ -457,10 +454,10 @@ test('show returns task with granted access', function () {
     // Grant access to our external user
     $task->externalUsers()->attach($this->externalUser->id);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-        ->getJson("/api/tasks/{$task->id}?" . http_build_query([
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData
+            'user' => $this->externalUserData,
         ]));
 
     $response->assertStatus(200);
@@ -478,7 +475,7 @@ test('update succeeds with granted access', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
-        'project_id' => $this->project->id
+        'project_id' => $this->project->id,
     ]);
 
     // Create a task submitted by the other external user
@@ -503,10 +500,10 @@ test('update succeeds with granted access', function () {
             'id' => $this->externalUser->external_id,
             'environment' => $this->externalUser->environment,
             'url' => $this->externalUser->url,
-        ]
+        ],
     ];
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->putJson("/api/tasks/{$task->id}", $updateData);
 
     $response->assertStatus(200);
@@ -524,7 +521,7 @@ test('toggle status succeeds with granted access', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
-        'project_id' => $this->project->id
+        'project_id' => $this->project->id,
     ]);
 
     // Create a task submitted by the other external user
@@ -537,7 +534,7 @@ test('toggle status succeeds with granted access', function () {
     // Grant access to our external user
     $task->externalUsers()->attach($this->externalUser->id);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/toggle-status", [
             'status' => 'completed',
             'project' => $this->project->token,
@@ -545,13 +542,49 @@ test('toggle status succeeds with granted access', function () {
                 'id' => $this->externalUser->external_id,
                 'environment' => $this->externalUser->environment,
                 'url' => $this->externalUser->url,
-            ]
+            ],
         ]);
 
     $response->assertStatus(200);
     $response->assertJson([
         'status' => 'completed',
-        'message' => 'Task status updated successfully'
+        'message' => 'Task status updated successfully',
+    ]);
+});
+
+test('toggle status allows awaiting feedback for external users with access', function () {
+    $otherExternalUser = ExternalUser::create([
+        'external_id' => 'other-456',
+        'name' => 'Other User',
+        'email' => 'other2@example.com',
+        'environment' => 'testing',
+        'url' => 'https://other.com',
+        'project_id' => $this->project->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'status' => 'pending',
+    ]);
+    $task->submitter()->associate($otherExternalUser)->save();
+
+    $task->externalUsers()->attach($this->externalUser->id);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$task->id}/toggle-status", [
+            'status' => 'awaiting-feedback',
+            'project' => $this->project->token,
+            'user' => [
+                'id' => $this->externalUser->external_id,
+                'environment' => $this->externalUser->environment,
+                'url' => $this->externalUser->url,
+            ],
+        ]);
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'status' => 'awaiting-feedback',
+        'message' => 'Task status updated successfully',
     ]);
 });
 
@@ -563,7 +596,7 @@ test('toggle priority succeeds with granted access', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
-        'project_id' => $this->project->id
+        'project_id' => $this->project->id,
     ]);
 
     // Create a task submitted by the other external user
@@ -576,7 +609,7 @@ test('toggle priority succeeds with granted access', function () {
     // Grant access to our external user
     $task->externalUsers()->attach($this->externalUser->id);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/toggle-priority", [
             'priority' => 'high',
             'project' => $this->project->token,
@@ -584,12 +617,12 @@ test('toggle priority succeeds with granted access', function () {
                 'id' => $this->externalUser->external_id,
                 'environment' => $this->externalUser->environment,
                 'url' => $this->externalUser->url,
-            ]
+            ],
         ]);
 
     $response->assertStatus(200);
     $response->assertJson([
         'priority' => 'high',
-        'message' => 'Task priority updated successfully'
+        'message' => 'Task priority updated successfully',
     ]);
 });
