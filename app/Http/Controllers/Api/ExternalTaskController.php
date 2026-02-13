@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
@@ -14,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ExternalTaskController extends Controller
 {
@@ -28,7 +31,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             $externalUser = ExternalUser::create([
                 'external_id' => request()->offsetGet('user.id'),
                 'name' => request()->offsetGet('user.name'),
@@ -40,7 +43,7 @@ class ExternalTaskController extends Controller
 
         $tasks = Task::query()
             ->with(['submitter', 'metadata', 'project'])
-            ->whereHas('project', fn($query) => $query->where('token', request('project')))
+            ->whereHas('project', fn ($query) => $query->where('token', request('project')))
             ->where(function ($query) use ($externalUser) {
                 // Tasks where the external user is the submitter
                 $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {
@@ -54,11 +57,11 @@ class ExternalTaskController extends Controller
             ->latest()
             ->when(
                 request('search'),
-                fn($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%' . request('search') . '%'])
+                fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.request('search').'%'])
             )
             ->when(
                 request('status'),
-                fn($query) => $query->where('status', request('status'))
+                fn ($query) => $query->where('status', request('status'))
             )
             ->paginate(10)
             ->withQueryString();
@@ -82,7 +85,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
@@ -90,7 +93,7 @@ class ExternalTaskController extends Controller
         $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
         $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
 
-        if (!$isSubmitter && !$hasAccess) {
+        if (! $isSubmitter && ! $hasAccess) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -100,12 +103,13 @@ class ExternalTaskController extends Controller
         $formattedAttachments = $task->attachments->map(function ($attachment) {
             // Get the client's URL from request metadata or user data
             $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+
             return [
                 'id' => $attachment->id,
                 'original_filename' => $attachment->original_filename,
                 'path' => $attachment->path,
                 // Return SDK-facing download URL pointing to the client's proxy route
-                'url' => rtrim($clientUrl, '/') . '/shift/api/attachments/' . $attachment->id . '/download',
+                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
                 'created_at' => $attachment->created_at,
             ];
         });
@@ -128,8 +132,8 @@ class ExternalTaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project' => 'required|exists:projects,token',
-            'priority' => 'nullable|string|in:low,medium,high',
-            'status' => 'nullable|string|in:pending,in-progress,completed',
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'user.id' => 'nullable',
             'user.name' => 'nullable|string|max:255',
             'user.email' => 'nullable|email',
@@ -187,7 +191,7 @@ class ExternalTaskController extends Controller
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
-                if (!Storage::exists($permanentPath)) {
+                if (! Storage::exists($permanentPath)) {
                     Storage::makeDirectory($permanentPath);
                 }
 
@@ -199,7 +203,7 @@ class ExternalTaskController extends Controller
                     }
 
                     // Try to get original filename from metadata
-                    $metadataPath = $file . '.meta';
+                    $metadataPath = $file.'.meta';
                     $originalFilename = basename($file);
 
                     if (Storage::exists($metadataPath)) {
@@ -236,7 +240,7 @@ class ExternalTaskController extends Controller
         }
 
         // If this task included inline attachments, rewrite temp URLs to stable download routes.
-        if (!empty($attributes['temp_identifier'])) {
+        if (! empty($attributes['temp_identifier'])) {
             $task->load('attachments');
             $task->description = $this->replaceTempUrlsInContent(
                 (string) ($task->description ?? ''),
@@ -268,7 +272,7 @@ class ExternalTaskController extends Controller
 
         // Add all users with access to the project
         foreach ($project->projectUser as $projectUser) {
-            if ($projectUser->user && !$usersToNotify->contains('id', $projectUser->user->id)) {
+            if ($projectUser->user && ! $usersToNotify->contains('id', $projectUser->user->id)) {
                 $usersToNotify->push($projectUser->user);
             }
         }
@@ -296,7 +300,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
@@ -304,15 +308,15 @@ class ExternalTaskController extends Controller
         $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
         $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
 
-        if (!$isSubmitter && !$hasAccess) {
+        if (! $isSubmitter && ! $hasAccess) {
             return response()->json(['error' => 'Unauthorized to update this task'], 403);
         }
 
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'priority' => 'nullable|string|in:low,medium,high',
-            'status' => 'nullable|string|in:pending,in-progress,completed',
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -357,7 +361,7 @@ class ExternalTaskController extends Controller
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
-                if (!Storage::exists($permanentPath)) {
+                if (! Storage::exists($permanentPath)) {
                     Storage::makeDirectory($permanentPath);
                 }
 
@@ -369,7 +373,7 @@ class ExternalTaskController extends Controller
                     }
 
                     // Try to get original filename from metadata
-                    $metadataPath = $file . '.meta';
+                    $metadataPath = $file.'.meta';
                     $originalFilename = basename($file);
 
                     if (Storage::exists($metadataPath)) {
@@ -406,7 +410,7 @@ class ExternalTaskController extends Controller
         }
 
         // If this update included inline attachments, rewrite temp URLs to stable download routes.
-        if (!empty($attributes['temp_identifier'])) {
+        if (! empty($attributes['temp_identifier'])) {
             $task->load('attachments');
             $task->description = $this->replaceTempUrlsInContent(
                 (string) ($task->description ?? ''),
@@ -434,7 +438,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
@@ -442,7 +446,7 @@ class ExternalTaskController extends Controller
         $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
         $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
 
-        if (!$isSubmitter && !$hasAccess) {
+        if (! $isSubmitter && ! $hasAccess) {
             return response()->json(['error' => 'Unauthorized to delete this task'], 403);
         }
 
@@ -466,7 +470,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
@@ -474,12 +478,12 @@ class ExternalTaskController extends Controller
         $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
         $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
 
-        if (!$isSubmitter && !$hasAccess) {
+        if (! $isSubmitter && ! $hasAccess) {
             return response()->json(['error' => 'Unauthorized to update this task status'], 403);
         }
 
         $validatedData = $request->validate([
-            'status' => 'required|string|in:pending,in-progress,completed',
+            'status' => ['required', Rule::enum(TaskStatus::class)],
         ]);
 
         $task->status = $validatedData['status'];
@@ -487,7 +491,7 @@ class ExternalTaskController extends Controller
 
         return response()->json([
             'status' => $task->status,
-            'message' => 'Task status updated successfully'
+            'message' => 'Task status updated successfully',
         ]);
     }
 
@@ -506,7 +510,7 @@ class ExternalTaskController extends Controller
             ->where('url', request()->offsetGet('user.url'))
             ->first();
 
-        if (!$externalUser) {
+        if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
@@ -514,12 +518,12 @@ class ExternalTaskController extends Controller
         $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
         $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
 
-        if (!$isSubmitter && !$hasAccess) {
+        if (! $isSubmitter && ! $hasAccess) {
             return response()->json(['error' => 'Unauthorized to update this task priority'], 403);
         }
 
         $validatedData = $request->validate([
-            'priority' => 'required|string|in:low,medium,high',
+            'priority' => ['required', Rule::enum(TaskPriority::class)],
         ]);
 
         $task->priority = $validatedData['priority'];
@@ -527,7 +531,7 @@ class ExternalTaskController extends Controller
 
         return response()->json([
             'priority' => $task->priority,
-            'message' => 'Task priority updated successfully'
+            'message' => 'Task priority updated successfully',
         ]);
     }
 
@@ -542,7 +546,7 @@ class ExternalTaskController extends Controller
      */
     private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string
     {
-        if (empty($content) || empty($tempIdentifier) || !$attachments || $attachments->isEmpty()) {
+        if (empty($content) || empty($tempIdentifier) || ! $attachments || $attachments->isEmpty()) {
             return $content;
         }
 
@@ -596,6 +600,7 @@ class ExternalTaskController extends Controller
         $replace = function (string $pattern, string $html) {
             return preg_replace_callback($pattern, function ($m) {
                 $id = (int) $m[1];
+
                 return route('attachments.download', ['attachment' => $id], false);
             }, $html) ?? $html;
         };
@@ -631,7 +636,8 @@ class ExternalTaskController extends Controller
         $replace = function (string $pattern, string $html) use ($clientBase) {
             return preg_replace_callback($pattern, function ($m) use ($clientBase) {
                 $id = (int) $m[1];
-                return $clientBase . '/shift/api/attachments/' . $id . '/download';
+
+                return $clientBase.'/shift/api/attachments/'.$id.'/download';
             }, $html) ?? $html;
         };
 

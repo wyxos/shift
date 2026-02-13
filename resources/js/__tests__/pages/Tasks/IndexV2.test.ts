@@ -5,11 +5,13 @@ import { h } from 'vue';
 
 const axiosGetMock = vi.fn();
 const axiosPutMock = vi.fn();
+const axiosPatchMock = vi.fn();
 
 vi.mock('axios', () => ({
     default: {
         get: (...args: any[]) => axiosGetMock(...args),
         put: (...args: any[]) => axiosPutMock(...args),
+        patch: (...args: any[]) => axiosPatchMock(...args),
         post: vi.fn(),
         delete: vi.fn(),
     },
@@ -275,6 +277,54 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.text()).toContain('Created');
         expect(wrapper.text()).toContain('17:40');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('allows any user to change task status from the V2 edit sheet', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockReset();
+        axiosPatchMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        axiosPatchMock.mockResolvedValueOnce({
+            data: { status: 'in-progress', message: 'Task status updated successfully' },
+        });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        const statusSelect = wrapper.get('[data-testid="task-status-select"]');
+        await statusSelect.setValue('in-progress');
+        await flushPromises();
+
+        expect(axiosPatchMock).toHaveBeenCalledWith('/tasks.toggle-status', expect.objectContaining({ status: 'in-progress' }));
 
         wrapper.unmount();
         vi.useRealTimers();
