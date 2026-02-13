@@ -30,6 +30,7 @@ const emit = defineEmits<{
     (e: 'send', payload: { html: string; attachments: SentAttachment[] }): void;
     (e: 'update:modelValue', value: string): void;
     (e: 'uploading', value: boolean): void;
+    (e: 'cancel'): void;
 }>();
 
 // Props
@@ -44,9 +45,11 @@ const props = withDefaults(
         removeTempUrl?: string;
         resolveTempUrl?: (data: any) => string;
         clearOnSend?: boolean;
+        cancelable?: boolean;
     }>(),
     {
         clearOnSend: true,
+        cancelable: false,
     },
 );
 
@@ -389,6 +392,17 @@ defineExpose({ editor, reset });
                 </button>
                 <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-gray-100" @click="openFilePicker">
                     <Paperclip :size="18" />
+                </button>
+                <button
+                    v-if="props.cancelable"
+                    type="button"
+                    data-testid="toolbar-cancel"
+                    class="rounded p-1 text-slate-500 hover:bg-gray-100 hover:text-red-600"
+                    aria-label="Cancel edit"
+                    title="Cancel"
+                    @click="emit('cancel')"
+                >
+                    <X :size="18" />
                 </button>
                 <button
                     type="button"
