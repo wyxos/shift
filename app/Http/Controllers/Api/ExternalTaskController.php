@@ -60,8 +60,40 @@ class ExternalTaskController extends Controller
                 fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.request('search').'%'])
             )
             ->when(
-                request('status'),
-                fn ($query) => $query->where('status', request('status'))
+                request()->has('status'),
+                function ($query) {
+                    $status = request('status');
+                    if (is_array($status)) {
+                        $status = array_values(array_filter($status, fn ($value) => filled($value)));
+                        if (count($status) > 0) {
+                            $query->whereIn('status', $status);
+                        }
+
+                        return;
+                    }
+
+                    if (filled($status)) {
+                        $query->where('status', $status);
+                    }
+                }
+            )
+            ->when(
+                request()->has('priority'),
+                function ($query) {
+                    $priority = request('priority');
+                    if (is_array($priority)) {
+                        $priority = array_values(array_filter($priority, fn ($value) => filled($value)));
+                        if (count($priority) > 0) {
+                            $query->whereIn('priority', $priority);
+                        }
+
+                        return;
+                    }
+
+                    if (filled($priority)) {
+                        $query->where('priority', $priority);
+                    }
+                }
             )
             ->paginate(10)
             ->withQueryString();

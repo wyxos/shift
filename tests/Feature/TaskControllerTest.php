@@ -57,7 +57,7 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Tasks/IndexV2')
-        ->has('tasks', 1)
+        ->has('tasks.data', 1)
         ->where('filters.status', ['pending', 'in-progress', 'awaiting-feedback'])
     );
 });

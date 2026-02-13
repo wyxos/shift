@@ -218,26 +218,44 @@ class TaskController extends Controller
     public function indexV2()
     {
         $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+        $allPriorities = ['low', 'medium', 'high'];
 
         $selectedStatuses = $this->normalizeListFilter(request('status'));
         if (empty($selectedStatuses)) {
             $selectedStatuses = $defaultStatuses;
         }
 
+        $selectedPriorities = $this->normalizeListFilter(request('priority'));
+        if (empty($selectedPriorities)) {
+            $selectedPriorities = $allPriorities;
+        }
+
+        $search = trim((string) request('search', ''));
+
         $query = $this->visibleTasksQuery()
             ->latest();
 
-        // V2 (for now) is intentionally "list + filters" only.
-        // Keep server filtering limited to status (like the SDK UI),
-        // and handle search/priority filtering client-side.
         $query->whereIn('status', $selectedStatuses);
 
-        $tasks = $query->get(['id', 'title', 'status', 'priority']);
+        if (count($selectedPriorities) > 0 && count($selectedPriorities) < count($allPriorities)) {
+            $query->whereIn('priority', $selectedPriorities);
+        }
+
+        if ($search !== '') {
+            $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$search.'%']);
+        }
+
+        $tasks = $query
+            ->select(['id', 'title', 'status', 'priority'])
+            ->paginate(10)
+            ->withQueryString();
 
         return inertia('Tasks/IndexV2')
             ->with([
                 'filters' => [
                     'status' => $selectedStatuses,
+                    'priority' => $selectedPriorities,
+                    'search' => $search,
                 ],
                 'tasks' => $tasks,
             ]);
@@ -280,13 +298,39 @@ class TaskController extends Controller
 
         $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
         if (! $isOwner) {
-            return response()->json(['error' => 'You cannot edit this task'], 403);
+            $attributes = $request->validate([
+                'status' => ['required', Rule::enum(TaskStatus::class)],
+            ]);
+
+            $task->status = $attributes['status'];
+            $task->save();
+            $task->load('attachments');
+
+            return response()->json([
+                'ok' => true,
+                'task' => [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'priority' => $task->priority,
+                    'status' => $task->status,
+                    'description' => $task->description,
+                    'attachments' => $task->attachments->map(function ($attachment) {
+                        return [
+                            'id' => $attachment->id,
+                            'original_filename' => $attachment->original_filename,
+                            'path' => $attachment->path,
+                            'url' => route('attachments.download', $attachment),
+                        ];
+                    })->values(),
+                ],
+            ]);
         }
 
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => ['required', Rule::enum(TaskPriority::class)],
+            'status' => ['required', Rule::enum(TaskStatus::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -294,6 +338,7 @@ class TaskController extends Controller
 
         $task->title = $attributes['title'];
         $task->priority = $attributes['priority'];
+        $task->status = $attributes['status'];
         $task->description = $attributes['description'] ?? null;
         $task->save();
 
