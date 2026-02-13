@@ -3,17 +3,18 @@
 import ShiftEditor from '@/components/ShiftEditor.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Filter, Pencil, Trash2 } from 'lucide-vue-next';
+import { Filter, Paperclip, Pencil, Trash2 } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -22,6 +23,15 @@ type Task = {
     title: string;
     status: string;
     priority: string;
+};
+
+type TaskPaginator = {
+    data: Task[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
 };
 
 type TaskAttachment = {
@@ -52,19 +62,23 @@ type ThreadMessage = {
 };
 
 const props = defineProps<{
-    tasks: Task[];
+    tasks: TaskPaginator;
     filters: {
         status?: string[] | string | null;
+        priority?: string[] | string | null;
+        search?: string | null;
     };
 }>();
 
-const tasks = ref<Task[]>([...props.tasks]);
+const tasksPage = ref<TaskPaginator>({ ...props.tasks });
 watch(
     () => props.tasks,
     (next) => {
-        tasks.value = [...next];
+        tasksPage.value = { ...next };
     },
+    { deep: true },
 );
+const taskRows = computed(() => tasksPage.value.data ?? []);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Tasks', href: '/tasks' },
@@ -85,6 +99,7 @@ const priorityOptions = [
 ];
 
 const defaultStatuses = statusOptions.filter((option) => option.value !== 'completed').map((option) => option.value);
+const allPriorities = priorityOptions.map((option) => option.value);
 
 function normalizeStringList(value: unknown): string[] {
     if (Array.isArray(value)) return value.map(String).filter((item) => item.trim().length > 0);
@@ -93,55 +108,86 @@ function normalizeStringList(value: unknown): string[] {
 }
 
 const filtersOpen = ref(false);
-const searchTerm = ref('');
 const error = ref<string | null>(null);
 const deleteLoading = ref<number | null>(null);
 
 const providedStatuses = normalizeStringList(props.filters.status);
-const selectedStatuses = ref<string[]>(providedStatuses.length ? providedStatuses : [...defaultStatuses]);
+const providedPriorities = normalizeStringList(props.filters.priority);
+const providedSearchTerm = typeof props.filters.search === 'string' ? props.filters.search : '';
 
-const selectedPriorities = ref<string[]>(priorityOptions.map((option) => option.value));
+const appliedStatuses = ref<string[]>(providedStatuses.length ? providedStatuses : [...defaultStatuses]);
+const appliedPriorities = ref<string[]>(providedPriorities.length ? providedPriorities : [...allPriorities]);
+const appliedSearchTerm = ref(providedSearchTerm);
 
-const activeFilterCount = computed(() => {
-    let count = 0;
-    if (selectedStatuses.value.length && selectedStatuses.value.length < statusOptions.length) count += 1;
-    if (selectedPriorities.value.length && selectedPriorities.value.length < priorityOptions.length) count += 1;
-    if (searchTerm.value.trim()) count += 1;
-    return count;
-});
-
-function visitWithFilters() {
-    router.get(
-        '/tasks-v2',
-        { status: selectedStatuses.value },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        },
-    );
-}
+const draftStatuses = ref<string[]>([...appliedStatuses.value]);
+const draftPriorities = ref<string[]>([...appliedPriorities.value]);
+const draftSearchTerm = ref(appliedSearchTerm.value);
 
 watch(
-    selectedStatuses,
-    () => {
-        visitWithFilters();
+    () => props.filters,
+    (next) => {
+        const nextStatuses = normalizeStringList(next.status);
+        const nextPriorities = normalizeStringList(next.priority);
+        const nextSearch = typeof next.search === 'string' ? next.search : '';
+
+        appliedStatuses.value = nextStatuses.length ? nextStatuses : [...defaultStatuses];
+        appliedPriorities.value = nextPriorities.length ? nextPriorities : [...allPriorities];
+        appliedSearchTerm.value = nextSearch;
     },
     { deep: true },
 );
 
+const activeFilterCount = computed(() => {
+    let count = 0;
+    if (appliedStatuses.value.length && appliedStatuses.value.length < statusOptions.length) count += 1;
+    if (appliedPriorities.value.length && appliedPriorities.value.length < priorityOptions.length) count += 1;
+    if (appliedSearchTerm.value.trim()) count += 1;
+    return count;
+});
+
+watch(filtersOpen, (open) => {
+    if (!open) return;
+    draftStatuses.value = [...appliedStatuses.value];
+    draftPriorities.value = [...appliedPriorities.value];
+    draftSearchTerm.value = appliedSearchTerm.value;
+});
+
 function resetFilters() {
-    selectedStatuses.value = [...defaultStatuses];
-    selectedPriorities.value = priorityOptions.map((option) => option.value);
-    searchTerm.value = '';
+    draftStatuses.value = [...defaultStatuses];
+    draftPriorities.value = [...allPriorities];
+    draftSearchTerm.value = '';
+
+    appliedStatuses.value = [...draftStatuses.value];
+    appliedPriorities.value = [...draftPriorities.value];
+    appliedSearchTerm.value = draftSearchTerm.value;
+
+    router.get(
+        '/tasks-v2',
+        { status: appliedStatuses.value, priority: appliedPriorities.value, search: appliedSearchTerm.value || undefined, page: 1 },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+    filtersOpen.value = false;
+}
+
+function applyFilters() {
+    appliedStatuses.value = [...draftStatuses.value];
+    appliedPriorities.value = [...draftPriorities.value];
+    appliedSearchTerm.value = draftSearchTerm.value;
+
+    router.get(
+        '/tasks-v2',
+        { status: appliedStatuses.value, priority: appliedPriorities.value, search: appliedSearchTerm.value || undefined, page: 1 },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+    filtersOpen.value = false;
 }
 
 function selectAllStatuses() {
-    selectedStatuses.value = statusOptions.map((option) => option.value);
+    draftStatuses.value = statusOptions.map((option) => option.value);
 }
 
 function selectAllPriorities() {
-    selectedPriorities.value = priorityOptions.map((option) => option.value);
+    draftPriorities.value = priorityOptions.map((option) => option.value);
 }
 
 const editOpen = ref(false);
@@ -151,14 +197,15 @@ const editUploading = ref(false);
 const editTask = ref<TaskDetail | null>(null);
 const deletedAttachmentIds = ref<number[]>([]);
 const editTempIdentifier = ref(Date.now().toString());
-const editStatus = ref<string>('pending');
-const statusSaving = ref(false);
-const statusError = ref<string | null>(null);
 const editForm = ref({
     title: '',
     priority: 'medium',
+    status: 'pending',
     description: '',
 });
+
+const confirmCloseOpen = ref(false);
+const initialEditSnapshot = ref<{ title: string; priority: string; status: string; description: string } | null>(null);
 
 const threadTempIdentifier = ref(Date.now().toString());
 const threadLoading = ref(false);
@@ -188,6 +235,71 @@ const taskAttachments = computed(() => {
     const removed = new Set(deletedAttachmentIds.value);
     return editTask.value.attachments.filter((attachment) => !removed.has(attachment.id));
 });
+
+const hasUnsavedTaskChanges = computed(() => {
+    if (!editOpen.value) return false;
+    const snap = initialEditSnapshot.value;
+    if (!snap) return false;
+
+    if (editForm.value.title !== snap.title) return true;
+    if (editForm.value.priority !== snap.priority) return true;
+    if (editForm.value.status !== snap.status) return true;
+    if ((editForm.value.description ?? '') !== (snap.description ?? '')) return true;
+    if (deletedAttachmentIds.value.length > 0) return true;
+
+    return false;
+});
+
+const hasUnsavedCommentDraft = computed(() => {
+    if (!editOpen.value) return false;
+    if (threadEditingId.value) return true;
+    if (threadComposerHtml.value.trim()) return true;
+    return false;
+});
+
+const hasUnsavedChanges = computed(() => hasUnsavedTaskChanges.value || hasUnsavedCommentDraft.value);
+
+function closeEditNow() {
+    editOpen.value = false;
+    editTask.value = null;
+    editError.value = null;
+    editUploading.value = false;
+    deletedAttachmentIds.value = [];
+    threadMessages.value = [];
+    threadError.value = null;
+    editForm.value = {
+        title: '',
+        priority: 'medium',
+        status: 'pending',
+        description: '',
+    };
+    initialEditSnapshot.value = null;
+    threadComposerHtml.value = '';
+    threadEditingId.value = null;
+    threadEditError.value = null;
+    threadEditSaving.value = false;
+}
+
+function attemptCloseEdit() {
+    if (!hasUnsavedChanges.value) {
+        closeEditNow();
+        return;
+    }
+    confirmCloseOpen.value = true;
+}
+
+function discardChangesAndClose() {
+    confirmCloseOpen.value = false;
+    closeEditNow();
+}
+
+function onEditOpenChange(open: boolean) {
+    if (open) {
+        editOpen.value = true;
+        return;
+    }
+    attemptCloseEdit();
+}
 
 function openLightboxForImage(img: HTMLImageElement) {
     const src = img.currentSrc || img.src;
@@ -359,20 +471,29 @@ async function openEdit(taskId: number) {
     threadMessages.value = [];
     threadError.value = null;
     threadTempIdentifier.value = Date.now().toString();
-    statusError.value = null;
-    statusSaving.value = false;
+    threadComposerHtml.value = '';
+    threadEditingId.value = null;
+    threadEditError.value = null;
+    threadEditSaving.value = false;
+    initialEditSnapshot.value = null;
 
     try {
         const response = await axios.get(route('tasks.v2.show', { task: taskId }));
         const data = response.data as TaskDetail;
         editTask.value = data;
-        editStatus.value = data?.status ?? 'pending';
         editForm.value = {
             title: data?.title ?? '',
             priority: data?.priority ?? 'medium',
+            status: data?.status ?? 'pending',
             description: data?.description ?? '',
         };
         editTempIdentifier.value = Date.now().toString();
+        initialEditSnapshot.value = {
+            title: editForm.value.title,
+            priority: editForm.value.priority,
+            status: editForm.value.status,
+            description: editForm.value.description,
+        };
         void fetchThreads(taskId);
     } catch (e: any) {
         editError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch task';
@@ -381,79 +502,28 @@ async function openEdit(taskId: number) {
     }
 }
 
-function closeEdit() {
-    editOpen.value = false;
-    editTask.value = null;
-    editError.value = null;
-    editUploading.value = false;
-    deletedAttachmentIds.value = [];
-    threadMessages.value = [];
-    threadError.value = null;
-    editStatus.value = 'pending';
-    statusError.value = null;
-    statusSaving.value = false;
-}
-
-async function saveStatus(nextStatus: string) {
-    if (!editTask.value) return;
-    if (!nextStatus) return;
-    if (statusSaving.value) return;
-
-    const prevStatus = editTask.value.status;
-    if (nextStatus === prevStatus) return;
-
-    statusSaving.value = true;
-    statusError.value = null;
-
-    try {
-        await axios.patch(route('tasks.toggle-status', { task: editTask.value.id }), { status: nextStatus });
-        editTask.value.status = nextStatus;
-        const idx = tasks.value.findIndex((t) => t.id === editTask.value?.id);
-        if (idx !== -1) {
-            tasks.value[idx] = {
-                ...tasks.value[idx],
-                status: nextStatus,
-            };
-        }
-    } catch (e: any) {
-        statusError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to update status';
-        editStatus.value = prevStatus;
-    } finally {
-        statusSaving.value = false;
-    }
-}
-
-function onEditStatusSelected(nextStatus: string) {
-    editStatus.value = nextStatus;
-    void saveStatus(nextStatus);
-}
-
 async function saveEdit() {
-    if (!editTask.value || !isOwner.value) return;
+    if (!editTask.value) return;
+    if (!hasUnsavedTaskChanges.value) return;
 
     editError.value = null;
     editLoading.value = true;
     try {
-        const payload = {
-            title: editForm.value.title,
-            description: editForm.value.description,
-            priority: editForm.value.priority,
-            temp_identifier: editTempIdentifier.value,
-            deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
-        };
+        const payload = isOwner.value
+            ? {
+                  title: editForm.value.title,
+                  description: editForm.value.description,
+                  priority: editForm.value.priority,
+                  status: editForm.value.status,
+                  temp_identifier: editTempIdentifier.value,
+                  deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
+              }
+            : { status: editForm.value.status };
 
         await axios.put(route('tasks.v2.update', { task: editTask.value.id }), payload);
 
-        const idx = tasks.value.findIndex((t) => t.id === editTask.value?.id);
-        if (idx !== -1) {
-            tasks.value[idx] = {
-                ...tasks.value[idx],
-                title: editForm.value.title,
-                priority: editForm.value.priority,
-            };
-        }
-
-        closeEdit();
+        closeEditNow();
+        router.reload({ preserveScroll: true, preserveState: true });
     } catch (e: any) {
         editError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to update task';
     } finally {
@@ -619,7 +689,7 @@ async function deleteTask(taskId: number) {
     error.value = null;
     try {
         await axios.delete(route('tasks.v2.destroy', { task: taskId }));
-        tasks.value = tasks.value.filter((task) => task.id !== taskId);
+        router.reload({ preserveScroll: true, preserveState: true });
     } catch (e: any) {
         error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete task';
     } finally {
@@ -627,28 +697,23 @@ async function deleteTask(taskId: number) {
     }
 }
 
-const filteredTasks = computed(() => {
-    let list = [...tasks.value];
+function goToPage(page: number) {
+    const current = Number(tasksPage.value.current_page ?? 1);
+    const last = Number(tasksPage.value.last_page ?? 1);
+    const next = Math.max(1, Math.min(last, page));
+    if (next === current) return;
 
-    if (selectedStatuses.value.length === 0) return [];
-    if (selectedStatuses.value.length < statusOptions.length) {
-        list = list.filter((task) => selectedStatuses.value.includes(task.status));
-    }
-
-    if (selectedPriorities.value.length === 0) return [];
-    if (selectedPriorities.value.length < priorityOptions.length) {
-        list = list.filter((task) => selectedPriorities.value.includes(task.priority));
-    }
-
-    const query = searchTerm.value.trim().toLowerCase();
-    if (query) {
-        list = list.filter((task) => task.title.toLowerCase().includes(query));
-    }
-
-    return list;
-});
-
-const totalTasks = computed(() => tasks.value.length);
+    router.get(
+        '/tasks-v2',
+        {
+            status: appliedStatuses.value,
+            priority: appliedPriorities.value,
+            search: appliedSearchTerm.value || undefined,
+            page: next,
+        },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+}
 
 function statusVariant(status: string) {
     switch (status) {
@@ -717,7 +782,7 @@ function getPriorityLabel(value: string) {
                                 <div class="flex-1 space-y-6 overflow-auto px-6 pb-6">
                                     <div class="space-y-2">
                                         <Label>Search</Label>
-                                        <Input v-model="searchTerm" data-testid="filter-search" placeholder="Search by title" />
+                                        <Input v-model="draftSearchTerm" data-testid="filter-search" placeholder="Search by title" />
                                     </div>
 
                                     <div class="space-y-2">
@@ -728,7 +793,7 @@ function getPriorityLabel(value: string) {
                                         <div class="grid gap-2">
                                             <label v-for="option in statusOptions" :key="option.value" class="flex items-center gap-2 text-sm">
                                                 <input
-                                                    v-model="selectedStatuses"
+                                                    v-model="draftStatuses"
                                                     type="checkbox"
                                                     :value="option.value"
                                                     :data-testid="`status-${option.value}`"
@@ -746,7 +811,7 @@ function getPriorityLabel(value: string) {
                                         <div class="grid gap-2">
                                             <label v-for="option in priorityOptions" :key="option.value" class="flex items-center gap-2 text-sm">
                                                 <input
-                                                    v-model="selectedPriorities"
+                                                    v-model="draftPriorities"
                                                     type="checkbox"
                                                     :value="option.value"
                                                     :data-testid="`priority-${option.value}`"
@@ -758,8 +823,8 @@ function getPriorityLabel(value: string) {
                                 </div>
 
                                 <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                                    <Button variant="ghost" @click="resetFilters">Reset</Button>
-                                    <Button variant="default" @click="filtersOpen = false">Apply</Button>
+                                    <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                                    <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
                                 </SheetFooter>
                             </SheetContent>
                         </Sheet>
@@ -768,17 +833,17 @@ function getPriorityLabel(value: string) {
 
                 <CardContent>
                     <div class="text-muted-foreground mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <span> Showing {{ filteredTasks.length }} of {{ totalTasks }} tasks </span>
+                        <span> Showing {{ tasksPage.from ?? 0 }} to {{ tasksPage.to ?? 0 }} of {{ tasksPage.total ?? taskRows.length }} tasks </span>
                         <span v-if="activeFilterCount">{{ activeFilterCount }} filter{{ activeFilterCount === 1 ? '' : 's' }} active</span>
                     </div>
 
                     <div v-if="error" class="text-destructive py-2 text-center text-sm">{{ error }}</div>
 
-                    <div v-if="filteredTasks.length === 0" class="text-muted-foreground py-8 text-center">No tasks found</div>
+                    <div v-if="taskRows.length === 0" class="text-muted-foreground py-8 text-center">No tasks found</div>
 
                     <ul v-else class="divide-border divide-y">
                         <li
-                            v-for="task in filteredTasks"
+                            v-for="task in taskRows"
                             :key="task.id"
                             data-testid="task-row"
                             class="flex flex-col gap-3 py-4 transition sm:flex-row sm:items-center sm:gap-4"
@@ -807,13 +872,35 @@ function getPriorityLabel(value: string) {
                             </div>
                         </li>
                     </ul>
+
+                    <div v-if="(tasksPage.last_page ?? 1) > 1" class="mt-4 flex items-center justify-between border-t pt-4">
+                        <div class="text-muted-foreground text-xs">Page {{ tasksPage.current_page ?? 1 }} of {{ tasksPage.last_page ?? 1 }}</div>
+                        <div class="flex items-center gap-2">
+                            <Button
+                                :disabled="(tasksPage.current_page ?? 1) <= 1"
+                                size="sm"
+                                variant="outline"
+                                @click="goToPage((tasksPage.current_page ?? 1) - 1)"
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                :disabled="(tasksPage.current_page ?? 1) >= (tasksPage.last_page ?? 1)"
+                                size="sm"
+                                variant="outline"
+                                @click="goToPage((tasksPage.current_page ?? 1) + 1)"
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
         </div>
 
-        <Sheet v-model:open="editOpen">
+        <Sheet :open="editOpen" @update:open="onEditOpenChange">
             <SheetContent side="right" class="flex h-full w-full max-w-none flex-col p-0 sm:w-1/2 sm:max-w-none">
-                <form class="flex h-full flex-col" @submit.prevent="saveEdit">
+                <form class="flex h-full flex-col" data-testid="edit-form" @submit.prevent="saveEdit">
                     <SheetHeader class="sr-only">
                         <SheetTitle>Task</SheetTitle>
                     </SheetHeader>
@@ -843,28 +930,20 @@ function getPriorityLabel(value: string) {
 
                                 <div class="space-y-2">
                                     <Label>Status</Label>
-                                    <Select
-                                        data-testid="task-status-select"
-                                        :disabled="statusSaving"
-                                        :model-value="editStatus"
-                                        @update:modelValue="onEditStatusSelected"
-                                    >
-                                        <option value="pending">Pending</option>
-                                        <option value="in-progress">In Progress</option>
-                                        <option value="awaiting-feedback">Awaiting Feedback</option>
-                                        <option value="completed">Completed</option>
-                                    </Select>
-                                    <div v-if="statusError" class="text-destructive text-xs">{{ statusError }}</div>
+                                    <ButtonGroup
+                                        v-model="editForm.status"
+                                        aria-label="Task status"
+                                        test-id-prefix="task-status"
+                                        :disabled="editLoading || editUploading"
+                                        :options="statusOptions"
+                                        :columns="4"
+                                    />
                                 </div>
 
                                 <div class="space-y-2">
                                     <Label>Priority</Label>
                                     <template v-if="isOwner">
-                                        <Select v-model="editForm.priority">
-                                            <option value="low">Low</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="high">High</option>
-                                        </Select>
+                                        <ButtonGroup v-model="editForm.priority" aria-label="Task priority" :options="priorityOptions" :columns="3" />
                                     </template>
                                     <template v-else>
                                         <div
@@ -982,16 +1061,22 @@ function getPriorityLabel(value: string) {
                                                             class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
                                                             v-html="message.content"
                                                         ></div>
-                                                        <div v-if="message.attachments?.length" class="mt-2 space-y-1">
+                                                        <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
                                                             <a
                                                                 v-for="attachment in message.attachments"
                                                                 :key="attachment.id"
                                                                 :href="attachment.url"
-                                                                class="block truncate text-xs underline decoration-white/40 underline-offset-2 hover:decoration-white/70"
+                                                                :class="
+                                                                    message.isYou
+                                                                        ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
+                                                                        : 'border-muted-foreground/20 bg-muted/20 text-foreground hover:bg-muted/30'
+                                                                "
+                                                                class="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-md border px-2 py-1 text-xs transition"
                                                                 rel="noreferrer"
                                                                 target="_blank"
                                                             >
-                                                                {{ attachment.original_filename }}
+                                                                <Paperclip class="h-3 w-3 shrink-0 opacity-80" />
+                                                                <span class="min-w-0 truncate">{{ attachment.original_filename }}</span>
                                                             </a>
                                                         </div>
                                                     </div>
@@ -1027,7 +1112,6 @@ function getPriorityLabel(value: string) {
 
                                 <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
                                     <div v-if="threadEditError" class="text-destructive mb-2 text-xs">{{ threadEditError }}</div>
-                                    <Label class="text-muted-foreground mb-2 block text-xs">{{ threadEditingId ? 'Edit' : 'Reply' }}</Label>
                                     <ShiftEditor
                                         ref="threadComposerRef"
                                         v-model="threadComposerHtml"
@@ -1046,12 +1130,26 @@ function getPriorityLabel(value: string) {
                     </div>
 
                     <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                        <Button type="button" variant="outline" @click="closeEdit">Close</Button>
-                        <Button v-if="isOwner" :disabled="editLoading || editUploading" type="submit" variant="default"> Save </Button>
+                        <Button type="button" variant="outline" @click="attemptCloseEdit">Close</Button>
+                        <Button :disabled="editLoading || editUploading || !hasUnsavedTaskChanges" type="submit" variant="default"> Save </Button>
                     </SheetFooter>
                 </form>
             </SheetContent>
         </Sheet>
+
+        <Dialog :open="confirmCloseOpen" @update:open="confirmCloseOpen = $event">
+            <DialogContent class="sm:max-w-md">
+                <div class="space-y-2">
+                    <div class="text-base font-semibold">Discard changes?</div>
+                    <div class="text-muted-foreground text-sm">You have unsaved changes. If you close now, they will be lost.</div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end gap-2">
+                    <Button type="button" variant="outline" @click="confirmCloseOpen = false">Cancel</Button>
+                    <Button type="button" variant="destructive" @click="discardChangesAndClose">Discard</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
 
         <ImageLightbox v-model:open="lightboxOpen" :alt="lightboxAlt" :src="lightboxSrc" />
     </AppLayout>
