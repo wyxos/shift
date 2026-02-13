@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import IndexV2 from '@/pages/Tasks/IndexV2.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -5,13 +6,11 @@ import { h } from 'vue';
 
 const axiosGetMock = vi.fn();
 const axiosPutMock = vi.fn();
-const axiosPatchMock = vi.fn();
 
 vi.mock('axios', () => ({
     default: {
         get: (...args: any[]) => axiosGetMock(...args),
         put: (...args: any[]) => axiosPutMock(...args),
-        patch: (...args: any[]) => axiosPatchMock(...args),
         post: vi.fn(),
         delete: vi.fn(),
     },
@@ -135,19 +134,41 @@ vi.mock('@/components/ui/sheet', () => ({
     },
 }));
 
-vi.mock('@/components/ui/select', () => ({
-    Select: {
-        props: ['modelValue'],
+vi.mock('@/components/ui/button-group', () => ({
+    ButtonGroup: {
+        props: ['modelValue', 'options', 'disabled', 'testIdPrefix'],
         emits: ['update:modelValue'],
         render() {
+            const options = Array.isArray((this as any).options) ? (this as any).options : [];
             return h(
-                'select',
-                {
-                    value: this.modelValue,
-                    onChange: (e) => this.$emit('update:modelValue', (e.target as HTMLSelectElement).value),
-                },
-                this.$slots.default?.(),
+                'div',
+                { class: 'button-group-stub' },
+                options.map((option: any) =>
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            disabled: (this as any).disabled,
+                            'data-testid': (this as any).testIdPrefix ? `${(this as any).testIdPrefix}-${option.value}` : undefined,
+                            onClick: () => (this as any).$emit('update:modelValue', option.value),
+                        },
+                        option.label,
+                    ),
+                ),
             );
+        },
+    },
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+    Dialog: {
+        render() {
+            return h('div', { class: 'dialog-stub' }, this.$slots.default?.());
+        },
+    },
+    DialogContent: {
+        render() {
+            return h('div', { class: 'dialog-content-stub' }, this.$slots.default?.());
         },
     },
 }));
@@ -188,21 +209,36 @@ vi.mock('@inertiajs/vue3', () => ({
     },
     router: {
         get: vi.fn(),
+        reload: vi.fn(),
     },
 }));
 
 describe('Tasks/IndexV2.vue', () => {
+    function makeTasksPage(tasks: any[]) {
+        const total = tasks.length;
+        return {
+            data: tasks,
+            total,
+            current_page: 1,
+            last_page: 1,
+            from: total ? 1 : 0,
+            to: total,
+        };
+    }
+
     it('renders header + task rows', () => {
         axiosGetMock.mockReset();
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [
+                tasks: makeTasksPage([
                     { id: 1, title: 'Auth issue', status: 'pending', priority: 'high' },
                     { id: 2, title: 'UI polish', status: 'in-progress', priority: 'medium' },
-                ],
+                ]),
                 filters: {
                     status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
                 },
             },
         });
@@ -229,9 +265,11 @@ describe('Tasks/IndexV2.vue', () => {
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
                 filters: {
                     status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
                 },
             },
         });
@@ -267,8 +305,8 @@ describe('Tasks/IndexV2.vue', () => {
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
-                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
             },
         });
 
@@ -288,7 +326,7 @@ describe('Tasks/IndexV2.vue', () => {
 
         (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
-        axiosPatchMock.mockReset();
+        axiosPutMock.mockReset();
 
         axiosGetMock
             .mockResolvedValueOnce({
@@ -306,25 +344,25 @@ describe('Tasks/IndexV2.vue', () => {
             })
             .mockResolvedValueOnce({ data: { external: [] } });
 
-        axiosPatchMock.mockResolvedValueOnce({
-            data: { status: 'in-progress', message: 'Task status updated successfully' },
-        });
+        axiosPutMock.mockResolvedValueOnce({ data: { ok: true } });
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
-                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
             },
         });
 
         await wrapper.find('button[title="Edit"]').trigger('click');
         await flushPromises();
 
-        const statusSelect = wrapper.get('[data-testid="task-status-select"]');
-        await statusSelect.setValue('in-progress');
+        await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
         await flushPromises();
 
-        expect(axiosPatchMock).toHaveBeenCalledWith('/tasks.toggle-status', expect.objectContaining({ status: 'in-progress' }));
+        await wrapper.get('[data-testid="edit-form"]').trigger('submit');
+        await flushPromises();
+
+        expect(axiosPutMock).toHaveBeenCalledWith('/tasks.v2.update', expect.objectContaining({ status: 'in-progress' }));
 
         wrapper.unmount();
         vi.useRealTimers();
@@ -382,8 +420,8 @@ describe('Tasks/IndexV2.vue', () => {
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
-                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
             },
         });
 
@@ -446,8 +484,8 @@ describe('Tasks/IndexV2.vue', () => {
 
         const wrapper = mount(IndexV2, {
             props: {
-                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
-                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
             },
         });
 
