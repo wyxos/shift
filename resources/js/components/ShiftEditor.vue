@@ -12,6 +12,7 @@ const emit = defineEmits<{
     (e: 'send', payload: any): void;
     (e: 'update:modelValue', value: string): void;
     (e: 'uploading', value: boolean): void;
+    (e: 'cancel'): void;
 }>();
 
 defineExpose({ editor, reset });
@@ -22,6 +23,7 @@ defineExpose({ editor, reset });
         ref="innerRef"
         v-bind="$attrs"
         @send="emit('send', $event)"
+        @cancel="emit('cancel')"
         @update:modelValue="emit('update:modelValue', $event)"
         @uploading="emit('uploading', $event)"
     />
