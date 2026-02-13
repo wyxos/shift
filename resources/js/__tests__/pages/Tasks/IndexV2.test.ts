@@ -218,6 +218,8 @@ describe('Tasks/IndexV2.vue', () => {
             expect(row.find('button[title="Edit"]').exists()).toBe(true);
             expect(row.find('button[title="Delete"]').exists()).toBe(true);
         }
+
+        wrapper.unmount();
     });
 
     it('has filter controls', () => {
@@ -234,6 +236,8 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.find('input[placeholder="Search by title"]').exists()).toBe(true);
         expect(wrapper.findAll('input[type="checkbox"]').length).toBeGreaterThanOrEqual(4);
+
+        wrapper.unmount();
     });
 
     it('shows task created timestamp in the edit sheet', async () => {
@@ -271,6 +275,9 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.text()).toContain('Created');
         expect(wrapper.text()).toContain('17:40');
+
+        wrapper.unmount();
+        vi.useRealTimers();
     });
 
     it('allows the comment owner to edit their comment', async () => {
@@ -345,5 +352,70 @@ describe('Tasks/IndexV2.vue', () => {
             expect.objectContaining({ content: '<p>Second</p>', temp_identifier: expect.any(String) }),
         );
         expect(wrapper.text()).toContain('Edited');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('cancels comment edit on Escape', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockReset();
+        axiosPutMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    external: [
+                        {
+                            id: 11,
+                            sender_name: 'You',
+                            is_current_user: true,
+                            content: '<p>Second</p>',
+                            created_at: '2026-02-09T12:01:00Z',
+                            attachments: [],
+                        },
+                    ],
+                },
+            });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: [{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }],
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'] },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        await wrapper.get('[data-testid="comment-bubble-11"]').trigger('dblclick');
+        await wrapper.vm.$nextTick();
+
+        const editor = wrapper.get('[data-testid="comments-editor"]');
+        expect(editor.attributes('placeholder')).toBe('Edit your comment...');
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await wrapper.vm.$nextTick();
+
+        expect(editor.attributes('placeholder')).toBe('Write a comment...');
+
+        wrapper.unmount();
+        vi.useRealTimers();
     });
 });
