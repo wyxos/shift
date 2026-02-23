@@ -1,11 +1,17 @@
 /* eslint-disable max-lines */
 import IndexV2 from '@/pages/Tasks/IndexV2.vue';
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 
 const axiosGetMock = vi.fn();
 const axiosPutMock = vi.fn();
+const sonnerMocks = vi.hoisted(() => ({
+    toastLoadingMock: vi.fn(() => 'autosave-toast'),
+    toastSuccessMock: vi.fn(),
+    toastErrorMock: vi.fn(),
+    toastDismissMock: vi.fn(),
+}));
 
 vi.mock('axios', () => ({
     default: {
@@ -13,6 +19,15 @@ vi.mock('axios', () => ({
         put: (...args: any[]) => axiosPutMock(...args),
         post: vi.fn(),
         delete: vi.fn(),
+    },
+}));
+
+vi.mock('vue-sonner', () => ({
+    toast: {
+        loading: sonnerMocks.toastLoadingMock,
+        success: sonnerMocks.toastSuccessMock,
+        error: sonnerMocks.toastErrorMock,
+        dismiss: sonnerMocks.toastDismissMock,
     },
 }));
 
@@ -69,7 +84,15 @@ vi.mock('@/components/ui/badge', () => ({
     Badge: {
         props: ['variant'],
         render() {
-            return h('span', { class: `badge ${this.variant || ''}` }, this.$slots.default?.());
+            const attrs = this.$attrs as Record<string, unknown>;
+            return h(
+                'span',
+                {
+                    ...attrs,
+                    class: `badge ${this.variant || ''} ${String(attrs.class ?? '')}`.trim(),
+                },
+                this.$slots.default?.(),
+            );
         },
     },
 }));
@@ -148,6 +171,7 @@ vi.mock('@/components/ui/button-group', () => ({
                         'button',
                         {
                             type: 'button',
+                            class: (this as any).modelValue === option.value ? (option.selectedClass ?? '') : (option.unselectedClass ?? ''),
                             disabled: (this as any).disabled,
                             'data-testid': (this as any).testIdPrefix ? `${(this as any).testIdPrefix}-${option.value}` : undefined,
                             onClick: () => (this as any).$emit('update:modelValue', option.value),
@@ -214,6 +238,13 @@ vi.mock('@inertiajs/vue3', () => ({
 }));
 
 describe('Tasks/IndexV2.vue', () => {
+    beforeEach(() => {
+        sonnerMocks.toastLoadingMock.mockClear();
+        sonnerMocks.toastSuccessMock.mockClear();
+        sonnerMocks.toastErrorMock.mockClear();
+        sonnerMocks.toastDismissMock.mockClear();
+    });
+
     function makeTasksPage(tasks: any[]) {
         const total = tasks.length;
         return {
@@ -280,6 +311,58 @@ describe('Tasks/IndexV2.vue', () => {
         wrapper.unmount();
     });
 
+    it('uses distinct status badge colors for each status', () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([
+                    { id: 1, title: 'A', status: 'pending', priority: 'low' },
+                    { id: 2, title: 'B', status: 'in-progress', priority: 'medium' },
+                    { id: 3, title: 'C', status: 'awaiting-feedback', priority: 'high' },
+                    { id: 4, title: 'D', status: 'completed', priority: 'low' },
+                ]),
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback', 'completed'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-testid="task-status-badge-1"]').classes()).toContain('bg-amber-100');
+        expect(wrapper.get('[data-testid="task-status-badge-2"]').classes()).toContain('bg-sky-100');
+        expect(wrapper.get('[data-testid="task-status-badge-3"]').classes()).toContain('bg-indigo-100');
+        expect(wrapper.get('[data-testid="task-status-badge-4"]').classes()).toContain('bg-emerald-100');
+
+        wrapper.unmount();
+    });
+
+    it('uses distinct priority badge colors for each priority', () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([
+                    { id: 1, title: 'A', status: 'pending', priority: 'low' },
+                    { id: 2, title: 'B', status: 'in-progress', priority: 'medium' },
+                    { id: 3, title: 'C', status: 'awaiting-feedback', priority: 'high' },
+                ]),
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-testid="task-priority-badge-1"]').classes()).toContain('bg-cyan-100');
+        expect(wrapper.get('[data-testid="task-priority-badge-2"]').classes()).toContain('bg-fuchsia-100');
+        expect(wrapper.get('[data-testid="task-priority-badge-3"]').classes()).toContain('bg-rose-100');
+
+        wrapper.unmount();
+    });
+
     it('shows task created timestamp in the edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
@@ -315,6 +398,48 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.text()).toContain('Created');
         expect(wrapper.text()).toContain('17:40');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('shows task creator and environment in the edit sheet', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    environment: 'staging',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { name: 'Taylor Brown', email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
+        expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
+        expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
 
         wrapper.unmount();
         vi.useRealTimers();
@@ -358,11 +483,14 @@ describe('Tasks/IndexV2.vue', () => {
 
         await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
         await flushPromises();
+        expect(wrapper.get('[data-testid="task-status-in-progress"]').classes()).toContain('bg-sky-100');
 
-        await wrapper.get('[data-testid="edit-form"]').trigger('submit');
+        vi.advanceTimersByTime(800);
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith('/tasks.v2.update', expect.objectContaining({ status: 'in-progress' }));
+        expect(sonnerMocks.toastLoadingMock).toHaveBeenCalledWith('Saving task changes...');
+        expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Task changes saved', expect.objectContaining({ id: 'autosave-toast' }));
 
         wrapper.unmount();
         vi.useRealTimers();

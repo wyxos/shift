@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 type Option = {
     value: string;
     label: string;
+    selectedClass?: string;
+    unselectedClass?: string;
 };
 
 const props = withDefaults(
@@ -37,6 +39,19 @@ const columnsClass = computed(() => {
             return 'grid-cols-3';
     }
 });
+
+function optionButtonClass(option: Option): string {
+    const selected = props.modelValue === option.value;
+    if (selected) return option.selectedClass ?? '';
+    return option.unselectedClass ?? '';
+}
+
+function optionButtonVariant(option: Option): 'default' | 'outline' {
+    if (option.selectedClass || option.unselectedClass) {
+        return 'outline';
+    }
+    return props.modelValue === option.value ? 'default' : 'outline';
+}
 </script>
 
 <template>
@@ -49,7 +64,8 @@ const columnsClass = computed(() => {
             size="sm"
             :disabled="disabled"
             :aria-checked="modelValue === option.value"
-            :variant="modelValue === option.value ? 'default' : 'outline'"
+            :variant="optionButtonVariant(option)"
+            :class="optionButtonClass(option)"
             :data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
             @click="emit('update:modelValue', option.value)"
         >
@@ -57,4 +73,3 @@ const columnsClass = computed(() => {
         </Button>
     </div>
 </template>
-

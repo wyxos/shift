@@ -102,4 +102,26 @@ describe('ShiftEditor toolbar', () => {
         const text = wrapper.find('.ProseMirror').text().trim();
         expect(text).toBe('');
     });
+
+    it('submits on Enter and keeps Shift+Enter for newline', async () => {
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>Hello world</p>');
+        await nextTick();
+
+        await wrapper.find('.ProseMirror').trigger('keydown', { key: 'Enter' });
+        await nextTick();
+
+        const firstSend = wrapper.emitted('send');
+        expect(firstSend?.length ?? 0).toBe(1);
+
+        ed?.commands.setContent('<p>Second line</p>');
+        await nextTick();
+        await wrapper.find('.ProseMirror').trigger('keydown', { key: 'Enter', shiftKey: true });
+        await nextTick();
+
+        const afterShiftEnter = wrapper.emitted('send');
+        expect(afterShiftEnter?.length ?? 0).toBe(1);
+    });
 });
