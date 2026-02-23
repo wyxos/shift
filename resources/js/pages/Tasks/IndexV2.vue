@@ -24,6 +24,9 @@ type Task = {
     title: string;
     status: string;
     priority: string;
+    environment?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 };
 
 type TaskPaginator = {
@@ -69,6 +72,8 @@ const props = defineProps<{
         status?: string[] | string | null;
         priority?: string[] | string | null;
         search?: string | null;
+        environment?: string | null;
+        sort_by?: string | null;
     };
 }>();
 
@@ -134,6 +139,13 @@ const priorityOptions = [
         unselectedClass: 'border-rose-300/60 text-rose-900 hover:bg-rose-50',
     },
 ];
+const sortByOptions = [
+    { value: 'updated_at', label: 'Updated At' },
+    { value: 'created_at', label: 'Created At' },
+    { value: 'priority', label: 'Priority' },
+];
+const defaultSortBy = 'updated_at';
+const allowedSortBy = new Set(sortByOptions.map((option) => option.value));
 
 const defaultStatuses = statusOptions.filter((option) => option.value !== 'completed').map((option) => option.value);
 const allPriorities = priorityOptions.map((option) => option.value);
@@ -151,14 +163,20 @@ const deleteLoading = ref<number | null>(null);
 const providedStatuses = normalizeStringList(props.filters.status);
 const providedPriorities = normalizeStringList(props.filters.priority);
 const providedSearchTerm = typeof props.filters.search === 'string' ? props.filters.search : '';
+const providedEnvironmentTerm = typeof props.filters.environment === 'string' ? props.filters.environment : '';
+const providedSortBy = typeof props.filters.sort_by === 'string' && allowedSortBy.has(props.filters.sort_by) ? props.filters.sort_by : defaultSortBy;
 
 const appliedStatuses = ref<string[]>(providedStatuses.length ? providedStatuses : [...defaultStatuses]);
 const appliedPriorities = ref<string[]>(providedPriorities.length ? providedPriorities : [...allPriorities]);
 const appliedSearchTerm = ref(providedSearchTerm);
+const appliedEnvironmentTerm = ref(providedEnvironmentTerm);
+const appliedSortBy = ref(providedSortBy);
 
 const draftStatuses = ref<string[]>([...appliedStatuses.value]);
 const draftPriorities = ref<string[]>([...appliedPriorities.value]);
 const draftSearchTerm = ref(appliedSearchTerm.value);
+const draftEnvironmentTerm = ref(appliedEnvironmentTerm.value);
+const draftSortBy = ref(appliedSortBy.value);
 
 watch(
     () => props.filters,
@@ -166,10 +184,14 @@ watch(
         const nextStatuses = normalizeStringList(next.status);
         const nextPriorities = normalizeStringList(next.priority);
         const nextSearch = typeof next.search === 'string' ? next.search : '';
+        const nextEnvironment = typeof next.environment === 'string' ? next.environment : '';
+        const nextSortBy = typeof next.sort_by === 'string' && allowedSortBy.has(next.sort_by) ? next.sort_by : defaultSortBy;
 
         appliedStatuses.value = nextStatuses.length ? nextStatuses : [...defaultStatuses];
         appliedPriorities.value = nextPriorities.length ? nextPriorities : [...allPriorities];
         appliedSearchTerm.value = nextSearch;
+        appliedEnvironmentTerm.value = nextEnvironment;
+        appliedSortBy.value = nextSortBy;
     },
     { deep: true },
 );
@@ -179,6 +201,8 @@ const activeFilterCount = computed(() => {
     if (appliedStatuses.value.length && appliedStatuses.value.length < statusOptions.length) count += 1;
     if (appliedPriorities.value.length && appliedPriorities.value.length < priorityOptions.length) count += 1;
     if (appliedSearchTerm.value.trim()) count += 1;
+    if (appliedEnvironmentTerm.value.trim()) count += 1;
+    if (appliedSortBy.value !== defaultSortBy) count += 1;
     return count;
 });
 
@@ -187,20 +211,33 @@ watch(filtersOpen, (open) => {
     draftStatuses.value = [...appliedStatuses.value];
     draftPriorities.value = [...appliedPriorities.value];
     draftSearchTerm.value = appliedSearchTerm.value;
+    draftEnvironmentTerm.value = appliedEnvironmentTerm.value;
+    draftSortBy.value = appliedSortBy.value;
 });
 
 function resetFilters() {
     draftStatuses.value = [...defaultStatuses];
     draftPriorities.value = [...allPriorities];
     draftSearchTerm.value = '';
+    draftEnvironmentTerm.value = '';
+    draftSortBy.value = defaultSortBy;
 
     appliedStatuses.value = [...draftStatuses.value];
     appliedPriorities.value = [...draftPriorities.value];
     appliedSearchTerm.value = draftSearchTerm.value;
+    appliedEnvironmentTerm.value = draftEnvironmentTerm.value;
+    appliedSortBy.value = draftSortBy.value;
 
     router.get(
         '/tasks-v2',
-        { status: appliedStatuses.value, priority: appliedPriorities.value, search: appliedSearchTerm.value || undefined, page: 1 },
+        {
+            status: appliedStatuses.value,
+            priority: appliedPriorities.value,
+            search: appliedSearchTerm.value || undefined,
+            environment: appliedEnvironmentTerm.value || undefined,
+            sort_by: appliedSortBy.value,
+            page: 1,
+        },
         { preserveState: true, preserveScroll: true, replace: true },
     );
     filtersOpen.value = false;
@@ -210,10 +247,19 @@ function applyFilters() {
     appliedStatuses.value = [...draftStatuses.value];
     appliedPriorities.value = [...draftPriorities.value];
     appliedSearchTerm.value = draftSearchTerm.value;
+    appliedEnvironmentTerm.value = draftEnvironmentTerm.value;
+    appliedSortBy.value = draftSortBy.value;
 
     router.get(
         '/tasks-v2',
-        { status: appliedStatuses.value, priority: appliedPriorities.value, search: appliedSearchTerm.value || undefined, page: 1 },
+        {
+            status: appliedStatuses.value,
+            priority: appliedPriorities.value,
+            search: appliedSearchTerm.value || undefined,
+            environment: appliedEnvironmentTerm.value || undefined,
+            sort_by: appliedSortBy.value,
+            page: 1,
+        },
         { preserveState: true, preserveScroll: true, replace: true },
     );
     filtersOpen.value = false;
@@ -904,6 +950,8 @@ function goToPage(page: number) {
             status: appliedStatuses.value,
             priority: appliedPriorities.value,
             search: appliedSearchTerm.value || undefined,
+            environment: appliedEnvironmentTerm.value || undefined,
+            sort_by: appliedSortBy.value,
             page: next,
         },
         { preserveState: true, preserveScroll: true, replace: true },
@@ -940,6 +988,11 @@ function getStatusLabel(value: string) {
 
 function getPriorityLabel(value: string) {
     return priorityOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function getTaskEnvironmentLabel(task: Task): string {
+    const formatted = formatEnvironmentLabel(String(task.environment ?? '').trim());
+    return formatted || 'Unknown';
 }
 </script>
 
@@ -981,6 +1034,11 @@ function getPriorityLabel(value: string) {
                                     </div>
 
                                     <div class="space-y-2">
+                                        <Label>Environment</Label>
+                                        <Input v-model="draftEnvironmentTerm" data-testid="filter-environment" placeholder="e.g. Production" />
+                                    </div>
+
+                                    <div class="space-y-2">
                                         <div class="flex items-center justify-between">
                                             <Label>Status</Label>
                                             <Button variant="ghost" size="sm" @click="selectAllStatuses">All</Button>
@@ -1014,6 +1072,17 @@ function getPriorityLabel(value: string) {
                                                 <span>{{ option.label }}</span>
                                             </label>
                                         </div>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <Label>Sort By</Label>
+                                        <ButtonGroup
+                                            v-model="draftSortBy"
+                                            test-id-prefix="sort-by"
+                                            :options="sortByOptions"
+                                            :columns="3"
+                                            aria-label="Sort tasks"
+                                        />
                                     </div>
                                 </div>
 
@@ -1055,6 +1124,9 @@ function getPriorityLabel(value: string) {
                                         variant="outline"
                                     >
                                         {{ getPriorityLabel(task.priority) }}
+                                    </Badge>
+                                    <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
+                                        {{ getTaskEnvironmentLabel(task) }}
                                     </Badge>
                                 </div>
                             </div>

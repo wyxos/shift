@@ -72,6 +72,53 @@ test('index returns tasks for external user', function () {
     $response->assertJsonCount(2, 'data');
 });
 
+test('index supports environment filtering and priority sorting', function () {
+    $stagingLow = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'priority' => 'low',
+    ]);
+    $stagingLow->submitter()->associate($this->externalUser)->save();
+    $stagingLow->metadata()->create([
+        'environment' => 'staging',
+        'url' => 'https://example.com/staging-low',
+    ]);
+
+    $stagingHigh = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'priority' => 'high',
+    ]);
+    $stagingHigh->submitter()->associate($this->externalUser)->save();
+    $stagingHigh->metadata()->create([
+        'environment' => 'staging',
+        'url' => 'https://example.com/staging-high',
+    ]);
+
+    $productionTask = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'priority' => 'high',
+    ]);
+    $productionTask->submitter()->associate($this->externalUser)->save();
+    $productionTask->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/production',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'environment' => 'staging',
+            'sort_by' => 'priority',
+        ]));
+
+    $response->assertOk();
+    $response->assertJsonCount(2, 'data');
+    $response->assertJsonPath('data.0.id', $stagingHigh->id);
+    $response->assertJsonPath('data.1.id', $stagingLow->id);
+    $response->assertJsonPath('data.0.environment', 'staging');
+    $response->assertJsonPath('data.1.environment', 'staging');
+});
+
 test('show returns task details', function () {
     // Create a task submitted by the external user
     $task = Task::factory()->create([

@@ -219,6 +219,8 @@ class TaskController extends Controller
     {
         $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
         $allPriorities = ['low', 'medium', 'high'];
+        $allowedSortBy = ['updated_at', 'created_at', 'priority'];
+        $defaultSortBy = 'updated_at';
 
         $selectedStatuses = $this->normalizeListFilter(request('status'));
         if (empty($selectedStatuses)) {
@@ -231,9 +233,11 @@ class TaskController extends Controller
         }
 
         $search = trim((string) request('search', ''));
+        $environment = trim((string) request('environment', ''));
+        $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
-            ->latest();
+            ->with(['metadata:id,task_id,environment', 'submitter']);
 
         $query->whereIn('status', $selectedStatuses);
 
@@ -245,10 +249,49 @@ class TaskController extends Controller
             $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$search.'%']);
         }
 
+        if ($environment !== '') {
+            $query->whereHas('metadata', function ($metadataQuery) use ($environment) {
+                $metadataQuery->whereRaw('LOWER(environment) = LOWER(?)', [$environment]);
+            });
+        }
+
+        if ($sortBy === 'priority') {
+            $query
+                ->orderByRaw("
+                    CASE priority
+                        WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2
+                        WHEN 'low' THEN 3
+                        ELSE 4
+                    END
+                ")
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        } else {
+            $query
+                ->orderByDesc($sortBy)
+                ->orderByDesc('id');
+        }
+
         $tasks = $query
-            ->select(['id', 'title', 'status', 'priority'])
             ->paginate(10)
             ->withQueryString();
+        $tasks->through(function (Task $task) {
+            $environment = $task->metadata?->environment;
+            if (! filled($environment) && $task->submitter) {
+                $environment = $task->submitter->environment ?? null;
+            }
+
+            return [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'priority' => $task->priority,
+                'environment' => $environment,
+                'created_at' => $task->created_at?->toIso8601String(),
+                'updated_at' => $task->updated_at?->toIso8601String(),
+            ];
+        });
 
         return inertia('Tasks/IndexV2')
             ->with([
@@ -256,6 +299,8 @@ class TaskController extends Controller
                     'status' => $selectedStatuses,
                     'priority' => $selectedPriorities,
                     'search' => $search,
+                    'environment' => $environment !== '' ? $environment : null,
+                    'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
             ]);

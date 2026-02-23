@@ -25,6 +25,10 @@ class ExternalTaskController extends Controller
      */
     public function index(): JsonResponse
     {
+        $allowedSortBy = ['updated_at', 'created_at', 'priority'];
+        $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : 'updated_at';
+        $environment = trim((string) request('environment', ''));
+
         // Get the current external user
         $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
             ->where('environment', request()->offsetGet('user.environment'))
@@ -41,7 +45,7 @@ class ExternalTaskController extends Controller
             ]);
         }
 
-        $tasks = Task::query()
+        $tasksQuery = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->whereHas('project', fn ($query) => $query->where('token', request('project')))
             ->where(function ($query) use ($externalUser) {
@@ -54,10 +58,13 @@ class ExternalTaskController extends Controller
                         $query->where('external_users.id', $externalUser->id);
                     });
             })
-            ->latest()
             ->when(
                 request('search'),
                 fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.request('search').'%'])
+            )
+            ->when(
+                $environment !== '',
+                fn ($query) => $query->whereHas('metadata', fn ($metadataQuery) => $metadataQuery->whereRaw('LOWER(environment) = LOWER(?)', [$environment]))
             )
             ->when(
                 request()->has('status'),
@@ -94,9 +101,34 @@ class ExternalTaskController extends Controller
                         $query->where('priority', $priority);
                     }
                 }
-            )
+            );
+
+        if ($sortBy === 'priority') {
+            $tasksQuery
+                ->orderByRaw("
+                    CASE priority
+                        WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2
+                        WHEN 'low' THEN 3
+                        ELSE 4
+                    END
+                ")
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        } else {
+            $tasksQuery
+                ->orderByDesc($sortBy)
+                ->orderByDesc('id');
+        }
+
+        $tasks = $tasksQuery
             ->paginate(10)
             ->withQueryString();
+        $tasks->through(function (Task $task) {
+            $task->environment = $task->metadata?->environment ?? ($task->submitter->environment ?? null);
+
+            return $task;
+        });
 
         return response()->json($tasks);
     }

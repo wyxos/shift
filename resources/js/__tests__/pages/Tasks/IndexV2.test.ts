@@ -363,6 +363,29 @@ describe('Tasks/IndexV2.vue', () => {
         wrapper.unmount();
     });
 
+    it('shows environment badges in list rows', () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([
+                    { id: 1, title: 'A', status: 'pending', priority: 'low', environment: 'staging' },
+                    { id: 2, title: 'B', status: 'in-progress', priority: 'medium', environment: null },
+                ]),
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        expect(wrapper.get('[data-testid="task-environment-badge-1"]').text()).toContain('Staging');
+        expect(wrapper.get('[data-testid="task-environment-badge-2"]').text()).toContain('Unknown');
+
+        wrapper.unmount();
+    });
+
     it('shows task created timestamp in the edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
