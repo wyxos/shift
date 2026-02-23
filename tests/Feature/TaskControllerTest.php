@@ -83,6 +83,115 @@ test('tasks v2 show includes created_at', function () {
     expect($response->json('created_at'))->toBeString()->not->toBeEmpty();
 });
 
+test('tasks v2 can filter tasks by environment', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $stagingTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+    ]);
+    $productionTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+    ]);
+
+    $stagingTask->submitter()->associate($this->user)->save();
+    $productionTask->submitter()->associate($this->user)->save();
+
+    $stagingTask->metadata()->create([
+        'environment' => 'staging',
+        'url' => 'https://example.com/staging',
+    ]);
+    $productionTask->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/production',
+    ]);
+
+    $response = $this->actingAs($this->user)->get(route('tasks.v2', [
+        'environment' => 'staging',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/IndexV2')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $stagingTask->id)
+        ->where('tasks.data.0.environment', 'staging')
+        ->where('filters.environment', 'staging')
+    );
+});
+
+test('tasks v2 defaults to sorting by updated_at descending', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $olderTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'updated_at' => now()->subHour(),
+    ]);
+    $newerTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'updated_at' => now(),
+    ]);
+
+    $olderTask->submitter()->associate($this->user)->save();
+    $newerTask->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)->get(route('tasks.v2'));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/IndexV2')
+        ->where('tasks.data.0.id', $newerTask->id)
+        ->where('tasks.data.1.id', $olderTask->id)
+        ->where('filters.sort_by', 'updated_at')
+    );
+});
+
+test('tasks v2 can sort tasks by priority', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $lowTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'priority' => 'low',
+    ]);
+    $mediumTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'priority' => 'medium',
+    ]);
+    $highTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'priority' => 'high',
+    ]);
+
+    $lowTask->submitter()->associate($this->user)->save();
+    $mediumTask->submitter()->associate($this->user)->save();
+    $highTask->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)->get(route('tasks.v2', [
+        'sort_by' => 'priority',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/IndexV2')
+        ->where('tasks.data.0.id', $highTask->id)
+        ->where('tasks.data.1.id', $mediumTask->id)
+        ->where('tasks.data.2.id', $lowTask->id)
+        ->where('filters.sort_by', 'priority')
+    );
+});
+
 test('index filters tasks by project', function () {
     // Create two projects owned by the user
     $project1 = Project::factory()->create([
