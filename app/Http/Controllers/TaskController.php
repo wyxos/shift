@@ -265,9 +265,14 @@ class TaskController extends Controller
     {
         $this->ensureTaskVisible($task);
 
-        $task->load(['submitter', 'attachments']);
+        $task->load(['submitter', 'attachments', 'metadata']);
 
         $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
+        $environment = $task->metadata?->environment;
+
+        if (! filled($environment) && $task->submitter) {
+            $environment = $task->submitter->environment ?? null;
+        }
 
         return response()->json([
             'id' => $task->id,
@@ -276,6 +281,7 @@ class TaskController extends Controller
             'priority' => $task->priority,
             'description' => $task->description,
             'created_at' => $task->created_at?->toIso8601String(),
+            'environment' => $environment,
             'is_owner' => $isOwner,
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,

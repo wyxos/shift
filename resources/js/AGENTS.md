@@ -33,6 +33,9 @@
 - Cross-repo UI parity:
     - Keep shadcn/ui components and layout parity with the SDK UI (`../shift-sdk-package/`).
     - If sidebar/header/layout styles change here, reflect them in the SDK UI.
+    - Treat shared task surfaces (`Tasks/IndexV2`, task sheet flows, ShiftEditor behavior, ButtonGroup semantics, status/priority color systems) as hard-parity areas; update both repos in the same task.
+    - Prefer shared modules (`resources/js/shared/**`, `@shared/**`) over per-repo divergence whenever possible.
+    - Use `vue-sonner` for new toast/notification UX; do not add new Oruga UI components for new requests.
 
 ## Touch Points / Key Files
 

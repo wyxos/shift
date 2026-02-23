@@ -247,8 +247,13 @@ const editor = useEditor({
             }
             return false;
         },
-        handleTextInput: (_view: any, _from: number, _to: number, text: string) => {
-            return editor.value?.commands.typeText(text) ?? false;
+        handleKeyDown: (_view: any, event: KeyboardEvent) => {
+            if (event.key !== 'Enter') return false;
+            if (event.shiftKey || event.isComposing) return false;
+
+            event.preventDefault();
+            onSend();
+            return true;
         },
     },
 });
@@ -433,8 +438,11 @@ defineExpose({ editor, reset });
     display: inline-block;
     margin: 4px;
 }
+.tiptap {
+    --editor-min-height: 140px;
+}
 .ProseMirror {
-    @apply rounded-lg border-2 border-blue-500 p-4;
+    @apply rounded-lg border-2 border-blue-500 p-4 text-sm leading-6;
     min-height: var(--editor-min-height, 140px);
     max-height: 600px;
     overflow-y: auto;
