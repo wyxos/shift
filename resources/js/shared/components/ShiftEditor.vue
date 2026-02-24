@@ -17,6 +17,7 @@ import { FileImage, FileText, Paperclip, Send, Smile, X } from 'lucide-vue-next'
 import { computed, reactive, ref, watch } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
+import ReplyQuote from '../extensions/replyQuote';
 import { MAX_UPLOAD_BYTES, uploadChunkedFile, type UploadEndpoints } from '../lib/chunkedUpload';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
@@ -201,6 +202,7 @@ function isInRichBlockNeedingEnter(editorInstance: any): boolean {
 const editor = useEditor({
     extensions: [
         StarterKit.configure({ codeBlock: false }),
+        ReplyQuote,
         Placeholder.configure({
             placeholder: props.placeholder ?? 'Type a message...',
             includeChildren: true,
