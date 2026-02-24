@@ -139,4 +139,18 @@ describe('ShiftEditor toolbar', () => {
         const emitted = wrapper.emitted('send');
         expect(emitted?.length ?? 0).toBe(0);
     });
+
+    it('preserves reply quote metadata through editor roundtrip', async () => {
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+
+        ed?.commands.setContent('<blockquote class="shift-reply" data-reply-to="42"><p>Replying</p><p>Quoted</p></blockquote><p></p>');
+        await nextTick();
+
+        const html = ed?.getHTML() ?? '';
+        expect(html).toContain('data-reply-to="42"');
+        expect(html).toContain('class="shift-reply"');
+        expect(html).toContain('Quoted');
+    });
 });
