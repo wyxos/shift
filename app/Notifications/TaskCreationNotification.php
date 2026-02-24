@@ -25,10 +25,19 @@ class TaskCreationNotification extends Notification implements ShouldQueue
     /**
      * Create a new notification instance.
      */
-    public function __construct(Task $task, string $url = null)
+    public function __construct(Task $task, ?string $url = null)
     {
         $this->task = $task;
         $this->url = $url;
+    }
+
+    protected function resolveUrl(): string
+    {
+        if (filled($this->url)) {
+            return (string) $this->url;
+        }
+
+        return route('tasks.v2', ['task' => $this->task->id]);
     }
 
     /**
@@ -44,14 +53,14 @@ class TaskCreationNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = $this->url;
+        $url = $this->resolveUrl();
 
         return (new MailMessage)
-            ->subject('New Task Created: ' . $this->task->title)
-            ->line('A new task has been created in the project: ' . $this->task->project->name)
-            ->line('Task Title: ' . $this->task->title)
-            ->line('Priority: ' . ucfirst($this->task->priority))
-            ->line('Status: ' . ucfirst(str_replace('_', ' ', $this->task->status)))
+            ->subject('New Task Created: '.$this->task->title)
+            ->line('A new task has been created in the project: '.$this->task->project->name)
+            ->line('Task Title: '.$this->task->title)
+            ->line('Priority: '.ucfirst($this->task->priority))
+            ->line('Status: '.ucfirst(str_replace('_', ' ', $this->task->status)))
             ->action('View Task', $url)
             ->line('Thank you for using our application!');
     }
@@ -66,6 +75,7 @@ class TaskCreationNotification extends Notification implements ShouldQueue
             'task_title' => $this->task->title,
             'project_id' => $this->task->project_id,
             'project_name' => $this->task->project->name,
+            'url' => $this->resolveUrl(),
         ];
     }
 }

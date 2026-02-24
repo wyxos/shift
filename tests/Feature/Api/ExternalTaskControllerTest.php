@@ -446,7 +446,10 @@ test('external task creation sends notifications to all relevant users', functio
     // Assert that notifications were sent to the project owner and all users with access
     \Illuminate\Support\Facades\Notification::assertSentTo(
         [$this->user, $projectUser1, $projectUser2],
-        \App\Notifications\TaskCreationNotification::class
+        \App\Notifications\TaskCreationNotification::class,
+        function ($notification, $channels, $notifiable) use ($response) {
+            return $notification->toArray($notifiable)['url'] === route('tasks.v2', ['task' => $response->json('id')]);
+        }
     );
 });
 test('index returns tasks with granted access', function () {

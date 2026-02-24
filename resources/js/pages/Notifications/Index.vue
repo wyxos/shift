@@ -106,7 +106,7 @@ const getNotificationUrl = (notification) => {
 
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
-            return route('tasks.edit', { task: data.task_id });
+            return route('tasks.v2', { task: data.task_id });
         case 'App\\Notifications\\TaskThreadUpdated':
             return data.url;
         case 'App\\Notifications\\ProjectInvitationNotification':

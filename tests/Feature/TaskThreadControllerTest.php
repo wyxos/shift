@@ -94,7 +94,8 @@ test('external thread creation sends notification to external user in non produc
     Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) {
-            return $notifiable->routes['mail'] === $this->externalUser->email;
+            return $notifiable->routes['mail'] === $this->externalUser->email
+                && ($notification->data['url'] ?? null) === 'https://example.com/shift/tasks-v2?task='.$this->task->id;
         }
     );
 });

@@ -39,10 +39,6 @@ class SendTaskThreadNotification implements ShouldQueue
 
     /**
      * Create a new job instance.
-     *
-     * @param int $threadId
-     * @param array $externalUserData
-     * @param array $payload
      */
     public function __construct(int $threadId, array $externalUserData, array $payload)
     {
@@ -60,14 +56,15 @@ class SendTaskThreadNotification implements ShouldQueue
         // Check if the thread still exists
         $thread = TaskThread::find($this->threadId);
 
-        if (!$thread) {
+        if (! $thread) {
             Log::info('Thread notification cancelled - thread no longer exists', [
-                'thread_id' => $this->threadId
+                'thread_id' => $this->threadId,
             ]);
+
             return;
         }
 
-        $notificationService = new ExternalNotificationService();
+        $notificationService = new ExternalNotificationService;
         $url = $this->externalUserData['url'];
         $email = $this->externalUserData['email'];
 
@@ -80,7 +77,7 @@ class SendTaskThreadNotification implements ShouldQueue
 
         // Create notification object with additional URL for email
         $notificationData = array_merge($this->payload, [
-            'url' => $this->externalUserData['url'] . '/shift/tasks/' . $this->payload['task_id'] . '/edit'
+            'url' => rtrim($this->externalUserData['url'], '/').'/shift/tasks-v2?task='.$this->payload['task_id'],
         ]);
 
         $notificationService->sendFallbackEmailIfNeeded(
@@ -91,7 +88,7 @@ class SendTaskThreadNotification implements ShouldQueue
 
         Log::info('Thread notification sent after delay', [
             'thread_id' => $this->threadId,
-            'external_user_email' => $email
+            'external_user_email' => $email,
         ]);
     }
 }

@@ -133,7 +133,10 @@ test('external thread creation sends notifications to project users', function (
     // Assert that notifications were sent to all project users
     Notification::assertSentTo(
         [$this->user, $projectUser1, $projectUser2],
-        TaskThreadUpdated::class
+        TaskThreadUpdated::class,
+        function (TaskThreadUpdated $notification) {
+            return ($notification->data['url'] ?? null) === route('tasks.v2', ['task' => $this->task->id]);
+        }
     );
 });
 

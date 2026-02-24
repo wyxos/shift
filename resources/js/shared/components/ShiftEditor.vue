@@ -183,6 +183,21 @@ function onFileChosen(e: Event) {
     (e.target as HTMLInputElement).value = '';
 }
 
+function isInRichBlockNeedingEnter(editorInstance: any): boolean {
+    const selection = editorInstance?.state?.selection;
+    const from = selection?.$from;
+    if (!from) return false;
+
+    for (let depth = from.depth; depth >= 0; depth -= 1) {
+        const typeName = from.node(depth)?.type?.name;
+        if (typeName === 'listItem' || typeName === 'codeBlock' || typeName === 'blockquote') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 const editor = useEditor({
     extensions: [
         StarterKit.configure({ codeBlock: false }),
@@ -250,6 +265,7 @@ const editor = useEditor({
         handleKeyDown: (_view: any, event: KeyboardEvent) => {
             if (event.key !== 'Enter') return false;
             if (event.shiftKey || event.isComposing) return false;
+            if (isInRichBlockNeedingEnter(editor.value)) return false;
 
             event.preventDefault();
             onSend();

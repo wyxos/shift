@@ -185,3 +185,34 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Rich text lists (TipTap + rendered task/comments content):
+   Tailwind preflight removes list markers/padding by default. */
+.ProseMirror ul,
+.shift-rich ul {
+    list-style: disc;
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.ProseMirror ol,
+.shift-rich ol {
+    list-style: decimal;
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.ProseMirror li,
+.shift-rich li {
+    margin: 0.125rem 0;
+}
+
+.ProseMirror ul ul,
+.shift-rich ul ul {
+    list-style: circle;
+}
+
+.ProseMirror ol ol,
+.shift-rich ol ol {
+    list-style: lower-alpha;
+}
