@@ -124,4 +124,19 @@ describe('ShiftEditor toolbar', () => {
         const afterShiftEnter = wrapper.emitted('send');
         expect(afterShiftEnter?.length ?? 0).toBe(1);
     });
+
+    it('does not submit on Enter while inside a list item', async () => {
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+
+        ed?.commands.setContent('<ul><li>First</li></ul>');
+        await nextTick();
+
+        await wrapper.find('.ProseMirror').trigger('keydown', { key: 'Enter' });
+        await nextTick();
+
+        const emitted = wrapper.emitted('send');
+        expect(emitted?.length ?? 0).toBe(0);
+    });
 });
