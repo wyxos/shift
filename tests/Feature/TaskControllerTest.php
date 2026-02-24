@@ -516,7 +516,10 @@ test('task creation sends notifications', function () {
     // Assert that notifications were sent to users with access to the project
     \Illuminate\Support\Facades\Notification::assertSentTo(
         [$projectUser1, $projectUser2],
-        \App\Notifications\TaskCreationNotification::class
+        \App\Notifications\TaskCreationNotification::class,
+        function ($notification, $channels, $notifiable) use ($task) {
+            return $notification->toArray($notifiable)['url'] === route('tasks.v2', ['task' => $task->id]);
+        }
     );
 });
 

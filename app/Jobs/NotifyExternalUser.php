@@ -32,18 +32,18 @@ class NotifyExternalUser implements ShouldQueue
         $externalUser = ExternalUser::find($this->externalUserId);
         $task = Task::find($this->taskId);
 
-        if (!$externalUser || !$task) {
+        if (! $externalUser || ! $task) {
             return;
         }
 
         $payload = [
-            'type'            => 'task',
-            'user_id'         => $externalUser->external_id,
-            'task_id'         => $task->id,
-            'task_title'      => $task->title,
-            'task_description'=> $task->description,
-            'task_status'     => $task->status,
-            'task_priority'   => $task->priority,
+            'type' => 'task',
+            'user_id' => $externalUser->external_id,
+            'task_id' => $task->id,
+            'task_title' => $task->title,
+            'task_description' => $task->description,
+            'task_status' => $task->status,
+            'task_priority' => $task->priority,
         ];
 
         $response = $notificationService->sendNotification(
@@ -52,7 +52,7 @@ class NotifyExternalUser implements ShouldQueue
             $payload
         );
 
-        $editUrl = $externalUser->url . '/shift/tasks/' . $task->id . '/edit';
+        $editUrl = rtrim($externalUser->url, '/').'/shift/tasks-v2?task='.$task->id;
 
         $notificationService->sendFallbackEmailIfNeeded(
             $response,

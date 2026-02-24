@@ -15,6 +15,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Filter, Paperclip, Pencil, Trash2 } from 'lucide-vue-next';
+import { marked } from 'marked';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -341,6 +342,47 @@ const hasUnsavedCommentDraft = computed(() => {
 });
 
 const hasUnsavedChanges = computed(() => hasUnsavedTaskChanges.value || hasUnsavedCommentDraft.value);
+const taskQueryParam = 'task';
+type HistoryMode = 'push' | 'replace';
+type OpenEditOptions = {
+    updateHistory?: boolean;
+};
+
+function getTaskIdFromQuery(): number | null {
+    if (typeof window === 'undefined') return null;
+    const raw = new URLSearchParams(window.location.search).get(taskQueryParam);
+    if (!raw) return null;
+    const taskId = Number.parseInt(raw, 10);
+    return Number.isFinite(taskId) && taskId > 0 ? taskId : null;
+}
+
+function syncTaskQuery(taskId: number | null, mode: HistoryMode = 'push') {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (taskId === null) {
+        url.searchParams.delete(taskQueryParam);
+    } else {
+        url.searchParams.set(taskQueryParam, String(taskId));
+    }
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next === current) return;
+    const historyMethod = mode === 'replace' ? 'replaceState' : 'pushState';
+    window.history[historyMethod](window.history.state, '', next);
+}
+
+function onTaskQueryPopState() {
+    const taskId = getTaskIdFromQuery();
+    const currentTaskId = editTask.value?.id ?? null;
+
+    if (taskId === null) {
+        if (editOpen.value) closeEditNow(false);
+        return;
+    }
+
+    if (editOpen.value && currentTaskId === taskId) return;
+    void openEdit(taskId, { updateHistory: false });
+}
 
 watch(
     () => [editForm.value.title, editForm.value.priority, editForm.value.status, editForm.value.description, deletedAttachmentIds.value.join(',')],
@@ -351,7 +393,7 @@ watch(
     },
 );
 
-function closeEditNow() {
+function closeEditNow(updateHistory = true) {
     if (taskAutosaveTimer) {
         window.clearTimeout(taskAutosaveTimer);
         taskAutosaveTimer = null;
@@ -381,6 +423,9 @@ function closeEditNow() {
     if (taskSaveToastId.value !== null) {
         toast.dismiss(taskSaveToastId.value);
         taskSaveToastId.value = null;
+    }
+    if (updateHistory) {
+        syncTaskQuery(null, 'push');
     }
 }
 
@@ -504,16 +549,94 @@ function getTaskEnvironment(task: TaskDetail | null): string | null {
     return label || null;
 }
 
+function hasHtmlMarkup(content: string): boolean {
+    return /<\/?[a-z][\s\S]*>/i.test(content);
+}
+
+function decodeHtmlToText(value: string): string {
+    if (typeof document === 'undefined') {
+        return value.replace(/<[^>]+>/g, ' ');
+    }
+    const temp = document.createElement('div');
+    temp.innerHTML = value;
+    return temp.textContent ?? '';
+}
+
+function normalizeLegacyListMarkup(html: string): string {
+    if (typeof document === 'undefined') return html;
+    if (!/(<ul|<ol)/i.test(html) || !/<br\s*\/?>/i.test(html)) return html;
+
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    let changed = false;
+
+    root.querySelectorAll('ul, ol').forEach((list) => {
+        const listTag = list.tagName.toLowerCase();
+        const children = Array.from(list.children).filter((child) => child.tagName.toLowerCase() === 'li');
+
+        children.forEach((item) => {
+            if (item.querySelector('ul, ol')) return;
+
+            const fragments = item.innerHTML
+                .split(/<br\s*\/?>/gi)
+                .map((fragment) => decodeHtmlToText(fragment).trim())
+                .filter(Boolean);
+
+            if (fragments.length < 2) return;
+
+            const hasMarkedTail = fragments.slice(1).some((line) => {
+                return listTag === 'ul' ? /^[-*+]\s+/.test(line) : /^\d+[.)]\s+/.test(line);
+            });
+            if (!hasMarkedTail) return;
+
+            const normalizedLines = fragments
+                .map((line) => {
+                    return listTag === 'ul' ? line.replace(/^[-*+]\s+/, '') : line.replace(/^\d+[.)]\s+/, '');
+                })
+                .map((line) => line.trim())
+                .filter(Boolean);
+
+            if (normalizedLines.length < 2) return;
+
+            const replacement = normalizedLines.map((line) => {
+                const li = document.createElement('li');
+                li.textContent = line;
+                return li;
+            });
+
+            item.replaceWith(...replacement);
+            changed = true;
+        });
+    });
+
+    return changed ? root.innerHTML : html;
+}
+
+function renderRichContent(content: string | null | undefined): string {
+    const value = String(content ?? '');
+    if (!value.trim()) return '';
+    if (hasHtmlMarkup(value)) return normalizeLegacyListMarkup(value);
+    const rendered = marked.parse(value);
+    return typeof rendered === 'string' ? rendered : value;
+}
+
 onMounted(() => {
     document.addEventListener('click', onGlobalClickCapture, true);
     document.addEventListener('dblclick', onGlobalDblClickCapture, true);
     document.addEventListener('keydown', onGlobalKeyDownCapture, true);
+    window.addEventListener('popstate', onTaskQueryPopState);
+
+    const deepLinkedTaskId = getTaskIdFromQuery();
+    if (deepLinkedTaskId !== null) {
+        void openEdit(deepLinkedTaskId, { updateHistory: false });
+    }
 });
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', onGlobalClickCapture, true);
     document.removeEventListener('dblclick', onGlobalDblClickCapture, true);
     document.removeEventListener('keydown', onGlobalKeyDownCapture, true);
+    window.removeEventListener('popstate', onTaskQueryPopState);
     if (taskSaveToastId.value !== null) {
         toast.dismiss(taskSaveToastId.value);
         taskSaveToastId.value = null;
@@ -618,7 +741,9 @@ async function fetchThreads(taskId: number) {
     }
 }
 
-async function openEdit(taskId: number) {
+async function openEdit(taskId: number, options: OpenEditOptions = {}) {
+    const { updateHistory = true } = options;
+
     if (taskAutosaveTimer) {
         window.clearTimeout(taskAutosaveTimer);
         taskAutosaveTimer = null;
@@ -642,6 +767,9 @@ async function openEdit(taskId: number) {
     threadEditError.value = null;
     threadEditSaving.value = false;
     initialEditSnapshot.value = null;
+    if (updateHistory) {
+        syncTaskQuery(taskId, 'push');
+    }
 
     try {
         const response = await axios.get(route('tasks.v2.show', { task: taskId }));
@@ -1262,7 +1390,7 @@ function getTaskEnvironmentLabel(task: Task): string {
                                             <div
                                                 v-if="editTask.description"
                                                 class="tiptap shift-rich [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
-                                                v-html="editTask.description"
+                                                v-html="renderRichContent(editTask.description)"
                                             ></div>
                                             <div v-else>No description provided.</div>
                                         </div>
@@ -1352,7 +1480,7 @@ function getTaskEnvironmentLabel(task: Task): string {
                                                         </div>
                                                         <div
                                                             class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
-                                                            v-html="message.content"
+                                                            v-html="renderRichContent(message.content)"
                                                         ></div>
                                                         <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
                                                             <a
