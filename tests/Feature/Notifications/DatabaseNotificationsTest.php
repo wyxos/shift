@@ -5,8 +5,6 @@ use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use Illuminate\Support\Facades\Notification;
 
-;
-
 test('notifications are stored in database', function () {
     // Create a user and a task
     $user = User::factory()->create();
@@ -29,6 +27,7 @@ test('notifications are stored in database', function () {
     $data = is_array($notification->data) ? $notification->data : json_decode($notification->data, true);
     expect($data['task_id'])->toEqual($task->id);
     expect($data['task_title'])->toEqual($task->title);
+    expect($data['url'])->toEqual(route('tasks.v2', ['task' => $task->id]));
 });
 
 test('all notification classes use database channel', function () {
@@ -42,7 +41,8 @@ test('all notification classes use database channel', function () {
     $notificationClasses = collect(glob(app_path('Notifications/*.php')))
         ->map(function ($file) {
             $className = basename($file, '.php');
-            return 'App\\Notifications\\' . $className;
+
+            return 'App\\Notifications\\'.$className;
         })
         ->filter(function ($class) {
             return class_exists($class);

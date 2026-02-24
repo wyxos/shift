@@ -173,7 +173,7 @@ class ExternalTaskThreadController extends Controller
                     'task_title' => $task->title,
                     'thread_id' => $thread->id,
                     'content' => $thread->content,
-                    'url' => route('tasks.edit', $task->id),
+                    'url' => route('tasks.v2', ['task' => $task->id]),
                 ])
             );
         }

@@ -243,6 +243,8 @@ describe('Tasks/IndexV2.vue', () => {
         sonnerMocks.toastSuccessMock.mockClear();
         sonnerMocks.toastErrorMock.mockClear();
         sonnerMocks.toastDismissMock.mockClear();
+        window.history.replaceState({}, '', '/tasks-v2');
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
     });
 
     function makeTasksPage(tasks: any[]) {
@@ -386,11 +388,128 @@ describe('Tasks/IndexV2.vue', () => {
         wrapper.unmount();
     });
 
+    it('syncs task id in URL when opening and closing the edit sheet', async () => {
+        axiosGetMock.mockReset();
+        const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        expect(window.location.search).toContain('task=1');
+        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks-v2?task=1')).toBe(true);
+
+        (wrapper.vm as any).closeEditNow();
+        await flushPromises();
+
+        expect(window.location.search).toBe('');
+        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks-v2')).toBe(true);
+        wrapper.unmount();
+        pushStateSpy.mockRestore();
+    });
+
+    it('auto-opens the edit sheet from task URL query', async () => {
+        axiosGetMock.mockReset();
+        window.history.replaceState({}, '', '/tasks-v2?task=1');
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await flushPromises();
+
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+        expect(axiosGetMock).toHaveBeenCalledWith('/task-threads.index');
+
+        wrapper.unmount();
+    });
+
+    it('handles browser popstate navigation for task deep links', async () => {
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        window.history.replaceState({}, '', '/tasks-v2?task=1');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        await flushPromises();
+
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+
+        window.history.replaceState({}, '', '/tasks-v2');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        await flushPromises();
+
+        expect(window.location.search).toBe('');
+        expect((wrapper.vm as any).editOpen).toBe(false);
+
+        wrapper.unmount();
+    });
+
     it('shows task created timestamp in the edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
-
-        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
 
         axiosGetMock
@@ -429,8 +548,6 @@ describe('Tasks/IndexV2.vue', () => {
     it('shows task creator and environment in the edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
-
-        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
 
         axiosGetMock
@@ -471,8 +588,6 @@ describe('Tasks/IndexV2.vue', () => {
     it('allows any user to change task status from the V2 edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
-
-        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
         axiosPutMock.mockReset();
 
@@ -522,8 +637,6 @@ describe('Tasks/IndexV2.vue', () => {
     it('allows the comment owner to edit their comment', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
-
-        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
         axiosPutMock.mockReset();
 
@@ -596,11 +709,109 @@ describe('Tasks/IndexV2.vue', () => {
         vi.useRealTimers();
     });
 
+    it('renders markdown list comments as list HTML', async () => {
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    external: [
+                        {
+                            id: 11,
+                            sender_name: 'You',
+                            is_current_user: true,
+                            content: '- first\n- second',
+                            created_at: '2026-02-09T12:01:00Z',
+                            attachments: [],
+                        },
+                    ],
+                },
+            });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        const commentHtml = wrapper.get('[data-testid="comment-bubble-11"]').html();
+        expect(commentHtml).toContain('<ul>');
+        expect(commentHtml).toMatch(/<li>first<\/li>/i);
+        expect(commentHtml).toMatch(/<li>second<\/li>/i);
+
+        wrapper.unmount();
+    });
+
+    it('normalizes legacy list HTML comments with br-separated markers', async () => {
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    external: [
+                        {
+                            id: 11,
+                            sender_name: 'You',
+                            is_current_user: true,
+                            content: '<ul><li><p>test<br>- test</p></li></ul>',
+                            created_at: '2026-02-09T12:01:00Z',
+                            attachments: [],
+                        },
+                    ],
+                },
+            });
+
+        const wrapper = mount(IndexV2, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        const commentHtml = wrapper.get('[data-testid="comment-bubble-11"]').html();
+        const liMatches = commentHtml.match(/<li>/g) ?? [];
+        expect(commentHtml).toContain('<ul>');
+        expect(liMatches.length).toBe(2);
+
+        wrapper.unmount();
+    });
+
     it('cancels comment edit on Escape', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
-
-        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosGetMock.mockReset();
         axiosPutMock.mockReset();
 

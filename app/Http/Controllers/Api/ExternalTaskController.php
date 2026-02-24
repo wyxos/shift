@@ -344,7 +344,7 @@ class ExternalTaskController extends Controller
         if ($usersToNotify->isNotEmpty()) {
             Notification::send(
                 $usersToNotify,
-                new TaskCreationNotification($task, route('tasks.edit', ['task' => $task->id]))
+                new TaskCreationNotification($task, route('tasks.v2', ['task' => $task->id]))
             );
         }
     }

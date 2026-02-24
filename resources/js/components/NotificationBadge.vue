@@ -109,7 +109,7 @@ const getNotificationUrl = (notification: NotificationItem) => {
 
     switch (notification.type) {
         case 'TaskCreationNotification':
-            return route('tasks.edit', { task: data.task_id });
+            return route('tasks.v2', { task: data.task_id });
         case 'TaskThreadUpdated':
             return data.url;
         case 'ProjectInvitationNotification':
