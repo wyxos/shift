@@ -4,6 +4,11 @@ export type ContextMessageLike = {
     pending?: boolean;
 };
 
+export type TouchTapState = {
+    lastTapAt: number;
+    lastTapId: number | null;
+};
+
 export function getSelectionForMessage(messageId?: number): string {
     if (typeof window === 'undefined' || !messageId) return '';
     const selection = window.getSelection();
@@ -20,6 +25,43 @@ export function getSelectionForMessage(messageId?: number): string {
 export function shouldShowCopySelection(message: ContextMessageLike, contextMenuMessageId: number | null, contextMenuSelectionText: string): boolean {
     if (message.isYou || !message.id || message.pending) return false;
     return contextMenuMessageId === message.id && contextMenuSelectionText.length > 0;
+}
+
+export function shouldIgnoreEditGesture(event: Event): boolean {
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    if (target.closest('img')) return true;
+    if (target.closest('a')) return true;
+    if (target.closest('button')) return true;
+    return false;
+}
+
+export function resolveTouchTap(
+    messageId: number,
+    state: TouchTapState,
+    now: number = Date.now(),
+    thresholdMs: number = 320,
+): { isDoubleTap: boolean; nextTapState: TouchTapState } {
+    const withinThreshold = now - state.lastTapAt < thresholdMs;
+    const sameMessage = state.lastTapId === messageId;
+
+    if (withinThreshold && sameMessage) {
+        return {
+            isDoubleTap: true,
+            nextTapState: {
+                lastTapAt: 0,
+                lastTapId: null,
+            },
+        };
+    }
+
+    return {
+        isDoubleTap: false,
+        nextTapState: {
+            lastTapAt: now,
+            lastTapId: messageId,
+        },
+    };
 }
 
 export async function copyTextToClipboard(text: string): Promise<boolean> {

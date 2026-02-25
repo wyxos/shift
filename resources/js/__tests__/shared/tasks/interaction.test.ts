@@ -2,6 +2,8 @@ import {
     copyTextToClipboard,
     getLightboxImageData,
     getSelectionForMessage,
+    resolveTouchTap,
+    shouldIgnoreEditGesture,
     shouldShowCopySelection,
     type ContextMessageLike,
 } from '@shared/tasks/interaction';
@@ -47,6 +49,40 @@ describe('shared/tasks/interaction', () => {
         expect(shouldShowCopySelection({ id: 10 }, 10, '')).toBe(false);
     });
 
+    it('ignores edit gestures on interactive targets', () => {
+        const image = document.createElement('img');
+        expect(shouldIgnoreEditGesture({ target: image } as unknown as Event)).toBe(true);
+
+        const link = document.createElement('a');
+        const nested = document.createElement('span');
+        link.appendChild(nested);
+        expect(shouldIgnoreEditGesture({ target: nested } as unknown as Event)).toBe(true);
+
+        const button = document.createElement('button');
+        expect(shouldIgnoreEditGesture({ target: button } as unknown as Event)).toBe(true);
+
+        const plain = document.createElement('div');
+        expect(shouldIgnoreEditGesture({ target: plain } as unknown as Event)).toBe(false);
+    });
+
+    it('resolves touch tap state and detects double taps', () => {
+        const first = resolveTouchTap(7, { lastTapAt: 0, lastTapId: null }, 1000);
+        expect(first.isDoubleTap).toBe(false);
+        expect(first.nextTapState).toEqual({ lastTapAt: 1000, lastTapId: 7 });
+
+        const second = resolveTouchTap(7, first.nextTapState, 1200);
+        expect(second.isDoubleTap).toBe(true);
+        expect(second.nextTapState).toEqual({ lastTapAt: 0, lastTapId: null });
+
+        const otherMessage = resolveTouchTap(8, first.nextTapState, 1200);
+        expect(otherMessage.isDoubleTap).toBe(false);
+        expect(otherMessage.nextTapState).toEqual({ lastTapAt: 1200, lastTapId: 8 });
+
+        const afterThreshold = resolveTouchTap(7, first.nextTapState, 1400);
+        expect(afterThreshold.isDoubleTap).toBe(false);
+        expect(afterThreshold.nextTapState).toEqual({ lastTapAt: 1400, lastTapId: 7 });
+    });
+
     it('copies via Clipboard API when available', async () => {
         const writeText = vi.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', {
@@ -79,6 +115,8 @@ describe('shared/tasks/interaction', () => {
     });
 
     it('extracts lightbox image data with sensible alt fallback', () => {
+        expect(getLightboxImageData(document.createElement('img'))).toBeNull();
+
         const image = document.createElement('img');
         image.src = 'https://example.com/a.png';
         image.alt = 'Screenshot';
