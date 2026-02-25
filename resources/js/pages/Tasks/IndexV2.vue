@@ -16,6 +16,8 @@ import {
     copyTextToClipboard,
     getLightboxImageData,
     getSelectionForMessage as getSelectionForMessageText,
+    resolveTouchTap,
+    shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent,
     shouldShowCopySelection as shouldShowCopySelectionForContext,
 } from '@/shared/tasks/interaction';
 import { getTaskCreatorEmail, getTaskCreatorName, getTaskEnvironment } from '@/shared/tasks/metadata';
@@ -894,35 +896,24 @@ function cancelThreadEdit() {
     contextMenuSelectionText.value = '';
 }
 
-function shouldIgnoreEditGesture(event: Event): boolean {
-    const target = event.target as HTMLElement | null;
-    if (!target) return false;
-    if (target.closest('img')) return true;
-    if (target.closest('a')) return true;
-    if (target.closest('button')) return true;
-    return false;
-}
-
 function onMessageDblClick(message: ThreadMessage, event: MouseEvent) {
-    if (shouldIgnoreEditGesture(event)) return;
+    if (shouldIgnoreEditGestureForEvent(event)) return;
     startThreadEdit(message);
 }
 
 function onMessageTouchEnd(message: ThreadMessage, event: TouchEvent) {
-    if (shouldIgnoreEditGesture(event)) return;
+    if (shouldIgnoreEditGestureForEvent(event)) return;
     if (!message.isYou || !message.id || message.pending) return;
 
-    const now = Date.now();
-    const within = now - lastTouchTapAt.value < 320;
-    const same = lastTouchTapId.value === message.id;
+    const { isDoubleTap, nextTapState } = resolveTouchTap(message.id, {
+        lastTapAt: lastTouchTapAt.value,
+        lastTapId: lastTouchTapId.value,
+    });
+    lastTouchTapAt.value = nextTapState.lastTapAt;
+    lastTouchTapId.value = nextTapState.lastTapId;
 
-    lastTouchTapAt.value = now;
-    lastTouchTapId.value = message.id;
-
-    if (within && same) {
+    if (isDoubleTap) {
         startThreadEdit(message);
-        lastTouchTapAt.value = 0;
-        lastTouchTapId.value = null;
     }
 }
 
