@@ -62,7 +62,7 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     );
 });
 
-test('tasks v2 show includes created_at', function () {
+test('tasks v2 show includes created and updated timestamps', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -79,8 +79,9 @@ test('tasks v2 show includes created_at', function () {
 
     $response->assertOk();
     $response->assertJsonPath('id', $task->id);
-    $response->assertJsonStructure(['created_at']);
+    $response->assertJsonStructure(['created_at', 'updated_at']);
     expect($response->json('created_at'))->toBeString()->not->toBeEmpty();
+    expect($response->json('updated_at'))->toBeString()->not->toBeEmpty();
 });
 
 test('tasks v2 can filter tasks by environment', function () {

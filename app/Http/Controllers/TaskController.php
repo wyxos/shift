@@ -326,6 +326,7 @@ class TaskController extends Controller
             'priority' => $task->priority,
             'description' => $task->description,
             'created_at' => $task->created_at?->toIso8601String(),
+            'updated_at' => $task->updated_at?->toIso8601String(),
             'environment' => $environment,
             'is_owner' => $isOwner,
             'submitter' => $task->submitter ? [
@@ -365,6 +366,8 @@ class TaskController extends Controller
                     'priority' => $task->priority,
                     'status' => $task->status,
                     'description' => $task->description,
+                    'created_at' => $task->created_at?->toIso8601String(),
+                    'updated_at' => $task->updated_at?->toIso8601String(),
                     'attachments' => $task->attachments->map(function ($attachment) {
                         return [
                             'id' => $attachment->id,
@@ -425,6 +428,8 @@ class TaskController extends Controller
                 'priority' => $task->priority,
                 'status' => $task->status,
                 'description' => $task->description,
+                'created_at' => $task->created_at?->toIso8601String(),
+                'updated_at' => $task->updated_at?->toIso8601String(),
                 'attachments' => $task->attachments->map(function ($attachment) {
                     return [
                         'id' => $attachment->id,
