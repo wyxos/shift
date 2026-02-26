@@ -690,6 +690,14 @@ function syncListRowFromEditForm(taskId: number) {
     };
 }
 
+function refreshTasksList() {
+    router.reload({
+        only: ['tasks'],
+        preserveScroll: true,
+        preserveState: true,
+    });
+}
+
 function scheduleTaskAutosave(immediate = false) {
     if (!autosaveArmed.value || !editTask.value) return;
     if (taskSaving.value) {
@@ -744,6 +752,7 @@ async function saveTaskChanges() {
         deletedAttachmentIds.value = [];
         initialEditSnapshot.value = currentTaskSnapshot();
         syncListRowFromEditForm(editTask.value.id);
+        refreshTasksList();
     } catch (e: any) {
         taskSaveError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to autosave task';
     } finally {
@@ -1165,6 +1174,9 @@ function getTaskEnvironmentLabel(task: Task): string {
                                 <div class="border-muted-foreground/20 bg-muted/10 grid gap-2 rounded-lg border p-3 text-xs">
                                     <div v-if="editTask.created_at" class="text-muted-foreground" data-testid="edit-task-created-at">
                                         Created {{ formatThreadTime(editTask.created_at) }}
+                                    </div>
+                                    <div v-if="editTask.updated_at" class="text-muted-foreground" data-testid="edit-task-updated-at">
+                                        Updated {{ formatThreadTime(editTask.updated_at) }}
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-muted-foreground">Environment</span>
