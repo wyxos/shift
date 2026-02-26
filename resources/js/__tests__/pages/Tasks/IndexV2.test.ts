@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import IndexV2 from '@/pages/Tasks/IndexV2.vue';
+import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
@@ -249,6 +250,8 @@ describe('Tasks/IndexV2.vue', () => {
         (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosPostMock.mockReset();
         axiosDeleteMock.mockReset();
+        (router.get as any).mockClear();
+        (router.reload as any).mockClear();
     });
 
     function makeTasksPage(tasks: any[]) {
@@ -563,6 +566,7 @@ describe('Tasks/IndexV2.vue', () => {
                     status: 'pending',
                     environment: 'staging',
                     created_at: '2026-02-10T17:40:00',
+                    updated_at: '2026-02-10T17:55:00',
                     description: '',
                     is_owner: false,
                     submitter: { name: 'Taylor Brown', email: 'someone@example.com' },
@@ -583,6 +587,7 @@ describe('Tasks/IndexV2.vue', () => {
 
         expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
+        expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toContain('Updated');
         expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
 
         wrapper.unmount();
@@ -631,6 +636,11 @@ describe('Tasks/IndexV2.vue', () => {
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith('/tasks.v2.update', expect.objectContaining({ status: 'in-progress' }));
+        expect(router.reload).toHaveBeenCalledWith({
+            only: ['tasks'],
+            preserveScroll: true,
+            preserveState: true,
+        });
         expect(sonnerMocks.toastLoadingMock).toHaveBeenCalledWith('Saving task changes...');
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Task changes saved', expect.objectContaining({ id: 'autosave-toast' }));
 
