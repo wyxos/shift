@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { buildThreadAiContext } from '@/shared/tasks/ai';
 import { getTaskIdFromQuery, syncTaskQuery } from '@/shared/tasks/history';
 import {
     copyTextToClipboard,
@@ -264,6 +265,7 @@ const threadLoading = ref(false);
 const threadSending = ref(false);
 const threadError = ref<string | null>(null);
 const threadMessages = ref<ThreadMessage[]>([]);
+const threadAiContext = computed(() => buildThreadAiContext(threadMessages.value));
 
 const threadComposerRef = ref<InstanceType<typeof ShiftEditor> | null>(null);
 const threadComposerHtml = ref('');
@@ -1427,6 +1429,7 @@ function getTaskEnvironmentLabel(task: Task): string {
                                     <ShiftEditor
                                         ref="threadComposerRef"
                                         v-model="threadComposerHtml"
+                                        :ai-context="threadAiContext"
                                         :cancelable="Boolean(threadEditingId)"
                                         :clear-on-send="false"
                                         :temp-identifier="threadTempIdentifier"

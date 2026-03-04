@@ -11,6 +11,7 @@ beforeEach(() => {
         if (name === 'attachments.upload-chunk') return '/attachments/upload-chunk';
         if (name === 'attachments.upload-complete') return '/attachments/upload-complete';
         if (name === 'attachments.remove-temp') return '/attachments/remove-temp';
+        if (name === 'ai.improve') return '/ai/improve';
         return '/';
     };
     postMock.mockReset();
@@ -152,5 +153,106 @@ describe('ShiftEditor toolbar', () => {
         expect(html).toContain('data-reply-to="42"');
         expect(html).toContain('class="shift-reply"');
         expect(html).toContain('Quoted');
+    });
+
+    it('opens AI drawer and applies accepted improvements while keeping protected rich content', async () => {
+        postMock.mockImplementation((url: string, payload: any) => {
+            if (url === '/ai/improve') {
+                const [firstToken, secondToken] = payload.protected_tokens ?? [];
+
+                return Promise.resolve({
+                    data: {
+                        improved_html: `<p>This message is clearer.</p><p>${firstToken}</p><p>${secondToken}</p>`,
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent(
+            '<p>plese fix this sentence</p><blockquote class="shift-reply" data-reply-to="42"><p>Original quote</p></blockquote><p><img src="/attachments/1/download" class="editor-tile"></p>',
+        );
+        await nextTick();
+
+        await wrapper.get('[data-testid="toolbar-ai-improve"]').trigger('click');
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="ai-improve-drawer"]').exists()).toBe(true);
+        await wrapper.get('[data-testid="ai-improve-accept"]').trigger('click');
+        await nextTick();
+
+        const updatedHtml = ed?.getHTML() ?? '';
+        expect(updatedHtml).toContain('This message is clearer.');
+        expect(updatedHtml).toContain('data-reply-to="42"');
+        expect(updatedHtml).toContain('src="/attachments/1/download"');
+    });
+
+    it('keeps original editor content when AI suggestion is rejected', async () => {
+        postMock.mockImplementation((url: string) => {
+            if (url === '/ai/improve') {
+                return Promise.resolve({
+                    data: {
+                        improved_html: '<p>This is an improved rewrite.</p>',
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>Original content stays.</p>');
+        await nextTick();
+
+        await wrapper.get('[data-testid="toolbar-ai-improve"]').trigger('click');
+        await nextTick();
+        expect(wrapper.find('[data-testid="ai-improve-drawer"]').exists()).toBe(true);
+
+        await wrapper.get('[data-testid="ai-improve-reject"]').trigger('click');
+        await nextTick();
+
+        const unchangedHtml = ed?.getHTML() ?? '';
+        expect(unchangedHtml).toContain('Original content stays.');
+    });
+
+    it('sends provided thread context to AI improvement endpoint', async () => {
+        postMock.mockImplementation((url: string) => {
+            if (url === '/ai/improve') {
+                return Promise.resolve({
+                    data: {
+                        improved_html: '<p>Updated from context.</p>',
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                aiContext: 'Recent thread context (oldest to newest):\n1. Alice: Need status update.',
+            },
+        });
+        await nextTick();
+
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>status pls</p>');
+        await nextTick();
+
+        await wrapper.get('[data-testid="toolbar-ai-improve"]').trigger('click');
+        await nextTick();
+
+        expect(postMock).toHaveBeenCalledWith(
+            '/ai/improve',
+            expect.objectContaining({
+                context: 'Recent thread context (oldest to newest):\n1. Alice: Need status update.',
+            }),
+        );
     });
 });
