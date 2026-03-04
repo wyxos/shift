@@ -51,6 +51,8 @@
         "@tiptap/starter-kit": "^2.6.6",
         "@tiptap/vue-3": "^2.6.6",
         "@toast-ui/editor": "^3.2.2",
+        "@unovis/ts": "^1.6.4",
+        "@unovis/vue": "^1.6.4",
         "@vitejs/plugin-vue": "^5.2.1",
         "@vueuse/core": "^12.8.2",
         "axios": "1.12.0",
