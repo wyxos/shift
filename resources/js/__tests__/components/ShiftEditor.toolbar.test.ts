@@ -35,6 +35,17 @@ vi.mock('axios', () => ({
 import 'emoji-picker-element';
 
 describe('ShiftEditor toolbar', () => {
+    it('hides AI improve action when disabled by parent config', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                enableAiImprove: false,
+            },
+        });
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="toolbar-ai-improve"]').exists()).toBe(false);
+    });
+
     it('inserts emoji into the editor via emoji picker', async () => {
         const wrapper = mount(ShiftEditor);
         await nextTick();

@@ -36,8 +36,8 @@ import {
 } from '@/shared/tasks/presentation';
 import { buildReplyQuoteHtml, extractPlainTextFromContent, renderRichContent } from '@/shared/tasks/rich-content';
 import { formatThreadTime, getReplyTargetFromEventTarget, mapThreadToMessage, shouldHandleImage } from '@/shared/tasks/thread';
-import type { BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Filter, Paperclip, Pencil, Trash2 } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
@@ -111,6 +111,8 @@ watch(
     { deep: true },
 );
 const taskRows = computed(() => tasksPage.value.data ?? []);
+const page = usePage<SharedData>();
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Tasks', href: '/tasks' },
@@ -1243,6 +1245,7 @@ function getTaskEnvironmentLabel(task: Task): string {
                                     <template v-if="isOwner">
                                         <ShiftEditor
                                             v-model="editForm.description"
+                                            :enable-ai-improve="aiImproveEnabled"
                                             :temp-identifier="editTempIdentifier"
                                             placeholder="Update the task details and drag files inline."
                                             @uploading="editUploading = $event"
@@ -1429,6 +1432,7 @@ function getTaskEnvironmentLabel(task: Task): string {
                                     <ShiftEditor
                                         ref="threadComposerRef"
                                         v-model="threadComposerHtml"
+                                        :enable-ai-improve="aiImproveEnabled"
                                         :ai-context="threadAiContext"
                                         :cancelable="Boolean(threadEditingId)"
                                         :clear-on-send="false"

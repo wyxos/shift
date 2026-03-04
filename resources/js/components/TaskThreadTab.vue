@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
 import { buildThreadAiContext } from '@/shared/tasks/ai';
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/vue3';
 import { computed, type Ref } from 'vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 
@@ -50,6 +52,8 @@ interface Emits {
 
 const props = defineProps<Props>();
 defineEmits<Emits>();
+const page = usePage<SharedData>();
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
 const aiContext = computed(() =>
     buildThreadAiContext(
         props.messages.map((message) => ({
@@ -95,6 +99,7 @@ const setMessagesContainer = (el: Element | null) => {
             <div class="">
                 <ShiftEditor
                     :model-value="newMessage"
+                    :enable-ai-improve="aiImproveEnabled"
                     @update:model-value="$emit('update:newMessage', $event)"
                     :ai-context="aiContext"
                     :temp-identifier="threadTempIdentifier"
