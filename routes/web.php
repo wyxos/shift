@@ -51,13 +51,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('projects/{project}/users/{projectUser}', [ProjectUserController::class, 'destroy'])->name('project-users.destroy');
 
     // tasks
-    Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
-    Route::get('tasks-v2', [TaskController::class, 'indexV2'])->name('tasks.v2');
+    Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks.index');
+    Route::get('tasks-v2', fn () => redirect()->route('tasks.index', request()->query()))->name('tasks.v2');
     Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])->name('tasks.v2.show');
     Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
     Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
-    Route::get('tasks/create', [TaskController::class, 'create'])->name('tasks.create');
-    Route::get('tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
+    Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
+    Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');
 
     // Use Api\TaskController for API requests
     Route::post('tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('tasks.store');

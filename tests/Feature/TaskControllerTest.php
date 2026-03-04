@@ -18,6 +18,7 @@ test('index displays tasks', function () {
     // Create tasks for the project
     $tasks = Task::factory()->count(3)->create([
         'project_id' => $project->id,
+        'status' => 'pending',
     ]);
 
     // Set the submitter for each task
@@ -30,7 +31,7 @@ test('index displays tasks', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Index')
+        ->component('Tasks/IndexV2')
         ->has('tasks.data', 3)
     );
 });
@@ -52,7 +53,7 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     $pendingTask->submitter()->associate($this->user)->save();
     $completedTask->submitter()->associate($this->user)->save();
 
-    $response = $this->actingAs($this->user)->get(route('tasks.v2'));
+    $response = $this->actingAs($this->user)->get(route('tasks.index'));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
@@ -110,7 +111,7 @@ test('tasks v2 can filter tasks by environment', function () {
         'url' => 'https://example.com/production',
     ]);
 
-    $response = $this->actingAs($this->user)->get(route('tasks.v2', [
+    $response = $this->actingAs($this->user)->get(route('tasks.index', [
         'environment' => 'staging',
     ]));
 
@@ -143,7 +144,7 @@ test('tasks v2 defaults to sorting by updated_at descending', function () {
     $olderTask->submitter()->associate($this->user)->save();
     $newerTask->submitter()->associate($this->user)->save();
 
-    $response = $this->actingAs($this->user)->get(route('tasks.v2'));
+    $response = $this->actingAs($this->user)->get(route('tasks.index'));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
@@ -179,7 +180,7 @@ test('tasks v2 can sort tasks by priority', function () {
     $mediumTask->submitter()->associate($this->user)->save();
     $highTask->submitter()->associate($this->user)->save();
 
-    $response = $this->actingAs($this->user)->get(route('tasks.v2', [
+    $response = $this->actingAs($this->user)->get(route('tasks.index', [
         'sort_by' => 'priority',
     ]));
 
@@ -193,50 +194,39 @@ test('tasks v2 can sort tasks by priority', function () {
     );
 });
 
-test('index filters tasks by project', function () {
-    // Create two projects owned by the user
-    $project1 = Project::factory()->create([
-        'author_id' => $this->user->id,
-    ]);
-    $project2 = Project::factory()->create([
+test('index filters tasks by status query', function () {
+    $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
 
-    // Create tasks for each project
-    $tasksProject1 = Task::factory()->count(2)->create([
-        'project_id' => $project1->id,
+    $pendingTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
     ]);
-    $tasksProject2 = Task::factory()->count(3)->create([
-        'project_id' => $project2->id,
+    $completedTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'completed',
     ]);
 
-    // Set the submitter for each task
-    foreach ($tasksProject1 as $task) {
-        $task->submitter()->associate($this->user)->save();
-    }
-    foreach ($tasksProject2 as $task) {
-        $task->submitter()->associate($this->user)->save();
-    }
+    $pendingTask->submitter()->associate($this->user)->save();
+    $completedTask->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)
-        ->get(route('tasks.index', ['project_id' => $project1->id]));
+        ->get(route('tasks.index', ['status' => ['pending']]));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Index')
-        ->has('tasks.data', 2)
+        ->component('Tasks/IndexV2')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $pendingTask->id)
     );
 });
 
-test('create displays form', function () {
+test('create route redirects to tasks index', function () {
     $response = $this->actingAs($this->user)
         ->get(route('tasks.create'));
 
-    $response->assertStatus(200);
-    $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Create')
-        ->has('projects')
-    );
+    $response->assertRedirect(route('tasks.index'));
 });
 
 test('store creates new task', function () {
@@ -272,7 +262,7 @@ test('store creates new task', function () {
     expect($task->submitter_type)->toEqual(User::class);
 });
 
-test('edit displays form', function () {
+test('edit route redirects to v2 task view', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -285,12 +275,7 @@ test('edit displays form', function () {
     $response = $this->actingAs($this->user)
         ->get(route('tasks.edit', $task));
 
-    $response->assertStatus(200);
-    $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Edit')
-        ->has('task')
-        ->has('project')
-    );
+    $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
 test('update updates task', function () {
@@ -519,12 +504,12 @@ test('task creation sends notifications', function () {
         [$projectUser1, $projectUser2],
         \App\Notifications\TaskCreationNotification::class,
         function ($notification, $channels, $notifiable) use ($task) {
-            return $notification->toArray($notifiable)['url'] === route('tasks.v2', ['task' => $task->id]);
+            return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $task->id]);
         }
     );
 });
 
-test('edit shows all external users for internal task', function () {
+test('edit route redirects for internal task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -550,16 +535,10 @@ test('edit shows all external users for internal task', function () {
     $response = $this->actingAs($this->user)
         ->get(route('tasks.edit', $task));
 
-    $response->assertStatus(200);
-    $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Edit')
-        ->has('projectExternalUsers', 2)
-        ->where('projectExternalUsers.0.name', 'Production User')
-        ->where('projectExternalUsers.1.name', 'Staging User')
-    );
+    $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
-test('edit shows only same environment external users for external task', function () {
+test('edit route redirects for external submitted task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -590,11 +569,5 @@ test('edit shows only same environment external users for external task', functi
     $response = $this->actingAs($this->user)
         ->get(route('tasks.edit', $task));
 
-    $response->assertStatus(200);
-    $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/Edit')
-        ->has('projectExternalUsers', 2) // Only production users should be shown
-        ->where('projectExternalUsers.0.name', 'Production User')
-        ->where('projectExternalUsers.1.name', 'Another Production User')
-    );
+    $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });

@@ -135,7 +135,7 @@ test('external thread creation sends notifications to project users', function (
         [$this->user, $projectUser1, $projectUser2],
         TaskThreadUpdated::class,
         function (TaskThreadUpdated $notification) {
-            return ($notification->data['url'] ?? null) === route('tasks.v2', ['task' => $this->task->id]);
+            return ($notification->data['url'] ?? null) === route('tasks.index', ['task' => $this->task->id]);
         }
     );
 });

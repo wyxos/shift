@@ -27,7 +27,7 @@ test('notifications are stored in database', function () {
     $data = is_array($notification->data) ? $notification->data : json_decode($notification->data, true);
     expect($data['task_id'])->toEqual($task->id);
     expect($data['task_title'])->toEqual($task->title);
-    expect($data['url'])->toEqual(route('tasks.v2', ['task' => $task->id]));
+    expect($data['url'])->toEqual(route('tasks.index', ['task' => $task->id]));
 });
 
 test('all notification classes use database channel', function () {
