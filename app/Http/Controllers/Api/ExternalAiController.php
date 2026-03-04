@@ -12,6 +12,12 @@ class ExternalAiController extends Controller
 {
     public function improve(Request $request, LocalRewriteService $rewriteService): JsonResponse
     {
+        if (! config('shift_ai.enabled', false)) {
+            return response()->json([
+                'error' => 'AI improvement is disabled.',
+            ], 404);
+        }
+
         $attributes = $request->validate([
             'project' => ['required', 'exists:projects,token'],
             'html' => ['required', 'string'],

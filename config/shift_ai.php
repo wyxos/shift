@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'enabled' => env('SHIFT_AI_ENABLED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Local AI Provider
