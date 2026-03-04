@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiRewriteController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ExternalUserController;
@@ -85,6 +86,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('attachments/{attachment}', [AttachmentController::class, 'deleteAttachment'])->name('attachments.delete');
     Route::get('attachments/{attachment}/download', [AttachmentController::class, 'downloadAttachment'])->name('attachments.download');
     Route::get('attachments/temp/{temp}/{filename}', [AttachmentController::class, 'showTemp'])->where('filename', '.*')->name('attachments.temp');
+    Route::post('ai/improve', [AiRewriteController::class, 'improve'])->name('ai.improve');
 
     // External Users
     Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');

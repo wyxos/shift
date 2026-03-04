@@ -18,6 +18,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'destroy'])->name('tasks.destroy');
         Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\Api\ExternalTaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
         Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\Api\ExternalTaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
+        Route::post('/ai/improve', [\App\Http\Controllers\Api\ExternalAiController::class, 'improve'])->name('ai.improve');
 
         // task threads
         Route::get('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'index'])->name('task-threads.index');
