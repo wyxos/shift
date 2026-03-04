@@ -13,8 +13,9 @@ import pythonLang from 'highlight.js/lib/languages/python';
 import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
-import { FileImage, FileText, Paperclip, Send, Smile, X } from 'lucide-vue-next';
+import { FileImage, FileText, Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
+import { Collapsible, CollapsibleContent } from '../../components/ui/collapsible';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
 import ReplyQuote from '../extensions/replyQuote';
@@ -47,10 +48,14 @@ const props = withDefaults(
         resolveTempUrl?: (data: any) => string;
         clearOnSend?: boolean;
         cancelable?: boolean;
+        aiImproveUrl?: string;
+        aiContext?: string;
+        enableAiImprove?: boolean;
     }>(),
     {
         clearOnSend: true,
         cancelable: false,
+        enableAiImprove: true,
     },
 );
 
@@ -70,6 +75,10 @@ const attachments = ref<AttachmentItem[]>([]);
 const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
 const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
+const aiImproving = ref(false);
+const aiError = ref('');
+const aiPreviewOpen = ref(false);
+const aiPreviewHtml = ref('');
 
 const axiosClient = computed(() => props.axiosInstance ?? axios);
 
@@ -116,6 +125,14 @@ function resolveRemoveTempUrl(): string | null {
     if (props.removeTempUrl) return props.removeTempUrl;
     if (typeof route === 'function') {
         return route('attachments.remove-temp') as string;
+    }
+    return null;
+}
+
+function resolveAiImproveUrl(): string | null {
+    if (props.aiImproveUrl) return props.aiImproveUrl;
+    if (typeof route === 'function') {
+        return route('ai.improve') as string;
     }
     return null;
 }
@@ -295,6 +312,54 @@ const isUploading = computed(() => {
     return hasUploadPlaceholder.value;
 });
 
+type ProtectedFragment = {
+    token: string;
+    html: string;
+};
+
+function createProtectedToken(index: number): string {
+    return `[[SHIFT_KEEP_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}]]`;
+}
+
+function prepareHtmlForAi(html: string): { preparedHtml: string; protectedFragments: ProtectedFragment[] } {
+    if (typeof DOMParser === 'undefined') {
+        return { preparedHtml: html, protectedFragments: [] };
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
+    const protectedFragments: ProtectedFragment[] = [];
+
+    const protectedNodes = doc.body.querySelectorAll('img, blockquote.shift-reply, blockquote[data-reply-to]');
+    protectedNodes.forEach((node, index) => {
+        const token = createProtectedToken(index);
+        protectedFragments.push({ token, html: node.outerHTML });
+        node.replaceWith(doc.createTextNode(token));
+    });
+
+    return {
+        preparedHtml: doc.body.innerHTML,
+        protectedFragments,
+    };
+}
+
+function restoreProtectedFragments(html: string, protectedFragments: ProtectedFragment[]): { restoredHtml: string; missingTokens: string[] } {
+    let restoredHtml = html;
+    const missingTokens: string[] = [];
+
+    protectedFragments.forEach((fragment) => {
+        if (!restoredHtml.includes(fragment.token)) {
+            missingTokens.push(fragment.token);
+
+            return;
+        }
+
+        restoredHtml = restoredHtml.split(fragment.token).join(fragment.html);
+    });
+
+    return { restoredHtml, missingTokens };
+}
+
 watch(
     isUploading,
     (value) => {
@@ -329,6 +394,69 @@ function onSend() {
 
     // Reset editor value and clear attachments list
     reset();
+}
+
+async function improveWithAi() {
+    if (aiImproving.value || isUploading.value) return;
+
+    const improveUrl = resolveAiImproveUrl();
+    if (!improveUrl) {
+        aiError.value = 'AI improvement endpoint is not configured.';
+
+        return;
+    }
+
+    const currentHtml = editor.value?.getHTML() ?? '';
+    if (!currentHtml.trim()) {
+        aiError.value = 'Write a message before using AI improvement.';
+
+        return;
+    }
+
+    aiError.value = '';
+    aiImproving.value = true;
+
+    const { preparedHtml, protectedFragments } = prepareHtmlForAi(currentHtml);
+
+    try {
+        const context = (props.aiContext ?? '').trim();
+        const response = await axiosClient.value.post(improveUrl, {
+            html: preparedHtml,
+            protected_tokens: protectedFragments.map((fragment) => fragment.token),
+            context: context || undefined,
+        });
+
+        const improvedHtml = String(response.data?.improved_html ?? '').trim();
+        if (!improvedHtml) {
+            throw new Error('AI returned an empty rewrite.');
+        }
+
+        const { restoredHtml, missingTokens } = restoreProtectedFragments(improvedHtml, protectedFragments);
+        if (missingTokens.length > 0) {
+            throw new Error('AI response omitted protected rich content. No changes were applied.');
+        }
+
+        aiPreviewHtml.value = restoredHtml;
+        aiPreviewOpen.value = true;
+    } catch (e: any) {
+        aiError.value = e?.response?.data?.error || e?.message || 'Failed to improve message with AI.';
+    } finally {
+        aiImproving.value = false;
+    }
+}
+
+function rejectAiImprove() {
+    aiPreviewOpen.value = false;
+    aiPreviewHtml.value = '';
+}
+
+function acceptAiImprove() {
+    if (!aiPreviewHtml.value) return;
+
+    editor.value?.commands.setContent(aiPreviewHtml.value, false);
+    emit('update:modelValue', editor.value?.getHTML() ?? aiPreviewHtml.value);
+    aiPreviewOpen.value = false;
+    aiPreviewHtml.value = '';
 }
 
 function iconForAttachment(type: string) {
@@ -417,6 +545,17 @@ defineExpose({ editor, reset });
                     <Paperclip :size="18" />
                 </button>
                 <button
+                    v-if="props.enableAiImprove"
+                    type="button"
+                    data-testid="toolbar-ai-improve"
+                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="isUploading || aiImproving"
+                    @click="improveWithAi"
+                >
+                    <Sparkles :size="14" />
+                    <span>{{ aiImproving ? 'Improving...' : 'Improve with AI' }}</span>
+                </button>
+                <button
                     v-if="props.cancelable"
                     type="button"
                     data-testid="toolbar-cancel"
@@ -443,6 +582,43 @@ defineExpose({ editor, reset });
         <div v-if="showEmoji" class="mb-2 px-4">
             <emoji-picker data-testid="emoji-picker" @emoji-click="onEmojiClick"></emoji-picker>
         </div>
+
+        <div v-if="aiError" data-testid="ai-improve-error" class="mt-2 px-1 text-xs text-red-600">
+            {{ aiError }}
+        </div>
+
+        <Collapsible :open="aiPreviewOpen">
+            <CollapsibleContent
+                data-testid="ai-improve-drawer"
+                class="ai-improve-drawer mt-2 flex max-h-[600px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            >
+                <div class="border-b border-slate-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold text-slate-900">AI Suggested Improvement</h3>
+                    <p class="mt-1 text-xs text-slate-500">Review and accept to replace the editor content.</p>
+                </div>
+                <div class="min-h-0 flex-1 overflow-auto p-4" data-testid="ai-improve-preview-scroll">
+                    <div class="tiptap shift-rich text-sm leading-6 text-slate-800" data-testid="ai-improve-preview" v-html="aiPreviewHtml"></div>
+                </div>
+                <div class="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                    <button
+                        type="button"
+                        data-testid="ai-improve-reject"
+                        class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                        @click="rejectAiImprove"
+                    >
+                        Keep Original
+                    </button>
+                    <button
+                        type="button"
+                        data-testid="ai-improve-accept"
+                        class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                        @click="acceptAiImprove"
+                    >
+                        Use Improvement
+                    </button>
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
     </div>
 </template>
 
@@ -490,5 +666,35 @@ defineExpose({ editor, reset });
     font-size: 0.875rem;
     line-height: 1.5;
     padding: 0;
+}
+
+.ai-improve-drawer[data-state='open'] {
+    animation: ai-improve-drawer-open 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-improve-drawer[data-state='closed'] {
+    animation: ai-improve-drawer-close 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes ai-improve-drawer-open {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ai-improve-drawer-close {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(8px);
+    }
 }
 </style>

@@ -41,6 +41,7 @@ After you've finished editing
   - External API contract here is consumed by the SDK package `wyxos/shift-php`.
   - If you change any external API routes/payloads (`routes/api.php`, `app/Http/Controllers/Api/**`), update the SDK accordingly.
   - If you change SDK routes/proxy expectations (`packages/shift-php/routes/shift.php`, `packages/shift-php/src/Http/Controllers/**`), verify/update SHIFT to match.
+  - Shared frontend components consumed by SDK should not assume a global Ziggy `route()` helper in SDK runtime; SDK consumers must pass explicit `/shift/api/**` URLs when needed.
 - Local SDK dev workflow (from portal repo):
   - Prefer: `php artisan shift:toggle --local --path=../shift-sdk-package/packages/shift-php`
   - Switch back: `php artisan shift:toggle --online`

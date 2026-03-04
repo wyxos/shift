@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
-import type { Ref } from 'vue';
+import { buildThreadAiContext } from '@/shared/tasks/ai';
+import { computed, type Ref } from 'vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 
 interface Message {
@@ -49,6 +50,15 @@ interface Emits {
 
 const props = defineProps<Props>();
 defineEmits<Emits>();
+const aiContext = computed(() =>
+    buildThreadAiContext(
+        props.messages.map((message) => ({
+            author: message.sender,
+            content: message.content,
+            time: message.timestamp,
+        })),
+    ),
+);
 
 // Assign messages container element to the passed-in ref
 const setMessagesContainer = (el: Element | null) => {
@@ -86,6 +96,7 @@ const setMessagesContainer = (el: Element | null) => {
                 <ShiftEditor
                     :model-value="newMessage"
                     @update:model-value="$emit('update:newMessage', $event)"
+                    :ai-context="aiContext"
                     :temp-identifier="threadTempIdentifier"
                     @send="$emit('sendMessage')"
                 />
