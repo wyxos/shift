@@ -52,7 +52,7 @@ class NotifyExternalUser implements ShouldQueue
             $payload
         );
 
-        $editUrl = rtrim($externalUser->url, '/').'/shift/tasks-v2?task='.$task->id;
+        $editUrl = rtrim($externalUser->url, '/').'/shift/tasks?task='.$task->id;
 
         $notificationService->sendFallbackEmailIfNeeded(
             $response,

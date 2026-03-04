@@ -448,7 +448,7 @@ test('external task creation sends notifications to all relevant users', functio
         [$this->user, $projectUser1, $projectUser2],
         \App\Notifications\TaskCreationNotification::class,
         function ($notification, $channels, $notifiable) use ($response) {
-            return $notification->toArray($notifiable)['url'] === route('tasks.v2', ['task' => $response->json('id')]);
+            return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $response->json('id')]);
         }
     );
 });
