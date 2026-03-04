@@ -246,7 +246,7 @@ describe('Tasks/IndexV2.vue', () => {
         sonnerMocks.toastSuccessMock.mockClear();
         sonnerMocks.toastErrorMock.mockClear();
         sonnerMocks.toastDismissMock.mockClear();
-        window.history.replaceState({}, '', '/tasks-v2');
+        window.history.replaceState({}, '', '/tasks');
         (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosPostMock.mockReset();
         axiosDeleteMock.mockReset();
@@ -284,7 +284,7 @@ describe('Tasks/IndexV2.vue', () => {
         });
 
         expect(wrapper.find('.app-layout').exists()).toBe(true);
-        expect(wrapper.text()).toContain('Tasks V2');
+        expect(wrapper.text()).toContain('Tasks');
         expect(wrapper.find('[data-testid="filters-trigger"]').exists()).toBe(true);
 
         const rows = wrapper.findAll('[data-testid="task-row"]');
@@ -426,20 +426,20 @@ describe('Tasks/IndexV2.vue', () => {
         await flushPromises();
 
         expect(window.location.search).toContain('task=1');
-        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks-v2?task=1')).toBe(true);
+        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks?task=1')).toBe(true);
 
         (wrapper.vm as any).closeEditNow();
         await flushPromises();
 
         expect(window.location.search).toBe('');
-        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks-v2')).toBe(true);
+        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks')).toBe(true);
         wrapper.unmount();
         pushStateSpy.mockRestore();
     });
 
     it('auto-opens the edit sheet from task URL query', async () => {
         axiosGetMock.mockReset();
-        window.history.replaceState({}, '', '/tasks-v2?task=1');
+        window.history.replaceState({}, '', '/tasks?task=1');
 
         axiosGetMock
             .mockResolvedValueOnce({
@@ -498,13 +498,13 @@ describe('Tasks/IndexV2.vue', () => {
             },
         });
 
-        window.history.replaceState({}, '', '/tasks-v2?task=1');
+        window.history.replaceState({}, '', '/tasks?task=1');
         window.dispatchEvent(new PopStateEvent('popstate'));
         await flushPromises();
 
         expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
 
-        window.history.replaceState({}, '', '/tasks-v2');
+        window.history.replaceState({}, '', '/tasks');
         window.dispatchEvent(new PopStateEvent('popstate'));
         await flushPromises();
 
