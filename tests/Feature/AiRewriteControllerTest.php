@@ -13,6 +13,7 @@ beforeEach(function () {
     ]);
 
     config()->set('shift_ai.provider', 'ollama');
+    config()->set('shift_ai.enabled', true);
     config()->set('shift_ai.model', 'llama3.1');
     config()->set('shift_ai.ollama.base_url', 'http://127.0.0.1:11434');
     config()->set('shift_ai.timeout', 30);
@@ -79,4 +80,23 @@ test('ai improve endpoint rejects model output that loses protected tokens', fun
 
     $response->assertStatus(422);
     $response->assertJsonPath('error', 'AI response did not preserve protected placeholders.');
+});
+
+test('ai improve endpoints return not found when feature is disabled', function () {
+    config()->set('shift_ai.enabled', false);
+
+    $webResponse = $this->actingAs($this->user)->postJson(route('ai.improve'), [
+        'html' => '<p>Original</p>',
+    ]);
+
+    $webResponse->assertStatus(404);
+    $webResponse->assertJsonPath('error', 'AI improvement is disabled.');
+
+    $apiResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)->postJson('/api/ai/improve', [
+        'project' => $this->project->token,
+        'html' => '<p>Original</p>',
+    ]);
+
+    $apiResponse->assertStatus(404);
+    $apiResponse->assertJsonPath('error', 'AI improvement is disabled.');
 });
