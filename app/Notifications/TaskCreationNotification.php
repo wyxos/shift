@@ -37,7 +37,7 @@ class TaskCreationNotification extends Notification implements ShouldQueue
             return (string) $this->url;
         }
 
-        return route('tasks.v2', ['task' => $this->task->id]);
+        return route('tasks.index', ['task' => $this->task->id]);
     }
 
     /**

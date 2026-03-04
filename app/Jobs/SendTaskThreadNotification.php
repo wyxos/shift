@@ -77,7 +77,7 @@ class SendTaskThreadNotification implements ShouldQueue
 
         // Create notification object with additional URL for email
         $notificationData = array_merge($this->payload, [
-            'url' => rtrim($this->externalUserData['url'], '/').'/shift/tasks-v2?task='.$this->payload['task_id'],
+            'url' => rtrim($this->externalUserData['url'], '/').'/shift/tasks?task='.$this->payload['task_id'],
         ]);
 
         $notificationService->sendFallbackEmailIfNeeded(

@@ -114,7 +114,7 @@ const taskRows = computed(() => tasksPage.value.data ?? []);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Tasks', href: '/tasks' },
-    { title: 'Tasks V2', href: '/tasks-v2' },
+    { title: 'Tasks', href: '/tasks' },
 ];
 
 const statusOptions = getStatusOptions({ includeClosed: false });
@@ -199,7 +199,7 @@ function resetFilters() {
     appliedSortBy.value = draftSortBy.value;
 
     router.get(
-        '/tasks-v2',
+        '/tasks',
         {
             status: appliedStatuses.value,
             priority: appliedPriorities.value,
@@ -221,7 +221,7 @@ function applyFilters() {
     appliedSortBy.value = draftSortBy.value;
 
     router.get(
-        '/tasks-v2',
+        '/tasks',
         {
             status: appliedStatuses.value,
             priority: appliedPriorities.value,
@@ -966,7 +966,7 @@ function goToPage(page: number) {
     if (next === current) return;
 
     router.get(
-        '/tasks-v2',
+        '/tasks',
         {
             status: appliedStatuses.value,
             priority: appliedPriorities.value,
@@ -985,14 +985,14 @@ function getTaskEnvironmentLabel(task: Task): string {
 </script>
 
 <template>
-    <Head title="Tasks V2" />
+    <Head title="Tasks" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
             <Card class="w-full">
                 <CardHeader class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <CardTitle>Tasks V2</CardTitle>
+                        <CardTitle>Tasks</CardTitle>
                         <p class="text-muted-foreground text-sm">Default view hides completed tasks.</p>
                     </div>
 
