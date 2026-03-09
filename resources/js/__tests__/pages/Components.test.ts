@@ -14,6 +14,13 @@ vi.mock('@/layouts/AppLayout.vue', () => ({
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { render: () => {} },
+    usePage: () => ({
+        props: {
+            shift: {
+                ai_enabled: false,
+            },
+        },
+    }),
 }));
 
 beforeEach(() => {

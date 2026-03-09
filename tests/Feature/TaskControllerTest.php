@@ -31,8 +31,9 @@ test('index displays tasks', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->has('tasks.data', 3)
+        ->has('projects', 1)
     );
 });
 
@@ -57,7 +58,7 @@ test('tasks v2 defaults to excluding completed tasks', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->has('tasks.data', 1)
         ->where('filters.status', ['pending', 'in-progress', 'awaiting-feedback'])
     );
@@ -117,7 +118,7 @@ test('tasks v2 can filter tasks by environment', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->has('tasks.data', 1)
         ->where('tasks.data.0.id', $stagingTask->id)
         ->where('tasks.data.0.environment', 'staging')
@@ -148,7 +149,7 @@ test('tasks v2 defaults to sorting by updated_at descending', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->where('tasks.data.0.id', $newerTask->id)
         ->where('tasks.data.1.id', $olderTask->id)
         ->where('filters.sort_by', 'updated_at')
@@ -186,7 +187,7 @@ test('tasks v2 can sort tasks by priority', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->where('tasks.data.0.id', $highTask->id)
         ->where('tasks.data.1.id', $mediumTask->id)
         ->where('tasks.data.2.id', $lowTask->id)
@@ -216,7 +217,7 @@ test('index filters tasks by status query', function () {
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Tasks/IndexV2')
+        ->component('Tasks/Index')
         ->has('tasks.data', 1)
         ->where('tasks.data.0.id', $pendingTask->id)
     );
@@ -260,6 +261,88 @@ test('store creates new task', function () {
     $task = Task::where('title', 'Test Task')->first();
     expect($task->submitter->id)->toEqual($this->user->id);
     expect($task->submitter_type)->toEqual(User::class);
+});
+
+test('store v2 creates new task and returns json', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $taskData = [
+        'title' => 'JSON Task',
+        'description' => '<p>Rich description</p>',
+        'project_id' => $project->id,
+        'priority' => 'medium',
+    ];
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.v2.store'), $taskData);
+
+    $response->assertCreated();
+    $response->assertJsonPath('ok', true);
+    $response->assertJsonPath('data.title', 'JSON Task');
+    $response->assertJsonPath('data.description', '<p>Rich description</p>');
+    $response->assertJsonPath('data.priority', 'medium');
+
+    $this->assertDatabaseHas('tasks', [
+        'title' => 'JSON Task',
+        'description' => '<p>Rich description</p>',
+        'project_id' => $project->id,
+        'priority' => 'medium',
+    ]);
+});
+
+test('store v2 persists temp attachments and rewrites editor temp urls', function () {
+    \Illuminate\Support\Facades\Storage::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $tempIdentifier = 'task-create-temp';
+    $tempPath = "temp_attachments/{$tempIdentifier}/task-screenshot.png";
+
+    \Illuminate\Support\Facades\Storage::put($tempPath, 'image-bytes');
+    \Illuminate\Support\Facades\Storage::put(
+        "{$tempPath}.meta",
+        json_encode(['original_filename' => 'Task Screenshot.png'], JSON_THROW_ON_ERROR),
+    );
+
+    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+        'title' => 'Task with inline upload',
+        'description' => "<p><img src=\"/attachments/temp/{$tempIdentifier}/task-screenshot.png\"></p>",
+        'project_id' => $project->id,
+        'priority' => 'medium',
+        'temp_identifier' => $tempIdentifier,
+    ]);
+
+    $response->assertCreated();
+
+    $task = Task::where('title', 'Task with inline upload')->firstOrFail();
+    $attachment = $task->attachments()->first();
+
+    expect($attachment)->not->toBeNull();
+    expect($attachment->original_filename)->toBe('Task Screenshot.png');
+
+    $task->refresh();
+    $downloadUrl = route('attachments.download', $attachment, false);
+
+    expect($task->description)->toContain($downloadUrl);
+    \Illuminate\Support\Facades\Storage::assertExists($attachment->path);
+    \Illuminate\Support\Facades\Storage::assertMissing($tempPath);
+    \Illuminate\Support\Facades\Storage::assertMissing("{$tempPath}.meta");
+});
+
+test('store v2 rejects inaccessible project ids', function () {
+    $otherUsersProject = Project::factory()->create();
+
+    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+        'title' => 'Blocked task',
+        'project_id' => $otherUsersProject->id,
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('project_id');
 });
 
 test('edit route redirects to v2 task view', function () {
