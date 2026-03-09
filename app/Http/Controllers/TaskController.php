@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Response;
 
 class TaskController extends Controller
@@ -88,6 +89,85 @@ class TaskController extends Controller
         if (! $this->visibleTasksQuery()->whereKey($task->id)->exists()) {
             abort(404);
         }
+    }
+
+    private function visibleProjectsQuery(): Builder
+    {
+        $userId = auth()->id();
+
+        return Project::query()->where(function ($query) use ($userId) {
+            $query
+                ->whereHas('client.organisation', function ($organisationQuery) use ($userId) {
+                    $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhereHas('organisation', function ($organisationQuery) use ($userId) {
+                    $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhere('author_id', $userId)
+                ->orWhereHas('projectUser', function ($projectUserQuery) use ($userId) {
+                    $projectUserQuery->where('user_id', $userId);
+                });
+        });
+    }
+
+    private function validateStoreAttributes(Request $request): array
+    {
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'project_id' => 'required|exists:projects,id',
+            'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
+            'temp_identifier' => 'nullable|string',
+            'external_user_ids' => 'nullable|array',
+            'external_user_ids.*' => 'exists:external_users,id',
+        ]);
+
+        if (! $this->visibleProjectsQuery()->whereKey($attributes['project_id'])->exists()) {
+            throw ValidationException::withMessages([
+                'project_id' => 'The selected project is invalid.',
+            ]);
+        }
+
+        return $attributes;
+    }
+
+    private function createTaskFromAttributes(array $attributes): Task
+    {
+        $taskAttributes = [
+            'title' => $attributes['title'],
+            'description' => $attributes['description'] ?? null,
+            'project_id' => $attributes['project_id'],
+        ];
+
+        if (isset($attributes['status'])) {
+            $taskAttributes['status'] = $attributes['status'];
+        }
+
+        if (isset($attributes['priority'])) {
+            $taskAttributes['priority'] = $attributes['priority'];
+        }
+
+        $task = Task::create($taskAttributes);
+
+        $task->submitter()->associate(auth()->user())->save();
+
+        if (! empty($attributes['external_user_ids'])) {
+            $task->externalUsers()->attach($attributes['external_user_ids']);
+        }
+
+        $this->sendTaskCreationNotifications($task);
+
+        if (! empty($attributes['temp_identifier'])) {
+            $created = $this->persistTempAttachmentsForTask($task, $attributes['temp_identifier']);
+
+            if ($task->description) {
+                $task->description = $this->replaceTempUrlsInContent($task->description, $attributes['temp_identifier'], $created);
+                $task->save();
+            }
+        }
+
+        return $task->fresh();
     }
 
     /**
@@ -191,23 +271,9 @@ class TaskController extends Controller
             return $task;
         });
 
-        // Get projects for the filter dropdown (same as in create method)
-        $projects = Project::where(function ($query) {
-            $query->where(
-                fn ($query) => $query
-                    ->whereHas('client.organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })->orWhereHas('organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
-                    })
-                    ->orWhere('author_id', auth()->user()->id)
-                    ->orWhereHas('projectUser', function ($query) {
-                        $query->where('user_id', auth()->user()->id);
-                    })
-            );
-        })->get();
+        $projects = $this->visibleProjectsQuery()->get();
 
-        return inertia('Tasks/Index')
+        return inertia('Tasks/IndexLegacy')
             ->with([
                 'filters' => request()->only(['search', 'project_id', 'priority', 'status']),
                 'tasks' => $tasks,
@@ -293,7 +359,7 @@ class TaskController extends Controller
             ];
         });
 
-        return inertia('Tasks/IndexV2')
+        return inertia('Tasks/Index')
             ->with([
                 'filters' => [
                     'status' => $selectedStatuses,
@@ -303,6 +369,9 @@ class TaskController extends Controller
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
+                'projects' => $this->visibleProjectsQuery()
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
             ]);
     }
 
@@ -609,19 +678,7 @@ class TaskController extends Controller
 
     public function create()
     {
-        $projects = Project::where(function ($query) {
-            $query->where(
-                fn ($query) => $query->whereHas('client.organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })->orWhereHas('organisation', function ($query) {
-                    $query->where('author_id', auth()->user()->id);
-                })
-                    ->orWhere('author_id', auth()->user()->id)
-            )
-                ->orWhereHas('projectUser', function ($query) {
-                    $query->where('user_id', auth()->user()->id);
-                });
-        })->get();
+        $projects = $this->visibleProjectsQuery()->get();
 
         // Load external users for each project
         $projects->each(function ($project) {
@@ -636,88 +693,36 @@ class TaskController extends Controller
 
     // create task
 
-    public function store()
+    public function storeV2(Request $request): JsonResponse
     {
-        $attributes = request()->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'project_id' => 'required|exists:projects,id',
-            'status' => ['nullable', Rule::enum(TaskStatus::class)],
-            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
-            'temp_identifier' => 'nullable|string',
-            'external_user_ids' => 'nullable|array',
-            'external_user_ids.*' => 'exists:external_users,id',
-        ]);
+        $attributes = $this->validateStoreAttributes($request);
+        $task = $this->createTaskFromAttributes($attributes);
+        $task->load(['metadata', 'submitter']);
 
-        $task = Task::create([
-            ...$attributes,
-        ]);
-
-        $task->submitter()->associate(auth()->user())->save();
-
-        // Assign external users to the task if provided
-        if (isset($attributes['external_user_ids']) && ! empty($attributes['external_user_ids'])) {
-            $task->externalUsers()->attach($attributes['external_user_ids']);
+        $environment = $task->metadata?->environment;
+        if (! filled($environment) && $task->submitter) {
+            $environment = $task->submitter->environment ?? null;
         }
 
-        // Send notification to project owner and users with access to the project
-        $this->sendTaskCreationNotifications($task);
+        return response()->json([
+            'ok' => true,
+            'data' => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'priority' => $task->priority,
+                'description' => $task->description,
+                'environment' => $environment,
+                'created_at' => $task->created_at?->toIso8601String(),
+                'updated_at' => $task->updated_at?->toIso8601String(),
+            ],
+        ], 201);
+    }
 
-        // Handle attachments if temp_identifier is provided
-        if (isset($attributes['temp_identifier'])) {
-            $tempIdentifier = $attributes['temp_identifier'];
-            $tempPath = "temp_attachments/{$tempIdentifier}";
-
-            // Check if temp directory exists
-            if (Storage::exists($tempPath)) {
-                // Get all files in the temp directory
-                $files = Storage::files($tempPath);
-
-                // Create permanent directory if it doesn't exist
-                $permanentPath = "attachments/{$task->id}";
-                if (! Storage::exists($permanentPath)) {
-                    Storage::makeDirectory($permanentPath);
-                }
-
-                // Move each file to the permanent location and create attachment records
-                foreach ($files as $file) {
-                    // Skip metadata files
-                    if (Str::endsWith($file, '.meta')) {
-                        continue;
-                    }
-
-                    // Try to get original filename from metadata
-                    $metadataPath = $file.'.meta';
-                    $originalFilename = basename($file);
-
-                    if (Storage::exists($metadataPath)) {
-                        $metadata = json_decode(Storage::get($metadataPath), true);
-                        if (isset($metadata['original_filename'])) {
-                            $originalFilename = $metadata['original_filename'];
-                        }
-                    }
-
-                    // Generate a unique filename for storage
-                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME).'_'.uniqid().'.'.$extension;
-                    $newPath = "{$permanentPath}/{$storedFilename}";
-
-                    // Move the file
-                    Storage::move($file, $newPath);
-
-                    // Create attachment record
-                    Attachment::create([
-                        'attachable_id' => $task->id,
-                        'attachable_type' => Task::class,
-                        'original_filename' => $originalFilename,
-                        'path' => $newPath,
-                    ]);
-                }
-
-                // Remove the temp directory
-                Storage::deleteDirectory($tempPath);
-            }
-        }
+    public function store(Request $request)
+    {
+        $attributes = $this->validateStoreAttributes($request);
+        $this->createTaskFromAttributes($attributes);
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
