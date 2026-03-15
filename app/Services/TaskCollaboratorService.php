@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCollaborator;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -74,56 +75,66 @@ class TaskCollaboratorService
 
     public function sync(Task $task, array $internalUserIds = [], iterable $externalUsers = []): void
     {
-        $normalizedInternalIds = collect($internalUserIds)
+        [$normalizedInternalIds, $normalizedExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
+
+        $this->persistSelection($task, $normalizedInternalIds, $normalizedExternalIds);
+    }
+
+    public function syncWithResult(Task $task, array $internalUserIds = [], iterable $externalUsers = []): array
+    {
+        $task->loadMissing(['submitter', 'internalCollaborators:id', 'externalCollaborators:id']);
+
+        $beforeInternalIds = $task->internalCollaborators
+            ->pluck('id')
             ->map(fn ($id) => (int) $id)
-            ->filter(fn (int $id) => $id > 0)
-            ->unique()
             ->values();
 
-        $normalizedExternalIds = collect($externalUsers)
-            ->map(function ($externalUser) {
-                if ($externalUser instanceof ExternalUser) {
-                    return $externalUser->id;
-                }
-
-                return is_array($externalUser) ? ($externalUser['id'] ?? null) : null;
-            })
-            ->filter()
+        $beforeExternalIds = $task->externalCollaborators
+            ->pluck('id')
             ->map(fn ($id) => (int) $id)
-            ->unique()
             ->values();
 
-        $now = now();
+        [$afterInternalIds, $afterExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
 
-        DB::transaction(function () use ($task, $normalizedInternalIds, $normalizedExternalIds, $now) {
-            $task->collaborators()->delete();
+        $this->persistSelection($task, $afterInternalIds, $afterExternalIds);
 
-            $records = $normalizedInternalIds
-                ->map(fn (int $userId) => [
-                    'task_id' => $task->id,
-                    'kind' => TaskCollaboratorKind::Internal->value,
-                    'user_id' => $userId,
-                    'external_user_id' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ])
-                ->concat(
-                    $normalizedExternalIds->map(fn (int $externalUserId) => [
-                        'task_id' => $task->id,
-                        'kind' => TaskCollaboratorKind::External->value,
-                        'user_id' => null,
-                        'external_user_id' => $externalUserId,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ])
-                )
-                ->values()
-                ->all();
+        $addedInternalIds = $afterInternalIds->diff($beforeInternalIds)->values();
+        $addedExternalIds = $afterExternalIds->diff($beforeExternalIds)->values();
 
-            if ($records !== []) {
-                TaskCollaborator::query()->insert($records);
-            }
-        });
+        return [
+            'internal_ids' => $afterInternalIds->all(),
+            'external_ids' => $afterExternalIds->all(),
+            'added_internal' => $addedInternalIds->isEmpty()
+                ? new EloquentCollection()
+                : User::query()->whereIn('id', $addedInternalIds)->get(),
+            'added_external' => $addedExternalIds->isEmpty()
+                ? new EloquentCollection()
+                : ExternalUser::query()->whereIn('id', $addedExternalIds)->get(),
+        ];
+    }
+
+    public function canManageForInternalUser(Task $task, ?int $userId): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        $task->loadMissing('internalCollaborators:id');
+
+        if ($task->submitter_type === User::class && $task->submitter_id === $userId) {
+            return true;
+        }
+
+        return $task->internalCollaborators->contains('id', $userId);
+    }
+
+    public function canManageForExternalUser(Task $task, ?ExternalUser $externalUser): bool
+    {
+        if ($externalUser === null) {
+            return false;
+        }
+
+        return $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
     }
 
     public function internalAudience(Task $task, ?int $excludingUserId = null): Collection
@@ -183,5 +194,85 @@ class TaskCollaboratorService
         }
 
         return $users->values();
+    }
+
+    private function persistSelection(Task $task, Collection $internalIds, Collection $externalIds): void
+    {
+        $now = now();
+
+        DB::transaction(function () use ($task, $internalIds, $externalIds, $now) {
+            $task->collaborators()->delete();
+
+            $records = $internalIds
+                ->map(fn (int $userId) => [
+                    'task_id' => $task->id,
+                    'kind' => TaskCollaboratorKind::Internal->value,
+                    'user_id' => $userId,
+                    'external_user_id' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+                ->concat(
+                    $externalIds->map(fn (int $externalUserId) => [
+                        'task_id' => $task->id,
+                        'kind' => TaskCollaboratorKind::External->value,
+                        'user_id' => null,
+                        'external_user_id' => $externalUserId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ])
+                )
+                ->values()
+                ->all();
+
+            if ($records !== []) {
+                TaskCollaborator::query()->insert($records);
+            }
+        });
+    }
+
+    private function normalizedSelection(Task $task, array $internalUserIds, iterable $externalUsers): array
+    {
+        $normalizedInternalIds = collect($internalUserIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $normalizedExternalIds = collect($externalUsers)
+            ->map(function ($externalUser) {
+                if ($externalUser instanceof ExternalUser) {
+                    return $externalUser->id;
+                }
+
+                if (is_array($externalUser)) {
+                    return $externalUser['id'] ?? null;
+                }
+
+                if (is_int($externalUser) || is_string($externalUser)) {
+                    return $externalUser;
+                }
+
+                return null;
+            })
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($task->submitter_type === User::class && $task->submitter_id !== null) {
+            $normalizedInternalIds = $normalizedInternalIds
+                ->reject(fn (int $id) => $id === (int) $task->submitter_id)
+                ->values();
+        }
+
+        if ($task->submitter_type === ExternalUser::class && $task->submitter_id !== null) {
+            $normalizedExternalIds = $normalizedExternalIds
+                ->reject(fn (int $id) => $id === (int) $task->submitter_id)
+                ->values();
+        }
+
+        return [$normalizedInternalIds, $normalizedExternalIds];
     }
 }

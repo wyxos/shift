@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Jobs\NotifyExternalCollaboratorAdded;
 use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
@@ -221,7 +223,12 @@ class TaskController extends Controller
         );
     }
 
-    private function syncCollaborators(Task $task, array $attributes, ?string $environment): void
+    private function canManageCollaborators(Task $task): bool
+    {
+        return $this->taskCollaboratorService->canManageForInternalUser($task, auth()->id());
+    }
+
+    private function syncCollaborators(Task $task, array $attributes, ?string $environment): array
     {
         $project = $task->project()->firstOrFail();
         $internalIds = $this->taskCollaboratorService->validateInternalCollaboratorIds(
@@ -236,7 +243,23 @@ class TaskController extends Controller
             ]);
         }
 
-        $this->taskCollaboratorService->sync($task, $internalIds, $externalUsers);
+        return $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalUsers);
+    }
+
+    private function sendCollaboratorAddedNotifications(Task $task, array $syncResult): void
+    {
+        $task->loadMissing('project');
+
+        $addedInternal = $syncResult['added_internal'] ?? collect();
+        if ($addedInternal->isNotEmpty()) {
+            Notification::send($addedInternal, new TaskCollaboratorAddedNotification($task));
+        }
+
+        foreach (($syncResult['added_external'] ?? collect()) as $externalUser) {
+            if ($externalUser->email !== null || $externalUser->url !== null) {
+                NotifyExternalCollaboratorAdded::dispatch($externalUser->id, $task->id);
+            }
+        }
     }
 
     private function createTaskFromAttributes(array $attributes): Task
@@ -439,6 +462,7 @@ class TaskController extends Controller
 
         if ($includeOwnerState) {
             $payload['is_owner'] = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
+            $payload['can_manage_collaborators'] = $this->canManageCollaborators($task);
         }
 
         return $payload;
@@ -597,6 +621,8 @@ class TaskController extends Controller
                     'email' => $user->email,
                 ])
                 ->values(),
+            'internal_available' => true,
+            'internal_error' => null,
             'external' => $external,
             'external_available' => $externalAvailable,
             'external_error' => $externalError,
@@ -686,7 +712,52 @@ class TaskController extends Controller
             }
         }
 
-        $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $this->sendCollaboratorAddedNotifications($task, $syncResult);
+        $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
+
+        return response()->json([
+            'ok' => true,
+            'task' => $this->serializeTaskDetail($task),
+        ]);
+    }
+
+    public function updateCollaboratorsV2(Request $request, Task $task): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+
+        if (! $this->canManageCollaborators($task)) {
+            abort(403);
+        }
+
+        $attributes = $request->validate([
+            'environment' => 'nullable|string|max:255',
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
+        ]);
+
+        $rawEnvironment = array_key_exists('environment', $attributes)
+            ? ($attributes['environment'] ?? null)
+            : $this->taskEnvironment($task);
+
+        $selectedEnvironment = $this->resolveTaskEnvironment(
+            $task->project()->with('environments')->firstOrFail(),
+            $rawEnvironment,
+            $this->externalCollaboratorsRequested($attributes) && ! filled($rawEnvironment),
+        );
+
+        $selectedEnvironmentUrl = $selectedEnvironment !== null
+            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
+            : null;
+
+        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
+        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $this->sendCollaboratorAddedNotifications($task, $syncResult);
+
         $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 
         return response()->json([
@@ -793,7 +864,8 @@ class TaskController extends Controller
         ]);
 
         $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
-        $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $this->sendCollaboratorAddedNotifications($task, $syncResult);
 
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
