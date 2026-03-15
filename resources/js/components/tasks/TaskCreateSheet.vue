@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
+import TaskEnvironmentField from '@/components/tasks/TaskEnvironmentField.vue';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { emptyTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
+import type { TaskProjectOption } from '@/shared/tasks/projects';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
 import TaskCreateForm from '@shared/components/TaskCreateForm.vue';
@@ -9,21 +13,18 @@ import { Plus } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
-type ProjectOption = {
-    id: number;
-    name: string;
-};
-
 type TaskCreateDraft = {
     title: string;
     priority: string;
     description: string;
     projectId: number | null;
+    environment: string | null;
+    collaborators: TaskCollaboratorSelection;
 };
 
 const props = withDefaults(
     defineProps<{
-        projects?: ProjectOption[];
+        projects?: TaskProjectOption[];
     }>(),
     {
         projects: () => [],
@@ -54,6 +55,8 @@ const createForm = ref<TaskCreateDraft>({
     priority: 'medium',
     description: '',
     projectId: defaultProjectId.value,
+    collaborators: emptyTaskCollaborators(),
+    environment: null,
 });
 
 function resetCreateForm() {
@@ -62,6 +65,8 @@ function resetCreateForm() {
         priority: 'medium',
         description: '',
         projectId: defaultProjectId.value,
+        environment: null,
+        collaborators: emptyTaskCollaborators(),
     };
     createTempIdentifier.value = Date.now().toString();
     createError.value = null;
@@ -93,7 +98,14 @@ async function createTask() {
             description: createForm.value.description,
             priority: createForm.value.priority,
             project_id: createForm.value.projectId,
+            environment: createForm.value.environment,
             temp_identifier: createTempIdentifier.value,
+            internal_collaborator_ids: createForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
+            external_collaborators: createForm.value.collaborators.external.map((collaborator) => ({
+                id: collaborator.id,
+                name: collaborator.name,
+                email: collaborator.email,
+            })),
         });
 
         const created = response.data?.data ?? response.data;
@@ -155,6 +167,15 @@ async function createTask() {
                         </option>
                     </select>
                 </div>
+
+                <TaskEnvironmentField
+                    v-model="createForm.environment"
+                    :project-id="createForm.projectId"
+                    :projects="projects"
+                    test-id="create-task-environment"
+                />
+
+                <TaskCollaboratorField v-model="createForm.collaborators" :environment="createForm.environment" :project-id="createForm.projectId" />
 
                 <template #actions>
                     <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">

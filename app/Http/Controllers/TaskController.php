@@ -6,10 +6,14 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
+use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use App\Services\ExternalUserService;
+use App\Services\ProjectEnvironmentService;
+use App\Services\TaskCollaboratorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,29 +27,15 @@ use Inertia\Response;
 
 class TaskController extends Controller
 {
+    public function __construct(
+        private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly ExternalUserService $externalUserService,
+        private readonly ProjectEnvironmentService $projectEnvironmentService,
+    ) {}
+
     private function visibleTasksQuery(): Builder
     {
-        $userId = auth()->id();
-
-        return Task::query()
-            ->where(function ($query) use ($userId) {
-                $query
-                    ->whereHas('project.projectUser', function ($query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    })
-                    ->orWhereHas('project', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHas('project.organisation', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHas('project.client.organisation', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHasMorph('submitter', [User::class], function ($query) use ($userId) {
-                        $query->where('users.id', $userId);
-                    });
-            });
+        return Task::query()->visibleTo(auth()->id());
     }
 
     private function normalizeListFilter(mixed $value): array
@@ -110,18 +100,93 @@ class TaskController extends Controller
         });
     }
 
-    private function validateStoreAttributes(Request $request): array
+    private function externalCollaboratorsRequested(array $attributes): bool
     {
-        $attributes = $request->validate([
+        return ! empty($attributes['external_collaborators'] ?? [])
+            || ! empty($attributes['external_user_ids'] ?? []);
+    }
+
+    private function resolveTaskEnvironment(Project $project, ?string $environment, bool $required): ?string
+    {
+        $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($environment);
+
+        if ($normalizedEnvironment === null) {
+            if ($required) {
+                throw ValidationException::withMessages([
+                    'environment' => 'Select an environment before tagging external collaborators.',
+                ]);
+            }
+
+            return null;
+        }
+
+        if (! $project->environments()->where('environment', $normalizedEnvironment)->exists()) {
+            throw ValidationException::withMessages([
+                'environment' => 'The selected environment is not registered for this project.',
+            ]);
+        }
+
+        return $normalizedEnvironment;
+    }
+
+    private function syncTaskEnvironment(Task $task, ?string $environment, ?string $url = null): void
+    {
+        if ($environment === null) {
+            $task->metadata()->delete();
+
+            return;
+        }
+
+        $task->metadata()->updateOrCreate(
+            ['task_id' => $task->id],
+            [
+                'environment' => $environment,
+                'url' => $url ?? $task->metadata?->url,
+            ],
+        );
+    }
+
+    private function serializeProject(Project $project): array
+    {
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
+            'environments' => $project->environments
+                ->sortBy('environment')
+                ->values()
+                ->map(fn ($environment) => [
+                    'key' => $environment->environment,
+                    'label' => $this->projectEnvironmentService->label($environment->environment),
+                    'url' => $environment->url,
+                ])
+                ->all(),
+        ];
+    }
+
+    private function validateStoreAttributes(Request $request, bool $allowLegacyExternalUserIds = false): array
+    {
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'project_id' => 'required|exists:projects,id',
+            'environment' => 'nullable|string|max:255',
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'temp_identifier' => 'nullable|string',
-            'external_user_ids' => 'nullable|array',
-            'external_user_ids.*' => 'exists:external_users,id',
-        ]);
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
+        ];
+
+        if ($allowLegacyExternalUserIds) {
+            $rules['external_user_ids'] = 'nullable|array';
+            $rules['external_user_ids.*'] = 'exists:external_users,id';
+        }
+
+        $attributes = $request->validate($rules);
 
         if (! $this->visibleProjectsQuery()->whereKey($attributes['project_id'])->exists()) {
             throw ValidationException::withMessages([
@@ -132,12 +197,66 @@ class TaskController extends Controller
         return $attributes;
     }
 
+    private function resolveExternalCollaboratorsForProject(Project $project, ?string $environment, array $attributes): \Illuminate\Support\Collection
+    {
+        if (! empty($attributes['external_user_ids'] ?? [])) {
+            $externalUsers = ExternalUser::query()
+                ->where('project_id', $project->id)
+                ->whereIn('id', $attributes['external_user_ids'])
+                ->get();
+
+            if ($externalUsers->count() !== count(array_unique(array_map('intval', $attributes['external_user_ids'])))) {
+                throw ValidationException::withMessages([
+                    'external_user_ids' => 'One or more external collaborators are invalid for this project.',
+                ]);
+            }
+
+            return $externalUsers->values();
+        }
+
+        return $this->externalUserService->resolveCollaborators(
+            $project,
+            $environment,
+            $attributes['external_collaborators'] ?? [],
+        );
+    }
+
+    private function syncCollaborators(Task $task, array $attributes, ?string $environment): void
+    {
+        $project = $task->project()->firstOrFail();
+        $internalIds = $this->taskCollaboratorService->validateInternalCollaboratorIds(
+            $project,
+            $attributes['internal_collaborator_ids'] ?? [],
+        );
+        try {
+            $externalUsers = $this->resolveExternalCollaboratorsForProject($project, $environment, $attributes);
+        } catch (\RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'external_collaborators' => $exception->getMessage(),
+            ]);
+        }
+
+        $this->taskCollaboratorService->sync($task, $internalIds, $externalUsers);
+    }
+
     private function createTaskFromAttributes(array $attributes): Task
     {
+        $project = Project::query()
+            ->with('environments')
+            ->findOrFail($attributes['project_id']);
+        $environment = $this->resolveTaskEnvironment(
+            $project,
+            $attributes['environment'] ?? null,
+            $this->externalCollaboratorsRequested($attributes),
+        );
+        $environmentUrl = $environment !== null
+            ? $project->environments->firstWhere('environment', $environment)?->url
+            : null;
+
         $taskAttributes = [
             'title' => $attributes['title'],
             'description' => $attributes['description'] ?? null,
-            'project_id' => $attributes['project_id'],
+            'project_id' => $project->id,
         ];
 
         if (isset($attributes['status'])) {
@@ -151,10 +270,8 @@ class TaskController extends Controller
         $task = Task::create($taskAttributes);
 
         $task->submitter()->associate(auth()->user())->save();
-
-        if (! empty($attributes['external_user_ids'])) {
-            $task->externalUsers()->attach($attributes['external_user_ids']);
-        }
+        $this->syncTaskEnvironment($task, $environment, $environmentUrl);
+        $this->syncCollaborators($task, $attributes, $environment);
 
         $this->sendTaskCreationNotifications($task);
 
@@ -255,6 +372,78 @@ class TaskController extends Controller
         return $out;
     }
 
+    private function serializeAttachments(Task $task): array
+    {
+        return $task->attachments->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => route('attachments.download', $attachment),
+            ];
+        })->values()->all();
+    }
+
+    private function serializeCollaborators(Task $task): array
+    {
+        return [
+            'internal_collaborators' => $task->internalCollaborators
+                ->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
+            'external_collaborators' => $task->externalCollaborators
+                ->map(fn (ExternalUser $user) => [
+                    'id' => $user->external_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function taskEnvironment(Task $task): ?string
+    {
+        $environment = $task->metadata?->environment;
+
+        if (! filled($environment) && $task->submitter) {
+            $environment = $task->submitter->environment ?? null;
+        }
+
+        return $environment;
+    }
+
+    private function serializeTaskDetail(Task $task, bool $includeOwnerState = true): array
+    {
+        $payload = [
+            'id' => $task->id,
+            'project_id' => $task->project_id,
+            'title' => $task->title,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'description' => $task->description,
+            'created_at' => $task->created_at?->toIso8601String(),
+            'updated_at' => $task->updated_at?->toIso8601String(),
+            'environment' => $this->taskEnvironment($task),
+            'submitter' => $task->submitter ? [
+                'name' => $task->submitter->name ?? null,
+                'email' => $task->submitter->email ?? null,
+            ] : null,
+            'attachments' => $this->serializeAttachments($task),
+            ...$this->serializeCollaborators($task),
+        ];
+
+        if ($includeOwnerState) {
+            $payload['is_owner'] = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
+        }
+
+        return $payload;
+    }
+
     public function index()
     {
         $query = $this->visibleTasksQuery()
@@ -343,17 +532,12 @@ class TaskController extends Controller
             ->paginate(10)
             ->withQueryString();
         $tasks->through(function (Task $task) {
-            $environment = $task->metadata?->environment;
-            if (! filled($environment) && $task->submitter) {
-                $environment = $task->submitter->environment ?? null;
-            }
-
             return [
                 'id' => $task->id,
                 'title' => $task->title,
                 'status' => $task->status,
                 'priority' => $task->priority,
-                'environment' => $environment,
+                'environment' => $this->taskEnvironment($task),
                 'created_at' => $task->created_at?->toIso8601String(),
                 'updated_at' => $task->updated_at?->toIso8601String(),
             ];
@@ -370,47 +554,62 @@ class TaskController extends Controller
                 ],
                 'tasks' => $tasks,
                 'projects' => $this->visibleProjectsQuery()
+                    ->with('environments')
                     ->orderBy('name')
-                    ->get(['id', 'name']),
+                    ->get()
+                    ->map(fn (Project $project) => $this->serializeProject($project))
+                    ->values()
+                    ->all(),
             ]);
+    }
+
+    public function collaborators(Project $project, Request $request): JsonResponse
+    {
+        if (! $this->visibleProjectsQuery()->whereKey($project->id)->exists()) {
+            abort(404);
+        }
+
+        $search = trim((string) $request->input('search', ''));
+        $environment = $request->input('environment');
+
+        $external = [];
+        $externalAvailable = false;
+        $externalError = null;
+
+        if (! filled($environment)) {
+            $externalError = 'Select an environment before tagging external collaborators.';
+        } else {
+            try {
+                $lookup = $this->externalUserService->searchCollaborators($project, (string) $environment, $search);
+                $external = $lookup['users'];
+                $externalAvailable = true;
+            } catch (\RuntimeException $exception) {
+                $externalError = $exception->getMessage();
+            }
+        }
+
+        return response()->json([
+            'internal' => $this->taskCollaboratorService
+                ->internalCandidates($project, $search)
+                ->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values(),
+            'external' => $external,
+            'external_available' => $externalAvailable,
+            'external_error' => $externalError,
+        ]);
     }
 
     public function showV2(Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
 
-        $task->load(['submitter', 'attachments', 'metadata']);
+        $task->load(['submitter', 'attachments', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 
-        $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
-        $environment = $task->metadata?->environment;
-
-        if (! filled($environment) && $task->submitter) {
-            $environment = $task->submitter->environment ?? null;
-        }
-
-        return response()->json([
-            'id' => $task->id,
-            'title' => $task->title,
-            'status' => $task->status,
-            'priority' => $task->priority,
-            'description' => $task->description,
-            'created_at' => $task->created_at?->toIso8601String(),
-            'updated_at' => $task->updated_at?->toIso8601String(),
-            'environment' => $environment,
-            'is_owner' => $isOwner,
-            'submitter' => $task->submitter ? [
-                'name' => $task->submitter->name ?? null,
-                'email' => $task->submitter->email ?? null,
-            ] : null,
-            'attachments' => $task->attachments->map(function ($attachment) {
-                return [
-                    'id' => $attachment->id,
-                    'original_filename' => $attachment->original_filename,
-                    'path' => $attachment->path,
-                    'url' => route('attachments.download', $attachment),
-                ];
-            })->values(),
-        ]);
+        return response()->json($this->serializeTaskDetail($task));
     }
 
     public function updateV2(Request $request, Task $task): JsonResponse
@@ -425,27 +624,11 @@ class TaskController extends Controller
 
             $task->status = $attributes['status'];
             $task->save();
-            $task->load('attachments');
+            $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 
             return response()->json([
                 'ok' => true,
-                'task' => [
-                    'id' => $task->id,
-                    'title' => $task->title,
-                    'priority' => $task->priority,
-                    'status' => $task->status,
-                    'description' => $task->description,
-                    'created_at' => $task->created_at?->toIso8601String(),
-                    'updated_at' => $task->updated_at?->toIso8601String(),
-                    'attachments' => $task->attachments->map(function ($attachment) {
-                        return [
-                            'id' => $attachment->id,
-                            'original_filename' => $attachment->original_filename,
-                            'path' => $attachment->path,
-                            'url' => route('attachments.download', $attachment),
-                        ];
-                    })->values(),
-                ],
+                'task' => $this->serializeTaskDetail($task),
             ]);
         }
 
@@ -454,16 +637,32 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'priority' => ['required', Rule::enum(TaskPriority::class)],
             'status' => ['required', Rule::enum(TaskStatus::class)],
+            'environment' => 'nullable|string|max:255',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
         ]);
+        $selectedEnvironment = $this->resolveTaskEnvironment(
+            $task->project()->with('environments')->firstOrFail(),
+            $attributes['environment'] ?? null,
+            $this->externalCollaboratorsRequested($attributes),
+        );
+        $selectedEnvironmentUrl = $selectedEnvironment !== null
+            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
+            : null;
 
         $task->title = $attributes['title'];
         $task->priority = $attributes['priority'];
         $task->status = $attributes['status'];
         $task->description = $attributes['description'] ?? null;
         $task->save();
+        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
 
         if (! empty($attributes['deleted_attachment_ids'])) {
             foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
@@ -487,27 +686,12 @@ class TaskController extends Controller
             }
         }
 
-        $task->load('attachments');
+        $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 
         return response()->json([
             'ok' => true,
-            'task' => [
-                'id' => $task->id,
-                'title' => $task->title,
-                'priority' => $task->priority,
-                'status' => $task->status,
-                'description' => $task->description,
-                'created_at' => $task->created_at?->toIso8601String(),
-                'updated_at' => $task->updated_at?->toIso8601String(),
-                'attachments' => $task->attachments->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                    ];
-                })->values(),
-            ],
+            'task' => $this->serializeTaskDetail($task),
         ]);
     }
 
@@ -577,14 +761,29 @@ class TaskController extends Controller
         $attributes = request()->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'environment' => 'nullable|string|max:255',
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
             'external_user_ids' => 'nullable|array',
             'external_user_ids.*' => 'exists:external_users,id',
         ]);
+        $selectedEnvironment = $this->resolveTaskEnvironment(
+            $task->project()->with('environments')->firstOrFail(),
+            $attributes['environment'] ?? null,
+            $this->externalCollaboratorsRequested($attributes),
+        );
+        $selectedEnvironmentUrl = $selectedEnvironment !== null
+            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
+            : null;
 
         $task->update([
             'title' => $attributes['title'],
@@ -593,10 +792,8 @@ class TaskController extends Controller
             'priority' => $attributes['priority'] ?? $task->priority,
         ]);
 
-        // Update external users access
-        if (isset($attributes['external_user_ids'])) {
-            $task->externalUsers()->sync($attributes['external_user_ids']);
-        }
+        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
+        $this->syncCollaborators($task, $attributes, $selectedEnvironment);
 
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
@@ -678,7 +875,9 @@ class TaskController extends Controller
 
     public function create()
     {
-        $projects = $this->visibleProjectsQuery()->get();
+        $projects = $this->visibleProjectsQuery()
+            ->with('environments')
+            ->get();
 
         // Load external users for each project
         $projects->each(function ($project) {
@@ -687,7 +886,7 @@ class TaskController extends Controller
 
         return inertia('Tasks/Create')
             ->with([
-                'projects' => $projects,
+                'projects' => $projects->map(fn (Project $project) => $this->serializeProject($project))->values()->all(),
             ]);
     }
 
@@ -697,31 +896,17 @@ class TaskController extends Controller
     {
         $attributes = $this->validateStoreAttributes($request);
         $task = $this->createTaskFromAttributes($attributes);
-        $task->load(['metadata', 'submitter']);
-
-        $environment = $task->metadata?->environment;
-        if (! filled($environment) && $task->submitter) {
-            $environment = $task->submitter->environment ?? null;
-        }
+        $task->load(['metadata', 'submitter', 'internalCollaborators', 'externalCollaborators']);
 
         return response()->json([
             'ok' => true,
-            'data' => [
-                'id' => $task->id,
-                'title' => $task->title,
-                'status' => $task->status,
-                'priority' => $task->priority,
-                'description' => $task->description,
-                'environment' => $environment,
-                'created_at' => $task->created_at?->toIso8601String(),
-                'updated_at' => $task->updated_at?->toIso8601String(),
-            ],
+            'data' => $this->serializeTaskDetail($task, false),
         ], 201);
     }
 
     public function store(Request $request)
     {
-        $attributes = $this->validateStoreAttributes($request);
+        $attributes = $this->validateStoreAttributes($request, true);
         $this->createTaskFromAttributes($attributes);
 
         return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
@@ -736,41 +921,17 @@ class TaskController extends Controller
      */
     protected function sendTaskCreationNotifications(Task $task)
     {
-        // Load the project with its relationships
-        $project = $task->project()->with(['author', 'projectUser.user'])->first();
+        $task->loadMissing(['submitter', 'internalCollaborators', 'externalCollaborators', 'project.author', 'project.projectUser.user']);
 
-        // Collect all users who should receive the notification
-        $usersToNotify = collect();
-
-        // Get the creator's ID (if it's a User)
-        $creatorId = null;
-        if ($task->submitter_type === User::class) {
-            $creatorId = $task->submitter_id;
-        }
-
-        // Add the project owner (author) if they're not the creator
-        if ($project->author && $project->author->id !== $creatorId) {
-            $usersToNotify->push($project->author);
-        }
-
-        // Add all users with access to the project, except the creator
-        foreach ($project->projectUser as $projectUser) {
-            if ($projectUser->user &&
-                $projectUser->user->id !== $creatorId &&
-                ! $usersToNotify->contains('id', $projectUser->user->id)) {
-                $usersToNotify->push($projectUser->user);
-            }
-        }
-
+        $creatorId = $task->submitter_type === User::class ? $task->submitter_id : null;
+        $usersToNotify = $this->taskCollaboratorService->internalAudience($task, $creatorId);
         if ($usersToNotify->isNotEmpty()) {
             Notification::send($usersToNotify, new TaskCreationNotification($task));
         }
 
-        // Notify external users attached to the task
-        $externalUsers = $task->externalUsers;
-
-        if ($externalUsers->isNotEmpty()) {
-            foreach ($externalUsers as $externalUser) {
+        $creatorExternalUserId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
+        foreach ($this->taskCollaboratorService->externalAudience($task, $creatorExternalUserId) as $externalUser) {
+            if ($externalUser->email !== null || $externalUser->url !== null) {
                 NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }
         }

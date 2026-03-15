@@ -25,6 +25,7 @@ beforeEach(function () {
         'url' => 'https://example.com',
         'name' => 'External Test User',
         'email' => 'external@example.com',
+        'project_id' => $this->project->id,
     ]);
 
     $this->externalUserData = [
@@ -137,6 +138,30 @@ test('external thread creation sends notifications to project users', function (
         function (TaskThreadUpdated $notification) {
             return ($notification->data['url'] ?? null) === route('tasks.index', ['task' => $this->task->id]);
         }
+    );
+});
+
+test('external thread creation sends notifications to tagged internal collaborators', function () {
+    Notification::fake();
+
+    $internalCollaborator = User::factory()->create();
+    $this->task->internalCollaborators()->attach($internalCollaborator->id);
+
+    $threadData = [
+        'content' => 'External collaborator update',
+        'type' => 'external',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson("/api/tasks/{$this->task->id}/threads", $threadData);
+
+    $response->assertStatus(201);
+
+    Notification::assertSentTo(
+        $internalCollaborator,
+        TaskThreadUpdated::class,
     );
 });
 

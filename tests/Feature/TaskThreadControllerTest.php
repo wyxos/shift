@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ExternalUser;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
@@ -14,8 +15,11 @@ beforeEach(function () {
     // Create a user
     $this->user = User::factory()->create();
 
+    $this->project = Project::factory()->withAuthor($this->user->id)->create();
+
     // Create an external user
     $this->externalUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
         'external_id' => 'ext-123',
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -24,7 +28,7 @@ beforeEach(function () {
     ]);
 
     // Create a task submitted by the external user
-    $this->task = Task::factory()->create();
+    $this->task = Task::factory()->for($this->project)->create();
     $this->task->submitter()->associate($this->externalUser)->save();
 });
 
@@ -145,7 +149,7 @@ test('external thread creation with non external submitter sends notification to
 
     // Create a task submitted by a regular user (not an external user)
     $regularUser = User::factory()->create();
-    $task = Task::factory()->create();
+    $task = Task::factory()->for($this->project)->create();
     $task->submitter()->associate($regularUser)->save();
 
     // Add an external user with access to the task
@@ -182,6 +186,7 @@ test('external thread creation sends notification to multiple external users', f
 
     // Create another external user
     $anotherExternalUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
         'external_id' => 'ext-456',
         'environment' => 'testing',
         'url' => 'https://another-example.com',
@@ -333,6 +338,7 @@ test('non creator cannot update a message', function () {
     $thread->save();
 
     $other = User::factory()->create();
+    $this->task->internalCollaborators()->attach($other);
 
     $response = $this->actingAs($other)->putJson(route('task-threads.update', ['task' => $this->task->id, 'thread' => $thread->id]), [
         'content' => '<p>Hack</p>',

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\TaskCollaboratorKind;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +47,35 @@ class Task extends Model
     public function scopeWithStatus(\Illuminate\Database\Eloquent\Builder $query, string $status): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', $status);
+    }
+
+    public function scopeVisibleTo(Builder $query, ?int $userId): Builder
+    {
+        if ($userId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $taskQuery) use ($userId) {
+            $taskQuery
+                ->whereHas('project.projectUser', function (Builder $projectUserQuery) use ($userId) {
+                    $projectUserQuery->where('user_id', $userId);
+                })
+                ->orWhereHas('project', function (Builder $projectQuery) use ($userId) {
+                    $projectQuery->where('author_id', $userId);
+                })
+                ->orWhereHas('project.organisation', function (Builder $organisationQuery) use ($userId) {
+                    $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhereHas('project.client.organisation', function (Builder $organisationQuery) use ($userId) {
+                    $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhereHasMorph('submitter', [User::class], function (Builder $submitterQuery) use ($userId) {
+                    $submitterQuery->where('users.id', $userId);
+                })
+                ->orWhereHas('internalCollaborators', function (Builder $collaboratorQuery) use ($userId) {
+                    $collaboratorQuery->where('users.id', $userId);
+                });
+        });
     }
 
     /**
@@ -127,10 +158,34 @@ class Task extends Model
     }
 
     /**
-     * Get the external users that have access to this task.
+     * Get the collaborator rows for this task.
+     */
+    public function collaborators(): HasMany
+    {
+        return $this->hasMany(TaskCollaborator::class);
+    }
+
+    public function internalCollaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'task_collaborators', 'task_id', 'user_id')
+            ->wherePivot('kind', TaskCollaboratorKind::Internal->value)
+            ->withPivotValue('kind', TaskCollaboratorKind::Internal->value)
+            ->withTimestamps();
+    }
+
+    public function externalCollaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(ExternalUser::class, 'task_collaborators', 'task_id', 'external_user_id')
+            ->wherePivot('kind', TaskCollaboratorKind::External->value)
+            ->withPivotValue('kind', TaskCollaboratorKind::External->value)
+            ->withTimestamps();
+    }
+
+    /**
+     * Keep the legacy name while pointing at the canonical collaborator table.
      */
     public function externalUsers(): BelongsToMany
     {
-        return $this->belongsToMany(ExternalUser::class, 'external_access');
+        return $this->externalCollaborators();
     }
 }
