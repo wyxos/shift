@@ -242,6 +242,54 @@ test('store creates new task', function () {
     ]);
 });
 
+test('store dispatches create notification jobs for tagged external collaborators', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://example.com/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://example.com',
+            'environment' => 'testing',
+            'users' => [
+                [
+                    'id' => 'other-456',
+                    'name' => 'Other External User',
+                    'email' => 'other-collaborator@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $taskData = [
+        'title' => 'New External Task With Collaborator',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+        'metadata' => [
+            'url' => 'https://example.com/task/new-collaborator',
+            'environment' => 'testing',
+        ],
+        'external_collaborators' => [
+            [
+                'id' => 'other-456',
+                'name' => 'Other External User',
+                'email' => 'other-collaborator@example.com',
+            ],
+        ],
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', $taskData);
+
+    $response->assertCreated();
+
+    $task = Task::query()->where('title', 'New External Task With Collaborator')->firstOrFail();
+    $externalUser = ExternalUser::query()->where('email', 'other-collaborator@example.com')->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task, $externalUser) {
+        return $job->taskId === $task->id
+            && $job->externalUserId === $externalUser->id;
+    });
+});
+
 test('update updates task', function () {
     // Create a task submitted by the external user
     $task = Task::factory()->create([

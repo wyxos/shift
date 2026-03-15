@@ -993,7 +993,7 @@ class TaskController extends Controller
      */
     protected function sendTaskCreationNotifications(Task $task)
     {
-        $task->loadMissing(['submitter', 'internalCollaborators', 'externalCollaborators', 'project.author', 'project.projectUser.user']);
+        $task->load(['submitter', 'internalCollaborators', 'externalCollaborators', 'project.author', 'project.projectUser.user']);
 
         $creatorId = $task->submitter_type === User::class ? $task->submitter_id : null;
         $usersToNotify = $this->taskCollaboratorService->internalAudience($task, $creatorId);
