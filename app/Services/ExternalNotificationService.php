@@ -7,6 +7,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 class ExternalNotificationService
 {
@@ -32,7 +33,13 @@ class ExternalNotificationService
                 ];
             }
 
-            $response = Http::post($url . '/shift/api/notifications', $data);
+            $request = Http::acceptJson();
+
+            if ($this->isLocalOrPrivateUrl($url)) {
+                $request = $request->withoutVerifying();
+            }
+
+            $response = $request->post($url . '/shift/api/notifications', $data);
 
             if ($response->successful()) {
                 Log::info("Notification sent to external API: {$handler}", [
@@ -75,6 +82,29 @@ class ExternalNotificationService
             });
 
             return true;
+        }
+
+        return false;
+    }
+
+    private function isLocalOrPrivateUrl(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! is_string($host) || $host === '') {
+            return true;
+        }
+
+        if (in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+            return true;
+        }
+
+        if (Str::endsWith($host, ['.test', '.local'])) {
+            return true;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         }
 
         return false;
