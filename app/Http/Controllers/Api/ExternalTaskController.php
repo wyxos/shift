@@ -510,7 +510,7 @@ class ExternalTaskController extends Controller
      */
     private function sendTaskCreationNotifications(Task $task): void
     {
-        $task->loadMissing(['submitter', 'project.author', 'project.projectUser.user', 'internalCollaborators', 'externalCollaborators']);
+        $task->load(['submitter', 'project.author', 'project.projectUser.user', 'internalCollaborators', 'externalCollaborators']);
         $usersToNotify = $this->taskCollaboratorService->internalAudience($task);
 
         if ($usersToNotify->isNotEmpty()) {
