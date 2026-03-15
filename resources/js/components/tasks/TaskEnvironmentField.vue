@@ -48,7 +48,7 @@ watch(
 
 <template>
     <div class="space-y-2">
-        <Label>{{ label }}</Label>
+        <Label class="text-muted-foreground">{{ label }}</Label>
 
         <div
             v-if="projectId === null"

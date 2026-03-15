@@ -3,7 +3,6 @@
 import ShiftEditor from '@/components/ShiftEditor.vue';
 import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
-import TaskEnvironmentField from '@/components/tasks/TaskEnvironmentField.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
@@ -863,6 +862,18 @@ async function saveTaskChanges() {
 
     if (!needsCoreUpdate && !needsCollaboratorUpdate) return;
 
+    const collaboratorPayload = needsCollaboratorUpdate
+        ? {
+              environment: editForm.value.environment,
+              internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
+              external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
+                  id: collaborator.id,
+                  name: collaborator.name,
+                  email: collaborator.email,
+              })),
+          }
+        : null;
+
     taskSaving.value = true;
     taskSaveError.value = null;
     showTaskSavingToast();
@@ -886,16 +897,8 @@ async function saveTaskChanges() {
             mergeEditedTask(response.data?.task ?? null);
         }
 
-        if (needsCollaboratorUpdate) {
-            const response = await axios.patch(route('tasks.v2.collaborators.update', { task: taskId }), {
-                environment: editForm.value.environment,
-                internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
-                external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
-                    id: collaborator.id,
-                    name: collaborator.name,
-                    email: collaborator.email,
-                })),
-            });
+        if (needsCollaboratorUpdate && collaboratorPayload) {
+            const response = await axios.patch(route('tasks.v2.collaborators.update', { task: taskId }), collaboratorPayload);
 
             mergeEditedTask(response.data?.task ?? null);
         }
@@ -1179,18 +1182,18 @@ function handleTaskCreated(taskId: number | null) {
 
                                 <div class="flex-1 space-y-6 overflow-auto px-6 pb-6">
                                     <div class="space-y-2">
-                                        <Label>Search</Label>
+                                        <Label class="text-muted-foreground">Search</Label>
                                         <Input v-model="draftSearchTerm" data-testid="filter-search" placeholder="Search by title" />
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label>Environment</Label>
+                                        <Label class="text-muted-foreground">Environment</Label>
                                         <Input v-model="draftEnvironmentTerm" data-testid="filter-environment" placeholder="e.g. Production" />
                                     </div>
 
                                     <div class="space-y-2">
                                         <div class="flex items-center justify-between">
-                                            <Label>Status</Label>
+                                            <Label class="text-muted-foreground">Status</Label>
                                             <Button variant="ghost" size="sm" @click="selectAllStatuses">All</Button>
                                         </div>
                                         <div class="grid gap-2">
@@ -1208,7 +1211,7 @@ function handleTaskCreated(taskId: number | null) {
 
                                     <div class="space-y-2">
                                         <div class="flex items-center justify-between">
-                                            <Label>Priority</Label>
+                                            <Label class="text-muted-foreground">Priority</Label>
                                             <Button variant="ghost" size="sm" @click="selectAllPriorities">All</Button>
                                         </div>
                                         <div class="grid gap-2">
@@ -1225,7 +1228,7 @@ function handleTaskCreated(taskId: number | null) {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label>Sort By</Label>
+                                        <Label class="text-muted-foreground">Sort By</Label>
                                         <ButtonGroup
                                             v-model="draftSortBy"
                                             test-id-prefix="sort-by"
@@ -1362,13 +1365,13 @@ function handleTaskCreated(taskId: number | null) {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label>Task</Label>
+                                    <Label class="text-muted-foreground">Task</Label>
                                     <template v-if="isOwner">
                                         <Input v-model="editForm.title" placeholder="Short, descriptive title" required />
                                     </template>
                                     <template v-else>
                                         <div
-                                            class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-md border border-dashed p-3 text-sm"
+                                            class="border-muted-foreground/30 bg-muted/10 text-foreground rounded-md border border-dashed p-3 text-sm"
                                         >
                                             {{ editTask.title }}
                                         </div>
@@ -1376,7 +1379,7 @@ function handleTaskCreated(taskId: number | null) {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label>Status</Label>
+                                    <Label class="text-muted-foreground">Status</Label>
                                     <ButtonGroup
                                         v-model="editForm.status"
                                         aria-label="Task status"
@@ -1388,7 +1391,7 @@ function handleTaskCreated(taskId: number | null) {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label>Priority</Label>
+                                    <Label class="text-muted-foreground">Priority</Label>
                                     <template v-if="isOwner">
                                         <ButtonGroup
                                             v-model="editForm.priority"
@@ -1400,25 +1403,15 @@ function handleTaskCreated(taskId: number | null) {
                                     </template>
                                     <template v-else>
                                         <div
-                                            class="border-muted-foreground/30 bg-muted/10 text-muted-foreground inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                            class="border-muted-foreground/30 bg-muted/10 text-foreground inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                                         >
                                             {{ getPriorityLabel(editTask.priority) }}
                                         </div>
                                     </template>
                                 </div>
 
-                                <div v-if="isOwner || canManageCollaborators" class="space-y-2">
-                                    <TaskEnvironmentField
-                                        v-model="editForm.environment"
-                                        :disabled="editLoading || editUploading"
-                                        :project-id="editTask.project_id ?? null"
-                                        :projects="props.projects"
-                                        test-id="edit-task-environment-select"
-                                    />
-                                </div>
-
                                 <div class="space-y-2">
-                                    <Label>Description</Label>
+                                    <Label class="text-muted-foreground">Description</Label>
                                     <template v-if="isOwner">
                                         <ShiftEditor
                                             v-model="editForm.description"
@@ -1429,13 +1422,13 @@ function handleTaskCreated(taskId: number | null) {
                                         />
                                     </template>
                                     <template v-else>
-                                        <div class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-lg border p-4 text-sm">
+                                        <div class="border-muted-foreground/30 bg-muted/10 text-foreground rounded-lg border p-4 text-sm">
                                             <div
                                                 v-if="editTask.description"
                                                 class="tiptap shift-rich [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
                                                 v-html="renderRichContent(editTask.description)"
                                             ></div>
-                                            <div v-else>No description provided.</div>
+                                            <div v-else class="text-muted-foreground">No description provided.</div>
                                         </div>
                                     </template>
                                 </div>
@@ -1452,12 +1445,12 @@ function handleTaskCreated(taskId: number | null) {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label>Attachments</Label>
+                                    <Label class="text-muted-foreground">Attachments</Label>
                                     <div v-if="taskAttachments.length" class="space-y-2">
                                         <div
                                             v-for="attachment in taskAttachments"
                                             :key="attachment.id"
-                                            class="border-muted-foreground/20 bg-muted/10 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                            class="border-muted-foreground/20 bg-muted/10 text-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                                         >
                                             <a
                                                 :href="attachment.url"
