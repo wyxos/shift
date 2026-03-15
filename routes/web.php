@@ -57,6 +57,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks-v2/projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.v2.collaborators');
     Route::post('tasks-v2/tasks', [TaskController::class, 'storeV2'])->name('tasks.v2.store');
     Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
+    Route::patch('tasks-v2/tasks/{task}/collaborators', [TaskController::class, 'updateCollaboratorsV2'])->name('tasks.v2.collaborators.update');
     Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');

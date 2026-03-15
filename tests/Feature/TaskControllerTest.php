@@ -870,3 +870,114 @@ test('edit route redirects for external submitted task', function () {
 
     $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
+
+test('attached internal collaborator can update collaborators through the v2 collaborator endpoint', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    $manager = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $manager->id,
+        'user_email' => $manager->email,
+        'user_name' => $manager->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $newCollaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $newCollaborator->id,
+        'user_email' => $newCollaborator->email,
+        'user_name' => $newCollaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Collaborator managed task',
+    ]);
+    $task->submitter()->associate($owner)->save();
+    $task->internalCollaborators()->attach($manager->id);
+
+    $response = $this->actingAs($manager)
+        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+            'internal_collaborator_ids' => [$manager->id, $newCollaborator->id],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('task.can_manage_collaborators', true)
+        ->assertJsonPath('task.internal_collaborators.1.id', $newCollaborator->id);
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $newCollaborator->id,
+    ]);
+});
+
+test('visible project member without task attachment cannot update collaborators', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    $viewer = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $viewer->id,
+        'user_email' => $viewer->email,
+        'user_name' => $viewer->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+    $task->submitter()->associate($owner)->save();
+
+    $response = $this->actingAs($viewer)
+        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+            'internal_collaborator_ids' => [$viewer->id],
+        ]);
+
+    $response->assertForbidden();
+});
+
+test('adding an internal collaborator to an existing task sends collaborator added notification', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $collaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $collaborator->id,
+        'user_email' => $collaborator->email,
+        'user_name' => $collaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Existing task',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)
+        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+            'internal_collaborator_ids' => [$collaborator->id],
+        ]);
+
+    $response->assertOk();
+
+    \Illuminate\Support\Facades\Notification::assertSentTo(
+        $collaborator,
+        \App\Notifications\TaskCollaboratorAddedNotification::class,
+    );
+});
+
