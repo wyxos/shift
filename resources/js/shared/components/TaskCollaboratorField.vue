@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
 <template>
     <div class="space-y-4" data-testid="task-collaborators">
         <div class="space-y-1">
-            <div class="flex items-center gap-2 text-sm leading-none font-medium select-none">Collaborators</div>
+            <div class="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium select-none">Collaborators</div>
             <p class="text-muted-foreground text-xs">Tag the people who should be able to access this task.</p>
         </div>
 

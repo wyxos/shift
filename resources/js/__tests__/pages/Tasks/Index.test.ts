@@ -8,6 +8,7 @@ import { h } from 'vue';
 const axiosGetMock = vi.fn();
 const axiosPutMock = vi.fn();
 const axiosPostMock = vi.fn();
+const axiosPatchMock = vi.fn();
 const axiosDeleteMock = vi.fn();
 const sonnerMocks = vi.hoisted(() => ({
     toastLoadingMock: vi.fn(() => 'autosave-toast'),
@@ -21,6 +22,7 @@ vi.mock('axios', () => ({
         get: (...args: any[]) => axiosGetMock(...args),
         put: (...args: any[]) => axiosPutMock(...args),
         post: (...args: any[]) => axiosPostMock(...args),
+        patch: (...args: any[]) => axiosPatchMock(...args),
         delete: (...args: any[]) => axiosDeleteMock(...args),
     },
 }));
@@ -323,6 +325,7 @@ describe('Tasks/Index.vue', () => {
         window.history.replaceState({}, '', '/tasks');
         (globalThis as any).route = vi.fn((name: string) => `/${name}`);
         axiosPostMock.mockReset();
+        axiosPatchMock.mockReset();
         axiosDeleteMock.mockReset();
         (router.get as any).mockClear();
         (router.reload as any).mockClear();
@@ -719,6 +722,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
+        expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
         expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toContain('Updated');
         expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
@@ -873,6 +877,7 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '',
                     is_owner: true,
+                    can_manage_collaborators: true,
                     submitter: { email: 'owner@example.com' },
                     attachments: [],
                     internal_collaborators: [],
@@ -896,7 +901,24 @@ describe('Tasks/Index.vue', () => {
                     id: 1,
                     title: 'Owner task',
                     environment: 'staging',
-                    priority: 'high',
+                    priority: 'medium',
+                    status: 'pending',
+                    description: '',
+                    attachments: [],
+                    internal_collaborators: [],
+                    external_collaborators: [],
+                },
+            },
+        });
+
+        axiosPatchMock.mockResolvedValueOnce({
+            data: {
+                ok: true,
+                task: {
+                    id: 1,
+                    title: 'Owner task',
+                    environment: 'staging',
+                    priority: 'medium',
                     status: 'pending',
                     description: '',
                     attachments: [],
@@ -917,15 +939,14 @@ describe('Tasks/Index.vue', () => {
         await wrapper.find('button[title="Edit"]').trigger('click');
         await flushPromises();
 
-        const collaboratorButtons = wrapper.findAll('[data-testid="set-task-collaborators"]');
-        expect(collaboratorButtons).toHaveLength(2);
-
-        await collaboratorButtons[1].trigger('click');
-        await flushPromises();
-        expect((wrapper.vm as any).editForm.collaborators).toEqual({
+        const nextCollaborators = {
             internal: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
             external: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
-        });
+        };
+
+        (wrapper.vm as any).editForm.collaborators = nextCollaborators;
+        await (wrapper.vm as any).$nextTick();
+        expect((wrapper.vm as any).editForm.collaborators).toEqual(nextCollaborators);
 
         await wrapper.get('[data-testid="task-priority-medium"]').trigger('click');
         await flushPromises();
@@ -936,8 +957,16 @@ describe('Tasks/Index.vue', () => {
         expect(axiosPutMock).toHaveBeenCalledWith(
             '/tasks.v2.update',
             expect.objectContaining({
-                environment: 'staging',
                 priority: 'medium',
+                title: 'Owner task',
+                status: 'pending',
+            }),
+        );
+
+        expect(axiosPatchMock).toHaveBeenCalledWith(
+            '/tasks.v2.collaborators.update',
+            expect.objectContaining({
+                environment: 'staging',
                 internal_collaborator_ids: [91],
                 external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
             }),
