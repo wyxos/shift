@@ -243,6 +243,52 @@ vi.mock('@shared/components/ShiftEditor.vue', () => ({
     },
 }));
 
+vi.mock('@/components/tasks/TaskCollaboratorField.vue', () => ({
+    default: {
+        props: ['modelValue', 'projectId', 'environment', 'readOnly', 'disabled'],
+        emits: ['update:modelValue'],
+        render() {
+            return h('div', { class: 'task-collaborator-field-stub' }, [
+                h(
+                    'button',
+                    {
+                        type: 'button',
+                        'data-testid': 'set-task-collaborators',
+                        disabled: this.disabled || this.readOnly,
+                        onClick: () =>
+                            this.$emit('update:modelValue', {
+                                internal: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
+                                external: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                            }),
+                    },
+                    'set collaborators',
+                ),
+            ]);
+        },
+    },
+}));
+
+vi.mock('@/components/tasks/TaskEnvironmentField.vue', () => ({
+    default: {
+        props: ['modelValue', 'projectId', 'projects', 'disabled'],
+        emits: ['update:modelValue'],
+        render() {
+            return h('div', { class: 'task-environment-field-stub' }, [
+                h(
+                    'button',
+                    {
+                        type: 'button',
+                        'data-testid': 'set-task-environment',
+                        disabled: this.disabled || this.projectId == null,
+                        onClick: () => this.$emit('update:modelValue', 'staging'),
+                    },
+                    'set environment',
+                ),
+            ]);
+        },
+    },
+}));
+
 vi.mock('@/components/ui/image-lightbox', () => ({
     ImageLightbox: {
         render() {
@@ -350,6 +396,14 @@ describe('Tasks/Index.vue', () => {
 
     it('creates a task from the V2 sheet and reloads the list', async () => {
         axiosGetMock.mockReset();
+        axiosGetMock.mockResolvedValue({
+            data: {
+                internal: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
+                external: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                external_available: true,
+                external_error: null,
+            },
+        });
         axiosPostMock.mockResolvedValueOnce({
             data: {
                 data: {
@@ -362,7 +416,7 @@ describe('Tasks/Index.vue', () => {
         const wrapper = mount(Index, {
             props: {
                 tasks: makeTasksPage([]),
-                projects: [{ id: 42, name: 'Portal' }],
+                projects: [{ id: 42, name: 'Portal', environments: [{ key: 'staging', label: 'Staging', url: 'https://portal.test' }] }],
                 filters: {
                     status: ['pending', 'in-progress', 'awaiting-feedback'],
                     priority: ['low', 'medium', 'high'],
@@ -374,6 +428,8 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="open-create-task"]').trigger('click');
         await wrapper.get('[data-testid="create-task-title"]').setValue('Created from UI');
         await wrapper.get('[data-testid="create-description-editor"] [data-testid="stub-editor-input"]').setValue('<p>Details</p>');
+        await wrapper.get('[data-testid="set-task-environment"]').trigger('click');
+        await wrapper.get('[data-testid="set-task-collaborators"]').trigger('click');
         await wrapper.get('[data-testid="create-task-form"]').trigger('submit');
         await flushPromises();
 
@@ -384,6 +440,9 @@ describe('Tasks/Index.vue', () => {
                 description: '<p>Details</p>',
                 priority: 'medium',
                 project_id: 42,
+                environment: 'staging',
+                internal_collaborator_ids: [91],
+                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
             }),
         );
         expect((router.reload as any).mock.calls).toHaveLength(1);
@@ -792,6 +851,97 @@ describe('Tasks/Index.vue', () => {
             expect.objectContaining({ content: '<p>Second</p>', temp_identifier: expect.any(String) }),
         );
         expect(wrapper.text()).toContain('Edited');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('includes grouped collaborator payloads in owner autosaves', async () => {
+        vi.useFakeTimers();
+        axiosGetMock.mockReset();
+        axiosPutMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    project_id: 42,
+                    title: 'Owner task',
+                    environment: 'staging',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: true,
+                    submitter: { email: 'owner@example.com' },
+                    attachments: [],
+                    internal_collaborators: [],
+                    external_collaborators: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } })
+            .mockResolvedValueOnce({
+                data: {
+                    internal: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
+                    external: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                    external_available: true,
+                    external_error: null,
+                },
+            });
+
+        axiosPutMock.mockResolvedValueOnce({
+            data: {
+                ok: true,
+                task: {
+                    id: 1,
+                    title: 'Owner task',
+                    environment: 'staging',
+                    priority: 'high',
+                    status: 'pending',
+                    description: '',
+                    attachments: [],
+                    internal_collaborators: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
+                    external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                },
+            },
+        });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Owner task', status: 'pending', priority: 'high' }]),
+                projects: [{ id: 42, name: 'Portal', environments: [{ key: 'staging', label: 'Staging', url: 'https://portal.test' }] }],
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        const collaboratorButtons = wrapper.findAll('[data-testid="set-task-collaborators"]');
+        expect(collaboratorButtons).toHaveLength(2);
+
+        await collaboratorButtons[1].trigger('click');
+        await flushPromises();
+        expect((wrapper.vm as any).editForm.collaborators).toEqual({
+            internal: [{ id: 91, name: 'Jane Doe', email: 'jane@example.com' }],
+            external: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+        });
+
+        await wrapper.get('[data-testid="task-priority-medium"]').trigger('click');
+        await flushPromises();
+
+        vi.advanceTimersByTime(800);
+        await flushPromises();
+
+        expect(axiosPutMock).toHaveBeenCalledWith(
+            '/tasks.v2.update',
+            expect.objectContaining({
+                environment: 'staging',
+                priority: 'medium',
+                internal_collaborator_ids: [91],
+                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+            }),
+        );
 
         wrapper.unmount();
         vi.useRealTimers();

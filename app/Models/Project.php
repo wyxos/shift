@@ -15,13 +15,12 @@ class Project extends Model
 
     /**
      * Generate a new API token for the project.
-     *
-     * @return string
      */
     public function generateApiToken(): string
     {
         $token = \Illuminate\Support\Str::random(60);
         $this->update(['token' => $token]);
+
         return $token;
     }
 
@@ -40,6 +39,11 @@ class Project extends Model
         return $this->hasMany(ProjectUser::class);
     }
 
+    public function environments(): HasMany
+    {
+        return $this->hasMany(ProjectEnvironment::class);
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
@@ -56,5 +60,16 @@ class Project extends Model
     public function externalUsers(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ExternalUser::class);
+    }
+
+    public function isManagedByUser(?int $userId): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        return $this->client?->organisation?->author_id === $userId
+            || $this->organisation?->author_id === $userId
+            || $this->author_id === $userId;
     }
 }

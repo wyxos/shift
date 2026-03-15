@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ExternalUser;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
@@ -10,7 +11,10 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     Sanctum::actingAs($this->user);
 
+    $this->project = Project::factory()->create();
+
     $this->externalUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
         'external_id' => 'ext-123',
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -18,7 +22,8 @@ beforeEach(function () {
         'email' => 'external@example.com',
     ]);
 
-    $this->task = Task::factory()->create();
+    $this->task = Task::factory()->for($this->project)->create();
+    $this->task->submitter()->associate($this->externalUser)->save();
     $this->projectToken = $this->task->project->generateApiToken();
 });
 
@@ -63,15 +68,26 @@ test('external thread update is forbidden for non owner', function () {
     $thread->sender()->associate($this->externalUser);
     $thread->save();
 
+    $otherExternalUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
+        'external_id' => 'different-user',
+        'environment' => $this->externalUser->environment,
+        'url' => $this->externalUser->url,
+        'name' => 'Different',
+        'email' => 'different@example.com',
+    ]);
+
+    $this->task->externalUsers()->attach($otherExternalUser);
+
     $response = $this->putJson(route('api.task-threads.update', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'content' => '<p>Hack</p>',
         'project' => $this->projectToken,
         'user' => [
-            'id' => 'different-user',
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
-            'name' => 'Different',
-            'email' => 'different@example.com',
+            'id' => $otherExternalUser->external_id,
+            'environment' => $otherExternalUser->environment,
+            'url' => $otherExternalUser->url,
+            'name' => $otherExternalUser->name,
+            'email' => $otherExternalUser->email,
         ],
         'metadata' => [
             'url' => $this->externalUser->url,
@@ -115,12 +131,23 @@ test('external thread delete is forbidden for non owner', function () {
     $thread->sender()->associate($this->externalUser);
     $thread->save();
 
+    $otherExternalUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
+        'external_id' => 'different-user',
+        'environment' => $this->externalUser->environment,
+        'url' => $this->externalUser->url,
+        'name' => 'Different',
+        'email' => 'different@example.com',
+    ]);
+
+    $this->task->externalUsers()->attach($otherExternalUser);
+
     $response = $this->deleteJson(route('api.task-threads.destroy', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'project' => $this->projectToken,
         'user' => [
-            'id' => 'different-user',
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
+            'id' => $otherExternalUser->external_id,
+            'environment' => $otherExternalUser->environment,
+            'url' => $otherExternalUser->url,
         ],
     ]);
 

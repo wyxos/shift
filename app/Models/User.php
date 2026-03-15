@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,7 +13,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -70,5 +71,13 @@ class User extends Authenticatable
     public function tasks(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(Task::class, 'submitter');
+    }
+
+    public function collaboratorTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_collaborators', 'user_id', 'task_id')
+            ->wherePivot('kind', \App\Enums\TaskCollaboratorKind::Internal->value)
+            ->withPivotValue('kind', \App\Enums\TaskCollaboratorKind::Internal->value)
+            ->withTimestamps();
     }
 }

@@ -292,6 +292,78 @@ test('store v2 creates new task and returns json', function () {
     ]);
 });
 
+test('store v2 syncs grouped collaborators and returns them in the response', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://client-app.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://client-app.test',
+            'environment' => 'production',
+            'users' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'token' => 'project-token',
+    ]);
+    $project->environments()->create([
+        'environment' => 'production',
+        'url' => 'https://client-app.test',
+    ]);
+
+    $internalCollaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $internalCollaborator->id,
+        'user_email' => $internalCollaborator->email,
+        'user_name' => $internalCollaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.v2.store'), [
+            'title' => 'Task with collaborators',
+            'project_id' => $project->id,
+            'environment' => 'production',
+            'internal_collaborator_ids' => [$internalCollaborator->id],
+            'external_collaborators' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ]);
+
+    $response->assertCreated();
+
+    $task = Task::where('title', 'Task with collaborators')->firstOrFail();
+    expect($task->metadata?->environment)->toBe('production');
+    $externalUser = ExternalUser::where('project_id', $project->id)
+        ->where('external_id', 'client-7')
+        ->first();
+
+    expect($externalUser)->not->toBeNull();
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $internalCollaborator->id,
+        'kind' => 'internal',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $externalUser->id,
+        'kind' => 'external',
+    ]);
+
+    $response->assertJsonPath('data.internal_collaborators.0.id', $internalCollaborator->id);
+    $response->assertJsonPath('data.external_collaborators.0.id', 'client-7');
+});
+
 test('store v2 persists temp attachments and rewrites editor temp urls', function () {
     \Illuminate\Support\Facades\Storage::fake();
 
@@ -343,6 +415,119 @@ test('store v2 rejects inaccessible project ids', function () {
 
     $response->assertStatus(422);
     $response->assertJsonValidationErrors('project_id');
+});
+
+test('store v2 requires an environment before syncing external collaborators', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'token' => 'project-token',
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+        'title' => 'Needs environment',
+        'project_id' => $project->id,
+        'external_collaborators' => [
+            [
+                'id' => 'client-7',
+                'name' => 'Client User',
+                'email' => 'client@example.com',
+            ],
+        ],
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('environment');
+});
+
+test('internal collaborator can view task details without broader project visibility', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Collaborator visible task',
+    ]);
+    $task->submitter()->associate($owner)->save();
+    $task->internalCollaborators()->attach($this->user->id);
+
+    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('id', $task->id)
+        ->assertJsonPath('internal_collaborators.0.id', $this->user->id);
+});
+
+test('collaborator candidate endpoint requires an environment before external lookup', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $registeredUser = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $registeredUser->id,
+        'user_email' => $registeredUser->email,
+        'user_name' => $registeredUser->name,
+        'registration_status' => 'registered',
+    ]);
+
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => null,
+        'user_email' => 'pending@example.com',
+        'user_name' => 'Pending Invite',
+        'registration_status' => 'pending',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->getJson(route('tasks.v2.collaborators', $project));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('external_available', false)
+        ->assertJsonPath('external_error', 'Select an environment before tagging external collaborators.')
+        ->assertJsonCount(2, 'internal');
+    $response->assertJsonFragment(['id' => $this->user->id]);
+    $response->assertJsonFragment(['id' => $registeredUser->id]);
+});
+
+test('collaborator candidate endpoint uses the selected environment registration for external lookup', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://staging-client.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://staging-client.test',
+            'environment' => 'staging',
+            'users' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'token' => 'project-token',
+    ]);
+    $project->environments()->create([
+        'environment' => 'staging',
+        'url' => 'https://staging-client.test',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->getJson(route('tasks.v2.collaborators', [
+            'project' => $project,
+            'environment' => 'staging',
+        ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('external_available', true)
+        ->assertJsonPath('external.0.id', 'client-7');
 });
 
 test('edit route redirects to v2 task view', function () {
@@ -589,6 +774,37 @@ test('task creation sends notifications', function () {
         function ($notification, $channels, $notifiable) use ($task) {
             return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $task->id]);
         }
+    );
+});
+
+test('task creation notifies tagged internal collaborators', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $collaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $collaborator->id,
+        'user_email' => $collaborator->email,
+        'user_name' => $collaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.v2.store'), [
+            'title' => 'Tagged internal collaborator task',
+            'project_id' => $project->id,
+            'internal_collaborator_ids' => [$collaborator->id],
+        ]);
+
+    $response->assertCreated();
+
+    \Illuminate\Support\Facades\Notification::assertSentTo(
+        $collaborator,
+        \App\Notifications\TaskCreationNotification::class,
     );
 });
 
