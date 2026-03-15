@@ -808,6 +808,57 @@ test('task creation notifies tagged internal collaborators', function () {
     );
 });
 
+test('store v2 dispatches create notification jobs for tagged external collaborators', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://client-app.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://client-app.test',
+            'environment' => 'local',
+            'users' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'token' => 'project-token-external-create',
+    ]);
+    $project->environments()->create([
+        'environment' => 'local',
+        'url' => 'https://client-app.test',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.v2.store'), [
+            'title' => 'Tagged external collaborator task',
+            'project_id' => $project->id,
+            'environment' => 'local',
+            'external_collaborators' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ]);
+
+    $response->assertCreated();
+
+    $task = Task::query()->where('title', 'Tagged external collaborator task')->firstOrFail();
+    $externalUser = ExternalUser::query()->where('email', 'client@example.com')->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task, $externalUser) {
+        return $job->taskId === $task->id
+            && $job->externalUserId === $externalUser->id;
+    });
+});
+
 test('edit route redirects for internal task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
