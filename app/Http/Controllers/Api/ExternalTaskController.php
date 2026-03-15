@@ -505,13 +505,12 @@ class ExternalTaskController extends Controller
     }
 
     /**
-     * Send task creation notifications to project owner and users with access to the project.
-     * For external tasks, all relevant users should receive notifications.
+     * Send creation notifications only to the submitter and explicitly tagged collaborators.
      */
     private function sendTaskCreationNotifications(Task $task): void
     {
-        $task->load(['submitter', 'project.author', 'project.projectUser.user', 'internalCollaborators', 'externalCollaborators']);
-        $usersToNotify = $this->taskCollaboratorService->internalAudience($task);
+        $task->load(['submitter', 'project', 'internalCollaborators', 'externalCollaborators']);
+        $usersToNotify = $this->taskCollaboratorService->internalTaskCreateAudience($task);
 
         if ($usersToNotify->isNotEmpty()) {
             Notification::send(
@@ -520,8 +519,7 @@ class ExternalTaskController extends Controller
             );
         }
 
-        $creatorExternalUserId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
-        foreach ($this->taskCollaboratorService->externalAudience($task, $creatorExternalUserId) as $externalUser) {
+        foreach ($this->taskCollaboratorService->externalTaskCreateAudience($task) as $externalUser) {
             if ($externalUser->email !== null || $externalUser->url !== null) {
                 NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }

@@ -176,6 +176,9 @@ async function createTask() {
                 />
 
                 <TaskCollaboratorField v-model="createForm.collaborators" :environment="createForm.environment" :project-id="createForm.projectId" />
+                <p class="text-muted-foreground text-xs">
+                    On create, the submitter and selected collaborators are notified.
+                </p>
 
                 <template #actions>
                     <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">

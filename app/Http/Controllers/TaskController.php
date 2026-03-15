@@ -985,24 +985,18 @@ class TaskController extends Controller
     }
 
     /**
-     * Send task creation notifications to project owner and users with access to the project.
-     * Excludes the creator of the task from receiving notifications.
-     * Also notifies external users attached to the task.
-     *
-     * @return void
+     * Send creation notifications only to the submitter and explicitly tagged collaborators.
      */
     protected function sendTaskCreationNotifications(Task $task)
     {
-        $task->load(['submitter', 'internalCollaborators', 'externalCollaborators', 'project.author', 'project.projectUser.user']);
+        $task->load(['submitter', 'internalCollaborators', 'externalCollaborators', 'project']);
 
-        $creatorId = $task->submitter_type === User::class ? $task->submitter_id : null;
-        $usersToNotify = $this->taskCollaboratorService->internalAudience($task, $creatorId);
+        $usersToNotify = $this->taskCollaboratorService->internalTaskCreateAudience($task);
         if ($usersToNotify->isNotEmpty()) {
             Notification::send($usersToNotify, new TaskCreationNotification($task));
         }
 
-        $creatorExternalUserId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
-        foreach ($this->taskCollaboratorService->externalAudience($task, $creatorExternalUserId) as $externalUser) {
+        foreach ($this->taskCollaboratorService->externalTaskCreateAudience($task) as $externalUser) {
             if ($externalUser->email !== null || $externalUser->url !== null) {
                 NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }

@@ -457,41 +457,40 @@ test('destroy returns 403 for unauthorized user', function () {
     $response->assertStatus(403);
 });
 
-test('external task creation sends notifications to all relevant users', function () {
+test('external task creation only notifies explicitly tagged internal collaborators', function () {
     \Illuminate\Support\Facades\Notification::fake();
 
-    // Create additional users with access to the project
-    $projectUser1 = User::factory()->create();
-    $projectUser2 = User::factory()->create();
+    $taggedInternalCollaborator = User::factory()->create();
+    $untaggedProjectUser = User::factory()->create();
 
-    // Give these users access to the project
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $this->project->id,
-        'user_id' => $projectUser1->id,
-        'user_email' => $projectUser1->email,
-        'user_name' => $projectUser1->name,
+        'user_id' => $taggedInternalCollaborator->id,
+        'user_email' => $taggedInternalCollaborator->email,
+        'user_name' => $taggedInternalCollaborator->name,
         'registration_status' => 'registered',
     ]);
 
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $this->project->id,
-        'user_id' => $projectUser2->id,
-        'user_email' => $projectUser2->email,
-        'user_name' => $projectUser2->name,
+        'user_id' => $untaggedProjectUser->id,
+        'user_email' => $untaggedProjectUser->email,
+        'user_name' => $untaggedProjectUser->name,
         'registration_status' => 'registered',
     ]);
 
     $taskData = [
-        'title' => 'External Notification Test Task',
-        'description' => 'This task should trigger notifications to all users',
+        'title' => 'External Notification Policy Task',
+        'description' => 'This task should only notify explicit recipients',
         'project' => $this->project->token,
         'priority' => 'high',
         'status' => 'pending',
         'user' => $this->externalUserData,
         'metadata' => [
-            'url' => 'https://example.com/task/notification-test',
+            'url' => 'https://example.com/task/notification-policy',
             'environment' => 'testing',
         ],
+        'internal_collaborator_ids' => [$taggedInternalCollaborator->id],
     ];
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -499,13 +498,17 @@ test('external task creation sends notifications to all relevant users', functio
 
     $response->assertStatus(201);
 
-    // Assert that notifications were sent to the project owner and all users with access
     \Illuminate\Support\Facades\Notification::assertSentTo(
-        [$this->user, $projectUser1, $projectUser2],
+        $taggedInternalCollaborator,
         \App\Notifications\TaskCreationNotification::class,
         function ($notification, $channels, $notifiable) use ($response) {
             return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $response->json('id')]);
         }
+    );
+
+    \Illuminate\Support\Facades\Notification::assertNotSentTo(
+        [$this->user, $untaggedProjectUser],
+        \App\Notifications\TaskCreationNotification::class,
     );
 });
 test('index returns tasks with granted access', function () {
