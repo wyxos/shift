@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyExternalCollaboratorAdded;
+use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
+use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Services\ExternalUserService;
+use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +29,7 @@ class ExternalTaskController extends Controller
     public function __construct(
         private readonly ExternalUserService $externalUserService,
         private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly ProjectEnvironmentService $projectEnvironmentService,
     ) {}
 
     private function resolveProjectFromRequest(): ?Project
@@ -62,6 +67,175 @@ class ExternalTaskController extends Controller
         $hasAccess = $task->externalCollaborators()->where('external_users.id', $externalUser->id)->exists();
 
         return $isSubmitter || $hasAccess;
+    }
+
+    private function canManageCollaborators(Task $task, ?ExternalUser $externalUser): bool
+    {
+        return $this->taskCollaboratorService->canManageForExternalUser($task, $externalUser);
+    }
+
+    private function externalCollaboratorsRequested(array $attributes): bool
+    {
+        return ! empty($attributes['external_collaborators'] ?? []);
+    }
+
+    private function resolveTaskEnvironment(Project $project, array $attributes, ?string $fallbackEnvironment = null): ?string
+    {
+        $rawEnvironment = array_key_exists('environment', $attributes)
+            ? ($attributes['environment'] ?? null)
+            : ($attributes['metadata']['environment'] ?? $attributes['user']['environment'] ?? $fallbackEnvironment);
+
+        $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($rawEnvironment);
+
+        if ($normalizedEnvironment === null) {
+            if ($this->externalCollaboratorsRequested($attributes)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'environment' => 'Select an environment before tagging external collaborators.',
+                ]);
+            }
+
+            return null;
+        }
+
+        if (! $project->environments()->where('environment', $normalizedEnvironment)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'environment' => 'The selected environment is not registered for this project.',
+            ]);
+        }
+
+        return $normalizedEnvironment;
+    }
+
+    private function syncTaskEnvironment(Task $task, ?string $environment, ?string $url = null): void
+    {
+        if ($environment === null) {
+            $task->metadata()->delete();
+
+            return;
+        }
+
+        $task->metadata()->updateOrCreate(
+            ['task_id' => $task->id],
+            [
+                'environment' => $environment,
+                'url' => $url ?? $task->metadata?->url,
+            ],
+        );
+    }
+
+    private function resolveExternalCollaborators(Project $project, ?string $environment, array $attributes): \Illuminate\Support\Collection
+    {
+        return $this->externalUserService->resolveCollaborators(
+            $project,
+            $environment,
+            $attributes['external_collaborators'] ?? [],
+        );
+    }
+
+    private function syncCollaborators(Task $task, Project $project, array $attributes, ?string $environment): array
+    {
+        $internalIds = $this->taskCollaboratorService->validateInternalCollaboratorIds(
+            $project,
+            $attributes['internal_collaborator_ids'] ?? [],
+        );
+
+        try {
+            $externalUsers = $this->resolveExternalCollaborators($project, $environment, $attributes);
+        } catch (\RuntimeException $exception) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'external_collaborators' => $exception->getMessage(),
+            ]);
+        }
+
+        return $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalUsers);
+    }
+
+    private function serializeCollaborators(Task $task): array
+    {
+        return [
+            'internal_collaborators' => $task->internalCollaborators
+                ->map(fn (\App\Models\User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
+            'external_collaborators' => $task->externalCollaborators
+                ->map(fn (ExternalUser $user) => [
+                    'id' => $user->external_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function serializeAttachments(Task $task, string $clientUrl): array
+    {
+        return $task->attachments
+            ->map(fn (Attachment $attachment) => [
+                'id' => $attachment->id,
+                'original_filename' => $attachment->original_filename,
+                'path' => $attachment->path,
+                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
+                'created_at' => $attachment->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function serializeTaskPayload(Task $task, string $clientUrl, bool $canManageCollaborators): array
+    {
+        return [
+            'id' => $task->id,
+            'project_id' => $task->project_id,
+            'title' => $task->title,
+            'description' => $this->rewriteContentUrlsToClientProxyUrls((string) ($task->description ?? ''), $clientUrl),
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'created_at' => $task->created_at?->toIso8601String(),
+            'updated_at' => $task->updated_at?->toIso8601String(),
+            'environment' => $this->taskEnvironment($task),
+            'submitter' => $task->submitter ? [
+                'name' => $task->submitter->name ?? null,
+                'email' => $task->submitter->email ?? null,
+            ] : null,
+            'attachments' => $this->serializeAttachments($task, $clientUrl),
+            'can_manage_collaborators' => $canManageCollaborators,
+            ...$this->serializeCollaborators($task),
+        ];
+    }
+
+    private function taskEnvironment(Task $task): ?string
+    {
+        $environment = $task->metadata?->environment;
+
+        if (! filled($environment) && $task->submitter) {
+            $environment = $task->submitter->environment ?? null;
+        }
+
+        return $environment;
+    }
+
+    private function sendCollaboratorAddedNotifications(Task $task, array $syncResult): void
+    {
+        $task->loadMissing('project');
+
+        $addedInternal = $syncResult['added_internal'] ?? collect();
+        if ($addedInternal->isNotEmpty()) {
+            Notification::send(
+                $addedInternal,
+                new TaskCollaboratorAddedNotification($task, route('tasks.index', ['task' => $task->id]))
+            );
+        }
+
+        foreach (($syncResult['added_external'] ?? collect()) as $externalUser) {
+            if ($externalUser->email !== null || $externalUser->url !== null) {
+                NotifyExternalCollaboratorAdded::dispatch($externalUser->id, $task->id);
+            }
+        }
     }
 
     /**
@@ -189,30 +363,15 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
-        $task->load(['submitter', 'metadata', 'project', 'attachments']);
+        $task->load(['submitter', 'metadata', 'project', 'attachments', 'internalCollaborators', 'externalCollaborators']);
 
-        // Format the attachments for the response
-        $formattedAttachments = $task->attachments->map(function ($attachment) {
-            // Get the client's URL from request metadata or user data
-            $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
+        $clientUrl = (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'));
 
-            return [
-                'id' => $attachment->id,
-                'original_filename' => $attachment->original_filename,
-                'path' => $attachment->path,
-                // Return SDK-facing download URL pointing to the client's proxy route
-                'url' => rtrim($clientUrl, '/').'/shift/api/attachments/'.$attachment->id.'/download',
-                'created_at' => $attachment->created_at,
-            ];
-        });
-
-        // Add the formatted attachments to the task
-        $task = $task->toArray();
-        $task['attachments'] = $formattedAttachments;
-        $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
-        $task['description'] = $this->rewriteContentUrlsToClientProxyUrls((string) ($task['description'] ?? ''), (string) $clientUrl);
-
-        return response()->json($task);
+        return response()->json($this->serializeTaskPayload(
+            $task,
+            $clientUrl,
+            $this->canManageCollaborators($task, $externalUser),
+        ));
     }
 
     /**
@@ -226,6 +385,7 @@ class ExternalTaskController extends Controller
             'project' => 'required|exists:projects,token',
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'environment' => 'nullable|string|max:255',
             'user.id' => 'nullable',
             'user.name' => 'nullable|string|max:255',
             'user.email' => 'nullable|email',
@@ -234,13 +394,19 @@ class ExternalTaskController extends Controller
             'metadata.url' => 'nullable|url',
             'metadata.environment' => 'nullable|string|max:255',
             'temp_identifier' => 'nullable|string',
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
         ]);
 
         if (isset($attributes['description'])) {
             $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
         }
 
-        $project = Project::query()->where('token', $attributes['project'])->firstOrFail();
+        $project = Project::query()->with('environments')->where('token', $attributes['project'])->firstOrFail();
         $task = Task::create([
             ...$attributes,
             'project_id' => $project->id,
@@ -260,40 +426,33 @@ class ExternalTaskController extends Controller
             $task->submitter()->associate($externalUser)->save();
         }
 
-        if (isset($attributes['metadata'])) {
-            $task->metadata()->create([
-                'url' => request('metadata.url'),
-                'environment' => request('metadata.environment'),
-            ]);
+        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
+        $environmentUrl = request('metadata.url') ?? request('user.url');
+        if ($selectedEnvironment !== null || isset($attributes['metadata'])) {
+            $this->syncTaskEnvironment($task, $selectedEnvironment, $environmentUrl);
         }
 
-        // Send notifications to project users
+        $this->syncCollaborators($task, $project, $attributes, $selectedEnvironment);
+
         $this->sendTaskCreationNotifications($task);
 
-        // Handle attachments if temp_identifier is provided
         if (isset($attributes['temp_identifier'])) {
             $tempIdentifier = $attributes['temp_identifier'];
             $tempPath = "temp_attachments/{$tempIdentifier}";
 
-            // Check if temp directory exists
             if (Storage::exists($tempPath)) {
-                // Get all files in the temp directory
                 $files = Storage::files($tempPath);
 
-                // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
                 if (! Storage::exists($permanentPath)) {
                     Storage::makeDirectory($permanentPath);
                 }
 
-                // Move each file to the permanent location and create attachment records
                 foreach ($files as $file) {
-                    // Skip metadata files
                     if (Str::endsWith($file, '.meta')) {
                         continue;
                     }
 
-                    // Try to get original filename from metadata
                     $metadataPath = $file.'.meta';
                     $originalFilename = basename($file);
 
@@ -304,14 +463,11 @@ class ExternalTaskController extends Controller
                         }
                     }
 
-                    // Keep the temp filename stable so we can rewrite inline HTML URLs reliably.
                     $storedFilename = basename($file);
                     $newPath = "{$permanentPath}/{$storedFilename}";
 
-                    // Move the file
                     Storage::move($file, $newPath);
 
-                    // Create attachment record
                     Attachment::create([
                         'attachable_id' => $task->id,
                         'attachable_type' => Task::class,
@@ -319,18 +475,15 @@ class ExternalTaskController extends Controller
                         'path' => $newPath,
                     ]);
 
-                    // Delete metadata file
                     if (Storage::exists($metadataPath)) {
                         Storage::delete($metadataPath);
                     }
                 }
 
-                // Remove the temp directory
                 Storage::deleteDirectory($tempPath);
             }
         }
 
-        // If this task included inline attachments, rewrite temp URLs to stable download routes.
         if (! empty($attributes['temp_identifier'])) {
             $task->load('attachments');
             $task->description = $this->replaceTempUrlsInContent(
@@ -341,7 +494,14 @@ class ExternalTaskController extends Controller
             $task->save();
         }
 
-        return response()->json($task, 201);
+        $task->load(['submitter', 'metadata', 'project', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+
+        $clientUrl = (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'));
+
+        return response()->json(
+            $this->serializeTaskPayload($task, $clientUrl, true),
+            201,
+        );
     }
 
     /**
@@ -350,7 +510,7 @@ class ExternalTaskController extends Controller
      */
     private function sendTaskCreationNotifications(Task $task): void
     {
-        $task->loadMissing(['project.author', 'project.projectUser.user', 'internalCollaborators']);
+        $task->loadMissing(['submitter', 'project.author', 'project.projectUser.user', 'internalCollaborators', 'externalCollaborators']);
         $usersToNotify = $this->taskCollaboratorService->internalAudience($task);
 
         if ($usersToNotify->isNotEmpty()) {
@@ -359,6 +519,84 @@ class ExternalTaskController extends Controller
                 new TaskCreationNotification($task, route('tasks.index', ['task' => $task->id]))
             );
         }
+
+        $creatorExternalUserId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
+        foreach ($this->taskCollaboratorService->externalAudience($task, $creatorExternalUserId) as $externalUser) {
+            if ($externalUser->email !== null || $externalUser->url !== null) {
+                NotifyExternalUser::dispatch($externalUser->id, $task->id);
+            }
+        }
+    }
+
+    public function internalCollaborators(Request $request): JsonResponse
+    {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null) {
+            return response()->json(['error' => 'Project not found'], 404);
+        }
+
+        $search = trim((string) $request->input('search', ''));
+
+        return response()->json([
+            'users' => $this->taskCollaboratorService
+                ->internalCandidates($project, $search)
+                ->map(fn (\App\Models\User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    public function updateCollaborators(Request $request, Task $task): JsonResponse
+    {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
+            return response()->json(['error' => 'Task not found in the specified project'], 404);
+        }
+
+        $externalUser = $this->currentExternalUser($project);
+
+        if (! $externalUser) {
+            return response()->json(['error' => 'External user not found'], 404);
+        }
+
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
+            return response()->json(['error' => 'Unauthorized to update this task'], 403);
+        }
+
+        if (! $this->canManageCollaborators($task, $externalUser)) {
+            return response()->json(['error' => 'Unauthorized to update task collaborators'], 403);
+        }
+
+        $attributes = $request->validate([
+            'environment' => 'nullable|string|max:255',
+            'internal_collaborator_ids' => 'nullable|array',
+            'internal_collaborator_ids.*' => 'integer',
+            'external_collaborators' => 'nullable|array',
+            'external_collaborators.*.id' => 'required',
+            'external_collaborators.*.name' => 'required|string|max:255',
+            'external_collaborators.*.email' => 'required|email',
+        ]);
+
+        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes, $this->taskEnvironment($task));
+        $this->syncTaskEnvironment($task, $selectedEnvironment, $task->metadata?->url ?? $externalUser->url);
+        $syncResult = $this->syncCollaborators($task, $project, $attributes, $selectedEnvironment);
+        $this->sendCollaboratorAddedNotifications($task, $syncResult);
+
+        $task->load(['submitter', 'metadata', 'project', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+
+        return response()->json(
+            $this->serializeTaskPayload(
+                $task,
+                (string) ($task->metadata?->url ?? $externalUser->url ?? config('app.url')),
+                $this->canManageCollaborators($task, $externalUser),
+            )
+        );
     }
 
     /**
@@ -490,7 +728,17 @@ class ExternalTaskController extends Controller
             $task->save();
         }
 
-        return response()->json($task, 200);
+        $task->load(['submitter', 'metadata', 'project', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+        $clientUrl = (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'));
+
+        return response()->json(
+            $this->serializeTaskPayload(
+                $task,
+                $clientUrl,
+                $this->canManageCollaborators($task, $externalUser),
+            ),
+            200,
+        );
     }
 
     /**

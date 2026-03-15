@@ -89,6 +89,7 @@ type TaskDetail = Task & {
     environment?: string | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
+    can_manage_collaborators?: boolean;
     internal_collaborators?: CollaboratorOption[];
     external_collaborators?: CollaboratorOption[];
 };
@@ -318,6 +319,7 @@ const lightboxSrc = ref('');
 const lightboxAlt = ref('');
 
 const isOwner = computed(() => Boolean(editTask.value?.is_owner));
+const canManageCollaborators = computed(() => Boolean(editTask.value?.can_manage_collaborators));
 const editTaskCreatorLabel = computed(() => getTaskCreatorName(editTask.value) ?? getTaskCreatorEmail(editTask.value) ?? 'Unknown');
 const editTaskEnvironmentLabel = computed(() => {
     const projectId = editTask.value?.project_id ?? null;
@@ -759,6 +761,34 @@ function currentTaskSnapshot() {
     };
 }
 
+function hasCollaboratorManagementChanges() {
+    const snap = initialEditSnapshot.value;
+    if (!snap) return false;
+    if ((editForm.value.environment ?? '') !== (snap.environment ?? '')) return true;
+    return !collaboratorsEqual(editForm.value.collaborators, snap.collaborators);
+}
+
+function mergeEditedTask(task: Partial<TaskDetail> | null | undefined) {
+    if (!editTask.value || !task) return;
+
+    editTask.value = {
+        ...editTask.value,
+        ...task,
+        attachments: Array.isArray(task.attachments) ? task.attachments : editTask.value.attachments,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(task, 'environment')) {
+        editForm.value.environment = task.environment ?? null;
+    }
+
+    if (task.internal_collaborators || task.external_collaborators) {
+        editForm.value.collaborators = normalizeTaskCollaborators({
+            internal: Array.isArray(task.internal_collaborators) ? task.internal_collaborators : editForm.value.collaborators.internal,
+            external: Array.isArray(task.external_collaborators) ? task.external_collaborators : editForm.value.collaborators.external,
+        });
+    }
+}
+
 function updateEditCollaborators(value: TaskCollaboratorSelection) {
     editForm.value.collaborators = normalizeTaskCollaborators(value);
 
@@ -817,52 +847,62 @@ async function saveTaskChanges() {
     if (!editTask.value) return;
     if (!hasPendingTaskChanges()) return;
 
+    const taskId = editTask.value.id;
+    const snapshot = initialEditSnapshot.value;
+    const canUpdateCollaborators = canManageCollaborators.value;
+    const needsCollaboratorUpdate = canUpdateCollaborators && hasCollaboratorManagementChanges();
+    const needsCoreUpdate = isOwner.value
+        ? Boolean(snapshot) && (
+              editForm.value.title !== snapshot.title ||
+              editForm.value.priority !== snapshot.priority ||
+              editForm.value.status !== snapshot.status ||
+              (editForm.value.description ?? '') !== (snapshot.description ?? '') ||
+              deletedAttachmentIds.value.length > 0
+          )
+        : Boolean(snapshot) && editForm.value.status !== snapshot.status;
+
+    if (!needsCoreUpdate && !needsCollaboratorUpdate) return;
+
     taskSaving.value = true;
     taskSaveError.value = null;
     showTaskSavingToast();
 
     try {
-        const payload = isOwner.value
-            ? {
-                  title: editForm.value.title,
-                  description: editForm.value.description,
-                  priority: editForm.value.priority,
-                  status: editForm.value.status,
-                  environment: editForm.value.environment,
-                  temp_identifier: editTempIdentifier.value,
-                  deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
-                  internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
-                  external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
-                      id: collaborator.id,
-                      name: collaborator.name,
-                      email: collaborator.email,
-                  })),
-              }
-            : {
-                  status: editForm.value.status,
-              };
+        if (needsCoreUpdate) {
+            const payload = isOwner.value
+                ? {
+                      title: editForm.value.title,
+                      description: editForm.value.description,
+                      priority: editForm.value.priority,
+                      status: editForm.value.status,
+                      temp_identifier: editTempIdentifier.value,
+                      deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
+                  }
+                : {
+                      status: editForm.value.status,
+                  };
 
-        const response = await axios.put(route('tasks.v2.update', { task: editTask.value.id }), payload);
-        const task = response.data?.task ?? null;
-        if (task) {
-            editTask.value = {
-                ...editTask.value,
-                ...task,
-                attachments: Array.isArray(task.attachments) ? task.attachments : editTask.value.attachments,
-            };
-            if (Object.prototype.hasOwnProperty.call(task, 'environment')) {
-                editForm.value.environment = task.environment ?? null;
-            }
-            if (task.internal_collaborators || task.external_collaborators) {
-                editForm.value.collaborators = normalizeTaskCollaborators({
-                    internal: Array.isArray(task.internal_collaborators) ? task.internal_collaborators : editForm.value.collaborators.internal,
-                    external: Array.isArray(task.external_collaborators) ? task.external_collaborators : editForm.value.collaborators.external,
-                });
-            }
+            const response = await axios.put(route('tasks.v2.update', { task: taskId }), payload);
+            mergeEditedTask(response.data?.task ?? null);
         }
+
+        if (needsCollaboratorUpdate) {
+            const response = await axios.patch(route('tasks.v2.collaborators.update', { task: taskId }), {
+                environment: editForm.value.environment,
+                internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
+                external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
+                    id: collaborator.id,
+                    name: collaborator.name,
+                    email: collaborator.email,
+                })),
+            });
+
+            mergeEditedTask(response.data?.task ?? null);
+        }
+
         deletedAttachmentIds.value = [];
         initialEditSnapshot.value = currentTaskSnapshot();
-        syncListRowFromEditForm(editTask.value.id);
+        syncListRowFromEditForm(taskId);
         refreshTasksList();
     } catch (e: any) {
         taskSaveError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to autosave task';
@@ -1367,7 +1407,7 @@ function handleTaskCreated(taskId: number | null) {
                                     </template>
                                 </div>
 
-                                <div v-if="isOwner" class="space-y-2">
+                                <div v-if="isOwner || canManageCollaborators" class="space-y-2">
                                     <TaskEnvironmentField
                                         v-model="editForm.environment"
                                         :disabled="editLoading || editUploading"
@@ -1406,7 +1446,7 @@ function handleTaskCreated(taskId: number | null) {
                                         :disabled="editLoading || editUploading"
                                         :environment="editForm.environment"
                                         :project-id="editTask.project_id ?? null"
-                                        :read-only="!isOwner"
+                                        :read-only="!canManageCollaborators"
                                         @update:model-value="updateEditCollaborators"
                                     />
                                 </div>

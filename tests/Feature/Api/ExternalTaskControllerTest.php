@@ -16,6 +16,10 @@ beforeEach(function () {
         'token' => 'test-project-token',
         'author_id' => $this->user->id,
     ]);
+    $this->project->environments()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+    ]);
 
     // External user data
     $this->externalUserData = [
@@ -680,3 +684,89 @@ test('toggle priority succeeds with granted access', function () {
         'message' => 'Task priority updated successfully',
     ]);
 });
+
+test('internal collaborator lookup endpoint returns registered shift users for the project', function () {
+    $registeredUser = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $this->project->id,
+        'user_id' => $registeredUser->id,
+        'user_email' => $registeredUser->email,
+        'user_name' => $registeredUser->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/collaborators/internal?'.http_build_query([
+            'project' => $this->project->token,
+            'search' => $registeredUser->email,
+        ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonFragment(['id' => $registeredUser->id]);
+});
+
+test('external submitter can update collaborators through collaborator endpoint', function () {
+    $internalCollaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $this->project->id,
+        'user_id' => $internalCollaborator->id,
+        'user_email' => $internalCollaborator->email,
+        'user_name' => $internalCollaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'External collaborator update',
+    ]);
+    $task->submitter()->associate($this->externalUser)->save();
+    $task->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$task->id}/collaborators", [
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'internal_collaborator_ids' => [$internalCollaborator->id],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('can_manage_collaborators', true)
+        ->assertJsonPath('internal_collaborators.0.id', $internalCollaborator->id);
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $internalCollaborator->id,
+    ]);
+});
+
+test('non submitter external collaborator cannot update collaborators', function () {
+    $otherExternalUser = ExternalUser::create([
+        'external_id' => 'other-123',
+        'name' => 'Other User',
+        'email' => 'other@example.com',
+        'environment' => 'testing',
+        'url' => 'https://other.com',
+        'project_id' => $this->project->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+    ]);
+    $task->submitter()->associate($otherExternalUser)->save();
+    $task->externalUsers()->attach($this->externalUser->id);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$task->id}/collaborators", [
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'internal_collaborator_ids' => [],
+        ]);
+
+    $response->assertStatus(403);
+});
+
