@@ -46,6 +46,7 @@ After you've finished editing
   - Prefer: `php artisan shift:toggle --local --path=../shift-sdk-package/packages/shift-php`
   - Switch back: `php artisan shift:toggle --online`
   - After SDK UI changes: run `npm run build:shift` in `../shift-sdk-package/`, then `php artisan shift:publish --group=public` here.
+  - `install:shift` in a consumer app now registers that app's current `APP_ENV` + `APP_URL` with SHIFT and scaffolds the external collaborator resolver. Portal external collaborator lookup depends on a registered project environment, not inferred callback traffic.
 
 ## Root Setup Commands
 - Install (PHP): `composer install`
@@ -63,6 +64,8 @@ After you've finished editing
 - Prefer minimal, scoped changes; don’t refactor unrelated code.
 - Don’t edit generated build output: `public/build/**`.
 - Keep API changes backwards-compatible when possible (SDK consumers).
+- For editor-backed task create flows, use the V2 JSON endpoint (`tasks.v2.*`) instead of the legacy redirect route so temp attachment URLs are persisted and rewritten correctly.
+- For task/thread authorization tests, create a real access path first (project author/member/collaborator or external submitter/collaborator); hidden tasks now intentionally return `404`.
 - PHP style: Pint (`vendor/bin/pint`).
 - JS style: Prettier + ESLint (`npm run format`, `npm run lint`).
 - Cross-repo alignment is mandatory:

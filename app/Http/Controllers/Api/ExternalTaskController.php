@@ -10,6 +10,8 @@ use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Notifications\TaskCreationNotification;
+use App\Services\ExternalUserService;
+use App\Services\TaskCollaboratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +22,48 @@ use Illuminate\Validation\Rule;
 
 class ExternalTaskController extends Controller
 {
+    public function __construct(
+        private readonly ExternalUserService $externalUserService,
+        private readonly TaskCollaboratorService $taskCollaboratorService,
+    ) {}
+
+    private function resolveProjectFromRequest(): ?Project
+    {
+        return Project::query()
+            ->where('token', request('project'))
+            ->first();
+    }
+
+    private function currentExternalUser(Project $project, bool $create = false): ?ExternalUser
+    {
+        $attributes = [
+            'external_id' => request()->offsetGet('user.id'),
+            'name' => request()->offsetGet('user.name'),
+            'email' => request()->offsetGet('user.email'),
+            'environment' => request()->offsetGet('user.environment'),
+            'url' => request()->offsetGet('user.url'),
+        ];
+
+        if ($create) {
+            return $this->externalUserService->upsert($project, $attributes);
+        }
+
+        return $this->externalUserService->find(
+            $project,
+            $attributes['external_id'],
+            $attributes['environment'],
+            $attributes['url'],
+        );
+    }
+
+    private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
+    {
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalCollaborators()->where('external_users.id', $externalUser->id)->exists();
+
+        return $isSubmitter || $hasAccess;
+    }
+
     /**
      * Display a listing of the tasks.
      */
@@ -28,33 +72,24 @@ class ExternalTaskController extends Controller
         $allowedSortBy = ['updated_at', 'created_at', 'priority'];
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : 'updated_at';
         $environment = trim((string) request('environment', ''));
+        $project = $this->resolveProjectFromRequest();
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
-
-        if (! $externalUser) {
-            $externalUser = ExternalUser::create([
-                'external_id' => request()->offsetGet('user.id'),
-                'name' => request()->offsetGet('user.name'),
-                'email' => request()->offsetGet('user.email'),
-                'environment' => request()->offsetGet('user.environment'),
-                'url' => request()->offsetGet('user.url'),
-            ]);
+        if ($project === null) {
+            return response()->json(['error' => 'Project not found'], 404);
         }
+
+        $externalUser = $this->currentExternalUser($project, true);
 
         $tasksQuery = Task::query()
             ->with(['submitter', 'metadata', 'project'])
-            ->whereHas('project', fn ($query) => $query->where('token', request('project')))
+            ->where('project_id', $project->id)
             ->where(function ($query) use ($externalUser) {
                 // Tasks where the external user is the submitter
                 $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {
                     $query->where('external_users.id', $externalUser->id);
                 })
                     // OR tasks where the external user has been granted access
-                    ->orWhereHas('externalUsers', function ($query) use ($externalUser) {
+                    ->orWhereHas('externalCollaborators', function ($query) use ($externalUser) {
                         $query->where('external_users.id', $externalUser->id);
                     });
             })
@@ -138,26 +173,19 @@ class ExternalTaskController extends Controller
      */
     public function show(Task $task): JsonResponse
     {
-        // Ensure the task belongs to the project specified in the request
-        if ($task->project->token !== request('project')) {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
+        $externalUser = $this->currentExternalUser($project);
 
         if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (! $isSubmitter && ! $hasAccess) {
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -212,22 +240,21 @@ class ExternalTaskController extends Controller
             $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
         }
 
+        $project = Project::query()->where('token', $attributes['project'])->firstOrFail();
         $task = Task::create([
             ...$attributes,
-            'project_id' => Project::where('token', $attributes['project'])->firstOrFail()->id,
+            'project_id' => $project->id,
             'status' => $attributes['status'] ?? 'pending',
             'priority' => $attributes['priority'] ?? 'medium',
         ]);
 
         if (isset($attributes['user'])) {
-            $externalUser = ExternalUser::updateOrCreate([
+            $externalUser = $this->externalUserService->upsert($project, [
                 'external_id' => $attributes['user']['id'],
                 'environment' => $attributes['user']['environment'],
                 'url' => $attributes['user']['url'],
-            ], [
                 'name' => $attributes['user']['name'] ?? null,
-                'email' => $attributes['user']['email'],
-                'project_id' => $task->project_id, // Set project_id based on the task's project
+                'email' => $attributes['user']['email'] ?? null,
             ]);
 
             $task->submitter()->associate($externalUser)->save();
@@ -323,23 +350,8 @@ class ExternalTaskController extends Controller
      */
     private function sendTaskCreationNotifications(Task $task): void
     {
-        // Load the project with its relationships
-        $project = $task->project()->with(['author', 'projectUser.user'])->first();
-
-        // Collect all users who should receive the notification
-        $usersToNotify = collect();
-
-        // Add the project owner (author)
-        if ($project->author) {
-            $usersToNotify->push($project->author);
-        }
-
-        // Add all users with access to the project
-        foreach ($project->projectUser as $projectUser) {
-            if ($projectUser->user && ! $usersToNotify->contains('id', $projectUser->user->id)) {
-                $usersToNotify->push($projectUser->user);
-            }
-        }
+        $task->loadMissing(['project.author', 'project.projectUser.user', 'internalCollaborators']);
+        $usersToNotify = $this->taskCollaboratorService->internalAudience($task);
 
         if ($usersToNotify->isNotEmpty()) {
             Notification::send(
@@ -354,25 +366,19 @@ class ExternalTaskController extends Controller
      */
     public function update(Request $request, Task $task): JsonResponse|RedirectResponse
     {
-        if ($task->project->token !== request('project')) {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
+        $externalUser = $this->currentExternalUser($project);
 
         if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (! $isSubmitter && ! $hasAccess) {
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to update this task'], 403);
         }
 
@@ -492,25 +498,19 @@ class ExternalTaskController extends Controller
      */
     public function destroy(Task $task, Request $request): JsonResponse|RedirectResponse
     {
-        if ($task->project->token !== request('project')) {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
+        $externalUser = $this->currentExternalUser($project);
 
         if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (! $isSubmitter && ! $hasAccess) {
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to delete this task'], 403);
         }
 
@@ -524,25 +524,19 @@ class ExternalTaskController extends Controller
      */
     public function toggleStatus(Task $task, Request $request): JsonResponse
     {
-        if ($task->project->token !== request('project')) {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
+        $externalUser = $this->currentExternalUser($project);
 
         if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (! $isSubmitter && ! $hasAccess) {
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to update this task status'], 403);
         }
 
@@ -564,25 +558,19 @@ class ExternalTaskController extends Controller
      */
     public function togglePriority(Task $task, Request $request): JsonResponse
     {
-        if ($task->project->token !== request('project')) {
+        $project = $this->resolveProjectFromRequest();
+
+        if ($project === null || $task->project_id !== $project->id) {
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        // Get the current external user
-        $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-            ->where('environment', request()->offsetGet('user.environment'))
-            ->where('url', request()->offsetGet('user.url'))
-            ->first();
+        $externalUser = $this->currentExternalUser($project);
 
         if (! $externalUser) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        // Check if the external user is the submitter or has been granted access
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-        if (! $isSubmitter && ! $hasAccess) {
+        if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to update this task priority'], 403);
         }
 

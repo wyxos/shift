@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Attachment;
 use App\Models\Task;
+use App\Models\TaskThread;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -11,10 +12,16 @@ use Shift\Core\ChunkedUploadConfig;
 
 class AttachmentController extends Controller
 {
+    private function ensureTaskVisible(Task $task): void
+    {
+        if (! Task::query()->visibleTo(auth()->id())->whereKey($task->id)->exists()) {
+            abort(404);
+        }
+    }
+
     /**
      * Upload a file to temporary storage.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function upload(Request $request)
@@ -34,20 +41,20 @@ class AttachmentController extends Controller
 
         // Create temp directory if it doesn't exist
         $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             Storage::makeDirectory($tempPath);
         }
 
         // Store the file with original filename
         $filename = pathinfo($originalFilename, PATHINFO_FILENAME);
         $extension = $file->getClientOriginalExtension();
-        $storedFilename = $filename . '_' . uniqid() . '.' . $extension;
+        $storedFilename = $filename.'_'.uniqid().'.'.$extension;
         $path = $file->storeAs($tempPath, $storedFilename);
 
         // Store metadata about the file
-        $metadataPath = $tempPath . '/' . $storedFilename . '.meta';
+        $metadataPath = $tempPath.'/'.$storedFilename.'.meta';
         Storage::put($metadataPath, json_encode([
-            'original_filename' => $originalFilename
+            'original_filename' => $originalFilename,
         ]));
 
         return response()->json([
@@ -239,6 +246,7 @@ class AttachmentController extends Controller
         $expectedSize = (int) ($meta['size'] ?? 0);
         if ($expectedSize > 0 && filesize($finalAbs) !== $expectedSize) {
             Storage::delete($finalPath);
+
             return response()->json(['error' => 'File size mismatch'], 422);
         }
 
@@ -262,7 +270,6 @@ class AttachmentController extends Controller
     /**
      * List all files in a temporary directory.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function listTempFiles(Request $request)
@@ -278,7 +285,7 @@ class AttachmentController extends Controller
         $tempIdentifier = $request->input('temp_identifier');
         $tempPath = "temp_attachments/{$tempIdentifier}";
 
-        if (!Storage::exists($tempPath)) {
+        if (! Storage::exists($tempPath)) {
             return response()->json(['files' => []]);
         }
 
@@ -292,7 +299,7 @@ class AttachmentController extends Controller
             }
 
             // Try to get original filename from metadata
-            $metadataPath = $file . '.meta';
+            $metadataPath = $file.'.meta';
             $originalFilename = basename($file);
 
             if (Storage::exists($metadataPath)) {
@@ -356,7 +363,7 @@ class AttachmentController extends Controller
         }
 
         $path = "temp_attachments/{$safeTemp}/{$filename}";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             abort(404, 'File not found');
         }
 
@@ -372,7 +379,6 @@ class AttachmentController extends Controller
     /**
      * Remove a file from temporary storage.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function removeTempFile(Request $request)
@@ -385,6 +391,7 @@ class AttachmentController extends Controller
 
         if (Storage::exists($path)) {
             Storage::delete($path);
+
             return response()->json(['success' => true]);
         }
 
@@ -394,8 +401,8 @@ class AttachmentController extends Controller
     /**
      * List all attachments for a model.
      *
-     * @param string $type
-     * @param int $id
+     * @param  string  $type
+     * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
     public function listAttachments($type, $id)
@@ -403,11 +410,16 @@ class AttachmentController extends Controller
         // Map the type to a model class
         $modelClass = $this->getModelClass($type);
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             return response()->json(['error' => 'Invalid type'], 400);
         }
 
         $model = $modelClass::findOrFail($id);
+
+        $task = $model instanceof Task ? $model : ($model instanceof TaskThread ? $model->task : null);
+        if ($task instanceof Task) {
+            $this->ensureTaskVisible($task);
+        }
 
         $attachments = $model->attachments()->get()->map(function ($attachment) {
             return [
@@ -425,11 +437,12 @@ class AttachmentController extends Controller
     /**
      * List all attachments for a task.
      *
-     * @param Task $task
      * @return \Illuminate\Http\JsonResponse
      */
     public function listTaskAttachments(Task $task)
     {
+        $this->ensureTaskVisible($task);
+
         $attachments = $task->attachments()->get()->map(function ($attachment) {
             return [
                 'id' => $attachment->id,
@@ -446,11 +459,15 @@ class AttachmentController extends Controller
     /**
      * Delete an attachment.
      *
-     * @param Attachment $attachment
      * @return \Illuminate\Http\JsonResponse
      */
     public function deleteAttachment(Attachment $attachment)
     {
+        $task = $this->getTaskFromAttachment($attachment);
+        if ($task instanceof Task) {
+            $this->ensureTaskVisible($task);
+        }
+
         // Check if the file exists
         if (Storage::exists($attachment->path)) {
             // Delete the file
@@ -466,7 +483,7 @@ class AttachmentController extends Controller
     /**
      * Get the model class for a given type.
      *
-     * @param string $type
+     * @param  string  $type
      * @return string|null
      */
     private function getModelClass($type)
@@ -483,13 +500,17 @@ class AttachmentController extends Controller
     /**
      * Download an attachment.
      *
-     * @param Attachment $attachment
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
      */
     public function downloadAttachment(Attachment $attachment)
     {
+        $task = $this->getTaskFromAttachment($attachment);
+        if ($task instanceof Task) {
+            $this->ensureTaskVisible($task);
+        }
+
         // Check if the file exists
-        if (!Storage::exists($attachment->path)) {
+        if (! Storage::exists($attachment->path)) {
             abort(404, 'File not found');
         }
 
@@ -512,10 +533,25 @@ class AttachmentController extends Controller
         }
     }
 
+    private function getTaskFromAttachment(Attachment $attachment): ?Task
+    {
+        $attachable = $attachment->attachable;
+
+        if ($attachable instanceof Task) {
+            return $attachable;
+        }
+
+        if ($attachable instanceof TaskThread) {
+            return $attachable->task;
+        }
+
+        return null;
+    }
+
     /**
      * Get the MIME type for a file extension.
      *
-     * @param string $extension
+     * @param  string  $extension
      * @return string
      */
     private function getMimeType($extension)

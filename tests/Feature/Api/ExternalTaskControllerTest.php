@@ -33,6 +33,7 @@ beforeEach(function () {
         'email' => $this->externalUserData['email'],
         'environment' => $this->externalUserData['environment'],
         'url' => $this->externalUserData['url'],
+        'project_id' => $this->project->id,
     ]);
 });
 
@@ -55,6 +56,7 @@ test('index returns tasks for external user', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
+        'project_id' => $this->project->id,
     ]);
 
     $task3 = Task::factory()->create([
@@ -287,6 +289,7 @@ test('update returns 403 for unauthorized user', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
+        'project_id' => $this->project->id,
     ]);
 
     $task = Task::factory()->create([
@@ -381,6 +384,7 @@ test('destroy returns 403 for unauthorized user', function () {
         'email' => 'other@example.com',
         'environment' => 'testing',
         'url' => 'https://other.com',
+        'project_id' => $this->project->id,
     ]);
 
     $task = Task::factory()->create([
