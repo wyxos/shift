@@ -1,7 +1,9 @@
 <script lang="ts" setup>
 /* eslint-disable max-lines */
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
+import TaskEnvironmentField from '@/components/tasks/TaskEnvironmentField.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
@@ -13,6 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { buildThreadAiContext } from '@/shared/tasks/ai';
+import {
+    collaboratorsEqual,
+    emptyTaskCollaborators,
+    normalizeTaskCollaborators,
+    type CollaboratorOption,
+    type TaskCollaboratorSelection,
+} from '@/shared/tasks/collaborators';
 import { getTaskIdFromQuery, syncTaskQuery } from '@/shared/tasks/history';
 import {
     copyTextToClipboard,
@@ -35,6 +44,7 @@ import {
     getStatusOptions,
     normalizeStringList,
 } from '@/shared/tasks/presentation';
+import { projectEnvironmentOptions, type TaskProjectOption } from '@/shared/tasks/projects';
 import { buildReplyQuoteHtml, extractPlainTextFromContent, renderRichContent } from '@/shared/tasks/rich-content';
 import { formatThreadTime, getReplyTargetFromEventTarget, mapThreadToMessage, shouldHandleImage } from '@/shared/tasks/thread';
 import type { BreadcrumbItem, SharedData } from '@/types';
@@ -64,11 +74,6 @@ type TaskPaginator = {
     to: number | null;
 };
 
-type ProjectOption = {
-    id: number;
-    name: string;
-};
-
 type TaskAttachment = {
     id: number;
     original_filename: string;
@@ -77,12 +82,15 @@ type TaskAttachment = {
 };
 
 type TaskDetail = Task & {
+    project_id: number;
     description?: string;
     created_at?: string;
     submitter?: { name?: string; email?: string } | null;
     environment?: string | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
+    internal_collaborators?: CollaboratorOption[];
+    external_collaborators?: CollaboratorOption[];
 };
 
 type ThreadMessage = {
@@ -100,7 +108,7 @@ type ThreadMessage = {
 const props = withDefaults(
     defineProps<{
         tasks: TaskPaginator;
-        projects?: ProjectOption[];
+        projects?: TaskProjectOption[];
         filters: {
             status?: string[] | string | null;
             priority?: string[] | string | null;
@@ -271,10 +279,19 @@ const editForm = ref({
     priority: 'medium',
     status: 'pending',
     description: '',
+    environment: null as string | null,
+    collaborators: emptyTaskCollaborators(),
 });
 
 const confirmCloseOpen = ref(false);
-const initialEditSnapshot = ref<{ title: string; priority: string; status: string; description: string } | null>(null);
+const initialEditSnapshot = ref<{
+    title: string;
+    priority: string;
+    status: string;
+    description: string;
+    environment: string | null;
+    collaborators: TaskCollaboratorSelection;
+} | null>(null);
 
 const threadTempIdentifier = ref(Date.now().toString());
 const threadLoading = ref(false);
@@ -302,7 +319,19 @@ const lightboxAlt = ref('');
 
 const isOwner = computed(() => Boolean(editTask.value?.is_owner));
 const editTaskCreatorLabel = computed(() => getTaskCreatorName(editTask.value) ?? getTaskCreatorEmail(editTask.value) ?? 'Unknown');
-const editTaskEnvironmentLabel = computed(() => getTaskEnvironment(editTask.value) ?? 'Unknown');
+const editTaskEnvironmentLabel = computed(() => {
+    const projectId = editTask.value?.project_id ?? null;
+    const selectedEnvironment = editForm.value.environment;
+
+    if (projectId !== null && selectedEnvironment) {
+        return (
+            projectEnvironmentOptions(props.projects, projectId).find((environment) => environment.key === selectedEnvironment)?.label ??
+            selectedEnvironment
+        );
+    }
+
+    return getTaskEnvironment(editTask.value) ?? 'Unknown';
+});
 const taskSaving = ref(false);
 const taskSaveError = ref<string | null>(null);
 const pendingTaskSave = ref(false);
@@ -348,7 +377,15 @@ function onTaskQueryPopState() {
 }
 
 watch(
-    () => [editForm.value.title, editForm.value.priority, editForm.value.status, editForm.value.description, deletedAttachmentIds.value.join(',')],
+    () => [
+        editForm.value.title,
+        editForm.value.priority,
+        editForm.value.status,
+        editForm.value.description,
+        editForm.value.environment,
+        JSON.stringify(editForm.value.collaborators),
+        deletedAttachmentIds.value.join(','),
+    ],
     () => {
         if (!editOpen.value || !autosaveArmed.value) return;
         if (!hasPendingTaskChanges()) return;
@@ -373,6 +410,8 @@ function closeEditNow(updateHistory = true) {
         priority: 'medium',
         status: 'pending',
         description: '',
+        environment: null,
+        collaborators: emptyTaskCollaborators(),
     };
     initialEditSnapshot.value = null;
     threadComposerHtml.value = '';
@@ -673,6 +712,11 @@ async function openEdit(taskId: number, options: OpenEditOptions = {}) {
             priority: data?.priority ?? 'medium',
             status: data?.status ?? 'pending',
             description: data?.description ?? '',
+            environment: data?.environment ?? null,
+            collaborators: normalizeTaskCollaborators({
+                internal: data?.internal_collaborators ?? [],
+                external: data?.external_collaborators ?? [],
+            }),
         };
         editTempIdentifier.value = Date.now().toString();
         initialEditSnapshot.value = {
@@ -680,6 +724,8 @@ async function openEdit(taskId: number, options: OpenEditOptions = {}) {
             priority: editForm.value.priority,
             status: editForm.value.status,
             description: editForm.value.description,
+            environment: editForm.value.environment,
+            collaborators: normalizeTaskCollaborators(editForm.value.collaborators),
         };
         autosaveArmed.value = true;
         void fetchThreads(taskId);
@@ -697,6 +743,8 @@ function hasPendingTaskChanges() {
     if (editForm.value.priority !== snap.priority) return true;
     if (editForm.value.status !== snap.status) return true;
     if ((editForm.value.description ?? '') !== (snap.description ?? '')) return true;
+    if ((editForm.value.environment ?? '') !== (snap.environment ?? '')) return true;
+    if (!collaboratorsEqual(editForm.value.collaborators, snap.collaborators)) return true;
     return deletedAttachmentIds.value.length > 0;
 }
 
@@ -706,7 +754,18 @@ function currentTaskSnapshot() {
         priority: editForm.value.priority,
         status: editForm.value.status,
         description: editForm.value.description,
+        environment: editForm.value.environment,
+        collaborators: normalizeTaskCollaborators(editForm.value.collaborators),
     };
+}
+
+function updateEditCollaborators(value: TaskCollaboratorSelection) {
+    editForm.value.collaborators = normalizeTaskCollaborators(value);
+
+    if (!editOpen.value || !autosaveArmed.value) return;
+    if (!hasPendingTaskChanges()) return;
+
+    scheduleTaskAutosave();
 }
 
 function syncListRowFromEditForm(taskId: number) {
@@ -719,6 +778,7 @@ function syncListRowFromEditForm(taskId: number) {
                       title: editForm.value.title,
                       status: editForm.value.status,
                       priority: editForm.value.priority,
+                      environment: editForm.value.environment,
                   }
                 : task,
         ),
@@ -768,8 +828,15 @@ async function saveTaskChanges() {
                   description: editForm.value.description,
                   priority: editForm.value.priority,
                   status: editForm.value.status,
+                  environment: editForm.value.environment,
                   temp_identifier: editTempIdentifier.value,
                   deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
+                  internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
+                  external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
+                      id: collaborator.id,
+                      name: collaborator.name,
+                      email: collaborator.email,
+                  })),
               }
             : {
                   status: editForm.value.status,
@@ -783,6 +850,15 @@ async function saveTaskChanges() {
                 ...task,
                 attachments: Array.isArray(task.attachments) ? task.attachments : editTask.value.attachments,
             };
+            if (Object.prototype.hasOwnProperty.call(task, 'environment')) {
+                editForm.value.environment = task.environment ?? null;
+            }
+            if (task.internal_collaborators || task.external_collaborators) {
+                editForm.value.collaborators = normalizeTaskCollaborators({
+                    internal: Array.isArray(task.internal_collaborators) ? task.internal_collaborators : editForm.value.collaborators.internal,
+                    external: Array.isArray(task.external_collaborators) ? task.external_collaborators : editForm.value.collaborators.external,
+                });
+            }
         }
         deletedAttachmentIds.value = [];
         initialEditSnapshot.value = currentTaskSnapshot();
@@ -1291,6 +1367,16 @@ function handleTaskCreated(taskId: number | null) {
                                     </template>
                                 </div>
 
+                                <div v-if="isOwner" class="space-y-2">
+                                    <TaskEnvironmentField
+                                        v-model="editForm.environment"
+                                        :disabled="editLoading || editUploading"
+                                        :project-id="editTask.project_id ?? null"
+                                        :projects="props.projects"
+                                        test-id="edit-task-environment-select"
+                                    />
+                                </div>
+
                                 <div class="space-y-2">
                                     <Label>Description</Label>
                                     <template v-if="isOwner">
@@ -1312,6 +1398,17 @@ function handleTaskCreated(taskId: number | null) {
                                             <div v-else>No description provided.</div>
                                         </div>
                                     </template>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <TaskCollaboratorField
+                                        :model-value="editForm.collaborators"
+                                        :disabled="editLoading || editUploading"
+                                        :environment="editForm.environment"
+                                        :project-id="editTask.project_id ?? null"
+                                        :read-only="!isOwner"
+                                        @update:model-value="updateEditCollaborators"
+                                    />
                                 </div>
 
                                 <div class="space-y-2">

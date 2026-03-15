@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Services\ExternalUserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -14,6 +16,35 @@ use Shift\Core\ChunkedUploadConfig;
 
 class ExternalAttachmentController extends Controller
 {
+    public function __construct(
+        private readonly ExternalUserService $externalUserService,
+    ) {}
+
+    private function resolveProjectFromRequest(): ?Project
+    {
+        return Project::query()
+            ->where('token', request('project'))
+            ->first();
+    }
+
+    private function currentExternalUser(Project $project): ?ExternalUser
+    {
+        return $this->externalUserService->find(
+            $project,
+            request()->offsetGet('user.id'),
+            request()->offsetGet('user.environment'),
+            request()->offsetGet('user.url'),
+        );
+    }
+
+    private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
+    {
+        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        $hasAccess = $task->externalCollaborators()->where('external_users.id', $externalUser->id)->exists();
+
+        return $isSubmitter || $hasAccess;
+    }
+
     /**
      * Upload a temporary attachment.
      *
@@ -370,6 +401,7 @@ class ExternalAttachmentController extends Controller
         $expectedSize = (int) ($meta['size'] ?? 0);
         if ($expectedSize > 0 && filesize($finalAbs) !== $expectedSize) {
             Storage::delete($finalPath);
+
             return response()->json(['error' => 'File size mismatch'], 422);
         }
 
@@ -444,26 +476,18 @@ class ExternalAttachmentController extends Controller
                 return response()->json(['error' => 'Attachment not associated with a task'], 404);
             }
 
-            // Verify the task belongs to the project specified in the request
-            if ($task->project->token !== request('project')) {
+            $project = $this->resolveProjectFromRequest();
+            if ($project === null || $task->project_id !== $project->id) {
                 return response()->json(['error' => 'Task not found in the specified project'], 404);
             }
 
-            // Get the current external user
-            $externalUser = ExternalUser::where('external_id', request()->offsetGet('user.id'))
-                ->where('environment', request()->offsetGet('user.environment'))
-                ->where('url', request()->offsetGet('user.url'))
-                ->first();
+            $externalUser = $this->currentExternalUser($project);
 
             if (! $externalUser) {
                 return response()->json(['error' => 'External user not found'], 404);
             }
 
-            // Check if the external user is the submitter or has been granted access
-            $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-            $hasAccess = $task->externalUsers()->where('external_users.id', $externalUser->id)->exists();
-
-            if (! $isSubmitter && ! $hasAccess) {
+            if (! $this->externalUserHasAccess($task, $externalUser)) {
                 return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
             }
         }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TaskCollaboratorKind;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,6 +36,9 @@ class ExternalUser extends Model
      */
     public function accessibleTasks(): BelongsToMany
     {
-        return $this->belongsToMany(Task::class, 'external_access');
+        return $this->belongsToMany(Task::class, 'task_collaborators', 'external_user_id', 'task_id')
+            ->wherePivot('kind', TaskCollaboratorKind::External->value)
+            ->withPivotValue('kind', TaskCollaboratorKind::External->value)
+            ->withTimestamps();
     }
 }

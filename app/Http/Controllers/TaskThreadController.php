@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attachment;
-use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Services\TaskCollaboratorService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,11 +15,24 @@ use Illuminate\Support\Str;
 
 class TaskThreadController extends Controller
 {
+    public function __construct(
+        private readonly TaskCollaboratorService $taskCollaboratorService,
+    ) {}
+
+    private function ensureTaskVisible(Task $task): void
+    {
+        if (! Task::query()->visibleTo(Auth::id())->whereKey($task->id)->exists()) {
+            abort(404);
+        }
+    }
+
     /**
      * Get all threads for a task.
      */
     public function index(Task $task): JsonResponse
     {
+        $this->ensureTaskVisible($task);
+
         $internalThreads = $this->getThreadsByType($task, 'internal');
         $externalThreads = $this->getThreadsByType($task, 'external');
 
@@ -78,6 +91,8 @@ class TaskThreadController extends Controller
      */
     public function store(Request $request, Task $task): JsonResponse
     {
+        $this->ensureTaskVisible($task);
+
         $request->validate([
             'content' => 'required|string',
             'type' => 'required|in:internal,external',
@@ -116,25 +131,7 @@ class TaskThreadController extends Controller
         $thread->load('attachments');
 
         if ($request->input('type') === 'external') {
-            $externalUsers = collect();
-
-            // Check if the submitter is an external user
-            if ($task->isExternallySubmitted()) {
-                /** @var ExternalUser $externalUser */
-                $externalUser = $task->submitter;
-                $externalUsers->push($externalUser);
-            }
-
-            // Get all external users who have access to the task
-            // If submitter is already in the collection, it won't be added again
-            $task->externalUsers->each(function ($user) use ($externalUsers) {
-                if (! $externalUsers->contains('id', $user->id)) {
-                    $externalUsers->push($user);
-                }
-            });
-
-            // Queue delayed notifications to all external users
-            foreach ($externalUsers as $externalUser) {
+            foreach ($this->taskCollaboratorService->externalAudience($task) as $externalUser) {
                 $payload = [
                     'type' => 'task_thread',
                     'user_id' => $externalUser->external_id,
@@ -249,6 +246,8 @@ class TaskThreadController extends Controller
      */
     public function show(Task $task, TaskThread $thread): JsonResponse
     {
+        $this->ensureTaskVisible($task);
+
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
         }
@@ -280,6 +279,8 @@ class TaskThreadController extends Controller
      */
     public function destroy(Task $task, TaskThread $thread): JsonResponse
     {
+        $this->ensureTaskVisible($task);
+
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
         }
@@ -311,6 +312,8 @@ class TaskThreadController extends Controller
      */
     public function update(Request $request, Task $task, TaskThread $thread): JsonResponse
     {
+        $this->ensureTaskVisible($task);
+
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
         }
