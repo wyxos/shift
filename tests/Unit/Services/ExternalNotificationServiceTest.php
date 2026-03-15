@@ -75,6 +75,49 @@ test('send notification with custom source', function () {
     });
 });
 
+
+test('send notification skips ssl verification for local consumer apps', function () {
+    $capturedOptions = null;
+
+    Http::fake(function ($request, $options) use (&$capturedOptions) {
+        $capturedOptions = $options;
+
+        return Http::response([
+            'success' => true,
+            'production' => false,
+        ], 200);
+    });
+
+    $service = new ExternalNotificationService();
+
+    $response = $service->sendNotification('https://shift-sdk-package.test', 'test.handler', ['key' => 'value']);
+
+    expect($response)->not->toBeNull();
+    expect($capturedOptions)->toBeArray();
+    expect($capturedOptions['verify'] ?? null)->toBeFalse();
+});
+
+test('send notification keeps ssl verification for public hosts', function () {
+    $capturedOptions = null;
+
+    Http::fake(function ($request, $options) use (&$capturedOptions) {
+        $capturedOptions = $options;
+
+        return Http::response([
+            'success' => true,
+            'production' => true,
+        ], 200);
+    });
+
+    $service = new ExternalNotificationService();
+
+    $response = $service->sendNotification('https://example.com', 'test.handler', ['key' => 'value']);
+
+    expect($response)->not->toBeNull();
+    expect($capturedOptions)->toBeArray();
+    expect($capturedOptions['verify'] ?? true)->not->toBeFalse();
+});
+
 test('send notification handles exception', function () {
     // Arrange
     Http::fake(function () {
