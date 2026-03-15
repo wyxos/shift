@@ -714,66 +714,54 @@ test('toggle priority updates task priority', function () {
     ]);
 });
 
-test('task creation sends notifications', function () {
+test('task creation notifies the submitter and explicitly tagged collaborators only', function () {
     \Illuminate\Support\Facades\Notification::fake();
 
-    // Create a project owned by the user
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
 
-    // Create additional users with access to the project
-    $projectUser1 = User::factory()->create();
-    $projectUser2 = User::factory()->create();
+    $taggedCollaborator = User::factory()->create();
+    $untaggedProjectUser = User::factory()->create();
 
-    // Give these users access to the project
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $project->id,
-        'user_id' => $projectUser1->id,
-        'user_email' => $projectUser1->email,
-        'user_name' => $projectUser1->name,
+        'user_id' => $taggedCollaborator->id,
+        'user_email' => $taggedCollaborator->email,
+        'user_name' => $taggedCollaborator->name,
         'registration_status' => 'registered',
     ]);
 
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $project->id,
-        'user_id' => $projectUser2->id,
-        'user_email' => $projectUser2->email,
-        'user_name' => $projectUser2->name,
+        'user_id' => $untaggedProjectUser->id,
+        'user_email' => $untaggedProjectUser->email,
+        'user_name' => $untaggedProjectUser->name,
         'registration_status' => 'registered',
     ]);
-
-    // Create a task for the project
-    $taskData = [
-        'title' => 'Notification Test Task',
-        'description' => 'This task should trigger notifications',
-        'project_id' => $project->id,
-        'priority' => 'high',
-        'status' => 'pending',
-    ];
 
     $response = $this->actingAs($this->user)
-        ->post(route('tasks.store'), $taskData);
+        ->postJson(route('tasks.v2.store'), [
+            'title' => 'Notification Policy Task',
+            'project_id' => $project->id,
+            'internal_collaborator_ids' => [$taggedCollaborator->id],
+        ]);
 
-    $response->assertRedirect(route('tasks.index'));
-    $response->assertSessionHas('success', 'Task created successfully.');
+    $response->assertCreated();
 
-    // Get the created task
-    $task = \App\Models\Task::where('title', 'Notification Test Task')->first();
-
-    // Assert that notifications were NOT sent to the task creator (who is also the project owner)
-    \Illuminate\Support\Facades\Notification::assertNotSentTo(
-        [$this->user],
-        \App\Notifications\TaskCreationNotification::class
+    \Illuminate\Support\Facades\Notification::assertSentTo(
+        $this->user,
+        \App\Notifications\TaskCreationNotification::class,
     );
 
-    // Assert that notifications were sent to users with access to the project
     \Illuminate\Support\Facades\Notification::assertSentTo(
-        [$projectUser1, $projectUser2],
+        $taggedCollaborator,
         \App\Notifications\TaskCreationNotification::class,
-        function ($notification, $channels, $notifiable) use ($task) {
-            return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $task->id]);
-        }
+    );
+
+    \Illuminate\Support\Facades\Notification::assertNotSentTo(
+        $untaggedProjectUser,
+        \App\Notifications\TaskCreationNotification::class,
     );
 });
 

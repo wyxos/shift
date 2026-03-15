@@ -137,6 +137,44 @@ class TaskCollaboratorService
         return $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
     }
 
+    public function internalTaskCreateAudience(Task $task): Collection
+    {
+        $task->loadMissing(['submitter', 'internalCollaborators']);
+
+        $users = collect();
+
+        if ($task->submitter instanceof User) {
+            $users->push($task->submitter);
+        }
+
+        foreach ($task->internalCollaborators as $collaborator) {
+            if (! $users->contains('id', $collaborator->id)) {
+                $users->push($collaborator);
+            }
+        }
+
+        return $users->values();
+    }
+
+    public function externalTaskCreateAudience(Task $task): Collection
+    {
+        $task->loadMissing(['submitter', 'externalCollaborators']);
+
+        $users = collect();
+
+        if ($task->submitter instanceof ExternalUser) {
+            $users->push($task->submitter);
+        }
+
+        foreach ($task->externalCollaborators as $collaborator) {
+            if (! $users->contains('id', $collaborator->id)) {
+                $users->push($collaborator);
+            }
+        }
+
+        return $users->values();
+    }
+
     public function internalAudience(Task $task, ?int $excludingUserId = null): Collection
     {
         $task->loadMissing(['project.author', 'project.projectUser.user', 'internalCollaborators']);
