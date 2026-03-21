@@ -14,32 +14,32 @@ const STATUS_OPTIONS: TaskFilterOption[] = [
     {
         value: 'pending',
         label: 'Pending',
-        selectedClass: 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200',
-        unselectedClass: 'border-amber-300/60 text-amber-900 hover:bg-amber-50',
+        selectedClass: 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-400/60 dark:bg-amber-500/22 dark:text-amber-50 dark:hover:bg-amber-500/28',
+        unselectedClass: 'border-amber-300/60 text-amber-900 hover:bg-amber-50 dark:border-amber-500/25 dark:bg-amber-500/8 dark:text-amber-200 dark:hover:bg-amber-500/14 dark:hover:text-amber-100',
     },
     {
         value: 'in-progress',
         label: 'In Progress',
-        selectedClass: 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200',
-        unselectedClass: 'border-sky-300/60 text-sky-900 hover:bg-sky-50',
+        selectedClass: 'border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200 dark:border-sky-400/60 dark:bg-sky-500/22 dark:text-sky-50 dark:hover:bg-sky-500/28',
+        unselectedClass: 'border-sky-300/60 text-sky-900 hover:bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/8 dark:text-sky-200 dark:hover:bg-sky-500/14 dark:hover:text-sky-100',
     },
     {
         value: 'awaiting-feedback',
         label: 'Awaiting Feedback',
-        selectedClass: 'border-indigo-300 bg-indigo-100 text-indigo-900 hover:bg-indigo-200',
-        unselectedClass: 'border-indigo-300/60 text-indigo-900 hover:bg-indigo-50',
+        selectedClass: 'border-indigo-300 bg-indigo-100 text-indigo-900 hover:bg-indigo-200 dark:border-indigo-400/60 dark:bg-indigo-500/22 dark:text-indigo-50 dark:hover:bg-indigo-500/28',
+        unselectedClass: 'border-indigo-300/60 text-indigo-900 hover:bg-indigo-50 dark:border-indigo-500/25 dark:bg-indigo-500/8 dark:text-indigo-200 dark:hover:bg-indigo-500/14 dark:hover:text-indigo-100',
     },
     {
         value: 'completed',
         label: 'Completed',
-        selectedClass: 'border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200',
-        unselectedClass: 'border-emerald-300/60 text-emerald-900 hover:bg-emerald-50',
+        selectedClass: 'border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:border-emerald-400/60 dark:bg-emerald-500/22 dark:text-emerald-50 dark:hover:bg-emerald-500/28',
+        unselectedClass: 'border-emerald-300/60 text-emerald-900 hover:bg-emerald-50 dark:border-emerald-500/25 dark:bg-emerald-500/8 dark:text-emerald-200 dark:hover:bg-emerald-500/14 dark:hover:text-emerald-100',
     },
     {
         value: 'closed',
         label: 'Closed',
-        selectedClass: 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200',
-        unselectedClass: 'border-slate-300/60 text-slate-700 hover:bg-slate-50',
+        selectedClass: 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:border-slate-400/60 dark:bg-slate-500/22 dark:text-slate-50 dark:hover:bg-slate-500/28',
+        unselectedClass: 'border-slate-300/60 text-slate-700 hover:bg-slate-50 dark:border-slate-500/25 dark:bg-slate-500/8 dark:text-slate-200 dark:hover:bg-slate-500/14 dark:hover:text-slate-100',
     },
 ];
 
@@ -47,20 +47,20 @@ const PRIORITY_OPTIONS: TaskFilterOption[] = [
     {
         value: 'low',
         label: 'Low',
-        selectedClass: 'border-cyan-300 bg-cyan-100 text-cyan-900 hover:bg-cyan-200',
-        unselectedClass: 'border-cyan-300/60 text-cyan-900 hover:bg-cyan-50',
+        selectedClass: 'border-cyan-300 bg-cyan-100 text-cyan-900 hover:bg-cyan-200 dark:border-cyan-400/60 dark:bg-cyan-500/22 dark:text-cyan-50 dark:hover:bg-cyan-500/28',
+        unselectedClass: 'border-cyan-300/60 text-cyan-900 hover:bg-cyan-50 dark:border-cyan-500/25 dark:bg-cyan-500/8 dark:text-cyan-200 dark:hover:bg-cyan-500/14 dark:hover:text-cyan-100',
     },
     {
         value: 'medium',
         label: 'Medium',
-        selectedClass: 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-900 hover:bg-fuchsia-200',
-        unselectedClass: 'border-fuchsia-300/60 text-fuchsia-900 hover:bg-fuchsia-50',
+        selectedClass: 'border-fuchsia-300 bg-fuchsia-100 text-fuchsia-900 hover:bg-fuchsia-200 dark:border-fuchsia-400/60 dark:bg-fuchsia-500/22 dark:text-fuchsia-50 dark:hover:bg-fuchsia-500/28',
+        unselectedClass: 'border-fuchsia-300/60 text-fuchsia-900 hover:bg-fuchsia-50 dark:border-fuchsia-500/25 dark:bg-fuchsia-500/8 dark:text-fuchsia-200 dark:hover:bg-fuchsia-500/14 dark:hover:text-fuchsia-100',
     },
     {
         value: 'high',
         label: 'High',
-        selectedClass: 'border-rose-300 bg-rose-100 text-rose-900 hover:bg-rose-200',
-        unselectedClass: 'border-rose-300/60 text-rose-900 hover:bg-rose-50',
+        selectedClass: 'border-rose-300 bg-rose-100 text-rose-900 hover:bg-rose-200 dark:border-rose-400/60 dark:bg-rose-500/22 dark:text-rose-50 dark:hover:bg-rose-500/28',
+        unselectedClass: 'border-rose-300/60 text-rose-900 hover:bg-rose-50 dark:border-rose-500/25 dark:bg-rose-500/8 dark:text-rose-200 dark:hover:bg-rose-500/14 dark:hover:text-rose-100',
     },
 ];
 
