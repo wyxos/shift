@@ -151,13 +151,33 @@ class SdkInstallSessionService
         return $this->manageableProjectsQuery((int) $session['approved_user_id'])
             ->orderBy('name')
             ->get()
-            ->map(fn (Project $project) => [
-                'id' => $project->id,
-                'name' => $project->name,
-                'client_name' => $project->client?->name,
-                'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
-                'has_project_token' => filled($project->token),
+            ->map(fn (Project $project) => $this->projectPayload($project));
+    }
+
+    public function createProject(string $deviceCode, string $name): array
+    {
+        return $this->withLock($deviceCode, function () use ($deviceCode, $name) {
+            $session = $this->requireApprovedSession($deviceCode);
+
+            if ($session['credentials_issued_at'] !== null) {
+                throw new ConflictHttpException('Credentials have already been issued for this install session.');
+            }
+
+            $project = Project::query()->create([
+                'name' => trim($name),
+                'author_id' => (int) $session['approved_user_id'],
+                'client_id' => null,
+                'organisation_id' => null,
             ]);
+
+            $project->loadMissing([
+                'client:id,name,organisation_id',
+                'client.organisation:id,name,author_id',
+                'organisation:id,name,author_id',
+            ]);
+
+            return $this->projectPayload($project);
+        });
     }
 
     public function finalize(string $deviceCode, int $projectId): array
@@ -316,6 +336,17 @@ class SdkInstallSessionService
     private function state(array $session): string
     {
         return $session['approved_user_id'] === null ? 'pending' : 'approved';
+    }
+
+    private function projectPayload(Project $project): array
+    {
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
+            'client_name' => $project->client?->name,
+            'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
+            'has_project_token' => filled($project->token),
+        ];
     }
 
     private function generateUniqueDeviceCode(): string
