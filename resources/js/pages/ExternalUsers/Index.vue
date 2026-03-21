@@ -1,40 +1,47 @@
 <script lang="ts" setup>
+import AdminListShell from '@/components/admin/AdminListShell.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
-import debounce from 'lodash/debounce';
-import { onMounted, ref, watch } from 'vue';
+import { Pencil } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
-const props = defineProps({
-    externalUsers: {
-        type: Object,
-        required: true,
-    },
-    filters: {
-        type: Object,
-        required: true,
-    },
-});
+type ExternalUserRow = {
+    id: number;
+    name: string;
+    email?: string | null;
+    environment?: string | null;
+    project?: {
+        id: number;
+        name: string;
+    } | null;
+};
 
-// Create a reactive copy of the externalUsers data
-const localExternalUsers = ref({ ...props.externalUsers });
+type ExternalUsersPage = {
+    data: ExternalUserRow[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+};
 
-// Update local externalUsers when props change
-watch(
-    () => props.externalUsers,
-    (newExternalUsers) => {
-        localExternalUsers.value = { ...newExternalUsers };
-    },
-    { deep: true },
-);
+type Filters = {
+    search?: string | null;
+    sort_by?: string | null;
+};
 
-// Initialize local externalUsers on component mount
-onMounted(() => {
-    localExternalUsers.value = { ...props.externalUsers };
-});
+type SortBy = 'newest' | 'oldest' | 'name';
+
+const props = defineProps<{
+    externalUsers: ExternalUsersPage;
+    filters: Filters;
+}>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -43,95 +50,186 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const search = ref(props.filters.search || '');
-const title = `External Users` + (search.value ? ` - ${search.value}` : '');
+const defaultSortBy: SortBy = 'newest';
+const filtersOpen = ref(false);
+const sortOptions = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'oldest', label: 'Oldest' },
+    { value: 'name', label: 'Name' },
+] satisfies { value: SortBy; label: string }[];
 
-function onPageChange(page: number) {
-    // Update the current page in local externalUsers
-    localExternalUsers.value.current_page = page;
+function normalizeSortBy(value: string | null | undefined): SortBy {
+    if (value === 'oldest' || value === 'name') {
+        return value;
+    }
 
-    // Use router to navigate to the new page
-    router.get(
-        '/external-users',
-        { page, search: search.value },
-        {
-            preserveState: true,
-            preserveScroll: true,
-        },
-    );
+    return defaultSortBy;
 }
 
-// Watch for changes in search input
-watch(search, (value) =>
-    debounce(() => {
-        router.get(
-            '/external-users',
-            {
-                search: value,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    }, 300)(),
+const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
+const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
+const draftSearchTerm = ref(appliedSearchTerm.value);
+const draftSortBy = ref<SortBy>(appliedSortBy.value);
+
+watch(
+    () => props.filters,
+    (next) => {
+        appliedSearchTerm.value = typeof next.search === 'string' ? next.search : '';
+        appliedSortBy.value = normalizeSortBy(next.sort_by);
+        draftSearchTerm.value = appliedSearchTerm.value;
+        draftSortBy.value = appliedSortBy.value;
+    },
+    { deep: true },
 );
+
+const activeFilterCount = computed(() => {
+    let count = 0;
+
+    if (appliedSearchTerm.value.trim()) count += 1;
+    if (appliedSortBy.value !== defaultSortBy) count += 1;
+
+    return count;
+});
+
+function queryParams(page = 1) {
+    return {
+        search: appliedSearchTerm.value.trim() || undefined,
+        sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
+        page,
+    };
+}
+
+function applyFilters() {
+    appliedSearchTerm.value = draftSearchTerm.value;
+    appliedSortBy.value = draftSortBy.value;
+    filtersOpen.value = false;
+
+    router.get('/external-users', queryParams(), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function resetFilters() {
+    draftSearchTerm.value = '';
+    draftSortBy.value = defaultSortBy;
+    appliedSearchTerm.value = '';
+    appliedSortBy.value = defaultSortBy;
+    filtersOpen.value = false;
+
+    router.get('/external-users', queryParams(), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function goToPage(page: number) {
+    router.get('/external-users', queryParams(page), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function editExternalUser(externalUserId: number) {
+    router.visit(`/external-users/${externalUserId}/edit`);
+}
+
+function environmentLabel(environment?: string | null) {
+    return environment?.trim() || 'Unknown';
+}
 </script>
 
 <template>
-    <Head :title="title" />
+    <Head title="External Users" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <div class="flex flex-wrap gap-4">
-                <Input v-model="search" class="mb-4 rounded border p-2" placeholder="Search..." type="text" />
-            </div>
-
-            <o-table
-                :current-page="localExternalUsers.current_page"
-                :data="localExternalUsers.data"
-                :paginated="true"
-                :per-page="localExternalUsers.per_page"
-                :total="localExternalUsers.total"
-                backend-pagination
-                @page-change="onPageChange"
+            <AdminListShell
+                v-model:filtersOpen="filtersOpen"
+                :active-filter-count="activeFilterCount"
+                description="External contacts grouped by project and environment."
+                filter-description="Search and sort the external users list."
+                items-label="external users"
+                :page="props.externalUsers"
+                title="External Users"
+                @page-change="goToPage"
             >
-                <o-table-column v-slot="{ row }" field="name" label="Name">
-                    {{ row.name }}
-                </o-table-column>
-
-                <o-table-column v-slot="{ row }" field="email" label="Email">
-                    {{ row.email }}
-                </o-table-column>
-
-                <o-table-column v-slot="{ row }" field="environment" label="Environment">
-                    <span class="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
-                        {{ row.environment }}
-                    </span>
-                </o-table-column>
-
-                <o-table-column v-slot="{ row }" field="project" label="Project">
-                    <span v-if="row.project" class="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                        {{ row.project.name }}
-                    </span>
-                    <span v-else class="text-gray-500"> No project assigned </span>
-                </o-table-column>
-
-                <o-table-column v-slot="{ row }" label="Actions">
-                    <div class="flex justify-end gap-2">
-                        <Button variant="outline" @click="router.visit(`/external-users/${row.id}/edit`)">
-                            <i class="fas fa-edit"></i>
-                        </Button>
+                <template #filters>
+                    <div class="space-y-2">
+                        <label class="text-muted-foreground text-sm leading-none font-medium">Search</label>
+                        <Input v-model="draftSearchTerm" data-testid="filter-search" placeholder="Search by name, email, or environment" />
                     </div>
-                </o-table-column>
 
-                <template #empty>
-                    <div class="flex h-full items-center justify-center">
-                        <p class="text-gray-500">No external users found.</p>
+                    <div class="space-y-2">
+                        <label class="text-muted-foreground text-sm leading-none font-medium">Sort By</label>
+                        <ButtonGroup
+                            v-model="draftSortBy"
+                            aria-label="Sort external users"
+                            :columns="3"
+                            :options="sortOptions"
+                            test-id-prefix="sort-by"
+                        />
                     </div>
                 </template>
-            </o-table>
+
+                <template #filter-actions>
+                    <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                    <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
+                </template>
+
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Environment</TableHead>
+                            <TableHead>Project</TableHead>
+                            <TableHead class="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <template v-if="props.externalUsers.data.length">
+                            <TableRow
+                                v-for="externalUser in props.externalUsers.data"
+                                :key="externalUser.id"
+                                :data-testid="`external-user-row-${externalUser.id}`"
+                            >
+                                <TableCell class="font-medium">{{ externalUser.name }}</TableCell>
+                                <TableCell>{{ externalUser.email || 'No email' }}</TableCell>
+                                <TableCell>
+                                    <Badge variant="secondary" :data-testid="`external-user-environment-${externalUser.id}`">
+                                        {{ environmentLabel(externalUser.environment) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge v-if="externalUser.project" class="bg-sky-100 text-sky-900 hover:bg-sky-100" variant="secondary">
+                                        {{ externalUser.project.name }}
+                                    </Badge>
+                                    <span v-else class="text-muted-foreground text-sm">No project assigned</span>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="flex justify-end">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            :data-testid="`external-user-edit-${externalUser.id}`"
+                                            title="Edit external user"
+                                            @click="editExternalUser(externalUser.id)"
+                                        >
+                                            <Pencil class="h-4 w-4" />
+                                            <span class="sr-only">Edit external user</span>
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </template>
+                        <TableEmpty v-else :colspan="5">No external users found.</TableEmpty>
+                    </TableBody>
+                </Table>
+            </AdminListShell>
         </div>
     </AppLayout>
 </template>

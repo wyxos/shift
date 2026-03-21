@@ -1,219 +1,248 @@
 import Clients from '@/pages/Clients.vue';
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { h } from 'vue';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock components
+const inertiaMocks = vi.hoisted(() => ({
+    routerGet: vi.fn(),
+    routerDelete: vi.fn(),
+    formInstances: [] as Array<Record<string, any>>,
+}));
+
+function clone<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value));
+}
+
 vi.mock('@/layouts/AppLayout.vue', () => ({
     default: {
         props: ['breadcrumbs'],
-        render() {
-            return h('div', { class: 'app-layout' }, this.$slots.default?.());
-        },
+        template: '<div class="app-layout"><slot /></div>',
+    },
+}));
+
+vi.mock('@/components/admin/AdminListShell.vue', () => ({
+    default: {
+        props: ['page'],
+        emits: ['update:filtersOpen', 'page-change'],
+        template: `
+            <div class="admin-list-shell">
+                <div class="filters"><slot name="filters" /></div>
+                <div class="filter-actions"><slot name="filter-actions" /></div>
+                <div class="actions"><slot name="actions" /></div>
+                <button data-testid="shell-next-page" @click="$emit('page-change', Number(page?.current_page || 1) + 1)">Next page</button>
+                <slot />
+            </div>
+        `,
     },
 }));
 
 vi.mock('@/components/ui/button', () => ({
     Button: {
-        props: ['variant', 'disabled'],
-        render() {
-            return h(
-                'button',
-                {
-                    class: `button ${this.variant || ''}`,
-                    disabled: this.disabled,
-                },
-                this.$slots.default?.(),
-            );
-        },
+        props: ['variant', 'disabled', 'size', 'type'],
+        inheritAttrs: false,
+        template: '<button v-bind="$attrs" :disabled="disabled" :type="type || `button`"><slot /></button>',
+    },
+}));
+
+vi.mock('@/components/ui/button-group', () => ({
+    ButtonGroup: {
+        props: ['modelValue', 'options', 'testIdPrefix'],
+        emits: ['update:modelValue'],
+        template: `
+            <div>
+                <button
+                    v-for="option in options"
+                    :key="option.value"
+                    :data-testid="testIdPrefix + '-' + option.value"
+                    type="button"
+                    @click="$emit('update:modelValue', option.value)"
+                >
+                    {{ option.label }}
+                </button>
+            </div>
+        `,
     },
 }));
 
 vi.mock('@/components/ui/input', () => ({
     Input: {
-        props: ['type', 'placeholder', 'modelValue'],
+        props: ['modelValue', 'type', 'placeholder'],
         emits: ['update:modelValue'],
-        render() {
-            return h('input', {
-                type: this.type,
-                placeholder: this.placeholder,
-                value: this.modelValue,
-                onInput: (e) => this.$emit('update:modelValue', e.target.value),
-            });
-        },
+        inheritAttrs: false,
+        template:
+            '<input v-bind="$attrs" :type="type" :placeholder="placeholder" :value="modelValue" @input="$emit(`update:modelValue`, $event.target.value)" />',
     },
 }));
 
-vi.mock('@oruga-ui/oruga-next', () => ({
-    OTable: {
-        props: ['data', 'paginated', 'perPage', 'currentPage', 'backendPagination', 'total'],
-        render() {
-            // Simplified implementation that just renders the empty slot
-            return h('div', { class: 'o-table' }, this.$slots.empty?.());
-        },
-    },
-    OTableColumn: {
-        render() {
-            // Simplified implementation
-            return h('div', { class: 'o-table-column' });
-        },
-    },
+vi.mock('@/components/ui/label', () => ({ Label: { template: '<label><slot /></label>' } }));
+vi.mock('@/components/ui/badge', () => ({ Badge: { template: '<span v-bind="$attrs"><slot /></span>' } }));
+vi.mock('@/components/ui/table', () => ({
+    Table: { template: '<table><slot /></table>' },
+    TableBody: { template: '<tbody><slot /></tbody>' },
+    TableCell: { template: '<td><slot /></td>' },
+    TableEmpty: { template: '<div v-bind="$attrs"><slot /></div>' },
+    TableHead: { template: '<th><slot /></th>' },
+    TableHeader: { template: '<thead><slot /></thead>' },
+    TableRow: { template: '<tr v-bind="$attrs"><slot /></tr>' },
 }));
-
 vi.mock('@/components/ui/alert-dialog', () => ({
     AlertDialog: {
         props: ['open'],
-        render() {
-            if (!this.open) return null;
-            return h('div', { class: 'alert-dialog' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogTrigger: {
-        render() {
-            return h('div', { class: 'alert-dialog-trigger' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogContent: {
-        render() {
-            return h('div', { class: 'alert-dialog-content' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogHeader: {
-        render() {
-            return h('div', { class: 'alert-dialog-header' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogTitle: {
-        render() {
-            return h('h2', { class: 'alert-dialog-title' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogDescription: {
-        render() {
-            return h('p', { class: 'alert-dialog-description' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogFooter: {
-        render() {
-            return h('div', { class: 'alert-dialog-footer' }, this.$slots.default?.());
-        },
-    },
-    AlertDialogAction: {
-        props: ['disabled'],
-        render() {
-            return h(
-                'button',
-                {
-                    class: 'alert-dialog-action',
-                    disabled: this.disabled,
-                },
-                this.$slots.default?.(),
-            );
-        },
+        template: '<div v-if="open" class="alert-dialog"><slot /></div>',
     },
     AlertDialogCancel: {
-        render() {
-            return h('button', { class: 'alert-dialog-cancel' }, this.$slots.default?.());
-        },
+        props: ['type'],
+        inheritAttrs: false,
+        template: '<button v-bind="$attrs" :type="type || `button`"><slot /></button>',
     },
+    AlertDialogContent: { template: '<div><slot /></div>' },
+    AlertDialogDescription: { template: '<p><slot /></p>' },
+    AlertDialogFooter: { template: '<div><slot /></div>' },
+    AlertDialogHeader: { template: '<div><slot /></div>' },
+    AlertDialogTitle: { template: '<h2><slot /></h2>' },
+    AlertDialogTrigger: { template: '<div><slot /></div>' },
 }));
-
 vi.mock('@/components/DeleteDialog.vue', () => ({
     default: {
         props: ['isOpen'],
-        render() {
-            if (!this.isOpen) return null;
-            return h('div', { class: 'delete-dialog' }, [
-                this.$slots.title?.(),
-                this.$slots.description?.(),
-                h('div', { class: 'actions' }, [this.$slots.cancel?.(), this.$slots.confirm?.()]),
-            ]);
-        },
+        emits: ['cancel', 'confirm'],
+        template: `
+            <div v-if="isOpen" class="delete-dialog">
+                <slot name="title" />
+                <slot name="description" />
+                <button data-testid="delete-dialog-confirm" @click="$emit('confirm')"><slot name="confirm" /></button>
+            </div>
+        `,
     },
 }));
-
-// Mock Inertia components and functions
-vi.mock('@inertiajs/vue3', () => {
-    const useFormMock = vi.fn(() => ({
-        id: null,
-        name: '',
-        organisation_id: null,
-        isActive: false,
-        errors: {},
-        processing: false,
-        post: vi.fn(),
-        put: vi.fn(),
-        reset: vi.fn(),
-    }));
+vi.mock('@inertiajs/vue3', async () => {
+    const { defineComponent, reactive } = await import('vue');
 
     return {
-        Head: {
-            render: () => {},
-        },
+        Head: defineComponent({
+            setup() {
+                return () => null;
+            },
+        }),
         router: {
-            get: vi.fn(),
-            delete: vi.fn(),
+            get: inertiaMocks.routerGet,
+            delete: inertiaMocks.routerDelete,
         },
-        useForm: useFormMock,
+        useForm: vi.fn((initialValues: Record<string, unknown>) => {
+            const initial = clone(initialValues);
+            const form = reactive({
+                ...clone(initialValues),
+                errors: {},
+                processing: false,
+                post: vi.fn((_url: string, options?: Record<string, any>) => options?.onSuccess?.()),
+                put: vi.fn((_url: string, options?: Record<string, any>) => options?.onSuccess?.()),
+                reset: vi.fn(() => {
+                    Object.assign(form, clone(initial), { errors: {}, processing: false });
+                }),
+            });
+
+            inertiaMocks.formInstances.push(form as Record<string, any>);
+
+            return form;
+        }),
     };
 });
 
 describe('Clients.vue', () => {
     const mockClients = {
         data: [
-            { id: 1, name: 'Client 1' },
-            { id: 2, name: 'Client 2' },
+            { id: 1, name: 'Acme', organisation_name: 'Northwind' },
+            { id: 2, name: 'Solo Client', organisation_name: null },
         ],
-        per_page: 10,
         current_page: 1,
-        total: 2,
+        last_page: 3,
+        total: 25,
+        from: 1,
+        to: 10,
     };
 
     const mockOrganisations = [
-        { id: 1, name: 'Organisation 1' },
-        { id: 2, name: 'Organisation 2' },
+        { id: 1, name: 'Northwind' },
+        { id: 2, name: 'Tailspin' },
     ];
 
-    const mockFilters = {
-        search: '',
-    };
-
-    it('renders clients table correctly', () => {
-        const wrapper = mount(Clients, {
+    function mountPage() {
+        return mount(Clients, {
             props: {
                 clients: mockClients,
                 organisations: mockOrganisations,
-                filters: mockFilters,
+                filters: {
+                    search: '',
+                    sort_by: 'newest',
+                },
             },
         });
+    }
 
-        expect(wrapper.find('.o-table').exists()).toBe(true);
-        expect(wrapper.text()).toContain('No clients found');
+    beforeEach(() => {
+        inertiaMocks.routerGet.mockReset();
+        inertiaMocks.routerDelete.mockReset();
+        inertiaMocks.formInstances.length = 0;
     });
 
-    it('shows add client button', () => {
-        const wrapper = mount(Clients, {
-            props: {
-                clients: mockClients,
-                organisations: mockOrganisations,
-                filters: mockFilters,
-            },
-        });
+    it('renders migrated table rows and actions', () => {
+        const wrapper = mountPage();
 
-        const addButton = wrapper.findAll('button').find((btn) => btn.text().includes('Add Client'));
-        expect(addButton).toBeDefined();
+        expect(wrapper.text()).toContain('Acme');
+        expect(wrapper.text()).toContain('Northwind');
+        expect(wrapper.find('[data-testid="client-row-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="client-edit-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="client-organisation-2"]').text()).toContain('No organisation assigned');
     });
 
-    it('has search input', () => {
-        const wrapper = mount(Clients, {
-            props: {
-                clients: mockClients,
-                organisations: mockOrganisations,
-                filters: mockFilters,
-            },
-        });
+    it('applies filters and preserves pagination state', async () => {
+        const wrapper = mountPage();
 
-        const searchInput = wrapper.find('input[placeholder="Search..."]');
-        expect(searchInput.exists()).toBe(true);
+        await wrapper.get('[data-testid="filter-search"]').setValue('Acme');
+        await wrapper.get('[data-testid="sort-by-name"]').trigger('click');
+        await wrapper.get('[data-testid="filters-apply"]').trigger('click');
+
+        expect(inertiaMocks.routerGet).toHaveBeenCalledWith(
+            '/clients',
+            expect.objectContaining({ page: 1, search: 'Acme', sort_by: 'name' }),
+            expect.objectContaining({ preserveScroll: true, preserveState: true, replace: true }),
+        );
+
+        await wrapper.get('[data-testid="shell-next-page"]').trigger('click');
+
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith(
+            '/clients',
+            expect.objectContaining({ page: 2, search: 'Acme', sort_by: 'name' }),
+            expect.objectContaining({ preserveScroll: true, preserveState: true, replace: true }),
+        );
+
+        await wrapper.get('[data-testid="filters-reset"]').trigger('click');
+
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith(
+            '/clients',
+            expect.objectContaining({ page: 1 }),
+            expect.objectContaining({ preserveScroll: true, preserveState: true, replace: true }),
+        );
+    });
+
+    it('preserves create, edit, and delete flows', async () => {
+        const wrapper = mountPage();
+
+        await wrapper.get('[data-testid="open-create-client"]').trigger('click');
+        await wrapper.get('[data-testid="create-client-name"]').setValue('New Client');
+        await wrapper.get('[data-testid="create-client-organisation"]').setValue('1');
+        await wrapper.get('[data-testid="create-client-submit"]').trigger('click');
+
+        expect(inertiaMocks.formInstances[0].post).toHaveBeenCalledWith('/clients', expect.objectContaining({ preserveScroll: true }));
+
+        await wrapper.get('[data-testid="client-edit-1"]').trigger('click');
+        await wrapper.get('[data-testid="edit-client-name"]').setValue('Renamed Client');
+        await wrapper.get('[data-testid="edit-client-submit"]').trigger('click');
+
+        expect(inertiaMocks.formInstances[1].put).toHaveBeenCalledWith('/clients/1', expect.objectContaining({ preserveScroll: true }));
+
+        await wrapper.get('[data-testid="client-delete-1"]').trigger('click');
+        await wrapper.get('[data-testid="delete-dialog-confirm"]').trigger('click');
+
+        expect(inertiaMocks.routerDelete).toHaveBeenCalledWith('/clients/1', expect.objectContaining({ preserveScroll: true }));
     });
 });

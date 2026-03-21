@@ -2,79 +2,86 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
+use App\Models\Organisation;
 use App\Models\Project;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProjectController extends Controller
 {
     public function index()
     {
+        $sortBy = request('sort_by');
+
+        $projects = Project::query()
+            ->with([
+                'client:id,name,organisation_id',
+                'client.organisation:id,author_id',
+                'organisation:id,name,author_id',
+            ])
+            ->where(function (Builder $query) {
+                $query
+                    ->whereHas('client.organisation', function (Builder $subQuery) {
+                        $subQuery->where('author_id', auth()->id());
+                    })
+                    ->orWhereHas('organisation', function (Builder $subQuery) {
+                        $subQuery->where('author_id', auth()->id());
+                    })
+                    ->orWhereHas('projectUser', function (Builder $subQuery) {
+                        $subQuery->where('user_id', auth()->id());
+                    })
+                    ->orWhere('author_id', auth()->id());
+            })
+            ->when(
+                request('search'),
+                fn (Builder $query, string $search) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%'])
+            );
+
+        switch ($sortBy) {
+            case 'name':
+                $projects->orderBy('name');
+                break;
+            case 'oldest':
+                $projects->oldest();
+                break;
+            default:
+                $projects->latest();
+                break;
+        }
+
         return inertia('Projects')
             ->with([
-                'filters' => request()->only(['search']),
-                'projects' => \App\Models\Project::query()
-                    ->where(function ($query) {
-                        $query
-                            ->whereHas('client.organisation', function ($query) {
-                                $query->where('author_id', auth()->user()->id);
-                            })
-                            ->orWhereHas('organisation', function ($query) {
-                                $query->where('author_id', auth()->user()->id);
-                            })
-                            ->orWhereHas('projectUser', function ($query) {
-                                $query->where('user_id', auth()->user()->id);
-                            })
-                            ->orWhere('author_id', auth()->user()->id);
-                    })
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
+                'filters' => request()->only(['search', 'sort_by']),
+                'projects' => $projects
                     ->paginate(10)
                     ->withQueryString()
-                    ->through(function ($project) {
-                        // Add isOwner flag to each project
-                        $isOwner = $project->client?->organisation?->author_id === auth()->id() ||
-                                  $project->organisation?->author_id === auth()->id() ||
-                                  $project->author_id === auth()->id();
-
-                        return [
-                            ...$project->toArray(),
-                            'isOwner' => $isOwner,
-                        ];
-                    }),
-                'clients' => \App\Models\Client::query()
-                    ->whereHas('organisation', function ($query) {
-                        $query->where('author_id', auth()->user()->id);
+                    ->through(fn (Project $project) => [
+                        ...$project->toArray(),
+                        'client_name' => $project->client?->name,
+                        'organisation_name' => $project->organisation?->name,
+                        'isOwner' => $project->isManagedByUser(auth()->id()),
+                    ]),
+                'clients' => Client::query()
+                    ->whereHas('organisation', function (Builder $query) {
+                        $query->where('author_id', auth()->id());
                     })
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
-                    ->paginate(10)
-                    ->withQueryString(),
-                'organisations' => \App\Models\Organisation::query()
-                    ->where('author_id', auth()->user()->id)
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn($query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
-                    ->get(),
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
+                'organisations' => Organisation::query()
+                    ->where('author_id', auth()->id())
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
             ]);
     }
 
-    // delete route
-    public function destroy(\App\Models\Project $project)
+    public function destroy(Project $project)
     {
         $project->delete();
 
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
     }
 
-    // put project
-    public function update(\App\Models\Project $project)
+    public function update(Project $project)
     {
         $project->update(request()->validate([
             'name' => 'required|string|max:255',
@@ -83,7 +90,6 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
     }
 
-    // create project
     public function store()
     {
         $validated = request()->validate([
@@ -92,7 +98,7 @@ class ProjectController extends Controller
             'organisation_id' => 'nullable|exists:organisations,id',
         ]);
 
-        $project = \App\Models\Project::create([
+        Project::create([
             ...$validated,
             'author_id' => auth()->id(),
         ]);
@@ -100,31 +106,24 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
 
-    /**
-     * Get users with access to the project.
-     */
-    public function users(\App\Models\Project $project)
+    public function users(Project $project)
     {
-        // Check if the authenticated user has access to the project
         $hasAccess = $project->client?->organisation?->author_id === auth()->user()->id
             || $project->organisation?->author_id === auth()->user()->id
             || $project->author_id === auth()->user()->id
             || $project->projectUser()->where('user_id', auth()->id())->exists();
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $projectUsers = $project->projectUser()
-            ->with('user')
-            ->get();
-
-        return response()->json($projectUsers);
+        return response()->json(
+            $project->projectUser()
+                ->with('user')
+                ->get()
+        );
     }
 
-    /**
-     * Generate a new API token for the project.
-     */
     public function generateApiToken(Project $project)
     {
         $token = $project->generateApiToken();
