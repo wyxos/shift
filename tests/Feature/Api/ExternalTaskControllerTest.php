@@ -457,6 +457,35 @@ test('destroy returns 403 for unauthorized user', function () {
     $response->assertStatus(403);
 });
 
+test('store rejects tagged external collaborators when the environment is not registered', function () {
+    \Illuminate\Support\Facades\Http::fake();
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', [
+            'title' => 'Task With Unregistered Environment',
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'metadata' => [
+                'url' => 'https://example.com/task/unregistered-environment',
+                'environment' => 'production',
+            ],
+            'external_collaborators' => [
+                [
+                    'id' => 'client-2',
+                    'name' => 'Project User',
+                    'email' => 'project@example.com',
+                ],
+            ],
+        ]);
+
+    $response
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['environment'])
+        ->assertJsonPath('errors.environment.0', 'The selected environment is not registered for this project.');
+
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+});
+
 test('external task creation only notifies explicitly tagged internal collaborators', function () {
     \Illuminate\Support\Facades\Notification::fake();
 
@@ -821,3 +850,22 @@ test('non submitter external collaborator cannot update collaborators', function
     $response->assertStatus(403);
 });
 
+test('store requires an environment before syncing external collaborators', function () {
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', [
+            'title' => 'Needs environment',
+            'project' => $this->project->token,
+            'external_collaborators' => [
+                [
+                    'id' => 'client-7',
+                    'name' => 'Client User',
+                    'email' => 'client@example.com',
+                ],
+            ],
+        ]);
+
+    $response
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['environment'])
+        ->assertJsonPath('errors.environment.0', 'Select an environment before tagging external collaborators.');
+});
