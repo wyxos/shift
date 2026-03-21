@@ -7,6 +7,7 @@ Route::prefix('sdk/install')->name('api.sdk-install.')->group(function () {
     Route::post('/sessions', [\App\Http\Controllers\Api\SdkInstallController::class, 'store'])->middleware('throttle:20,1')->name('store');
     Route::post('/sessions/poll', [\App\Http\Controllers\Api\SdkInstallController::class, 'poll'])->middleware('throttle:120,1')->name('poll');
     Route::post('/sessions/projects', [\App\Http\Controllers\Api\SdkInstallController::class, 'projects'])->middleware('throttle:60,1')->name('projects');
+    Route::post('/sessions/projects/create', [\App\Http\Controllers\Api\SdkInstallController::class, 'createProject'])->middleware('throttle:20,1')->name('projects.create');
     Route::post('/sessions/finalize', [\App\Http\Controllers\Api\SdkInstallController::class, 'finalize'])->middleware('throttle:20,1')->name('finalize');
 });
 

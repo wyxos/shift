@@ -67,6 +67,25 @@ class SdkInstallController extends Controller
         ]);
     }
 
+    public function createProject(Request $request): JsonResponse
+    {
+        $attributes = $request->validate([
+            'device_code' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $project = $this->sdkInstallSessionService->createProject(
+                $attributes['device_code'],
+                $attributes['name'],
+            );
+        } catch (HttpExceptionInterface $exception) {
+            return $this->errorResponse($exception);
+        }
+
+        return response()->json(['project' => $project], 201);
+    }
+
     public function finalize(Request $request): JsonResponse
     {
         $attributes = $request->validate([

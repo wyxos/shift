@@ -152,6 +152,37 @@ test('approved sessions list only manageable projects and exclude shared project
         ->assertJsonPath('projects.0.name', 'Managed Project');
 });
 
+test('approved sessions can create a standalone project when none exist yet', function () {
+    $manager = User::factory()->create();
+
+    $session = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'staging',
+        'url' => 'https://client-app.test',
+    ])->json();
+
+    $this->actingAs($manager)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ]);
+
+    $this->postJson(route('api.sdk-install.projects'), [
+        'device_code' => $session['device_code'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('projects', []);
+
+    $this->postJson(route('api.sdk-install.projects.create'), [
+        'device_code' => $session['device_code'],
+        'name' => 'Atlas',
+    ])
+        ->assertCreated()
+        ->assertJsonPath('project.name', 'Atlas')
+        ->assertJsonPath('project.client_name', null)
+        ->assertJsonPath('project.organisation_name', null)
+        ->assertJsonPath('project.has_project_token', false);
+
+    $this->assertDatabaseHas('projects', ['name' => 'Atlas', 'author_id' => $manager->id]);
+});
+
 test('finalize generates credentials once, creates project tokens when missing, and registers the environment', function () {
     $manager = User::factory()->create();
     $project = Project::factory()->create([
