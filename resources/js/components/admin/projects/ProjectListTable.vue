@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { FolderKanban, KeyRound, Pencil, Trash2, UserPlus, Users } from 'lucide-vue-next';
 import { type ProjectRow, projectScopeLabel, projectScopeVariant } from './project-shared';
 
@@ -92,26 +93,23 @@ const emit = defineEmits<{
                                     <KeyRound class="h-4 w-4 sm:mr-2" />
                                     <span class="hidden sm:inline">Token</span>
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
+                                <ActionIconButton
+                                    label="Edit project"
+                                    title="Edit"
                                     :data-testid="`project-edit-${project.id}`"
                                     @click="emit('open-edit', project)"
                                 >
-                                    <Pencil class="h-4 w-4 sm:mr-2" />
-                                    <span class="hidden sm:inline">Edit</span>
-                                </Button>
-                                <Button
-                                    type="button"
+                                    <Pencil class="h-4 w-4" />
+                                </ActionIconButton>
+                                <ActionIconButton
+                                    label="Delete project"
+                                    title="Delete"
                                     variant="destructive"
-                                    size="sm"
                                     :data-testid="`project-delete-${project.id}`"
                                     @click="emit('open-delete', project)"
                                 >
-                                    <Trash2 class="h-4 w-4 sm:mr-2" />
-                                    <span class="hidden sm:inline">Delete</span>
-                                </Button>
+                                    <Trash2 class="h-4 w-4" />
+                                </ActionIconButton>
                             </template>
                             <span v-else class="text-muted-foreground text-sm">View and collaborate only</span>
                         </div>

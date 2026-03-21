@@ -2,6 +2,7 @@
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -176,12 +177,18 @@ const filtersOpenModel = computed({
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <Button type="button" variant="outline" title="Edit" @click="editState.openEdit(task.id)">
+                        <ActionIconButton label="Edit task" title="Edit" @click="editState.openEdit(task.id)">
                             <Pencil class="h-4 w-4" />
-                        </Button>
-                        <Button :disabled="state.deleteLoading === task.id" type="button" variant="destructive" title="Delete" @click="state.deleteTask(task.id)">
+                        </ActionIconButton>
+                        <ActionIconButton
+                            label="Delete task"
+                            title="Delete"
+                            variant="destructive"
+                            :loading="state.deleteLoading === task.id"
+                            @click="state.deleteTask(task.id)"
+                        >
                             <Trash2 class="h-4 w-4" />
-                        </Button>
+                        </ActionIconButton>
                     </div>
                 </div>
             </div>
