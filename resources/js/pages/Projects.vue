@@ -1,8 +1,9 @@
 <script setup lang="ts">
+/* eslint-disable max-lines */
 import DeleteDialog from '@/components/DeleteDialog.vue';
+import AdminListShell from '@/components/admin/AdminListShell.vue';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -11,34 +12,71 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
 import axios from 'axios';
-import debounce from 'lodash/debounce';
-import { ref, watch } from 'vue';
+import { FolderKanban, KeyRound, Pencil, Plus, Search, Shield, Trash2, UserPlus, Users } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
-const props = defineProps({
-    projects: {
-        type: Object,
-        required: true,
+type ProjectRow = {
+    id: number;
+    name: string;
+    client_id?: number | null;
+    organisation_id?: number | null;
+    client_name?: string | null;
+    organisation_name?: string | null;
+    isOwner?: boolean;
+    token?: string | null;
+};
+
+type ProjectPaginator = {
+    data: ProjectRow[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+};
+
+type Option = {
+    id: number;
+    name: string;
+};
+
+type ProjectFilters = {
+    search?: string | null;
+    sort_by?: string | null;
+};
+
+type ProjectAccessUser = {
+    id: number;
+    user_name?: string | null;
+    user_email?: string | null;
+    registration_status?: string | null;
+};
+
+type SortBy = 'newest' | 'oldest' | 'name';
+
+const props = withDefaults(
+    defineProps<{
+        projects: ProjectPaginator;
+        clients?: Option[];
+        organisations?: Option[];
+        filters?: ProjectFilters;
+    }>(),
+    {
+        clients: () => [],
+        organisations: () => [],
+        filters: () => ({}),
     },
-    clients: {
-        type: Object,
-        required: true,
-    },
-    organisations: {
-        type: Object,
-        required: true,
-    },
-    filters: {
-        type: Object,
-        required: true,
-    },
-});
+);
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -47,22 +85,67 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const defaultSortBy: SortBy = 'newest';
+const sortOptions = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'oldest', label: 'Oldest' },
+    { value: 'name', label: 'Name' },
+] satisfies { value: SortBy; label: string }[];
+
+function normalizeSortBy(value: string | null | undefined): SortBy {
+    if (value === 'oldest' || value === 'name') {
+        return value;
+    }
+
+    return defaultSortBy;
+}
+
+function normalizeNullableId(value: number | string | null | undefined) {
+    if (value === null || value === undefined || value === '' || value === 'null') {
+        return null;
+    }
+
+    return Number(value);
+}
+
+const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
+const manageUsersLoading = ref(false);
+const manageUsersError = ref<string | null>(null);
+const apiTokenLoading = ref(false);
+const apiTokenError = ref<string | null>(null);
+const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
+const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
+const draftSearchTerm = ref(appliedSearchTerm.value);
+const draftSortBy = ref<SortBy>(appliedSortBy.value);
 
-const search = ref(props.filters.search);
+watch(
+    () => props.filters,
+    (next) => {
+        appliedSearchTerm.value = typeof next?.search === 'string' ? next.search : '';
+        appliedSortBy.value = normalizeSortBy(next?.sort_by);
+        draftSearchTerm.value = appliedSearchTerm.value;
+        draftSortBy.value = appliedSortBy.value;
+    },
+    { deep: true },
+);
 
-const title = `Projects` + (search.value ? ` - ${search.value}` : '');
+watch(filtersOpen, (open) => {
+    if (!open) return;
 
-function openEditModal(project: { id: number; name: string }) {
-    editForm.id = project.id;
-    editForm.name = project.name;
-    editDialogOpen.value = true;
-}
+    draftSearchTerm.value = appliedSearchTerm.value;
+    draftSortBy.value = appliedSortBy.value;
+});
 
-function openDeleteModal(project: { id: number; name: string }) {
-    deleteForm.id = project.id;
-    deleteForm.isActive = true;
-}
+const projectRows = computed(() => props.projects.data ?? []);
+const activeFilterCount = computed(() => {
+    let count = 0;
+
+    if (appliedSearchTerm.value.trim()) count += 1;
+    if (appliedSortBy.value !== defaultSortBy) count += 1;
+
+    return count;
+});
 
 const editForm = useForm<{
     id: number | null;
@@ -83,20 +166,6 @@ const createForm = useForm<{
     organisation_id: null,
     isActive: false,
 });
-
-// Function to submit the form
-function submitCreateForm() {
-    createForm.post('/projects', {
-        onSuccess: () => {
-            createForm.isActive = false;
-            createForm.reset();
-        },
-        onError: () => {
-            // Keep the modal open when there are validation errors
-            createForm.isActive = true;
-        },
-    });
-}
 
 const deleteForm = useForm<{
     id: number | null;
@@ -123,7 +192,7 @@ const grantAccessForm = useForm<{
 const manageUsersForm = useForm<{
     project_id: number | null;
     project_name: string;
-    users: any[];
+    users: ProjectAccessUser[];
     isOpen: boolean;
 }>({
     project_id: null,
@@ -144,100 +213,12 @@ const apiTokenForm = useForm<{
     isOpen: false,
 });
 
-function saveEdit() {
-    if (editForm.id) {
-        editForm.put(`/projects/${editForm.id}`, {
-            onSuccess: () => {
-                editDialogOpen.value = false;
-            },
-            preserveScroll: true,
-        });
-    }
-}
-
-function confirmDelete() {
-    if (deleteForm.id) {
-        router.delete(`/projects/${deleteForm.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                deleteForm.isActive = false;
-            },
-        });
-    }
-}
-
-function grantAccess() {
-    if (grantAccessForm.project_id) {
-        grantAccessForm.post(`/projects/${grantAccessForm.project_id}/users`, {
-            onSuccess: () => {
-                grantAccessForm.isOpen = false;
-                grantAccessForm.reset();
-                grantAccessForm.isOpen = false; // Set it again after reset to ensure it's false
-            },
-            preserveScroll: true,
-        });
-    }
-}
-
-function openManageUsersModal(project: { id: number; name: string }) {
-    manageUsersForm.project_id = project.id;
-    manageUsersForm.project_name = project.name;
-
-    // Fetch users with access to the project
-    fetch(`/projects/${project.id}/users`)
-        .then((response) => response.json())
-        .then((data) => {
-            manageUsersForm.users = data;
-            manageUsersForm.isOpen = true;
-        })
-        .catch((error) => {
-            console.error('Error fetching users:', error);
-        });
-}
-
-function removeAccess(projectUser: { id: number }) {
-    if (manageUsersForm.project_id) {
-        router.delete(`/projects/${manageUsersForm.project_id}/users/${projectUser.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                // Refresh the list of users
-                openManageUsersModal({ id: manageUsersForm.project_id as number, name: manageUsersForm.project_name });
-            },
-        });
-    }
-}
-
-function openApiTokenModal(project: { id: number; name: string; token?: string }) {
-    apiTokenForm.project_id = project.id;
-    apiTokenForm.project_name = project.name;
-    apiTokenForm.token = project.token || '';
-    apiTokenForm.isOpen = true;
-}
-
-function generateApiToken() {
-    if (apiTokenForm.project_id) {
-        axios.post(`/projects/${apiTokenForm.project_id}/api-token`).then((response) => {
-            apiTokenForm.token = response.data.token;
-            apiTokenForm.errors = {}; // Clear any previous errors
-        });
-    }
-}
-
-function onPageChange(page: number) {
-    router.get('/projects', { page, search: search.value }, { preserveState: true, preserveScroll: true });
-}
-
-function reset() {
-    search.value = '';
-    router.get('/projects', { search: '' }, { preserveState: true, preserveScroll: true });
-}
-
-// Handle string "null" values from select elements
 watch(
     () => createForm.client_id,
     (value) => {
-        if (value === 'null') {
-            createForm.client_id = null;
+        const normalized = normalizeNullableId(value);
+        if (normalized !== value) {
+            createForm.client_id = normalized;
         }
     },
 );
@@ -245,303 +226,612 @@ watch(
 watch(
     () => createForm.organisation_id,
     (value) => {
-        if (value === 'null') {
-            createForm.organisation_id = null;
+        const normalized = normalizeNullableId(value);
+        if (normalized !== value) {
+            createForm.organisation_id = normalized;
         }
     },
 );
 
-watch(search, (value) =>
-    debounce(() => {
-        router.get('/projects', { search: value }, { preserveState: true, preserveScroll: true, replace: true });
-    }, 300)(),
-);
+const otherCreateErrors = computed<Record<string, string>>(() => {
+    return Object.entries(createForm.errors)
+        .filter(([key]) => !['name', 'client_id', 'organisation_id'].includes(key))
+        .reduce<Record<string, string>>((accumulator, [key, value]) => {
+            accumulator[key] = value;
+            return accumulator;
+        }, {});
+});
+
+const otherEditErrors = computed<Record<string, string>>(() => {
+    return Object.entries(editForm.errors)
+        .filter(([key]) => key !== 'name')
+        .reduce<Record<string, string>>((accumulator, [key, value]) => {
+            accumulator[key] = value;
+            return accumulator;
+        }, {});
+});
+
+const createDisabled = computed(() => createForm.processing || !createForm.name.trim());
+const editDisabled = computed(() => editForm.processing || !editForm.name.trim());
+const grantAccessDisabled = computed(() => grantAccessForm.processing || !grantAccessForm.email.trim() || !grantAccessForm.name.trim());
+
+function buildIndexParams(page = 1) {
+    return {
+        search: appliedSearchTerm.value.trim() || undefined,
+        sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
+        page,
+    };
+}
+
+function applyFilters() {
+    appliedSearchTerm.value = draftSearchTerm.value.trim();
+    appliedSortBy.value = draftSortBy.value;
+    filtersOpen.value = false;
+
+    router.get('/projects', buildIndexParams(), {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function resetFilters() {
+    draftSearchTerm.value = '';
+    draftSortBy.value = defaultSortBy;
+    appliedSearchTerm.value = '';
+    appliedSortBy.value = defaultSortBy;
+    filtersOpen.value = false;
+
+    router.get('/projects', buildIndexParams(), {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function onPageChange(page: number) {
+    router.get('/projects', buildIndexParams(page), {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function openEditModal(project: ProjectRow) {
+    editForm.id = project.id;
+    editForm.name = project.name;
+    editDialogOpen.value = true;
+}
+
+function openDeleteModal(project: ProjectRow) {
+    deleteForm.id = project.id;
+    deleteForm.isActive = true;
+}
+
+function openGrantAccessModal(project: ProjectRow) {
+    grantAccessForm.project_id = project.id;
+    grantAccessForm.project_name = project.name;
+    grantAccessForm.email = '';
+    grantAccessForm.name = '';
+    grantAccessForm.isOpen = true;
+}
+
+async function openManageUsersModal(project: ProjectRow) {
+    manageUsersForm.project_id = project.id;
+    manageUsersForm.project_name = project.name;
+    manageUsersForm.users = [];
+    manageUsersForm.isOpen = true;
+    manageUsersLoading.value = true;
+    manageUsersError.value = null;
+
+    try {
+        const response = await fetch(`/projects/${project.id}/users`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load users for project ${project.id}`);
+        }
+
+        manageUsersForm.users = await response.json();
+    } catch (error) {
+        console.error('Error fetching project users:', error);
+        manageUsersError.value = 'Unable to load project access right now.';
+    } finally {
+        manageUsersLoading.value = false;
+    }
+}
+
+function openApiTokenModal(project: ProjectRow) {
+    apiTokenForm.project_id = project.id;
+    apiTokenForm.project_name = project.name;
+    apiTokenForm.token = project.token ?? '';
+    apiTokenError.value = null;
+    apiTokenForm.isOpen = true;
+}
+
+function closeCreateModal() {
+    createForm.isActive = false;
+    createForm.reset();
+}
+
+function closeEditModal() {
+    editDialogOpen.value = false;
+    editForm.reset();
+    editForm.id = null;
+}
+
+function submitCreateForm() {
+    createForm.post('/projects', {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeCreateModal();
+        },
+        onError: () => {
+            createForm.isActive = true;
+        },
+    });
+}
+
+function saveEdit() {
+    if (!editForm.id) return;
+
+    editForm.put(`/projects/${editForm.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeEditModal();
+        },
+    });
+}
+
+function confirmDelete() {
+    if (!deleteForm.id) return;
+
+    router.delete(`/projects/${deleteForm.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            deleteForm.isActive = false;
+        },
+    });
+}
+
+function grantAccess() {
+    if (!grantAccessForm.project_id) return;
+
+    grantAccessForm.post(`/projects/${grantAccessForm.project_id}/users`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            grantAccessForm.reset();
+            grantAccessForm.isOpen = false;
+        },
+        onError: () => {
+            grantAccessForm.isOpen = true;
+        },
+    });
+}
+
+function removeAccess(projectUser: ProjectAccessUser) {
+    if (!manageUsersForm.project_id) return;
+
+    router.delete(`/projects/${manageUsersForm.project_id}/users/${projectUser.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            openManageUsersModal({ id: manageUsersForm.project_id as number, name: manageUsersForm.project_name });
+        },
+    });
+}
+
+async function generateApiToken() {
+    if (!apiTokenForm.project_id) return;
+
+    apiTokenLoading.value = true;
+    apiTokenError.value = null;
+
+    try {
+        const response = await axios.post(
+            `/projects/${apiTokenForm.project_id}/api-token`,
+            {},
+            {
+                headers: {
+                    Accept: 'application/json',
+                },
+            },
+        );
+
+        apiTokenForm.token = response.data.token;
+    } catch (error) {
+        console.error('Error generating project token:', error);
+        apiTokenError.value = 'Unable to generate a token right now.';
+    } finally {
+        apiTokenLoading.value = false;
+    }
+}
+
+function projectScopeLabel(project: ProjectRow) {
+    if (project.client_name) {
+        return project.client_name;
+    }
+
+    if (project.organisation_name) {
+        return project.organisation_name;
+    }
+
+    return 'Standalone project';
+}
+
+function projectScopeVariant(project: ProjectRow) {
+    if (project.client_name || project.organisation_name) {
+        return 'secondary';
+    }
+
+    return 'outline';
+}
+
+function accessStatusLabel(projectUser: ProjectAccessUser) {
+    return projectUser.registration_status === 'registered' ? 'Registered' : 'Pending invitation';
+}
 </script>
 
 <template>
-    <Head :title="title" />
+    <Head title="Projects" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <div class="flex gap-4">
-                <Input type="text" placeholder="Search..." class="mb-4 rounded border p-2" v-model="search" />
-
-                <Button @click="reset">Reset</Button>
-
-                <Button @click="createForm.isActive = true"> <i class="fas fa-plus"></i> Add Project </Button>
-            </div>
-
-            <o-table
-                :data="projects.data"
-                :paginated="true"
-                :per-page="projects.per_page"
-                :current-page="projects.current_page"
-                backend-pagination
-                :total="projects.total"
+            <AdminListShell
+                v-model:filtersOpen="filtersOpen"
+                :active-filter-count="activeFilterCount"
+                description="Manage projects, access, and API tokens from one list."
+                filter-description="Search and sort the projects list."
+                filter-title="Filter projects"
+                items-label="projects"
+                :page="props.projects"
+                title="Projects"
                 @page-change="onPageChange"
             >
-                <o-table-column v-slot="{ row }">
-                    {{ row.name }}
-                </o-table-column>
-                <o-table-column v-slot="{ row }">
-                    <div class="flex justify-end gap-2">
-                        <!-- Only show grant access button for project owners -->
-                        <Button
-                            v-if="row.isOwner"
-                            variant="outline"
-                            @click="
-                                () => {
-                                    grantAccessForm.project_id = row.id;
-                                    grantAccessForm.project_name = row.name;
-                                    grantAccessForm.isOpen = true;
-                                }
-                            "
-                        >
-                            <i class="fas fa-key"></i>
-                        </Button>
-                        <!-- Show users button for all users with access -->
-                        <Button v-if="row.isOwner" variant="outline" @click="openManageUsersModal(row)">
-                            <i class="fas fa-users"></i>
-                        </Button>
-                        <Button v-if="row.isOwner" variant="outline" @click="openApiTokenModal(row)">
-                            <i class="fas fa-lock"></i>
-                        </Button>
-                        <Button v-if="row.isOwner" variant="outline" @click="openEditModal(row)">
-                            <i class="fas fa-edit"></i>
-                        </Button>
-                        <Button v-if="row.isOwner" variant="destructive" @click="openDeleteModal(row)">
-                            <i class="fas fa-trash"></i>
-                        </Button>
+                <template #filters>
+                    <div class="space-y-2">
+                        <Label for="projects-search">Search</Label>
+                        <div class="relative">
+                            <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                            <Input
+                                id="projects-search"
+                                v-model="draftSearchTerm"
+                                data-testid="filter-search"
+                                placeholder="Search by project name"
+                                class="pl-9"
+                            />
+                        </div>
                     </div>
-                </o-table-column>
 
-                <template #empty>
-                    <div class="flex h-full items-center justify-center">
-                        <p class="text-gray-500">No projects found.</p>
+                    <div class="space-y-2">
+                        <Label class="text-sm leading-none font-medium">Sort By</Label>
+                        <ButtonGroup v-model="draftSortBy" :columns="3" :options="sortOptions" test-id-prefix="sort-by" />
                     </div>
                 </template>
-            </o-table>
+
+                <template #filter-actions>
+                    <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                    <Button data-testid="filters-apply" @click="applyFilters">Apply</Button>
+                </template>
+
+                <template #actions>
+                    <Button data-testid="open-create-project" size="sm" @click="createForm.isActive = true">
+                        <Plus class="mr-2 h-4 w-4" />
+                        Add Project
+                    </Button>
+                </template>
+
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Project</TableHead>
+                            <TableHead>Scope</TableHead>
+                            <TableHead>Access</TableHead>
+                            <TableHead class="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <template v-if="projectRows.length">
+                            <TableRow v-for="project in projectRows" :key="project.id" :data-testid="`project-row-${project.id}`">
+                                <TableCell>
+                                    <div class="flex flex-col gap-1">
+                                        <span class="font-medium">{{ project.name }}</span>
+                                        <span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                                            <FolderKanban class="h-3.5 w-3.5" />
+                                            Project #{{ project.id }}
+                                        </span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge :data-testid="`project-scope-${project.id}`" :variant="projectScopeVariant(project)" class="gap-1">
+                                        <Shield class="h-3.5 w-3.5" />
+                                        {{ projectScopeLabel(project) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        :data-testid="`project-access-${project.id}`"
+                                        :class="
+                                            project.isOwner
+                                                ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+                                                : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
+                                        "
+                                        variant="secondary"
+                                    >
+                                        {{ project.isOwner ? 'Owner access' : 'Shared access' }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <template v-if="project.isOwner">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                :data-testid="`project-grant-${project.id}`"
+                                                @click="openGrantAccessModal(project)"
+                                            >
+                                                <UserPlus class="h-4 w-4 sm:mr-2" />
+                                                <span class="hidden sm:inline">Grant</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                :data-testid="`project-manage-${project.id}`"
+                                                @click="openManageUsersModal(project)"
+                                            >
+                                                <Users class="h-4 w-4 sm:mr-2" />
+                                                <span class="hidden sm:inline">Manage</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                :data-testid="`project-token-${project.id}`"
+                                                @click="openApiTokenModal(project)"
+                                            >
+                                                <KeyRound class="h-4 w-4 sm:mr-2" />
+                                                <span class="hidden sm:inline">Token</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                :data-testid="`project-edit-${project.id}`"
+                                                @click="openEditModal(project)"
+                                            >
+                                                <Pencil class="h-4 w-4 sm:mr-2" />
+                                                <span class="hidden sm:inline">Edit</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                :data-testid="`project-delete-${project.id}`"
+                                                @click="openDeleteModal(project)"
+                                            >
+                                                <Trash2 class="h-4 w-4 sm:mr-2" />
+                                                <span class="hidden sm:inline">Delete</span>
+                                            </Button>
+                                        </template>
+                                        <span v-else class="text-muted-foreground text-sm">View and collaborate only</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </template>
+                        <TableEmpty v-else :colspan="4">No projects found.</TableEmpty>
+                    </TableBody>
+                </Table>
+            </AdminListShell>
         </div>
 
-        <DeleteDialog @cancel="deleteForm.isActive = false" @confirm="confirmDelete" :is-open="deleteForm.isActive">
-            <template #title> Delete Project </template>
-            <template #description> Are you sure you want to delete this project? This action cannot be undone. </template>
-            <template #cancel> Cancel </template>
-            <template #confirm> Confirm </template>
+        <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
+            <template #title>Delete Project</template>
+            <template #description>Are you sure you want to delete this project? This action cannot be undone.</template>
+            <template #cancel>Cancel</template>
+            <template #confirm>Confirm</template>
         </DeleteDialog>
 
-        <!-- Create Modal -->
         <AlertDialog v-model:open="createForm.isActive">
             <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
+                <div />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Create Project</AlertDialogTitle>
-                    <AlertDialogDescription> Add a new project. </AlertDialogDescription>
+                    <AlertDialogDescription>Create a project and attach it to either a client or an organisation.</AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4">
-                    <input
-                        v-model="createForm.name"
-                        type="text"
-                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        placeholder="Project Name"
-                    />
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="create-project-name">Project name</Label>
+                        <Input id="create-project-name" v-model="createForm.name" data-testid="create-project-name" placeholder="Portal refresh" />
+                        <p v-if="createForm.errors.name" class="text-sm text-red-500">{{ createForm.errors.name }}</p>
+                    </div>
 
-                    <div class="mb-2 text-sm text-gray-500 dark:text-gray-400">Select either a client or an organisation for this project</div>
+                    <div class="space-y-2">
+                        <Label for="create-project-client">Client</Label>
+                        <select
+                            id="create-project-client"
+                            v-model="createForm.client_id"
+                            data-testid="create-project-client"
+                            :disabled="createForm.organisation_id !== null"
+                            class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <option :value="null">No client</option>
+                            <option v-for="client in clients" :key="client.id" :value="client.id">
+                                {{ client.name }}
+                            </option>
+                        </select>
+                        <p v-if="createForm.errors.client_id" class="text-sm text-red-500">{{ createForm.errors.client_id }}</p>
+                    </div>
 
-                    <select
-                        v-model="createForm.client_id"
-                        class="mb-2 rounded border px-4 py-2 disabled:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
-                        :disabled="createForm.organisation_id !== null"
-                    >
-                        <option :value="null">Select Client (Optional)</option>
-                        <option v-for="client in clients.data" :key="client.id" :value="client.id">
-                            {{ client.name }}
-                        </option>
-                    </select>
+                    <div class="space-y-2">
+                        <Label for="create-project-organisation">Organisation</Label>
+                        <select
+                            id="create-project-organisation"
+                            v-model="createForm.organisation_id"
+                            data-testid="create-project-organisation"
+                            :disabled="createForm.client_id !== null"
+                            class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <option :value="null">No organisation</option>
+                            <option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">
+                                {{ organisation.name }}
+                            </option>
+                        </select>
+                        <p v-if="createForm.errors.organisation_id" class="text-sm text-red-500">{{ createForm.errors.organisation_id }}</p>
+                    </div>
 
-                    <select
-                        v-model="createForm.organisation_id"
-                        class="rounded border px-4 py-2 disabled:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
-                        :disabled="createForm.client_id !== null"
-                    >
-                        <option :value="null">Select Organisation (Optional)</option>
-                        <option v-for="org in organisations" :key="org.id" :value="org.id">
-                            {{ org.name }}
-                        </option>
-                    </select>
-                </div>
-
-                <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in createForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
-                    {{ error }}
+                    <p class="text-muted-foreground text-sm">Choose one parent or leave both empty for a standalone project.</p>
+                    <p v-for="(error, key) in otherCreateErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel
-                        @click="
-                            () => {
-                                createForm.isActive = false;
-                                createForm.reset();
-                            }
-                        "
-                        >Cancel</AlertDialogCancel
-                    >
-                    <Button @click="submitCreateForm" :disabled="createForm.processing">Create</Button>
+                    <AlertDialogCancel type="button" @click="closeCreateModal">Cancel</AlertDialogCancel>
+                    <Button type="button" :disabled="createDisabled" data-testid="create-project-submit" @click="submitCreateForm">Create</Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
-        <!-- Edit Modal -->
         <AlertDialog v-model:open="editDialogOpen">
             <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
+                <div />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Project</AlertDialogTitle>
-                    <AlertDialogDescription> Update project information. </AlertDialogDescription>
+                    <AlertDialogDescription>Update the project name.</AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4">
-                    <input
-                        v-model="editForm.name"
-                        type="text"
-                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        placeholder="Project Name"
-                    />
-                </div>
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="edit-project-name">Project name</Label>
+                        <Input id="edit-project-name" v-model="editForm.name" data-testid="edit-project-name" placeholder="Portal refresh" />
+                        <p v-if="editForm.errors.name" class="text-sm text-red-500">{{ editForm.errors.name }}</p>
+                    </div>
 
-                <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in editForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
-                    {{ error }}
+                    <p v-for="(error, key) in otherEditErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="saveEdit" :disabled="editForm.processing">Save</AlertDialogAction>
+                    <AlertDialogCancel type="button" @click="closeEditModal">Cancel</AlertDialogCancel>
+                    <Button type="button" :disabled="editDisabled" data-testid="edit-project-submit" @click="saveEdit">Save</Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
-        <!-- Grant Access Modal -->
         <AlertDialog :open="grantAccessForm.isOpen" @update:open="grantAccessForm.isOpen = $event">
             <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
+                <div />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Grant Project Access</AlertDialogTitle>
-                    <AlertDialogDescription> Grant a user access to {{ grantAccessForm.project_name }} </AlertDialogDescription>
+                    <AlertDialogDescription>Grant a user access to {{ grantAccessForm.project_name }}</AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
-                    <input
-                        v-model="grantAccessForm.email"
-                        type="email"
-                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        placeholder="User Email"
-                    />
-                    <input
-                        v-model="grantAccessForm.name"
-                        type="text"
-                        class="rounded border px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        placeholder="User Name"
-                    />
-                </div>
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="grant-project-email">Email</Label>
+                        <Input
+                            id="grant-project-email"
+                            v-model="grantAccessForm.email"
+                            data-testid="grant-project-email"
+                            placeholder="user@example.com"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="grant-project-name">Name</Label>
+                        <Input id="grant-project-name" v-model="grantAccessForm.name" data-testid="grant-project-name" placeholder="Pat Doe" />
+                    </div>
 
-                <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in grantAccessForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
-                    {{ error }}
+                    <p v-for="(error, key) in grantAccessForm.errors" :key="key" class="text-sm text-red-500">{{ error }}</p>
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="grantAccessForm.isOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="grantAccess" :disabled="grantAccessForm.processing">Grant Access</AlertDialogAction>
+                    <AlertDialogCancel type="button" @click="grantAccessForm.isOpen = false">Cancel</AlertDialogCancel>
+                    <Button type="button" :disabled="grantAccessDisabled" data-testid="grant-project-submit" @click="grantAccess"
+                        >Grant Access</Button
+                    >
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
-        <!-- Manage Users Modal -->
         <AlertDialog :open="manageUsersForm.isOpen" @update:open="manageUsersForm.isOpen = $event">
             <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
+                <div />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Manage Project Access</AlertDialogTitle>
-                    <AlertDialogDescription> Users with access to {{ manageUsersForm.project_name }} </AlertDialogDescription>
+                    <AlertDialogDescription>Users with access to {{ manageUsersForm.project_name }}</AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex max-h-96 flex-col gap-4 overflow-y-auto p-4">
-                    <div v-if="manageUsersForm.users.length === 0" class="text-center text-gray-500 dark:text-gray-400">
-                        No users have access to this project.
-                    </div>
+                <div class="max-h-96 space-y-4 overflow-y-auto pr-1">
+                    <p v-if="manageUsersLoading" class="text-muted-foreground text-sm">Loading project users…</p>
+                    <p v-else-if="manageUsersError" class="text-sm text-red-500">{{ manageUsersError }}</p>
+                    <p v-else-if="manageUsersForm.users.length === 0" class="text-muted-foreground text-sm">No users have access to this project.</p>
                     <div
                         v-else
-                        v-for="user in manageUsersForm.users"
-                        :key="user.id"
-                        class="flex items-center justify-between border-b p-2 dark:border-gray-700"
+                        v-for="projectUser in manageUsersForm.users"
+                        :key="projectUser.id"
+                        class="flex items-start justify-between gap-4 rounded-lg border p-3"
                     >
-                        <div>
-                            <div class="font-semibold dark:text-white">{{ user.user_name }}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ user.user_email }}</div>
-                            <div class="mt-1 text-xs" :class="user.registration_status === 'registered' ? 'text-green-500' : 'text-amber-500'">
-                                {{ user.registration_status === 'registered' ? 'Registered' : 'Pending Registration' }}
-                            </div>
+                        <div class="space-y-1">
+                            <div class="font-medium">{{ projectUser.user_name || 'Unknown user' }}</div>
+                            <div class="text-muted-foreground text-sm">{{ projectUser.user_email || 'No email' }}</div>
+                            <Badge variant="secondary">
+                                {{ accessStatusLabel(projectUser) }}
+                            </Badge>
                         </div>
-                        <Button variant="destructive" size="sm" @click="removeAccess(user)"> <i class="fas fa-trash mr-1"></i> Remove </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            :data-testid="`project-remove-access-${projectUser.id}`"
+                            @click="removeAccess(projectUser)"
+                        >
+                            <Trash2 class="mr-2 h-4 w-4" />
+                            Remove
+                        </Button>
                     </div>
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
+                    <AlertDialogCancel type="button" @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
-        <!-- API Token Modal -->
         <AlertDialog :open="apiTokenForm.isOpen" @update:open="apiTokenForm.isOpen = $event">
             <AlertDialogTrigger as-child>
-                <!-- Hidden trigger (manual open via v-model) -->
-                <div></div>
+                <div />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Project API Token</AlertDialogTitle>
-                    <AlertDialogDescription> Manage API token for {{ apiTokenForm.project_name }} </AlertDialogDescription>
+                    <AlertDialogDescription>Manage the API token for {{ apiTokenForm.project_name }}</AlertDialogDescription>
                 </AlertDialogHeader>
 
-                <div class="flex flex-col gap-4 p-4">
-                    <div v-if="apiTokenForm.token" class="rounded bg-gray-100 p-4 break-all dark:bg-gray-700">
-                        <div class="mb-2 font-semibold dark:text-white">Current API Token:</div>
-                        <div class="text-sm dark:text-gray-300">{{ apiTokenForm.token }}</div>
+                <div class="space-y-4">
+                    <div v-if="apiTokenForm.token" class="bg-muted rounded-lg p-4" data-testid="project-token-value">
+                        <p class="text-sm font-medium">Current API token</p>
+                        <p class="mt-2 text-sm break-all">{{ apiTokenForm.token }}</p>
                     </div>
-                    <div v-else class="text-gray-500 italic dark:text-gray-400">No API token has been generated for this project yet.</div>
+                    <p v-else class="text-muted-foreground text-sm">No API token has been generated for this project yet.</p>
 
-                    <Button @click="generateApiToken" class="mt-2" :disabled="apiTokenForm.processing">
+                    <p v-if="apiTokenError" class="text-sm text-red-500">{{ apiTokenError }}</p>
+
+                    <Button type="button" :disabled="apiTokenLoading" data-testid="generate-project-token" @click="generateApiToken">
+                        <KeyRound class="mr-2 h-4 w-4" />
                         {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
                     </Button>
 
-                    <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        <p>This token will be used by the Shift SDK to authenticate with this project.</p>
-                        <p class="mt-1">Regenerating the token will invalidate any existing SDK installations using the old token.</p>
-                    </div>
-                </div>
-
-                <!-- Display server-side validation errors -->
-                <div v-for="(error, key) in apiTokenForm.errors" :key="key" class="mt-2 mb-2 px-4 text-red-500">
-                    {{ error }}
+                    <p class="text-muted-foreground text-sm">Regenerating a token invalidates any existing integrations using the previous token.</p>
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel @click="apiTokenForm.isOpen = false">Close</AlertDialogCancel>
+                    <AlertDialogCancel type="button" @click="apiTokenForm.isOpen = false">Close</AlertDialogCancel>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

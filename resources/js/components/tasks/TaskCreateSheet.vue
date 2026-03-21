@@ -48,7 +48,7 @@ const inputClass =
 const defaultProjectId = computed(() => (props.projects.length === 1 ? props.projects[0].id : null));
 const hasProjects = computed(() => props.projects.length > 0);
 const showProjectSelector = computed(() => props.projects.length > 1);
-const canSubmit = computed(() => createForm.value.projectId !== null);
+const canSubmit = computed(() => createForm.value.projectId !== null && createForm.value.title.trim().length > 0);
 
 const createForm = ref<TaskCreateDraft>({
     title: '',
@@ -131,7 +131,7 @@ async function createTask() {
             </Button>
         </SheetTrigger>
 
-        <SheetContent class="flex h-full w-full max-w-none flex-col p-0 sm:w-1/2 sm:max-w-none lg:w-1/3" side="right">
+        <SheetContent class="flex h-full flex-col p-0" side="right">
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle>Create Task</SheetTitle>
@@ -176,9 +176,7 @@ async function createTask() {
                 />
 
                 <TaskCollaboratorField v-model="createForm.collaborators" :environment="createForm.environment" :project-id="createForm.projectId" />
-                <p class="text-muted-foreground text-xs">
-                    On create, the submitter and selected collaborators are notified.
-                </p>
+                <p class="text-muted-foreground text-xs">On create, the submitter and selected collaborators are notified.</p>
 
                 <template #actions>
                     <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">

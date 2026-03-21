@@ -397,6 +397,39 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
+    it('keeps create disabled until a project and title are provided', async () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([]),
+                projects: [
+                    { id: 42, name: 'Portal', environments: [{ key: 'staging', label: 'Staging', url: 'https://portal.test' }] },
+                    { id: 43, name: 'Docs', environments: [] },
+                ],
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        await wrapper.get('[data-testid="open-create-task"]').trigger('click');
+
+        const submit = wrapper.get('[data-testid="submit-create-task"]');
+        expect(submit.attributes('disabled')).toBeDefined();
+
+        await wrapper.get('[data-testid="create-task-title"]').setValue('   ');
+        await wrapper.get('[data-testid="create-task-project"]').setValue('42');
+        expect(submit.attributes('disabled')).toBeDefined();
+
+        await wrapper.get('[data-testid="create-task-title"]').setValue('Created from UI');
+        expect(submit.attributes('disabled')).toBeUndefined();
+
+        wrapper.unmount();
+    });
+
     it('creates a task from the V2 sheet and reloads the list', async () => {
         axiosGetMock.mockReset();
         axiosGetMock.mockResolvedValue({
