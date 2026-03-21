@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
+import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -347,26 +348,23 @@ function confirmDelete() {
                                 </TableCell>
                                 <TableCell>
                                     <div class="flex flex-wrap justify-end gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
+                                        <ActionIconButton
+                                            label="Edit client"
+                                            title="Edit"
                                             :data-testid="`client-edit-${client.id}`"
                                             @click="openEditModal(client)"
                                         >
-                                            <Pencil class="h-4 w-4 sm:mr-2" />
-                                            <span class="hidden sm:inline">Edit</span>
-                                        </Button>
-                                        <Button
-                                            type="button"
+                                            <Pencil class="h-4 w-4" />
+                                        </ActionIconButton>
+                                        <ActionIconButton
+                                            label="Delete client"
+                                            title="Delete"
                                             variant="destructive"
-                                            size="sm"
                                             :data-testid="`client-delete-${client.id}`"
                                             @click="openDeleteModal(client)"
                                         >
-                                            <Trash2 class="h-4 w-4 sm:mr-2" />
-                                            <span class="hidden sm:inline">Delete</span>
-                                        </Button>
+                                            <Trash2 class="h-4 w-4" />
+                                        </ActionIconButton>
                                     </div>
                                 </TableCell>
                             </TableRow>
