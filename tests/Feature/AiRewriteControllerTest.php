@@ -82,6 +82,29 @@ test('ai improve endpoint rejects model output that loses protected tokens', fun
     $response->assertJsonPath('error', 'AI response did not preserve protected placeholders.');
 });
 
+test('ai improve endpoints surface local provider failures as validation errors', function () {
+    Http::fake([
+        'http://127.0.0.1:11434/api/chat' => Http::response([], 500),
+    ]);
+
+    $webResponse = $this->actingAs($this->user)->postJson(route('ai.improve'), [
+        'html' => '<p>Original</p>',
+    ]);
+
+    $webResponse
+        ->assertStatus(422)
+        ->assertJsonPath('error', 'Local AI request failed: 500');
+
+    $apiResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)->postJson('/api/ai/improve', [
+        'project' => $this->project->token,
+        'html' => '<p>Original</p>',
+    ]);
+
+    $apiResponse
+        ->assertStatus(422)
+        ->assertJsonPath('error', 'Local AI request failed: 500');
+});
+
 test('ai improve endpoints return not found when feature is disabled', function () {
     config()->set('shift_ai.enabled', false);
 
