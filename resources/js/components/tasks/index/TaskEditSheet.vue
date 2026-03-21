@@ -78,15 +78,15 @@ function formatTaskTime(value?: string | null) {
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div class="space-y-1">
                                 <div class="text-muted-foreground text-xs uppercase tracking-wide">Created by</div>
-                                <div data-testid="edit-task-created-by" class="text-sm font-medium">{{ state.editTaskCreatorLabel }}</div>
+                                <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">{{ state.editTaskCreatorLabel }}</div>
                             </div>
                             <div class="space-y-1">
                                 <div class="text-muted-foreground text-xs uppercase tracking-wide">Created</div>
-                                <div data-testid="edit-task-created-at" class="text-sm font-medium">{{ formatTaskTime(state.editTask.created_at) }}</div>
+                                <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">{{ formatTaskTime(state.editTask.created_at) }}</div>
                             </div>
                             <div class="space-y-1">
                                 <div class="text-muted-foreground text-xs uppercase tracking-wide">Updated</div>
-                                <div data-testid="edit-task-updated-at" class="text-sm font-medium">Updated {{ formatTaskTime(state.editTask.updated_at) }}</div>
+                                <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">Updated {{ formatTaskTime(state.editTask.updated_at) }}</div>
                             </div>
                         </div>
 
@@ -94,7 +94,7 @@ function formatTaskTime(value?: string | null) {
                             <Label class="text-muted-foreground">Title</Label>
                             <input
                                 v-model="editTitleModel"
-                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent text-foreground px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                                 data-testid="task-edit-title"
                                 type="text"
                             />
@@ -128,7 +128,7 @@ function formatTaskTime(value?: string | null) {
                             <Label class="text-muted-foreground">Description</Label>
                             <textarea
                                 v-model="editDescriptionModel"
-                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex min-h-24 w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex min-h-24 w-full min-w-0 rounded-md border bg-transparent text-foreground px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                                 data-testid="task-edit-description"
                             />
                         </div>
@@ -149,7 +149,7 @@ function formatTaskTime(value?: string | null) {
 
                         <div class="space-y-2">
                             <Label class="text-muted-foreground">Environment</Label>
-                            <div data-testid="edit-task-environment" class="rounded-md border border-dashed border-muted-foreground/30 bg-muted/10 px-3 py-2 text-sm">
+                            <div data-testid="edit-task-environment" class="text-foreground rounded-md border border-dashed border-muted-foreground/30 bg-muted/10 px-3 py-2 text-sm">
                                 {{ state.editTaskEnvironmentLabel }}
                             </div>
                         </div>

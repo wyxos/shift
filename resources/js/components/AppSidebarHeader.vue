@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppearanceTabs from '@/components/AppearanceTabs.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import NotificationBadge from '@/components/NotificationBadge.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -7,9 +8,11 @@ import type { BreadcrumbItemType } from '@/types';
 withDefaults(
     defineProps<{
         breadcrumbs?: BreadcrumbItemType[];
+        showAppearanceToggle?: boolean;
     }>(),
     {
         breadcrumbs: () => [],
+        showAppearanceToggle: false,
     },
 );
 </script>
@@ -25,8 +28,9 @@ withDefaults(
             </template>
         </div>
         <div class="flex items-center gap-2">
-            <NotificationBadge />
             <slot name="actions" />
+            <AppearanceTabs v-if="showAppearanceToggle" compact />
+            <NotificationBadge />
         </div>
     </header>
 </template>
