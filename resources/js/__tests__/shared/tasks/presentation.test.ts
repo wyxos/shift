@@ -46,6 +46,14 @@ describe('shared/tasks/presentation', () => {
         expect(getPriorityBadgeClass('unknown')).toContain('border-zinc-300');
     });
 
+    it('includes dark mode state classes for status and priority options', () => {
+        const statuses = getStatusOptions({ includeClosed: false });
+        const priorities = getPriorityOptions();
+
+        expect(statuses.every((option) => option.selectedClass.includes('dark:bg-') && option.unselectedClass.includes('dark:bg-'))).toBe(true);
+        expect(priorities.every((option) => option.selectedClass.includes('dark:bg-') && option.unselectedClass.includes('dark:bg-'))).toBe(true);
+    });
+
     it('exposes supported sort options', () => {
         expect(getSortByOptions().map((option) => option.value)).toEqual(['updated_at', 'created_at', 'priority']);
     });
