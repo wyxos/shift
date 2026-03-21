@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useAppearance } from '@/composables/useAppearance';
-import { Monitor, Moon, Sun } from 'lucide-vue-next';
+import { ChevronRight, Monitor, Moon, Sun } from 'lucide-vue-next';
 
 const props = withDefaults(
     defineProps<{
@@ -13,49 +14,50 @@ const props = withDefaults(
 
 const { appearance, updateAppearance } = useAppearance();
 
-const tabs = [
+const options = [
     { value: 'light', Icon: Sun, label: 'Light' },
     { value: 'dark', Icon: Moon, label: 'Dark' },
     { value: 'system', Icon: Monitor, label: 'System' },
 ] as const;
 
-function titleFor(label: string) {
-    return `Use ${label.toLowerCase()} theme`;
+const currentOption = computed(() => options.find((option) => option.value === appearance.value) ?? options[2]);
+const nextOption = computed(() => {
+    const currentIndex = options.findIndex((option) => option.value === currentOption.value.value);
+
+    return options[(currentIndex + 1) % options.length];
+});
+const buttonLabel = computed(() => `Theme: ${currentOption.value.label}. Switch to ${nextOption.value.label}.`);
+
+function cycleAppearance() {
+    updateAppearance(nextOption.value.value);
 }
 </script>
 
 <template>
-    <div
-        :class="
+    <button
+        type="button"
+        data-appearance-toggle
+        :data-appearance="appearance"
+        :data-next-appearance="nextOption.value"
+        :title="buttonLabel"
+        :aria-label="buttonLabel"
+        @click="cycleAppearance"
+        :class="[
             props.compact
-                ? 'inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/80 p-1 shadow-xs backdrop-blur-sm'
-                : 'inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800'
-        "
+                ? 'inline-flex h-8 items-center gap-2 rounded-md border border-border/70 bg-background/85 px-2.5 text-foreground shadow-xs transition-all hover:bg-accent/80 hover:text-foreground'
+                : 'inline-flex h-11 items-center gap-3 rounded-lg border border-border/70 bg-background px-3.5 text-left text-foreground shadow-xs transition-all hover:bg-accent/80 hover:text-foreground',
+        ]"
     >
-        <button
-            v-for="{ value, Icon, label } in tabs"
-            :key="value"
-            type="button"
-            :title="titleFor(label)"
-            :aria-label="titleFor(label)"
-            :aria-pressed="appearance === value"
-            @click="updateAppearance(value)"
-            :class="[
-                props.compact
-                    ? 'flex h-8 items-center justify-center rounded-full px-2.5 text-muted-foreground transition-all'
-                    : 'flex items-center rounded-md px-3.5 py-1.5 transition-colors',
-                appearance === value
-                    ? props.compact
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
-                    : props.compact
-                      ? 'hover:bg-accent hover:text-foreground'
-                      : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60',
-            ]"
-        >
-            <component :is="Icon" :class="props.compact ? 'h-4 w-4' : '-ml-1 h-4 w-4'" />
-            <span v-if="!props.compact" class="ml-1.5 text-sm">{{ label }}</span>
-            <span v-else class="sr-only">{{ label }}</span>
-        </button>
-    </div>
+        <component :is="currentOption.Icon" class="h-4 w-4 shrink-0" />
+
+        <template v-if="!props.compact">
+            <span class="min-w-0">
+                <span class="block text-sm font-medium leading-none">{{ currentOption.label }}</span>
+                <span class="text-muted-foreground mt-1 block text-xs leading-none">Next: {{ nextOption.label }}</span>
+            </span>
+            <ChevronRight class="text-muted-foreground ml-1 h-3.5 w-3.5 shrink-0" />
+        </template>
+
+        <span v-else class="sr-only">{{ buttonLabel }}</span>
+    </button>
 </template>
