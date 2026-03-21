@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
     collaboratorKey,
@@ -21,8 +20,10 @@ const props = withDefaults(
         disabled?: boolean;
         lookupUrl?: string | null;
         internalLabel?: string;
+        internalBadgeLabel?: string | null;
         internalDescription?: string;
         externalLabel?: string;
+        externalBadgeLabel?: string | null;
         externalDescription?: string;
         searchPlaceholder?: string;
     }>(),
@@ -33,9 +34,11 @@ const props = withDefaults(
         readOnly: false,
         disabled: false,
         lookupUrl: null,
-        internalLabel: 'Internal',
+        internalLabel: 'SHIFT',
+        internalBadgeLabel: null,
         internalDescription: 'Registered SHIFT users on this project.',
         externalLabel: 'External',
+        externalBadgeLabel: 'External',
         externalDescription: 'Users available in the selected environment.',
         searchPlaceholder: 'Search collaborators',
     },
@@ -57,6 +60,55 @@ let searchTimer: number | null = null;
 
 const selection = computed(() => normalizeTaskCollaborators(props.modelValue));
 const hasSelection = computed(() => selection.value.internal.length > 0 || selection.value.external.length > 0);
+
+
+type CollaboratorKind = 'internal' | 'external';
+
+type CollaboratorBadgeStyle = {
+    shell: string;
+    label: string;
+    value: string;
+    remove: string;
+};
+
+const collaboratorBadgeStyles: Record<CollaboratorKind, CollaboratorBadgeStyle> = {
+    internal: {
+        shell: 'inline-flex items-stretch overflow-hidden rounded-md border border-sky-300/70 shadow-xs dark:border-sky-500/30',
+        label: 'bg-sky-100 px-2.5 py-1.5 text-[11px] font-semibold tracking-wide text-sky-900 dark:bg-sky-500/12 dark:text-sky-100',
+        value: 'bg-sky-200 px-3 py-1.5 text-sm font-medium text-sky-950 dark:bg-sky-500/24 dark:text-sky-50',
+        remove: 'border-l border-sky-300/70 bg-sky-200 px-2 text-sky-900 transition hover:bg-sky-300 dark:border-sky-500/30 dark:bg-sky-500/24 dark:text-sky-50 dark:hover:bg-sky-500/32',
+    },
+    external: {
+        shell: 'inline-flex items-stretch overflow-hidden rounded-md border border-emerald-300/70 shadow-xs dark:border-emerald-500/30',
+        label: 'bg-emerald-100 px-2.5 py-1.5 text-[11px] font-semibold tracking-wide text-emerald-900 dark:bg-emerald-500/12 dark:text-emerald-100',
+        value: 'bg-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-950 dark:bg-emerald-500/24 dark:text-emerald-50',
+        remove: 'border-l border-emerald-300/70 bg-emerald-200 px-2 text-emerald-900 transition hover:bg-emerald-300 dark:border-emerald-500/30 dark:bg-emerald-500/24 dark:text-emerald-50 dark:hover:bg-emerald-500/32',
+    },
+};
+
+function normalizeBadgeLabel(value?: string | null): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+}
+
+function collaboratorBadgeLabel(kind: CollaboratorKind): string | null {
+    return normalizeBadgeLabel(kind === 'internal' ? props.internalBadgeLabel : props.externalBadgeLabel);
+}
+
+function collaboratorDisplayValue(collaborator: Pick<CollaboratorOption, 'name' | 'email'>): string {
+    const name = collaborator.name?.trim();
+    const email = collaborator.email?.trim();
+
+    return name || email || 'Unknown collaborator';
+}
+
+function selectedBadgeStyle(kind: CollaboratorKind): CollaboratorBadgeStyle {
+    return collaboratorBadgeStyles[kind];
+}
 
 function emitSelection(next: TaskCollaboratorSelection) {
     emit('update:modelValue', normalizeTaskCollaborators(next));
@@ -203,43 +255,65 @@ onBeforeUnmount(() => {
 
         <div v-if="hasSelection" class="space-y-3">
             <div class="flex flex-wrap gap-2">
-                <Badge
+                <div
                     v-for="collaborator in selection.internal"
                     :key="`internal-${collaboratorKey(collaborator.id)}`"
-                    class="flex items-center gap-2 bg-sky-100 text-sky-900 hover:bg-sky-100"
-                    variant="secondary"
+                    :class="selectedBadgeStyle('internal').shell"
+                    data-collaborator-badge-kind="internal"
                 >
-                    <span class="font-medium">{{ internalLabel }}</span>
-                    <span>{{ collaborator.name }}</span>
-                    <span v-if="collaborator.email" class="text-xs opacity-75">{{ collaborator.email }}</span>
+                    <span
+                        v-if="collaboratorBadgeLabel('internal')"
+                        :class="selectedBadgeStyle('internal').label"
+                        data-collaborator-badge-label-kind="internal"
+                    >
+                        {{ collaboratorBadgeLabel('internal') }}
+                    </span>
+                    <span
+                        :class="selectedBadgeStyle('internal').value"
+                        data-collaborator-badge-value-kind="internal"
+                    >
+                        {{ collaboratorDisplayValue(collaborator) }}
+                    </span>
                     <button
                         v-if="!readOnly"
                         type="button"
-                        class="inline-flex h-4 w-4 items-center justify-center rounded-full"
+                        :class="selectedBadgeStyle('internal').remove"
+                        :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
                         @click="toggleCollaborator('internal', collaborator)"
                     >
                         <X class="h-3 w-3" />
                     </button>
-                </Badge>
+                </div>
 
-                <Badge
+                <div
                     v-for="collaborator in selection.external"
                     :key="`external-${collaboratorKey(collaborator.id)}`"
-                    class="flex items-center gap-2 bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
-                    variant="secondary"
+                    :class="selectedBadgeStyle('external').shell"
+                    data-collaborator-badge-kind="external"
                 >
-                    <span class="font-medium">{{ externalLabel }}</span>
-                    <span>{{ collaborator.name }}</span>
-                    <span v-if="collaborator.email" class="text-xs opacity-75">{{ collaborator.email }}</span>
+                    <span
+                        v-if="collaboratorBadgeLabel('external')"
+                        :class="selectedBadgeStyle('external').label"
+                        data-collaborator-badge-label-kind="external"
+                    >
+                        {{ collaboratorBadgeLabel('external') }}
+                    </span>
+                    <span
+                        :class="selectedBadgeStyle('external').value"
+                        data-collaborator-badge-value-kind="external"
+                    >
+                        {{ collaboratorDisplayValue(collaborator) }}
+                    </span>
                     <button
                         v-if="!readOnly"
                         type="button"
-                        class="inline-flex h-4 w-4 items-center justify-center rounded-full"
+                        :class="selectedBadgeStyle('external').remove"
+                        :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
                         @click="toggleCollaborator('external', collaborator)"
                     >
                         <X class="h-3 w-3" />
                     </button>
-                </Badge>
+                </div>
             </div>
         </div>
 
@@ -297,7 +371,7 @@ onBeforeUnmount(() => {
                                     <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{ collaborator.email }}</span>
                                 </span>
                                 <UserPlus v-if="!isSelected('internal', collaborator)" class="text-muted-foreground h-4 w-4 shrink-0" />
-                                <Badge v-else variant="secondary">Selected</Badge>
+                                <span v-else class="bg-muted text-foreground inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium">Selected</span>
                             </button>
                         </div>
                     </div>
@@ -337,7 +411,7 @@ onBeforeUnmount(() => {
                                     <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{ collaborator.email }}</span>
                                 </span>
                                 <UserPlus v-if="!isSelected('external', collaborator)" class="text-muted-foreground h-4 w-4 shrink-0" />
-                                <Badge v-else variant="secondary">Selected</Badge>
+                                <span v-else class="bg-muted text-foreground inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium">Selected</span>
                             </button>
                         </div>
                     </div>

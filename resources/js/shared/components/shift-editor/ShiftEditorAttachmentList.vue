@@ -39,7 +39,7 @@ function iconForAttachment(type: string) {
                     <div class="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                         <template v-if="att.status === 'uploading'">
                             <span>Uploading</span>
-                            <span class="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                            <span class="rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                                 {{ Math.max(1, att.progress) }}%
                             </span>
                         </template>
@@ -50,7 +50,7 @@ function iconForAttachment(type: string) {
                             <span>{{ formatBytes(att.size) }}</span>
                         </template>
                     </div>
-                    <div v-if="att.status === 'uploading'" class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                    <div v-if="att.status === 'uploading'" class="mt-2 h-1.5 overflow-hidden rounded-md bg-slate-200">
                         <div
                             class="h-1.5 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 transition-all"
                             :style="{ width: Math.max(1, att.progress) + '%' }"
