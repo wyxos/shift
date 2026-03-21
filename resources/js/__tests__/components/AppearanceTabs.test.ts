@@ -54,37 +54,46 @@ describe('AppearanceTabs', () => {
         vi.unstubAllGlobals();
     });
 
-    it('renders a compact icon-only toggle set for header usage', () => {
+    it('renders a single compact cycle button for header usage', () => {
         const wrapper = mount(AppearanceTabs, {
             props: {
                 compact: true,
             },
         });
 
-        const buttons = wrapper.findAll('button');
+        const button = wrapper.get('[data-appearance-toggle]');
 
-        expect(buttons).toHaveLength(3);
-        expect(buttons.map((button) => button.attributes('title'))).toEqual(['Use light theme', 'Use dark theme', 'Use system theme']);
-        expect(wrapper.findAll('.sr-only')).toHaveLength(3);
+        expect(wrapper.findAll('button')).toHaveLength(1);
+        expect(button.attributes('data-appearance')).toBe('system');
+        expect(button.attributes('data-next-appearance')).toBe('light');
+        expect(button.attributes('title')).toBe('Theme: System. Switch to Light.');
     });
 
-    it('persists and applies the selected appearance', async () => {
+    it('cycles through the appearances and persists the selected state', async () => {
         const wrapper = mount(AppearanceTabs, {
             props: {
                 compact: true,
             },
         });
 
-        await wrapper.get('button[title="Use dark theme"]').trigger('click');
-        expect(localStorage.getItem('appearance')).toBe('dark');
-        expect(document.documentElement.classList.contains('dark')).toBe(true);
+        const button = wrapper.get('[data-appearance-toggle]');
 
-        await wrapper.get('button[title="Use light theme"]').trigger('click');
+        await button.trigger('click');
         expect(localStorage.getItem('appearance')).toBe('light');
         expect(document.documentElement.classList.contains('dark')).toBe(false);
+        expect(button.attributes('data-appearance')).toBe('light');
+        expect(button.attributes('data-next-appearance')).toBe('dark');
 
-        await wrapper.get('button[title="Use system theme"]').trigger('click');
+        await button.trigger('click');
+        expect(localStorage.getItem('appearance')).toBe('dark');
+        expect(document.documentElement.classList.contains('dark')).toBe(true);
+        expect(button.attributes('data-appearance')).toBe('dark');
+        expect(button.attributes('data-next-appearance')).toBe('system');
+
+        await button.trigger('click');
         expect(localStorage.getItem('appearance')).toBe('system');
         expect(document.documentElement.classList.contains('dark')).toBe(true);
+        expect(button.attributes('data-appearance')).toBe('system');
+        expect(button.attributes('data-next-appearance')).toBe('light');
     });
 });
