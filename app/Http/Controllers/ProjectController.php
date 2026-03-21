@@ -126,6 +126,11 @@ class ProjectController extends Controller
 
     public function generateApiToken(Project $project)
     {
+        abort_unless(
+            $project->isManagedByUser(auth()->id()),
+            403,
+        );
+
         $token = $project->generateApiToken();
 
         if (request()->expectsJson()) {

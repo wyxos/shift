@@ -164,13 +164,18 @@ vi.mock('@/components/ui/sheet', () => ({
 
 vi.mock('@/components/ui/button-group', () => ({
     ButtonGroup: {
-        props: ['modelValue', 'options', 'disabled', 'testIdPrefix'],
+        props: ['modelValue', 'options', 'disabled', 'testIdPrefix', 'columns', 'ariaLabel', 'class'],
         emits: ['update:modelValue'],
         render() {
             const options = Array.isArray((this as any).options) ? (this as any).options : [];
+            const columnsClass = (this as any).columns === 2 ? 'grid-cols-2' : (this as any).columns === 4 ? 'grid-cols-4' : 'grid-cols-3';
+
             return h(
                 'div',
-                { class: 'button-group-stub' },
+                {
+                    class: ['button-group-stub', 'grid', columnsClass, (this as any).class],
+                    'aria-label': (this as any).ariaLabel,
+                },
                 options.map((option: any) =>
                     h(
                         'button',
@@ -754,10 +759,18 @@ describe('Tasks/Index.vue', () => {
         await wrapper.find('button[title="Edit"]').trigger('click');
         await flushPromises();
 
+        const editStatusGroup = wrapper.get('[aria-label="Task status"]');
+        const mobilePaneGroup = wrapper.get('[aria-label="Edit task section"]');
+
         expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
         expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
         expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toContain('Updated');
+        expect(editStatusGroup.classes()).toContain('grid-cols-2');
+        expect(editStatusGroup.classes()).toContain('xl:grid-cols-4');
+        expect(mobilePaneGroup.classes()).toContain('grid-cols-2');
+        expect(wrapper.get('[data-testid="edit-mobile-pane-details"]').text()).toContain('Details');
+        expect(wrapper.get('[data-testid="edit-mobile-pane-comments"]').text()).toContain('Comments');
         expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
 
         wrapper.unmount();

@@ -126,3 +126,44 @@ test('projects index filters by search and sorts oldest first', function () {
         ->where('filters.sort_by', 'oldest')
     );
 });
+
+test('project managers can generate api tokens', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'token' => null,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('projects.api-token', $project));
+
+    $response->assertOk();
+    $response->assertJsonPath('project_id', $project->id);
+
+    expect($project->fresh()->token)->not->toBeNull();
+});
+
+test('shared project members cannot generate api tokens', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'token' => null,
+    ]);
+
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('projects.api-token', $project))
+        ->assertForbidden();
+
+    expect($project->fresh()->token)->toBeNull();
+});
