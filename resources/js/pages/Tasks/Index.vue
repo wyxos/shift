@@ -851,13 +851,12 @@ async function saveTaskChanges() {
     const canUpdateCollaborators = canManageCollaborators.value;
     const needsCollaboratorUpdate = canUpdateCollaborators && hasCollaboratorManagementChanges();
     const needsCoreUpdate = isOwner.value
-        ? Boolean(snapshot) && (
-              editForm.value.title !== snapshot.title ||
+        ? Boolean(snapshot) &&
+          (editForm.value.title !== snapshot.title ||
               editForm.value.priority !== snapshot.priority ||
               editForm.value.status !== snapshot.status ||
               (editForm.value.description ?? '') !== (snapshot.description ?? '') ||
-              deletedAttachmentIds.value.length > 0
-          )
+              deletedAttachmentIds.value.length > 0)
         : Boolean(snapshot) && editForm.value.status !== snapshot.status;
 
     if (!needsCoreUpdate && !needsCollaboratorUpdate) return;
@@ -1172,7 +1171,7 @@ function handleTaskCreated(taskId: number | null) {
                                     </Badge>
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="right" class="flex h-full w-[320px] flex-col p-0">
+                            <SheetContent side="right" class="flex h-full flex-col p-0">
                                 <SheetHeader class="p-0">
                                     <div class="px-6 pt-6 pb-3">
                                         <SheetTitle>Filters</SheetTitle>
@@ -1334,7 +1333,7 @@ function handleTaskCreated(taskId: number | null) {
         </div>
 
         <Sheet :open="editOpen" @update:open="onEditOpenChange">
-            <SheetContent side="right" class="flex h-full w-full max-w-none flex-col p-0 sm:w-1/2 sm:max-w-none">
+            <SheetContent side="right" class="flex h-full flex-col p-0">
                 <form class="flex h-full flex-col" data-testid="edit-form">
                     <SheetHeader class="sr-only">
                         <SheetTitle>Task</SheetTitle>

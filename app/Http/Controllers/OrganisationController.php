@@ -2,67 +2,81 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Organisation;
+use Illuminate\Database\Eloquent\Builder;
+
 class OrganisationController extends Controller
 {
     public function index()
     {
-        return inertia('Organisations/Index')
-            ->with([
-                'filters' => request()->only(['search']),
-                'organisations' => \App\Models\Organisation::query()
-                    ->latest()
-                    ->when(
-                        request('search'),
-                        fn ($query)  => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%' . request('search') . '%'])
-                    )
-                    ->where(function($query) {
-                        $query->where('author_id', auth()->user()->id)
-                            ->orWhereHas('organisationUsers', function($query) {
-                                $query->where('user_id', auth()->user()->id);
-                            });
-                    })
-                    ->paginate(10)
-                    ->withQueryString(),
-            ]);
+        $userId = auth()->id();
+        $sortBy = request('sort_by');
+
+        $organisations = Organisation::query()
+            ->withCount(['organisationUsers', 'projects'])
+            ->where(function (Builder $query) use ($userId) {
+                $query->where('author_id', $userId)
+                    ->orWhereHas('organisationUsers', function (Builder $query) use ($userId) {
+                        $query->where('user_id', $userId);
+                    });
+            })
+            ->when(
+                request('search'),
+                fn (Builder $query, string $search) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%'])
+            );
+
+        switch ($sortBy) {
+            case 'name':
+                $organisations->orderBy('name');
+                break;
+            case 'oldest':
+                $organisations->oldest();
+                break;
+            default:
+                $organisations->latest();
+                break;
+        }
+
+        return inertia('Organisations/Index')->with([
+            'filters' => request()->only(['search', 'sort_by']),
+            'organisations' => $organisations
+                ->paginate(10)
+                ->withQueryString(),
+        ]);
     }
 
-    // delete route
-    public function destroy(\App\Models\Organisation $organisation)
+    public function destroy(Organisation $organisation)
     {
         $organisation->delete();
+
         return redirect()->route('organisations.index')->with('success', 'Organisation deleted successfully.');
     }
 
-    // put organisation
-    public function update(\App\Models\Organisation $organisation)
+    public function update(Organisation $organisation)
     {
         $organisation->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
+
         return redirect()->route('organisations.index')->with('success', 'Organisation updated successfully.');
     }
 
-    // create organisation
     public function store()
     {
-        $validate = request()->validate([
+        $validated = request()->validate([
             'name' => 'required|string|max:255',
         ]);
 
-        $organisation = \App\Models\Organisation::create([
-            ...$validate,
+        Organisation::create([
+            ...$validated,
             'author_id' => auth()->id(),
         ]);
 
         return redirect()->route('organisations.index')->with('success', 'Organisation created successfully.');
     }
 
-    /**
-     * Get users with access to the organisation.
-     */
-    public function users(\App\Models\Organisation $organisation)
+    public function users(Organisation $organisation)
     {
-        // Check if the authenticated user is the author of the organisation
         if ($organisation->author_id !== auth()->id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }

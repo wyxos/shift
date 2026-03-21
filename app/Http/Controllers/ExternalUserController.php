@@ -14,12 +14,11 @@ class ExternalUserController extends Controller
      */
     public function index()
     {
-        // Get the current user
         $user = auth()->user();
+        $sortBy = request('sort_by');
 
-        // Get the IDs of projects that the user owns or has access to
         $projectIds = Project::where('author_id', $user->id)
-            ->orWhereHas('projectUser', function($query) use ($user) {
+            ->orWhereHas('projectUser', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
             ->pluck('id');
@@ -28,19 +27,32 @@ class ExternalUserController extends Controller
             ->whereIn('project_id', $projectIds)
             ->when(
                 request('search'),
-                fn($query) => $query->where(function($q) {
-                    $search = '%' . request('search') . '%';
-                    $q->whereRaw('LOWER(name) LIKE LOWER(?)', [$search])
-                      ->orWhereRaw('LOWER(email) LIKE LOWER(?)', [$search])
-                      ->orWhereRaw('LOWER(environment) LIKE LOWER(?)', [$search]);
+                fn ($query, string $search) => $query->where(function ($query) use ($search) {
+                    $term = '%'.$search.'%';
+
+                    $query->whereRaw('LOWER(name) LIKE LOWER(?)', [$term])
+                        ->orWhereRaw('LOWER(email) LIKE LOWER(?)', [$term])
+                        ->orWhereRaw('LOWER(environment) LIKE LOWER(?)', [$term]);
                 })
-            )
-            ->paginate(10)
-            ->withQueryString();
+            );
+
+        switch ($sortBy) {
+            case 'name':
+                $externalUsers->orderBy('name');
+                break;
+            case 'oldest':
+                $externalUsers->oldest();
+                break;
+            default:
+                $externalUsers->latest();
+                break;
+        }
 
         return Inertia::render('ExternalUsers/Index', [
-            'externalUsers' => $externalUsers,
-            'filters' => request()->only(['search']),
+            'externalUsers' => $externalUsers
+                ->paginate(10)
+                ->withQueryString(),
+            'filters' => request()->only(['search', 'sort_by']),
         ]);
     }
 
@@ -78,7 +90,7 @@ class ExternalUserController extends Controller
 
         // Get the IDs of projects that the user owns or has access to
         $projectIds = Project::where('author_id', $user->id)
-            ->orWhereHas('projectUser', function($query) use ($user) {
+            ->orWhereHas('projectUser', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
             ->pluck('id');
@@ -93,7 +105,7 @@ class ExternalUserController extends Controller
 
         return Inertia::render('ExternalUsers/Edit', [
             'externalUser' => $externalUser,
-            'projects' => $projects
+            'projects' => $projects,
         ]);
     }
 
@@ -107,7 +119,7 @@ class ExternalUserController extends Controller
 
         // Get the IDs of projects that the user owns or has access to
         $projectIds = Project::where('author_id', $user->id)
-            ->orWhereHas('projectUser', function($query) use ($user) {
+            ->orWhereHas('projectUser', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
             ->pluck('id');
@@ -115,7 +127,7 @@ class ExternalUserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
-            'project_id' => 'nullable|exists:projects,id|in:' . $projectIds->implode(','),
+            'project_id' => 'nullable|exists:projects,id|in:'.$projectIds->implode(','),
         ]);
 
         $externalUser = ExternalUser::whereIn('project_id', $projectIds)
