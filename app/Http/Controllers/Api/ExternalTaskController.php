@@ -407,6 +407,8 @@ class ExternalTaskController extends Controller
         }
 
         $project = Project::query()->with('environments')->where('token', $attributes['project'])->firstOrFail();
+        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
+
         $task = Task::create([
             ...$attributes,
             'project_id' => $project->id,
@@ -426,7 +428,6 @@ class ExternalTaskController extends Controller
             $task->submitter()->associate($externalUser)->save();
         }
 
-        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
         $environmentUrl = request('metadata.url') ?? request('user.url');
         if ($selectedEnvironment !== null || isset($attributes['metadata'])) {
             $this->syncTaskEnvironment($task, $selectedEnvironment, $environmentUrl);

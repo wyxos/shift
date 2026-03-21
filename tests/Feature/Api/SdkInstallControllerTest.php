@@ -268,6 +268,36 @@ test('finalize reuses an existing project token', function () {
     expect($project->fresh()->token)->toBe('existing-project-token');
 });
 
+test('create project returns conflict after credentials are issued', function () {
+    $manager = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $manager->id,
+        'client_id' => null,
+        'organisation_id' => null,
+    ]);
+
+    $session = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'staging',
+        'url' => 'https://client-app.test',
+    ])->json();
+
+    $this->actingAs($manager)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ]);
+
+    $this->postJson(route('api.sdk-install.finalize'), [
+        'device_code' => $session['device_code'],
+        'project_id' => $project->id,
+    ])->assertOk();
+
+    $this->postJson(route('api.sdk-install.projects.create'), [
+        'device_code' => $session['device_code'],
+        'name' => 'Another Project',
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'Credentials have already been issued for this install session.');
+});
+
 test('poll returns expired after the install session lifetime passes', function () {
     $session = $this->postJson(route('api.sdk-install.store'), [
         'environment' => 'staging',
@@ -288,4 +318,59 @@ test('poll returns expired after the install session lifetime passes', function 
         ->assertOk()
         ->assertJsonPath('state', 'expired')
         ->assertJsonPath('expires_at', null);
+});
+
+test('create project cannot be used after credentials were issued for the install session', function () {
+    $manager = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $manager->id,
+        'client_id' => null,
+        'organisation_id' => null,
+    ]);
+
+    $session = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'staging',
+        'url' => 'https://client-app.test',
+    ])->json();
+
+    $this->actingAs($manager)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ]);
+
+    $this->postJson(route('api.sdk-install.finalize'), [
+        'device_code' => $session['device_code'],
+        'project_id' => $project->id,
+    ])->assertOk();
+
+    $this->postJson(route('api.sdk-install.projects.create'), [
+        'device_code' => $session['device_code'],
+        'name' => 'Should Not Exist',
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'Credentials have already been issued for this install session.');
+
+    $this->assertDatabaseMissing('projects', ['name' => 'Should Not Exist']);
+});
+
+test('finalize rejects projects outside the approver visibility', function () {
+    $manager = User::factory()->create();
+    $unmanagedProject = Project::factory()->create([
+        'author_id' => User::factory()->create()->id,
+    ]);
+
+    $session = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'staging',
+        'url' => 'https://client-app.test',
+    ])->json();
+
+    $this->actingAs($manager)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ]);
+
+    $this->postJson(route('api.sdk-install.finalize'), [
+        'device_code' => $session['device_code'],
+        'project_id' => $unmanagedProject->id,
+    ])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'You do not have permission to install against the selected project.');
 });
