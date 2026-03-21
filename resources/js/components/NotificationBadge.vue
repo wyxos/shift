@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Bell } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 type NotificationData = {
     task_title?: string;
@@ -27,11 +27,46 @@ type NotificationItem = {
 const unreadCount = ref(0);
 const notifications = ref<NotificationItem[]>([]);
 const loading = ref(true);
+const hasRouteHelper = typeof route === 'function';
+
+const unreadUrl = computed(() => (hasRouteHelper ? route('notifications.unread') : null));
+const notificationsIndexUrl = computed(() => (hasRouteHelper ? route('notifications.index') : null));
+const markAllAsReadUrl = computed(() => (hasRouteHelper ? route('notifications.mark-all-as-read') : null));
+const notificationsEnabled = computed(() => Boolean(unreadUrl.value && markAllAsReadUrl.value && hasRouteHelper));
+
+function getNotificationData(notification: NotificationItem): NotificationData {
+    return typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+}
+
+function getMarkAsReadUrl(id: NotificationItem['id']): string | null {
+    return hasRouteHelper ? route('notifications.mark-as-read', { id }) : null;
+}
+
+function getProjectNotificationsUrl(): string | null {
+    return hasRouteHelper ? route('projects.index') : null;
+}
+
+function getOrganisationNotificationsUrl(): string | null {
+    return hasRouteHelper ? route('organisations.index') : null;
+}
+
+function getTaskNotificationsUrl(taskId?: NotificationData['task_id']): string | null {
+    if (!hasRouteHelper || taskId === undefined || taskId === null) return null;
+
+    return route('tasks.index', { task: taskId });
+}
 
 const fetchNotifications = async () => {
+    if (!unreadUrl.value) {
+        notifications.value = [];
+        unreadCount.value = 0;
+        loading.value = false;
+        return;
+    }
+
     loading.value = true;
     try {
-        const response = await axios.get(route('notifications.unread'));
+        const response = await axios.get(unreadUrl.value);
         notifications.value = response.data.notifications;
         unreadCount.value = response.data.count;
     } catch (error) {
@@ -42,20 +77,23 @@ const fetchNotifications = async () => {
 };
 
 const markAsRead = async (id: NotificationItem['id']) => {
+    const url = getMarkAsReadUrl(id);
+    if (!url) return;
+
     try {
-        await axios.post(route('notifications.mark-as-read', { id }));
-        // Remove the notification from the list
+        await axios.post(url);
         notifications.value = notifications.value.filter((notification) => notification.id !== id);
-        // Decrement the unread count
-        unreadCount.value--;
+        unreadCount.value = Math.max(0, unreadCount.value - 1);
     } catch (error) {
         console.error('Error marking notification as read:', error);
     }
 };
 
 const markAllAsRead = async () => {
+    if (!markAllAsReadUrl.value) return;
+
     try {
-        await axios.post(route('notifications.mark-all-as-read'));
+        await axios.post(markAllAsReadUrl.value);
         notifications.value = [];
         unreadCount.value = 0;
     } catch (error) {
@@ -63,22 +101,22 @@ const markAllAsRead = async () => {
     }
 };
 
-// Fetch notifications on component mount
 onMounted(() => {
+    if (!notificationsEnabled.value) {
+        loading.value = false;
+        return;
+    }
+
     fetchNotifications();
 
-    // Set up polling to refresh notifications every minute
     const interval = setInterval(fetchNotifications, 60000);
 
-    // Clean up interval on component unmount
     return () => clearInterval(interval);
 });
 
-// Format notification title based on type
 const getNotificationTitle = (notification: NotificationItem) => {
     const type = notification.type;
-    // Handle both string and object data formats
-    const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+    const data = getNotificationData(notification);
 
     switch (type) {
         case 'TaskCreationNotification':
@@ -98,10 +136,8 @@ const getNotificationTitle = (notification: NotificationItem) => {
     }
 };
 
-// Get notification URL
 const getNotificationUrl = (notification: NotificationItem) => {
-    // Handle both string and object data formats
-    const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+    const data = getNotificationData(notification);
 
     if (data.url) {
         return data.url;
@@ -109,15 +145,15 @@ const getNotificationUrl = (notification: NotificationItem) => {
 
     switch (notification.type) {
         case 'TaskCreationNotification':
-            return route('tasks.index', { task: data.task_id });
+            return getTaskNotificationsUrl(data.task_id) ?? '#';
         case 'TaskThreadUpdated':
-            return data.url;
+            return data.url ?? '#';
         case 'ProjectInvitationNotification':
         case 'ProjectUserRegisteredNotification':
-            return route('projects.index');
+            return getProjectNotificationsUrl() ?? '#';
         case 'OrganisationInvitationNotification':
         case 'OrganisationAccessNotification':
-            return route('organisations.index');
+            return getOrganisationNotificationsUrl() ?? '#';
         default:
             return '#';
     }
@@ -125,7 +161,7 @@ const getNotificationUrl = (notification: NotificationItem) => {
 </script>
 
 <template>
-    <DropdownMenu>
+    <DropdownMenu v-if="notificationsEnabled">
         <DropdownMenuTrigger :as-child="true">
             <Button variant="ghost" size="icon" class="relative h-9 w-9">
                 <Bell class="h-5 w-5" />
@@ -181,8 +217,8 @@ const getNotificationUrl = (notification: NotificationItem) => {
                 </div>
             </div>
 
-            <div class="border-t p-2">
-                <Link :href="route('notifications.index')" class="hover:bg-accent block rounded-md p-2 text-center text-sm font-medium">
+            <div v-if="notificationsIndexUrl" class="border-t p-2">
+                <Link :href="notificationsIndexUrl" class="hover:bg-accent block rounded-md p-2 text-center text-sm font-medium">
                     View all notifications
                 </Link>
             </div>

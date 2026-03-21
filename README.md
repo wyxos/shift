@@ -67,6 +67,18 @@ Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded 
 
 ---
 
+
+## SDK Install Flow
+
+SHIFT exposes a cache-backed browser/device install flow for SDK consumers.
+
+- `POST /api/sdk/install/sessions` creates an install session and returns the device/user codes plus verification URLs.
+- `/sdk/install` lets a SHIFT user enter or prefill a code, log in if needed, and approve the install session.
+- `POST /api/sdk/install/sessions/poll`, `/projects`, and `/finalize` let the CLI wait for approval, list manageable projects, and finalize credentials.
+- Finalization reuses an existing project token when possible, otherwise creates one, then issues a user API token once and registers the selected environment URL.
+
+---
+
 ## Tech Stack
 
 - **Backend**: Laravel 12 with PHP 8.3+

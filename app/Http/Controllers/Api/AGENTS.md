@@ -11,6 +11,7 @@
 ## API Patterns (public contract)
 - Routes: `routes/api.php`
   - ✅ DO: Keep route paths stable (`/tasks`, `/tasks/{task}`, `/tasks/{task}/threads`, `/attachments/*`).
+  - ✅ DO: Keep the SDK install flow stable as well (`/sdk/install/sessions`, `/sdk/install/sessions/poll`, `/sdk/install/sessions/projects`, `/sdk/install/sessions/finalize`).
 - Controllers:
   - Tasks: `app/Http/Controllers/Api/ExternalTaskController.php`
   - Threads: `app/Http/Controllers/Api/ExternalTaskThreadController.php`
