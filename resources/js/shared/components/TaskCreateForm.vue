@@ -64,8 +64,8 @@ function updateField(field: keyof TaskCreateDraft, value: string) {
 </script>
 
 <template>
-    <form class="flex h-full flex-col" data-testid="create-task-form" @submit.prevent="emit('submit')">
-        <div class="flex-1 space-y-6 overflow-auto px-6 pb-6">
+    <form class="flex h-full min-h-0 flex-col" data-testid="create-task-form" @submit.prevent="emit('submit')">
+        <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
             <div class="space-y-2">
                 <label :class="baseControlClass">
                     {{ titleLabel }}
