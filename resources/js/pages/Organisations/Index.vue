@@ -1,49 +1,20 @@
-<!-- eslint-disable max-lines -->
 <script setup lang="ts">
-/* eslint-disable max-lines */
 import DeleteDialog from '@/components/DeleteDialog.vue';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
+import OrganisationCreateDialog from '@/components/admin/organisations/OrganisationCreateDialog.vue';
+import OrganisationEditDialog from '@/components/admin/organisations/OrganisationEditDialog.vue';
+import OrganisationInviteDialog from '@/components/admin/organisations/OrganisationInviteDialog.vue';
+import OrganisationListTable from '@/components/admin/organisations/OrganisationListTable.vue';
+import OrganisationManageUsersDialog from '@/components/admin/organisations/OrganisationManageUsersDialog.vue';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Building2, FolderKanban, Pencil, Trash2, UserPlus, Users } from 'lucide-vue-next';
+import { Building2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-
-type OrganisationRow = {
-    id: number;
-    name: string;
-    created_at?: string | null;
-    organisation_users_count?: number | null;
-    projects_count?: number | null;
-};
-
-type OrganisationPaginator = {
-    data: OrganisationRow[];
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number | null;
-    to: number | null;
-};
-
-type SortBy = 'newest' | 'oldest' | 'name';
 
 const props = defineProps<{
     organisations: OrganisationPaginator;
@@ -59,6 +30,8 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/organisations',
     },
 ];
+
+
 
 const defaultSortBy: SortBy = 'newest';
 const sortOptions = [
@@ -207,17 +180,6 @@ const inviteForm = useForm<{
     name: '',
 });
 
-const otherInviteErrors = computed(() => {
-    return Object.entries(inviteForm.errors)
-        .filter(([key]) => !['email', 'name'].includes(key))
-        .reduce<Record<string, string>>((accumulator, [key, value]) => {
-            if (typeof value === 'string') {
-                accumulator[key] = value;
-            }
-            return accumulator;
-        }, {});
-});
-
 const manageUsersForm = useForm<{
     organisation_id: number | null;
     organisation_name: string;
@@ -306,20 +268,8 @@ function removeAccess(organisationUser: { id: number }) {
     });
 }
 
-function formatDate(value?: string | null) {
-    if (!value) return 'Unknown';
-    return new Date(value).toLocaleDateString();
-}
 
-function usersLabel(count?: number | null) {
-    const total = Number(count ?? 0);
-    return `${total} user${total === 1 ? '' : 's'}`;
-}
 
-function projectsLabel(count?: number | null) {
-    const total = Number(count ?? 0);
-    return `${total} project${total === 1 ? '' : 's'}`;
-}
 </script>
 
 <template>
@@ -367,92 +317,13 @@ function projectsLabel(count?: number | null) {
                     </Button>
                 </template>
 
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Organisation</TableHead>
-                            <TableHead>Access</TableHead>
-                            <TableHead>Created</TableHead>
-                            <TableHead class="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableEmpty v-if="organisationRows.length === 0" :colspan="4">No organisations found.</TableEmpty>
-
-                        <TableRow
-                            v-for="organisation in organisationRows"
-                            v-else
-                            :key="organisation.id"
-                            :data-testid="`organisation-row-${organisation.id}`"
-                        >
-                            <TableCell>
-                                <div class="flex items-start gap-3">
-                                    <div class="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-lg">
-                                        <Building2 class="h-4 w-4" />
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="truncate font-medium">{{ organisation.name }}</div>
-                                        <div class="text-muted-foreground text-xs">Created {{ formatDate(organisation.created_at) }}</div>
-                                    </div>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div class="flex flex-wrap gap-2">
-                                    <Badge variant="secondary">{{ usersLabel(organisation.organisation_users_count) }}</Badge>
-                                    <Badge variant="outline" class="gap-1">
-                                        <FolderKanban class="h-3 w-3" />
-                                        {{ projectsLabel(organisation.projects_count) }}
-                                    </Badge>
-                                </div>
-                            </TableCell>
-                            <TableCell class="text-muted-foreground">{{ formatDate(organisation.created_at) }}</TableCell>
-                            <TableCell>
-                                <div class="flex flex-wrap justify-end gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        :data-testid="`organisation-invite-${organisation.id}`"
-                                        title="Invite user"
-                                        @click="openInviteModal(organisation)"
-                                    >
-                                        <UserPlus class="h-4 w-4" />
-                                        <span class="sr-only">Invite user</span>
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        :data-testid="`organisation-manage-${organisation.id}`"
-                                        title="Manage users"
-                                        @click="openManageUsersModal(organisation)"
-                                    >
-                                        <Users class="h-4 w-4" />
-                                        <span class="sr-only">Manage users</span>
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        :data-testid="`organisation-edit-${organisation.id}`"
-                                        title="Edit organisation"
-                                        @click="openEditModal(organisation)"
-                                    >
-                                        <Pencil class="h-4 w-4" />
-                                        <span class="sr-only">Edit organisation</span>
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        :data-testid="`organisation-delete-${organisation.id}`"
-                                        title="Delete organisation"
-                                        @click="openDeleteModal(organisation)"
-                                    >
-                                        <Trash2 class="h-4 w-4" />
-                                        <span class="sr-only">Delete organisation</span>
-                                    </Button>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
+                <OrganisationListTable
+                    :organisations="organisationRows"
+                    @open-delete="openDeleteModal"
+                    @open-edit="openEditModal"
+                    @open-invite="openInviteModal"
+                    @open-manage-users="openManageUsersModal"
+                />
             </AdminListShell>
         </div>
 
@@ -463,141 +334,36 @@ function projectsLabel(count?: number | null) {
             <template #confirm>Confirm</template>
         </DeleteDialog>
 
-        <AlertDialog v-model:open="createForm.isActive">
-            <AlertDialogTrigger as-child>
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Create Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>Add a new organisation.</AlertDialogDescription>
-                </AlertDialogHeader>
+        <OrganisationCreateDialog
+            :form="createForm"
+            :open="createForm.isActive"
+            @cancel="createForm.isActive = false"
+            @submit="submitCreateForm"
+            @update:open="createForm.isActive = $event"
+        />
 
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label>Name</Label>
-                        <Input v-model="createForm.name" data-testid="create-organisation-name" placeholder="Organisation name" />
-                    </div>
+        <OrganisationEditDialog
+            :form="editForm"
+            :open="editDialogOpen"
+            @cancel="editDialogOpen = false"
+            @submit="saveEdit"
+            @update:open="editDialogOpen = $event"
+        />
 
-                    <div v-for="(error, key) in createForm.errors" :key="key" class="text-destructive text-sm">
-                        {{ error }}
-                    </div>
-                </div>
+        <OrganisationInviteDialog
+            :form="inviteForm"
+            :open="inviteDialogOpen"
+            @cancel="inviteDialogOpen = false"
+            @submit="inviteUser"
+            @update:open="inviteDialogOpen = $event"
+        />
 
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="createForm.isActive = false">Cancel</AlertDialogCancel>
-                    <Button data-testid="submit-create-organisation" :disabled="createForm.processing" @click="submitCreateForm">Create</Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog v-model:open="editDialogOpen">
-            <AlertDialogTrigger as-child>
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Edit Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>Update organisation information.</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label>Name</Label>
-                        <Input v-model="editForm.name" data-testid="edit-organisation-name" placeholder="Organisation name" />
-                    </div>
-
-                    <div v-for="(error, key) in editForm.errors" :key="key" class="text-destructive text-sm">
-                        {{ error }}
-                    </div>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="editDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction data-testid="submit-edit-organisation" :disabled="editForm.processing" @click="saveEdit">
-                        Save
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog v-model:open="inviteDialogOpen">
-            <AlertDialogTrigger as-child>
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Invite User to Organisation</AlertDialogTitle>
-                    <AlertDialogDescription>Invite a user to join {{ inviteForm.organisation_name }}</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label>Email</Label>
-                        <Input v-model="inviteForm.email" data-testid="invite-organisation-email" type="email" placeholder="user@example.com" />
-                        <div v-if="inviteForm.errors.email" class="text-destructive text-sm">{{ inviteForm.errors.email }}</div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label>Name</Label>
-                        <Input v-model="inviteForm.name" data-testid="invite-organisation-name" placeholder="User name" />
-                        <div v-if="inviteForm.errors.name" class="text-destructive text-sm">{{ inviteForm.errors.name }}</div>
-                    </div>
-
-                    <div v-for="(error, key) in otherInviteErrors" :key="key" class="text-destructive text-sm">
-                        {{ error }}
-                    </div>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="inviteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction data-testid="submit-invite-organisation" :disabled="inviteForm.processing" @click="inviteUser">
-                        Invite
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog :open="manageUsersForm.isOpen" @update:open="manageUsersForm.isOpen = $event">
-            <AlertDialogTrigger as-child>
-                <div></div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Manage Organisation Access</AlertDialogTitle>
-                    <AlertDialogDescription>Users with access to {{ manageUsersForm.organisation_name }}</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="flex max-h-96 flex-col gap-3 overflow-y-auto">
-                    <div v-for="(error, key) in manageUsersForm.errors" :key="key" class="text-destructive text-sm">
-                        {{ error }}
-                    </div>
-
-                    <div v-if="manageUsersForm.users.length === 0" class="text-muted-foreground py-6 text-center text-sm">
-                        No users have access to this organisation.
-                    </div>
-
-                    <div
-                        v-for="user in manageUsersForm.users"
-                        v-else
-                        :key="user.id"
-                        class="flex items-center justify-between rounded-lg border px-3 py-3"
-                    >
-                        <div class="min-w-0">
-                            <div class="truncate font-medium">{{ user.user_name }}</div>
-                            <div class="text-muted-foreground truncate text-sm">{{ user.user_email }}</div>
-                        </div>
-                        <Button size="sm" variant="destructive" :data-testid="`organisation-remove-access-${user.id}`" @click="removeAccess(user)">
-                            <Trash2 class="mr-2 h-4 w-4" />
-                            Remove
-                        </Button>
-                    </div>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <OrganisationManageUsersDialog
+            :form="manageUsersForm"
+            :open="manageUsersForm.isOpen"
+            @cancel="manageUsersForm.isOpen = false"
+            @remove-access="removeAccess"
+            @update:open="manageUsersForm.isOpen = $event"
+        />
     </AppLayout>
 </template>

@@ -1,68 +1,23 @@
 <script setup lang="ts">
-/* eslint-disable max-lines */
 import DeleteDialog from '@/components/DeleteDialog.vue';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
-import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
+import ProjectApiTokenDialog from '@/components/admin/projects/ProjectApiTokenDialog.vue';
+import ProjectCreateDialog from '@/components/admin/projects/ProjectCreateDialog.vue';
+import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue';
+import ProjectGrantAccessDialog from '@/components/admin/projects/ProjectGrantAccessDialog.vue';
+import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
+import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
+import { type Option, type ProjectAccessUser, type ProjectFilters, type ProjectPaginator, type ProjectRow, defaultSortBy, normalizeNullableId, normalizeSortBy, sortOptions, type SortBy } from '@/components/admin/projects/project-shared';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { FolderKanban, KeyRound, Pencil, Plus, Search, Shield, Trash2, UserPlus, Users } from 'lucide-vue-next';
+import { Plus, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-
-type ProjectRow = {
-    id: number;
-    name: string;
-    client_id?: number | null;
-    organisation_id?: number | null;
-    client_name?: string | null;
-    organisation_name?: string | null;
-    isOwner?: boolean;
-    token?: string | null;
-};
-
-type ProjectPaginator = {
-    data: ProjectRow[];
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number | null;
-    to: number | null;
-};
-
-type Option = {
-    id: number;
-    name: string;
-};
-
-type ProjectFilters = {
-    search?: string | null;
-    sort_by?: string | null;
-};
-
-type ProjectAccessUser = {
-    id: number;
-    user_name?: string | null;
-    user_email?: string | null;
-    registration_status?: string | null;
-};
-
-type SortBy = 'newest' | 'oldest' | 'name';
 
 const props = withDefaults(
     defineProps<{
@@ -77,7 +32,6 @@ const props = withDefaults(
         filters: () => ({}),
     },
 );
-
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Projects',
@@ -85,28 +39,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const defaultSortBy: SortBy = 'newest';
-const sortOptions = [
-    { value: 'newest', label: 'Newest' },
-    { value: 'oldest', label: 'Oldest' },
-    { value: 'name', label: 'Name' },
-] satisfies { value: SortBy; label: string }[];
 
-function normalizeSortBy(value: string | null | undefined): SortBy {
-    if (value === 'oldest' || value === 'name') {
-        return value;
-    }
 
-    return defaultSortBy;
-}
-
-function normalizeNullableId(value: number | string | null | undefined) {
-    if (value === null || value === undefined || value === '' || value === 'null') {
-        return null;
-    }
-
-    return Number(value);
-}
 
 const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
@@ -445,29 +379,8 @@ async function generateApiToken() {
     }
 }
 
-function projectScopeLabel(project: ProjectRow) {
-    if (project.client_name) {
-        return project.client_name;
-    }
 
-    if (project.organisation_name) {
-        return project.organisation_name;
-    }
 
-    return 'Standalone project';
-}
-
-function projectScopeVariant(project: ProjectRow) {
-    if (project.client_name || project.organisation_name) {
-        return 'secondary';
-    }
-
-    return 'outline';
-}
-
-function accessStatusLabel(projectUser: ProjectAccessUser) {
-    return projectUser.registration_status === 'registered' ? 'Registered' : 'Pending invitation';
-}
 </script>
 
 <template>
@@ -519,108 +432,14 @@ function accessStatusLabel(projectUser: ProjectAccessUser) {
                     </Button>
                 </template>
 
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Project</TableHead>
-                            <TableHead>Scope</TableHead>
-                            <TableHead>Access</TableHead>
-                            <TableHead class="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <template v-if="projectRows.length">
-                            <TableRow v-for="project in projectRows" :key="project.id" :data-testid="`project-row-${project.id}`">
-                                <TableCell>
-                                    <div class="flex flex-col gap-1">
-                                        <span class="font-medium">{{ project.name }}</span>
-                                        <span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                                            <FolderKanban class="h-3.5 w-3.5" />
-                                            Project #{{ project.id }}
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge :data-testid="`project-scope-${project.id}`" :variant="projectScopeVariant(project)" class="gap-1">
-                                        <Shield class="h-3.5 w-3.5" />
-                                        {{ projectScopeLabel(project) }}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge
-                                        :data-testid="`project-access-${project.id}`"
-                                        :class="
-                                            project.isOwner
-                                                ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
-                                                : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
-                                        "
-                                        variant="secondary"
-                                    >
-                                        {{ project.isOwner ? 'Owner access' : 'Shared access' }}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <div class="flex flex-wrap justify-end gap-2">
-                                        <template v-if="project.isOwner">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                :data-testid="`project-grant-${project.id}`"
-                                                @click="openGrantAccessModal(project)"
-                                            >
-                                                <UserPlus class="h-4 w-4 sm:mr-2" />
-                                                <span class="hidden sm:inline">Grant</span>
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                :data-testid="`project-manage-${project.id}`"
-                                                @click="openManageUsersModal(project)"
-                                            >
-                                                <Users class="h-4 w-4 sm:mr-2" />
-                                                <span class="hidden sm:inline">Manage</span>
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                :data-testid="`project-token-${project.id}`"
-                                                @click="openApiTokenModal(project)"
-                                            >
-                                                <KeyRound class="h-4 w-4 sm:mr-2" />
-                                                <span class="hidden sm:inline">Token</span>
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                :data-testid="`project-edit-${project.id}`"
-                                                @click="openEditModal(project)"
-                                            >
-                                                <Pencil class="h-4 w-4 sm:mr-2" />
-                                                <span class="hidden sm:inline">Edit</span>
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="destructive"
-                                                size="sm"
-                                                :data-testid="`project-delete-${project.id}`"
-                                                @click="openDeleteModal(project)"
-                                            >
-                                                <Trash2 class="h-4 w-4 sm:mr-2" />
-                                                <span class="hidden sm:inline">Delete</span>
-                                            </Button>
-                                        </template>
-                                        <span v-else class="text-muted-foreground text-sm">View and collaborate only</span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </template>
-                        <TableEmpty v-else :colspan="4">No projects found.</TableEmpty>
-                    </TableBody>
-                </Table>
+                <ProjectListTable
+                    :projects="projectRows"
+                    @open-api-token="openApiTokenModal"
+                    @open-delete="openDeleteModal"
+                    @open-edit="openEditModal"
+                    @open-grant-access="openGrantAccessModal"
+                    @open-manage-users="openManageUsersModal"
+                />
             </AdminListShell>
         </div>
 
@@ -630,210 +449,51 @@ function accessStatusLabel(projectUser: ProjectAccessUser) {
             <template #cancel>Cancel</template>
             <template #confirm>Confirm</template>
         </DeleteDialog>
-
-        <AlertDialog v-model:open="createForm.isActive">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Create Project</AlertDialogTitle>
-                    <AlertDialogDescription>Create a project and attach it to either a client or an organisation.</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label for="create-project-name">Project name</Label>
-                        <Input id="create-project-name" v-model="createForm.name" data-testid="create-project-name" placeholder="Portal refresh" />
-                        <p v-if="createForm.errors.name" class="text-sm text-red-500">{{ createForm.errors.name }}</p>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label for="create-project-client">Client</Label>
-                        <select
-                            id="create-project-client"
-                            v-model="createForm.client_id"
-                            data-testid="create-project-client"
-                            :disabled="createForm.organisation_id !== null"
-                            class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <option :value="null">No client</option>
-                            <option v-for="client in clients" :key="client.id" :value="client.id">
-                                {{ client.name }}
-                            </option>
-                        </select>
-                        <p v-if="createForm.errors.client_id" class="text-sm text-red-500">{{ createForm.errors.client_id }}</p>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label for="create-project-organisation">Organisation</Label>
-                        <select
-                            id="create-project-organisation"
-                            v-model="createForm.organisation_id"
-                            data-testid="create-project-organisation"
-                            :disabled="createForm.client_id !== null"
-                            class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <option :value="null">No organisation</option>
-                            <option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">
-                                {{ organisation.name }}
-                            </option>
-                        </select>
-                        <p v-if="createForm.errors.organisation_id" class="text-sm text-red-500">{{ createForm.errors.organisation_id }}</p>
-                    </div>
-
-                    <p class="text-muted-foreground text-sm">Choose one parent or leave both empty for a standalone project.</p>
-                    <p v-for="(error, key) in otherCreateErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="closeCreateModal">Cancel</AlertDialogCancel>
-                    <Button type="button" :disabled="createDisabled" data-testid="create-project-submit" @click="submitCreateForm">Create</Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog v-model:open="editDialogOpen">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Edit Project</AlertDialogTitle>
-                    <AlertDialogDescription>Update the project name.</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label for="edit-project-name">Project name</Label>
-                        <Input id="edit-project-name" v-model="editForm.name" data-testid="edit-project-name" placeholder="Portal refresh" />
-                        <p v-if="editForm.errors.name" class="text-sm text-red-500">{{ editForm.errors.name }}</p>
-                    </div>
-
-                    <p v-for="(error, key) in otherEditErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="closeEditModal">Cancel</AlertDialogCancel>
-                    <Button type="button" :disabled="editDisabled" data-testid="edit-project-submit" @click="saveEdit">Save</Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog :open="grantAccessForm.isOpen" @update:open="grantAccessForm.isOpen = $event">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Grant Project Access</AlertDialogTitle>
-                    <AlertDialogDescription>Grant a user access to {{ grantAccessForm.project_name }}</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div class="space-y-2">
-                        <Label for="grant-project-email">Email</Label>
-                        <Input
-                            id="grant-project-email"
-                            v-model="grantAccessForm.email"
-                            data-testid="grant-project-email"
-                            placeholder="user@example.com"
-                        />
-                    </div>
-                    <div class="space-y-2">
-                        <Label for="grant-project-name">Name</Label>
-                        <Input id="grant-project-name" v-model="grantAccessForm.name" data-testid="grant-project-name" placeholder="Pat Doe" />
-                    </div>
-
-                    <p v-for="(error, key) in grantAccessForm.errors" :key="key" class="text-sm text-red-500">{{ error }}</p>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="grantAccessForm.isOpen = false">Cancel</AlertDialogCancel>
-                    <Button type="button" :disabled="grantAccessDisabled" data-testid="grant-project-submit" @click="grantAccess"
-                        >Grant Access</Button
-                    >
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog :open="manageUsersForm.isOpen" @update:open="manageUsersForm.isOpen = $event">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Manage Project Access</AlertDialogTitle>
-                    <AlertDialogDescription>Users with access to {{ manageUsersForm.project_name }}</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="max-h-96 space-y-4 overflow-y-auto pr-1">
-                    <p v-if="manageUsersLoading" class="text-muted-foreground text-sm">Loading project users…</p>
-                    <p v-else-if="manageUsersError" class="text-sm text-red-500">{{ manageUsersError }}</p>
-                    <p v-else-if="manageUsersForm.users.length === 0" class="text-muted-foreground text-sm">No users have access to this project.</p>
-                    <div
-                        v-else
-                        v-for="projectUser in manageUsersForm.users"
-                        :key="projectUser.id"
-                        class="flex items-start justify-between gap-4 rounded-lg border p-3"
-                    >
-                        <div class="space-y-1">
-                            <div class="font-medium">{{ projectUser.user_name || 'Unknown user' }}</div>
-                            <div class="text-muted-foreground text-sm">{{ projectUser.user_email || 'No email' }}</div>
-                            <Badge variant="secondary">
-                                {{ accessStatusLabel(projectUser) }}
-                            </Badge>
-                        </div>
-                        <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            :data-testid="`project-remove-access-${projectUser.id}`"
-                            @click="removeAccess(projectUser)"
-                        >
-                            <Trash2 class="mr-2 h-4 w-4" />
-                            Remove
-                        </Button>
-                    </div>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="manageUsersForm.isOpen = false">Close</AlertDialogCancel>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog :open="apiTokenForm.isOpen" @update:open="apiTokenForm.isOpen = $event">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Project API Token</AlertDialogTitle>
-                    <AlertDialogDescription>Manage the API token for {{ apiTokenForm.project_name }}</AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div class="space-y-4">
-                    <div v-if="apiTokenForm.token" class="bg-muted rounded-lg p-4" data-testid="project-token-value">
-                        <p class="text-sm font-medium">Current API token</p>
-                        <p class="mt-2 text-sm break-all">{{ apiTokenForm.token }}</p>
-                    </div>
-                    <p v-else class="text-muted-foreground text-sm">No API token has been generated for this project yet.</p>
-
-                    <p v-if="apiTokenError" class="text-sm text-red-500">{{ apiTokenError }}</p>
-
-                    <Button type="button" :disabled="apiTokenLoading" data-testid="generate-project-token" @click="generateApiToken">
-                        <KeyRound class="mr-2 h-4 w-4" />
-                        {{ apiTokenForm.token ? 'Regenerate Token' : 'Generate Token' }}
-                    </Button>
-
-                    <p class="text-muted-foreground text-sm">Regenerating a token invalidates any existing integrations using the previous token.</p>
-                </div>
-
-                <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="apiTokenForm.isOpen = false">Close</AlertDialogCancel>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <ProjectCreateDialog
+            :open="createForm.isActive"
+            :form="createForm"
+            :clients="clients"
+            :disabled="createDisabled"
+            :organisations="organisations"
+            :other-errors="otherCreateErrors"
+            @cancel="closeCreateModal"
+            @submit="submitCreateForm"
+            @update:open="createForm.isActive = $event"
+        />
+        <ProjectEditDialog
+            :open="editDialogOpen"
+            :form="editForm"
+            :disabled="editDisabled"
+            :other-errors="otherEditErrors"
+            @cancel="closeEditModal"
+            @submit="saveEdit"
+            @update:open="editDialogOpen = $event"
+        />
+        <ProjectGrantAccessDialog
+            :form="grantAccessForm"
+            :open="grantAccessForm.isOpen"
+            :disabled="grantAccessDisabled"
+            @cancel="grantAccessForm.isOpen = false"
+            @submit="grantAccess"
+            @update:open="grantAccessForm.isOpen = $event"
+        />
+        <ProjectManageUsersDialog
+            :error="manageUsersError"
+            :form="manageUsersForm"
+            :loading="manageUsersLoading"
+            :open="manageUsersForm.isOpen"
+            @cancel="manageUsersForm.isOpen = false"
+            @remove-access="removeAccess"
+            @update:open="manageUsersForm.isOpen = $event"
+        />
+        <ProjectApiTokenDialog
+            :error="apiTokenError"
+            :form="apiTokenForm"
+            :loading="apiTokenLoading"
+            :open="apiTokenForm.isOpen"
+            @cancel="apiTokenForm.isOpen = false"
+            @generate="generateApiToken"
+            @update:open="apiTokenForm.isOpen = $event"
+        />
     </AppLayout>
 </template>
