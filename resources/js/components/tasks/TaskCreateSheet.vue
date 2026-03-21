@@ -131,7 +131,7 @@ async function createTask() {
             </Button>
         </SheetTrigger>
 
-        <SheetContent class="flex h-full flex-col p-0" side="right">
+        <SheetContent class="flex h-full flex-col p-0" side="right" width-preset="task">
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle>Create Task</SheetTitle>
