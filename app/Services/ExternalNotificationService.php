@@ -11,10 +11,14 @@ use Illuminate\Support\Str;
 
 class ExternalNotificationService
 {
+    public const SIGNATURE_HEADER = 'X-Shift-Signature';
+
+    public const TIMESTAMP_HEADER = 'X-Shift-Timestamp';
+
     /**
      * Send a notification to an external API endpoint.
      */
-    public function sendNotification(string $url, string $handler, array $payload, array $source = []): ?Response
+    public function sendNotification(string $url, string $handler, array $payload, array $source = [], ?string $signingSecret = null): ?Response
     {
         try {
             $data = [
@@ -23,32 +27,43 @@ class ExternalNotificationService
             ];
 
             // Add source information if provided
-            if (!empty($source)) {
+            if (! empty($source)) {
                 $data['source'] = $source;
             } else {
                 // Use default source information if not provided
                 $data['source'] = [
                     'url' => config('app.url'),
-                    'environment' => app()->environment()
+                    'environment' => app()->environment(),
                 ];
             }
 
-            $request = Http::acceptJson();
+            $body = json_encode($data, JSON_THROW_ON_ERROR);
+            $request = Http::acceptJson()
+                ->withBody($body, 'application/json');
+
+            if (filled($signingSecret)) {
+                $timestamp = (string) now()->timestamp;
+
+                $request = $request->withHeaders([
+                    self::TIMESTAMP_HEADER => $timestamp,
+                    self::SIGNATURE_HEADER => $this->signature($timestamp, $body, $signingSecret),
+                ]);
+            }
 
             if ($this->isLocalOrPrivateUrl($url)) {
                 $request = $request->withoutVerifying();
             }
 
-            $response = $request->post($url . '/shift/api/notifications', $data);
+            $response = $request->post($url.'/shift/api/notifications');
 
             if ($response->successful()) {
                 Log::info("Notification sent to external API: {$handler}", [
-                    'response' => $response->json()
+                    'response' => $response->json(),
                 ]);
             } else {
                 Log::warning("Failed to send notification to external API: {$handler}", [
                     'status' => $response->status(),
-                    'response' => $response->body()
+                    'response' => $response->body(),
                 ]);
             }
 
@@ -56,7 +71,7 @@ class ExternalNotificationService
         } catch (Exception $e) {
             Log::error("Exception when sending notification to external API: {$e->getMessage()}", [
                 'handler' => $handler,
-                'exception' => $e
+                'exception' => $e,
             ]);
 
             return null;
@@ -68,15 +83,15 @@ class ExternalNotificationService
      */
     public function sendFallbackEmailIfNeeded(?Response $response, string $email, object $notification): bool
     {
-        if (!$response) {
+        if (! $response) {
             return false;
         }
 
-        $isNotProduction = !$response->json('production');
+        $isNotProduction = ! $response->json('production');
 
         if ($isNotProduction) {
             // Queue the notification by dispatching it to the queue
-            dispatch(function() use ($email, $notification) {
+            dispatch(function () use ($email, $notification) {
                 Notification::route('mail', $email)
                     ->notify($notification);
             });
@@ -108,5 +123,10 @@ class ExternalNotificationService
         }
 
         return false;
+    }
+
+    private function signature(string $timestamp, string $body, string $signingSecret): string
+    {
+        return hash_hmac('sha256', $timestamp.'.'.$body, $signingSecret);
     }
 }
