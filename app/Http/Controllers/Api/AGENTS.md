@@ -1,37 +1,21 @@
 # SHIFT External API (`app/Http/Controllers/Api/`)
 
-## Package Identity
-- SDK-facing REST API used by external applications via the PHP SDK (`wyxos/shift-php`).
-- Routes are defined in `routes/api.php` and are protected by `auth:sanctum`.
+Applies inside `app/Http/Controllers/Api/**` in addition to the repo root and `app/AGENTS.md`.
 
-## Setup & Run
-- Run portal locally: `composer dev`
-- PHP tests: `./vendor/bin/phpunit`
+## Contract Rules
+- This folder is the SDK-facing API contract used by external applications and `wyxos/shift-php`.
+- Not every route in `routes/api.php` is Sanctum-protected: `sdk/install/**` is intentionally public and throttled, while the task, thread, attachment, collaborator, AI, and project-environment routes live behind `auth:sanctum`.
+- Keep existing route names and paths stable unless the SDK is updated in the same task.
+- Preserve the SDK install flow endpoints under `sdk/install/**`, including `/sessions`, `/sessions/poll`, `/sessions/projects`, `/sessions/projects/create`, and `/sessions/finalize`.
+- Preserve the external task request shape: `project` token plus `user.*` and `metadata.*` fields.
+- Do not rename or silently repurpose `user.id`, `user.environment`, `user.url`, or `metadata.*` keys without coordinated SDK changes.
+- Attachment responses for external consumers must continue to work with the client-app proxy flow (`/shift/api/attachments/{attachment}/download` on the consumer side), not only with raw portal URLs.
+- Auth or visibility changes here must preserve the current hidden-task `404` behavior for unauthorized access.
 
-## API Patterns (public contract)
+## High-Value Touch Points
 - Routes: `routes/api.php`
-  - ✅ DO: Keep route paths stable (`/tasks`, `/tasks/{task}`, `/tasks/{task}/threads`, `/attachments/*`).
-  - ✅ DO: Keep the SDK install flow stable as well (`/sdk/install/sessions`, `/sdk/install/sessions/poll`, `/sdk/install/sessions/projects`, `/sdk/install/sessions/finalize`).
-- Controllers:
-  - Tasks: `app/Http/Controllers/Api/ExternalTaskController.php`
-  - Threads: `app/Http/Controllers/Api/ExternalTaskThreadController.php`
-  - Attachments: `app/Http/Controllers/Api/ExternalAttachmentController.php`
-- Request shape (SDK contract):
-  - ✅ DO: Accept `project` token plus `user.*` and `metadata.*` fields (see usage in `app/Http/Controllers/Api/ExternalTaskController.php`).
-  - ❌ DON'T: Rename `user.id`, `user.environment`, `user.url` without coordinated SDK changes.
-- Attachment URLs:
-  - ✅ DO: Return download URLs that point back to the client app’s SDK proxy route (`/shift/api/attachments/{id}/download`), as done in `app/Http/Controllers/Api/ExternalTaskController.php`.
-
-## Touch Points / Key Files
-- Routes: `routes/api.php`
-- Primary controller: `app/Http/Controllers/Api/ExternalTaskController.php`
-
-## JIT Index Hints
-- Find request field usage: `rg -n "request\(\)->offsetGet\('user\." app/Http/Controllers/Api`
-- Find project token checks: `rg -n "request\('project'\)" app/Http/Controllers/Api`
-
-## Common Gotchas
-- Any breaking change here requires a coordinated change in `../shift-sdk-package/packages/shift-php/src/Http/Controllers/**`.
-
-## Pre-PR Checks
-- `vendor/bin/pint && ./vendor/bin/phpunit`
+- Tasks: `ExternalTaskController.php`
+- Threads: `ExternalTaskThreadController.php`
+- Attachments: `ExternalAttachmentController.php`
+- SDK install flow: `SdkInstallController.php`
+- Project environments: `ProjectEnvironmentController.php`
