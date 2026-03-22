@@ -54,10 +54,10 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        expect(wrapper.find('input[placeholder="Search by title"]').exists()).toBe(true);
-        expect(wrapper.findAll('button[data-testid^="task-filter-status-"]').length).toBeGreaterThanOrEqual(4);
-        expect(wrapper.findAll('button[data-testid^="task-filter-priority-"]').length).toBeGreaterThanOrEqual(3);
-        expect(wrapper.find('input[placeholder="Environment"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="filter-search"]').exists()).toBe(true);
+        expect(wrapper.findAll('input[data-testid^="status-"]').length).toBeGreaterThanOrEqual(4);
+        expect(wrapper.findAll('input[data-testid^="priority-"]').length).toBeGreaterThanOrEqual(3);
+        expect(wrapper.find('[data-testid="filter-environment"]').exists()).toBe(true);
 
         wrapper.unmount();
     });
