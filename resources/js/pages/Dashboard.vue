@@ -2,11 +2,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartCrosshair, ChartTooltip, ChartTooltipContent, componentToString, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { Donut } from '@unovis/ts';
 import { VisAxis, VisDonut, VisGroupedBar, VisSingleContainer, VisXYContainer } from '@unovis/vue';
 import { AlertTriangle, CheckCircle2, Clock3, Flame } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -303,17 +302,6 @@ const totalThroughputDelta = computed(() => {
                                     :tick-format="(value: number) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })"
                                 />
                                 <VisAxis type="y" :num-ticks="4" :tick-line="false" :domain-line="false" />
-                                <ChartTooltip />
-                                <ChartCrosshair
-                                    :template="
-                                        componentToString(throughputChartConfig, ChartTooltipContent, {
-                                            labelFormatter(value: number | Date) {
-                                                return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                            },
-                                        })
-                                    "
-                                    :color="[throughputChartConfig.created.color, throughputChartConfig.completed.color]"
-                                />
                             </VisXYContainer>
                         </ChartContainer>
                         <div class="text-muted-foreground mt-3 flex items-center justify-between text-xs">
@@ -339,13 +327,6 @@ const totalThroughputDelta = computed(() => {
                                     :color="(d) => statusChartConfig[d.segment as keyof typeof statusChartConfig]?.color"
                                     :arc-width="24"
                                     :corner-radius="3"
-                                />
-                                <ChartTooltip
-                                    :triggers="{
-                                        [Donut.selectors.segment]: componentToString(statusChartConfig, ChartTooltipContent, {
-                                            labelKey: 'label',
-                                        })!,
-                                    }"
                                 />
                             </VisSingleContainer>
                         </ChartContainer>
@@ -381,15 +362,6 @@ const totalThroughputDelta = computed(() => {
                                     :tick-format="(value: number) => priorityData[value]?.label ?? ''"
                                 />
                                 <VisAxis type="y" :num-ticks="4" :tick-line="false" :domain-line="false" />
-                                <ChartTooltip />
-                                <ChartCrosshair
-                                    :template="
-                                        componentToString(priorityChartConfig, ChartTooltipContent, {
-                                            labelKey: 'label',
-                                        })
-                                    "
-                                    color="#0000"
-                                />
                             </VisXYContainer>
                         </ChartContainer>
                     </CardContent>
@@ -422,15 +394,6 @@ const totalThroughputDelta = computed(() => {
                                     :tick-format="(value: number) => projectData[value]?.project ?? ''"
                                 />
                                 <VisAxis type="y" :num-ticks="4" :tick-line="false" :domain-line="false" />
-                                <ChartTooltip />
-                                <ChartCrosshair
-                                    :template="
-                                        componentToString(projectChartConfig, ChartTooltipContent, {
-                                            labelKey: 'project',
-                                        })
-                                    "
-                                    color="#0000"
-                                />
                             </VisXYContainer>
                         </ChartContainer>
                     </CardContent>
@@ -452,13 +415,6 @@ const totalThroughputDelta = computed(() => {
                                     :color="(d) => environmentChartConfig[d.segment]?.color"
                                     :arc-width="22"
                                     :corner-radius="3"
-                                />
-                                <ChartTooltip
-                                    :triggers="{
-                                        [Donut.selectors.segment]: componentToString(environmentChartConfig, ChartTooltipContent, {
-                                            labelKey: 'label',
-                                        })!,
-                                    }"
                                 />
                             </VisSingleContainer>
                         </ChartContainer>

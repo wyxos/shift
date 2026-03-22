@@ -20,6 +20,15 @@ interface Constructor<P = any> {
   }
 }
 
+function resolveChartPayload(data: unknown): Record<string, any> | null {
+  if (data === null || typeof data !== "object")
+    return null
+
+  const payload = "data" in data ? data.data : data
+
+  return payload !== null && typeof payload === "object" ? payload as Record<string, any> : null
+}
+
 export function componentToString<P>(config: ChartConfig, component: Constructor<P>, props?: P) {
   if (!isClient)
     return
@@ -29,7 +38,10 @@ export function componentToString<P>(config: ChartConfig, component: Constructor
 
   // https://unovis.dev/docs/auxiliary/Crosshair#component-props
   return (_data: any, x: number | Date) => {
-    const data = "data" in _data ? _data.data : _data
+    const data = resolveChartPayload(_data)
+    if (!data)
+      return ""
+
     const serializedKey = `${id}-${serializeKey(data)}`
     const cachedContent = cache.get(serializedKey)
     if (cachedContent)
