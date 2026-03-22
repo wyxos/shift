@@ -201,7 +201,7 @@ const {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <TaskIndexListCard :edit-state="combined" :filters="filtersModel" :projects="props.projects" :state="combined" />
+            <TaskIndexListCard :filters="filtersModel" :projects="props.projects" :state="combined" />
             <TaskEditSheet :state="combined" />
         </div>
     </AppLayout>
