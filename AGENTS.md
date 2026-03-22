@@ -1,104 +1,23 @@
 # SHIFT (Portal)
 
-## Code edit instructions
+Read `CLAUDE.md` for the Laravel Boost baseline and `PROFILE.md` for the repo's quality bar before changing anything here.
 
-After you've finished editing
+## Scope
+- This file applies repo-wide unless a deeper `AGENTS.md` overrides it.
+- SHIFT is the source-of-truth portal and external API for `../shift-sdk-package/` and `../shift-sdk-package/packages/shift-php`.
 
-- Use the jetbrains mcp (if available) to find any problems
-- Run format command if available
-- Run lint command if available
+## Repo Rules
+- Treat SDK-facing route, payload, auth, attachment, install, or notification changes as cross-repo contract changes. Update the SDK in the same task.
+- For editor-backed task create and edit flows, use the V2 task endpoints and route names (`tasks.v2.*`), not the legacy redirect-based task pages.
+- For task and thread authorization tests, establish a real access path first. Hidden tasks intentionally return `404`.
+- Shared task UI or helpers that may be consumed by the SDK must not rely on a global Ziggy `route()` helper at SDK runtime. Pass explicit `/shift/api/**` URLs from the consuming SDK layer when needed.
+- After SDK UI changes in the sibling repo, rebuild there with `npm run build:shift`, then publish here with `php artisan shift:publish --group=public`.
+- For unattended releases, prefer `node ~/Developer/wyxos/scripts/release-shift.mjs shift ...` instead of `npm run release`.
+- Do not edit generated build output in `public/build/**`.
 
-## How to find problems
-
-- DO THIS FIRST: Check the jetbrains provided MCP server (one of intellij, pycharm, webstorm) using get_file_problems
-    - Only provide a file path if you know where the problem is, but not what the problem is. If you don't know where the problem is:
-        - Inspect code changes with git
-        - Run tests
-- Run tests
-- Run lint
-- Inspect changed files
-
-## PROFILE.md (Required)
-- Read and follow `PROFILE.md` in this repo before making changes.
-- Its guidance on quality, naming, and refactoring is mandatory for all work.
-
-## Project Snapshot
-- Repo type: single Laravel app (Portal) with external API consumed by the PHP SDK.
-- Stack: PHP 8.2+ (Laravel 12, Sanctum), Vue 3 + Inertia, Vite, Tailwind, PHPUnit, Laravel Pint, ESLint + Prettier, Vitest.
-- This repo is the source-of-truth for the SHIFT API and UI; follow the nearest `AGENTS.md` (nearest-wins).
- - Product focus: SHIFT is a Laravel app for tracking tasks/issues within Laravel projects (orgs → clients → projects → tasks).
-
-## Related Repos (cross-repo awareness)
-- SDK workspace on this machine: `../shift-sdk-package/` (contains the SDK source + local dev harness).
-- Shared core PHP package (source-of-truth): `../shift-core` (`wyxos/shift-core`)
-  - Local dev override (no toggling): `composer config --global repositories.shift-core path /absolute/path/to/shift-core`
-  - Use `composer config --global repositories.shift-core.options.symlink true` to symlink instead of copy.
-- SDK purpose (`wyxos/shift-php`):
-  - Provides `/shift/**` dashboard UI (served from built SPA assets).
-  - Provides `/shift/api/**` proxy endpoints that call back to this portal’s external API.
-  - Includes Artisan install/publish/test commands for integration.
-- Cross-repo contract awareness:
-  - External API contract here is consumed by the SDK package `wyxos/shift-php`.
-  - If you change any external API routes/payloads (`routes/api.php`, `app/Http/Controllers/Api/**`), update the SDK accordingly.
-  - If you change SDK routes/proxy expectations (`packages/shift-php/routes/shift.php`, `packages/shift-php/src/Http/Controllers/**`), verify/update SHIFT to match.
-  - Shared frontend components consumed by SDK should not assume a global Ziggy `route()` helper in SDK runtime; SDK consumers must pass explicit `/shift/api/**` URLs when needed.
-- Local SDK dev workflow (from portal repo):
-  - Prefer: `php artisan shift:toggle --local --path=../shift-sdk-package/packages/shift-php`
-  - Switch back: `php artisan shift:toggle --online`
-  - After SDK UI changes: run `npm run build:shift` in `../shift-sdk-package/`, then `php artisan shift:publish --group=public` here.
-  - `install:shift` in a consumer app now registers that app's current `APP_ENV` + `APP_URL` with SHIFT and scaffolds the external collaborator resolver. Portal external collaborator lookup depends on a registered project environment, not inferred callback traffic.
-
-## Root Setup Commands
-- Install (PHP): `composer install`
-- Install (JS): `npm install` (CI uses `npm ci`)
-- Dev (app + Vite): `composer dev`
-- Build: `npm run build`
-- Test (PHP): `composer test` (or `./vendor/bin/phpunit`)
-- Test (JS): `npm run test` (watch: `npm run test:watch`)
-- Lint/format:
-  - PHP: `vendor/bin/pint`
-  - JS format: `npm run format` (check: `npm run format:check`)
-  - JS lint: `npm run lint`
-
-## Universal Conventions
-- Prefer minimal, scoped changes; don’t refactor unrelated code.
-- Don’t edit generated build output: `public/build/**`.
-- Keep API changes backwards-compatible when possible (SDK consumers).
-- For editor-backed task create flows, use the V2 JSON endpoint (`tasks.v2.*`) instead of the legacy redirect route so temp attachment URLs are persisted and rewritten correctly.
-- For task/thread authorization tests, create a real access path first (project author/member/collaborator or external submitter/collaborator); hidden tasks now intentionally return `404`.
-- PHP style: Pint (`vendor/bin/pint`).
-- JS style: Prettier + ESLint (`npm run format`, `npm run lint`).
-- Cross-repo alignment is mandatory:
-  - Any change in SHIFT that affects SDK routes, payloads, assets, or UI parity must be reflected in `../shift-sdk-package/`.
-  - Any SDK change that affects portal routes, payloads, or UI parity must be reflected here.
-- Documentation upkeep:
-  - If behavior or workflows change, update relevant `AGENTS.md` and `README.md`.
-
-## Security & Secrets
-- Never commit `.env` or real tokens/keys.
-- Auth for external API uses Sanctum (`routes/api.php`); treat tokens as secrets.
-
-## JIT Index (what to open, not what to paste)
-
-### Package Structure
-- Backend: `app/` → `app/AGENTS.md`
-- Frontend: `resources/js/` → `resources/js/AGENTS.md`
-- External API (SDK-facing): `routes/api.php`, `app/Http/Controllers/Api/` → `app/Http/Controllers/Api/AGENTS.md`
-- Outbound notifications to client apps: `app/Services/ExternalNotificationService.php` → `app/Services/AGENTS.md`
-- Routes: `routes/web.php`, `routes/auth.php`, `routes/settings.php`
-- DB schema notes: `database-schema.md`, `database/schema/**`
-- Tests: `tests/**` (PHP) and `resources/js/__tests__/**` (Vitest)
-
-### Quick Find Commands
-- Search backend (skip deps): `rg -n "ThingToFind" app routes config database tests --hidden --glob "!.git/**"`
-- Search external API controllers: `rg -n "namespace App\\Http\\Controllers\\Api" app/Http/Controllers/Api`
-- Find SDK-facing routes: `rg -n "auth:sanctum|/tasks|/attachments" routes/api.php`
-- Search frontend (skip deps): `rg -n "ThingToFind" resources/js --hidden --glob "!node_modules/**"`
-
-## Definition of Done
-- PHP tests: `composer test` (uses `php artisan test` / PHPUnit)
-- `vendor/bin/pint` is clean
-- JS checks: `npm run format:check` and `npm run lint`
-- JS tests (when JS changes): `npm run test`
-- `npm run build` succeeds when frontend assets or UI changes
-- If external API changed: SDK updated in `../shift-sdk-package/`
+## Scope Map
+- Backend domain and policies: `app/` -> `app/AGENTS.md`
+- SDK-facing API: `app/Http/Controllers/Api/` -> `app/Http/Controllers/Api/AGENTS.md`
+- Outbound integrations: `app/Services/` -> `app/Services/AGENTS.md`
+- Portal UI: `resources/js/` -> `resources/js/AGENTS.md`
+- Route contracts: `routes/api.php`, `routes/web.php`

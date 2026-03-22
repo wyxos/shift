@@ -1,44 +1,16 @@
 # SHIFT Backend (`app/`)
 
-## Package Identity
-- Laravel 12 backend for SHIFT portal: multi-tenant organisations/clients/projects/tasks, plus an external API for SDK consumers.
+Applies inside `app/**` in addition to the repo root file.
 
-## Setup & Run
-- Install: `composer install`
-- Dev (full stack): `composer dev`
-- Tests: `composer test` (or `./vendor/bin/phpunit`)
-- Format (PHP): `vendor/bin/pint`
+## Backend Rules
+- Keep portal business rules, policies, jobs, notifications, and model behavior in `app/**`; do not hide contract changes in unrelated helpers.
+- Changes to tasks, task threads, attachments, collaborators, or external-user access must preserve the current hidden-task `404` behavior and collaborator-based access model.
+- If a backend change affects SDK-facing payloads, permissions, install flow, notification delivery, or attachment handling, update the sibling SDK repo in the same task.
+- Put outbound HTTP or client-app integration behavior in `app/Services/**`, not in controllers.
+- Keep route-specific contract awareness close to `routes/api.php` and `routes/web.php`; do not assume every backend change is portal-only.
 
-## Patterns & Conventions
-- Controllers:
-  - UI controllers: `app/Http/Controllers/*.php` (Inertia pages + actions)
-    - ✅ DO: Keep request validation and persistence patterns consistent with `app/Http/Controllers/TaskController.php`
-  - External API controllers: `app/Http/Controllers/Api/**` (SDK-facing)
-    - ✅ DO: Treat these as a public contract (see `app/Http/Controllers/Api/AGENTS.md`)
-    - ❌ DON'T: Change payload shapes/route paths without updating `../shift-sdk-package/`
-- Services:
-  - ✅ DO: Put integration concerns in `app/Services/**` (example: `app/Services/ExternalNotificationService.php`)
-- Jobs/Notifications:
-  - ✅ DO: Use jobs for async work (example: `app/Jobs/SendTaskThreadNotification.php`)
-  - ✅ DO: Keep notification content in `app/Notifications/**` (example: `app/Notifications/TaskCreationNotification.php`)
-- Models:
-  - ✅ DO: Keep tenancy relationships on models (examples: `app/Models/Organisation.php`, `app/Models/Project.php`, `app/Models/Task.php`)
-
-## Touch Points / Key Files
-- SDK-facing API routes: `routes/api.php`
-- SDK-facing controllers: `app/Http/Controllers/Api/ExternalTaskController.php`
-- Outbound notifications to client apps: `app/Services/ExternalNotificationService.php`
+## High-Value Touch Points
 - Task domain: `app/Models/Task.php`, `app/Models/TaskThread.php`, `app/Models/Attachment.php`
-
-## JIT Index Hints
-- Find controllers: `rg -n "class .*Controller" app/Http/Controllers`
-- Find Sanctum-protected endpoints: `rg -n "auth:sanctum" routes/api.php`
-- Find notifications/jobs: `rg -n "extends (Notification|Job)" app/Notifications app/Jobs`
-
-## Common Gotchas
-- SDK expects `project` token and `user.*`/`metadata.*` fields in external API payloads (see `app/Http/Controllers/Api/ExternalTaskController.php`).
-
-## Pre-PR Checks
-- `vendor/bin/pint`
-- `composer test` (uses `php artisan test` / PHPUnit)
-- If API contract changes: update SDK + relevant `AGENTS.md`/`README.md`
+- Policies and access checks: `app/Policies/**`
+- Portal controllers: `app/Http/Controllers/**`
+- Async work and notifications: `app/Jobs/**`, `app/Notifications/**`
