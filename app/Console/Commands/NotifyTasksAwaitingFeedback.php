@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Task;
-use App\Models\ExternalUser;
 use App\Notifications\TaskAwaitingFeedbackNotification;
 use App\Services\ExternalNotificationService;
 use Exception;
@@ -38,10 +37,11 @@ class NotifyTasksAwaitingFeedback extends Command
 
         if ($tasks->isEmpty()) {
             $this->info('No tasks awaiting feedback found.');
+
             return 0;
         }
 
-        $this->info('Found ' . $tasks->count() . ' tasks awaiting feedback.');
+        $this->info('Found '.$tasks->count().' tasks awaiting feedback.');
 
         // Group tasks by external user
         $tasksByExternalUser = [];
@@ -49,16 +49,16 @@ class NotifyTasksAwaitingFeedback extends Command
         /** @var Task $task */
         foreach ($tasks as $task) {
             // Only process tasks submitted by external users
-            if (!$task->isExternallySubmitted()) {
+            if (! $task->isExternallySubmitted()) {
                 continue;
             }
 
             $externalUser = $task->submitter;
 
-            if (!isset($tasksByExternalUser[$externalUser->id])) {
+            if (! isset($tasksByExternalUser[$externalUser->id])) {
                 $tasksByExternalUser[$externalUser->id] = [
                     'user' => $externalUser,
-                    'tasks' => []
+                    'tasks' => [],
                 ];
             }
 
@@ -75,6 +75,8 @@ class NotifyTasksAwaitingFeedback extends Command
             }
 
             try {
+                $externalUser->loadMissing('project');
+
                 // Prepare task IDs for the payload
                 $taskIds = collect($userTasks)->pluck('id')->toArray();
 
@@ -83,18 +85,20 @@ class NotifyTasksAwaitingFeedback extends Command
                     'type' => 'tasks_awaiting_feedback',
                     'user_id' => $externalUser->external_id,
                     'task_ids' => $taskIds,
-                    'task_count' => count($userTasks)
+                    'task_count' => count($userTasks),
                 ];
 
                 // Send notification to the external API
                 $response = $notificationService->sendNotification(
                     $externalUser->url,
                     'tasks.awaiting_feedback',
-                    $payload
+                    $payload,
+                    [],
+                    $externalUser->project?->token,
                 );
 
                 // Generate URL with filter for awaiting-feedback tasks in the consuming app
-                $url = $externalUser->url . '/shift/?status=awaiting-feedback';
+                $url = $externalUser->url.'/shift/?status=awaiting-feedback';
 
                 // Send fallback email notification if the app is not in production
                 $notificationService->sendFallbackEmailIfNeeded(
@@ -103,22 +107,22 @@ class NotifyTasksAwaitingFeedback extends Command
                     new TaskAwaitingFeedbackNotification($userTasks, $url)
                 );
 
-                $this->info('Sent notification to ' . $externalUser->email . ' about ' . count($userTasks) . ' tasks.');
+                $this->info('Sent notification to '.$externalUser->email.' about '.count($userTasks).' tasks.');
 
                 // Log the notification
                 Log::info('Sent awaiting feedback notification', [
                     'external_user_id' => $externalUser->id,
                     'external_user_email' => $externalUser->email,
                     'task_count' => count($userTasks),
-                    'task_ids' => $taskIds
+                    'task_ids' => $taskIds,
                 ]);
             } catch (Exception $e) {
-                $this->error('Failed to send notification to ' . $externalUser->email . ': ' . $e->getMessage());
+                $this->error('Failed to send notification to '.$externalUser->email.': '.$e->getMessage());
 
                 Log::error('Failed to send awaiting feedback notification', [
                     'external_user_id' => $externalUser->id,
                     'external_user_email' => $externalUser->email,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }

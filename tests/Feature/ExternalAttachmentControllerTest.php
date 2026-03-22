@@ -8,8 +8,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
 
-;
-
 beforeEach(function () {
     // Create a fake disk for testing
     Storage::fake('local');
@@ -40,7 +38,7 @@ beforeEach(function () {
 test('upload stores file successfully', function () {
     $file = UploadedFile::fake()->create('document.pdf', 1000);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->post(route('api.attachments.upload'), [
             'file' => $file,
             'temp_identifier' => $this->tempIdentifier,
@@ -51,7 +49,7 @@ test('upload stores file successfully', function () {
         'original_filename',
         'path',
         'size',
-        'mime_type'
+        'mime_type',
     ]);
 
     // Verify the file was stored
@@ -59,14 +57,14 @@ test('upload stores file successfully', function () {
     Storage::assertExists($path);
 
     // Verify metadata was stored
-    Storage::assertExists($path . '.meta');
-    $metadata = json_decode(Storage::get($path . '.meta'), true);
+    Storage::assertExists($path.'.meta');
+    $metadata = json_decode(Storage::get($path.'.meta'), true);
     expect($metadata['original_filename'])->toEqual('document.pdf');
 });
 
 test('upload validates required fields', function () {
     // Test missing file
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->withHeader('Accept', 'application/json')
         ->post(route('api.attachments.upload'), [
             'temp_identifier' => $this->tempIdentifier,
@@ -77,7 +75,7 @@ test('upload validates required fields', function () {
 
     // Test missing temp_identifier
     $file = UploadedFile::fake()->create('document.pdf', 1000);
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->withHeader('Accept', 'application/json')
         ->post(route('api.attachments.upload'), [
             'file' => $file,
@@ -91,7 +89,7 @@ test('upload validates file size', function () {
     // Create a file larger than the configured max upload size
     $file = UploadedFile::fake()->create('large-document.pdf', ChunkedUploadConfig::MAX_UPLOAD_KB + 1);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->withHeader('Accept', 'application/json')
         ->post(route('api.attachments.upload'), [
             'file' => $file,
@@ -106,7 +104,7 @@ test('upload multiple stores files successfully', function () {
     $file1 = UploadedFile::fake()->create('document1.pdf', 1000);
     $file2 = UploadedFile::fake()->create('document2.pdf', 1000);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->post(route('api.attachments.upload-multiple'), [
             'attachments' => [$file1, $file2],
             'temp_identifier' => $this->tempIdentifier,
@@ -119,9 +117,9 @@ test('upload multiple stores files successfully', function () {
                 'original_filename',
                 'path',
                 'size',
-                'mime_type'
-            ]
-        ]
+                'mime_type',
+            ],
+        ],
     ]);
 
     // Verify the files were stored
@@ -129,13 +127,13 @@ test('upload multiple stores files successfully', function () {
 
     foreach ($response->json('files') as $file) {
         Storage::assertExists($file['path']);
-        Storage::assertExists($file['path'] . '.meta');
+        Storage::assertExists($file['path'].'.meta');
     }
 });
 
 test('upload multiple validates required fields', function () {
     // Test missing attachments
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->withHeader('Accept', 'application/json')
         ->post(route('api.attachments.upload-multiple'), [
             'temp_identifier' => $this->tempIdentifier,
@@ -146,7 +144,7 @@ test('upload multiple validates required fields', function () {
 
     // Test missing temp_identifier
     $file = UploadedFile::fake()->create('document.pdf', 1000);
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->withHeader('Accept', 'application/json')
         ->post(route('api.attachments.upload-multiple'), [
             'attachments' => [$file],
@@ -159,7 +157,7 @@ test('upload multiple validates required fields', function () {
 test('remove temp deletes file successfully', function () {
     // First upload a file
     $file = UploadedFile::fake()->create('document.pdf', 1000);
-    $uploadResponse = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $uploadResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->post(route('api.attachments.upload'), [
             'file' => $file,
             'temp_identifier' => $this->tempIdentifier,
@@ -169,10 +167,10 @@ test('remove temp deletes file successfully', function () {
 
     // Verify the file exists
     Storage::assertExists($path);
-    Storage::assertExists($path . '.meta');
+    Storage::assertExists($path.'.meta');
 
     // Now remove the file
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->delete(route('api.attachments.remove-temp'), [
             'path' => $path,
         ]);
@@ -182,12 +180,12 @@ test('remove temp deletes file successfully', function () {
 
     // Verify the file and metadata were deleted
     Storage::assertMissing($path);
-    Storage::assertMissing($path . '.meta');
+    Storage::assertMissing($path.'.meta');
 });
 
 test('remove temp validates path', function () {
     // Test invalid path (not starting with temp_attachments/)
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->delete(route('api.attachments.remove-temp'), [
             'path' => 'invalid/path/file.pdf',
         ]);
@@ -199,7 +197,7 @@ test('remove temp validates path', function () {
 test('remove temp handles missing file', function () {
     $nonExistentPath = "temp_attachments/{$this->tempIdentifier}/non-existent-file.pdf";
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->delete(route('api.attachments.remove-temp'), [
             'path' => $nonExistentPath,
         ]);
@@ -213,20 +211,20 @@ test('list temp returns files', function () {
     $file1 = UploadedFile::fake()->create('document1.pdf', 1000);
     $file2 = UploadedFile::fake()->create('document2.pdf', 1000);
 
-    $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->post(route('api.attachments.upload'), [
             'file' => $file1,
             'temp_identifier' => $this->tempIdentifier,
         ]);
 
-    $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->post(route('api.attachments.upload'), [
             'file' => $file2,
             'temp_identifier' => $this->tempIdentifier,
         ]);
 
     // List the files
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.list-temp', [
             'temp_identifier' => $this->tempIdentifier,
         ]));
@@ -238,9 +236,9 @@ test('list temp returns files', function () {
                 'original_filename',
                 'path',
                 'size',
-                'mime_type'
-            ]
-        ]
+                'mime_type',
+            ],
+        ],
     ]);
 
     // Verify we got both files
@@ -250,7 +248,7 @@ test('list temp returns files', function () {
 test('list temp returns empty array for nonexistent directory', function () {
     $nonExistentIdentifier = 'non-existent-identifier';
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.list-temp', [
             'temp_identifier' => $nonExistentIdentifier,
         ]));
@@ -260,7 +258,7 @@ test('list temp returns empty array for nonexistent directory', function () {
 });
 
 test('download returns file for valid attachment', function () {
-    $response = $this->actingAs($this->user)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.download', $this->attachment));
 
     $response->assertStatus(200);
@@ -272,7 +270,7 @@ test('download returns error for missing file', function () {
     // Delete the file but keep the attachment record
     Storage::delete($this->attachment->path);
 
-    $response = $this->actingAs($this->user)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.download', $this->attachment));
 
     // Assert we get a non-success response when the file is missing.
@@ -291,9 +289,25 @@ test('download returns image inline for image files', function () {
     // Create a fake image file
     Storage::put($imageAttachment->path, 'fake image content');
 
-    $response = $this->actingAs($this->user)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.download', $imageAttachment));
 
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'image/jpeg');
+});
+
+test('download requires authentication', function () {
+    $response = $this->getJson(route('api.attachments.download', $this->attachment));
+
+    $response->assertUnauthorized();
+});
+
+test('download returns not found for users without task access', function () {
+    $otherUser = User::factory()->create();
+    $otherToken = $otherUser->createToken('other-token')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->get(route('api.attachments.download', $this->attachment));
+
+    $response->assertNotFound();
 });

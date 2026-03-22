@@ -104,7 +104,7 @@ class TaskThreadController extends Controller
         $thread = new TaskThread([
             'task_id' => $task->id,
             'type' => $request->input('type'),
-            'content' => $request->input('content'),
+            'content' => $this->sanitizeRichContent($request->input('content')),
             'sender_name' => $user->name,
         ]);
 
@@ -328,7 +328,7 @@ class TaskThreadController extends Controller
             'temp_identifier' => 'nullable|string',
         ]);
 
-        $thread->content = $request->input('content');
+        $thread->content = $this->sanitizeRichContent($request->input('content'));
         $thread->save();
 
         // Process any temporary attachments

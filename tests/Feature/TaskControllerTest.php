@@ -1020,3 +1020,44 @@ test('adding an internal collaborator to an existing task sends collaborator add
     );
 });
 
+test('store v2 sanitizes dangerous description html without breaking inline uploads', function () {
+    \Illuminate\Support\Facades\Storage::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $tempIdentifier = 'task-sanitize-temp';
+    $tempPath = "temp_attachments/{$tempIdentifier}/task-screenshot.png";
+
+    \Illuminate\Support\Facades\Storage::put($tempPath, 'image-bytes');
+    \Illuminate\Support\Facades\Storage::put(
+        "{$tempPath}.meta",
+        json_encode(['original_filename' => 'Task Screenshot.png'], JSON_THROW_ON_ERROR),
+    );
+
+    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+        'title' => 'Task with sanitized inline upload',
+        'description' => implode('', [
+            "<p><img src=\"/attachments/temp/{$tempIdentifier}/task-screenshot.png\" class=\"editor-tile extra\" onerror=\"alert(1)\"></p>",
+            '<script>alert(1)</script>',
+            '<blockquote class="shift-reply extra" data-reply-to="42"><p>Reply</p></blockquote>',
+        ]),
+        'project_id' => $project->id,
+        'priority' => 'medium',
+        'temp_identifier' => $tempIdentifier,
+    ]);
+
+    $response->assertCreated();
+
+    $task = Task::where('title', 'Task with sanitized inline upload')->firstOrFail();
+    $attachment = $task->attachments()->first();
+    $task->refresh();
+
+    expect($attachment)->not->toBeNull();
+    expect($task->description)->toContain(route('attachments.download', $attachment, false));
+    expect($task->description)->toContain('data-reply-to="42"');
+    expect($task->description)->toContain('class="editor-tile"');
+    expect($task->description)->not->toContain('<script');
+    expect($task->description)->not->toContain('onerror');
+});

@@ -346,3 +346,29 @@ test('non creator cannot update a message', function () {
 
     $response->assertStatus(403);
 });
+
+test('thread store sanitizes dangerous html content', function () {
+    $response = $this->actingAs($this->user)
+        ->postJson(route('task-threads.store', $this->task), [
+            'content' => implode('', [
+                '<p>Hello</p>',
+                '<script>alert(1)</script>',
+                '<blockquote class="shift-reply extra" data-reply-to="42" onclick="alert(1)"><p>Reply</p></blockquote>',
+                '<p><img src="/attachments/1/download" class="editor-tile extra" onerror="alert(1)"></p>',
+                '<p><a href="javascript:alert(1)">bad</a></p>',
+            ]),
+            'type' => 'internal',
+        ]);
+
+    $response->assertCreated();
+
+    $content = (string) $response->json('thread.content');
+
+    expect($content)->toContain('data-reply-to="42"');
+    expect($content)->toContain('class="shift-reply"');
+    expect($content)->toContain('class="editor-tile"');
+    expect($content)->not->toContain('<script');
+    expect($content)->not->toContain('onclick');
+    expect($content)->not->toContain('onerror');
+    expect($content)->not->toContain('javascript:');
+});

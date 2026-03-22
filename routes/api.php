@@ -51,6 +51,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/attachments/temp/{temp}/{filename}', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'showTemp'])
         ->where('filename', '.*')
         ->name('api.attachments.temp');
+    Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'download'])->name('api.attachments.download');
 });
-
-Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExternalAttachmentController::class, 'download'])->name('api.attachments.download');

@@ -5,8 +5,12 @@
 use App\Services\ExternalNotificationService;
 use Illuminate\Notifications\Notification as BaseNotification;
 
-class TestNotification extends BaseNotification {
-    public function via($notifiable): array { return ['mail']; }
+class TestNotification extends BaseNotification
+{
+    public function via($notifiable): array
+    {
+        return ['mail'];
+    }
 }
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -25,29 +29,36 @@ test('send notification successful', function () {
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
-            'production' => true
-        ], 200)
+            'production' => true,
+        ], 200),
     ]);
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
     $url = 'https://example.com';
     $handler = 'test.handler';
     $payload = ['key' => 'value'];
+    $signingSecret = 'project-secret';
 
     // Act
-    $response = $service->sendNotification($url, $handler, $payload);
+    $response = $service->sendNotification($url, $handler, $payload, [], $signingSecret);
 
     // Assert
     expect($response)->not->toBeNull();
     expect($response->successful())->toBeTrue();
 
-    Http::assertSent(function ($request) use ($url, $handler, $payload) {
-        return $request->url() === $url . '/shift/api/notifications' &&
+    Http::assertSent(function ($request) use ($url, $handler, $payload, $signingSecret) {
+        $timestamp = $request->header(ExternalNotificationService::TIMESTAMP_HEADER)[0] ?? null;
+        $signature = $request->header(ExternalNotificationService::SIGNATURE_HEADER)[0] ?? null;
+        $body = $request->body();
+
+        return $request->url() === $url.'/shift/api/notifications' &&
             $request['handler'] === $handler &&
             $request['payload'] === $payload &&
             isset($request['source']) &&
             $request['source']['url'] === config('app.url') &&
-            $request['source']['environment'] === app()->environment();
+            $request['source']['environment'] === app()->environment() &&
+            is_string($timestamp) && $timestamp !== '' &&
+            $signature === hash_hmac('sha256', $timestamp.'.'.$body, $signingSecret);
     });
 });
 
@@ -55,26 +66,26 @@ test('send notification with custom source', function () {
     // Arrange
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
-            'success' => true
-        ], 200)
+            'success' => true,
+        ], 200),
     ]);
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
     $url = 'https://example.com';
     $handler = 'test.handler';
     $payload = ['key' => 'value'];
     $source = ['custom' => 'source'];
+    $signingSecret = 'project-secret';
 
     // Act
-    $response = $service->sendNotification($url, $handler, $payload, $source);
+    $response = $service->sendNotification($url, $handler, $payload, $source, $signingSecret);
 
     // Assert
     Http::assertSent(function ($request) use ($url, $source) {
-        return $request->url() === $url . '/shift/api/notifications' &&
+        return $request->url() === $url.'/shift/api/notifications' &&
             $request['source'] === $source;
     });
 });
-
 
 test('send notification skips ssl verification for local consumer apps', function () {
     $capturedOptions = null;
@@ -88,9 +99,9 @@ test('send notification skips ssl verification for local consumer apps', functio
         ], 200);
     });
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
 
-    $response = $service->sendNotification('https://shift-sdk-package.test', 'test.handler', ['key' => 'value']);
+    $response = $service->sendNotification('https://shift-sdk-package.test', 'test.handler', ['key' => 'value'], [], 'project-secret');
 
     expect($response)->not->toBeNull();
     expect($capturedOptions)->toBeArray();
@@ -109,9 +120,9 @@ test('send notification keeps ssl verification for public hosts', function () {
         ], 200);
     });
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
 
-    $response = $service->sendNotification('https://example.com', 'test.handler', ['key' => 'value']);
+    $response = $service->sendNotification('https://example.com', 'test.handler', ['key' => 'value'], [], 'project-secret');
 
     expect($response)->not->toBeNull();
     expect($capturedOptions)->toBeArray();
@@ -124,10 +135,10 @@ test('send notification handles exception', function () {
         throw new \Exception('Test exception');
     });
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
 
     // Act
-    $response = $service->sendNotification('https://example.com', 'test.handler', []);
+    $response = $service->sendNotification('https://example.com', 'test.handler', [], [], 'project-secret');
 
     // Assert
     expect($response)->toBeNull();
@@ -139,9 +150,9 @@ test('send fallback email when not production', function () {
     $mockResponse = $this->createMock(Response::class);
     $mockResponse->method('json')->with('production')->willReturn(false);
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
     $email = 'test@example.com';
-    $notification = new TestNotification();
+    $notification = new TestNotification;
 
     // Act
     $result = $service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
@@ -161,9 +172,9 @@ test('do not send fallback email when production', function () {
     $mockResponse = $this->createMock(Response::class);
     $mockResponse->method('json')->with('production')->willReturn(true);
 
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
     $email = 'test@example.com';
-    $notification = new TestNotification();
+    $notification = new TestNotification;
 
     // Act
     $result = $service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
@@ -175,9 +186,9 @@ test('do not send fallback email when production', function () {
 
 test('do not send fallback email when response is null', function () {
     // Arrange
-    $service = new ExternalNotificationService();
+    $service = new ExternalNotificationService;
     $email = 'test@example.com';
-    $notification = new TestNotification();
+    $notification = new TestNotification;
 
     // Act
     $result = $service->sendFallbackEmailIfNeeded(null, $email, $notification);

@@ -403,7 +403,9 @@ class ExternalTaskController extends Controller
         ]);
 
         if (isset($attributes['description'])) {
-            $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
+            $attributes['description'] = $this->sanitizeRichContent(
+                $this->normalizeDownloadUrlsToInternal((string) $attributes['description'])
+            );
         }
 
         $project = Project::query()->with('environments')->where('token', $attributes['project'])->firstOrFail();
@@ -630,7 +632,9 @@ class ExternalTaskController extends Controller
         ]);
 
         if (isset($attributes['description'])) {
-            $attributes['description'] = $this->normalizeDownloadUrlsToInternal((string) $attributes['description']);
+            $attributes['description'] = $this->sanitizeRichContent(
+                $this->normalizeDownloadUrlsToInternal((string) $attributes['description'])
+            );
         }
 
         $task->update([

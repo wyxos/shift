@@ -184,7 +184,7 @@ class ExternalTaskThreadController extends Controller
         $thread = new TaskThread([
             'task_id' => $task->id,
             'type' => 'external',
-            'content' => $request->input('content'),
+            'content' => $this->sanitizeRichContent($request->input('content')),
             'sender_name' => $externalUser->name,
         ]);
 
@@ -423,7 +423,9 @@ class ExternalTaskThreadController extends Controller
         $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
 
         // Normalize any client-proxy attachment download URLs back to the internal download route before persisting.
-        $thread->content = $this->normalizeAttachmentUrlsToInternalDownloadRoute($request->input('content', ''));
+        $thread->content = $this->sanitizeRichContent(
+            $this->normalizeAttachmentUrlsToInternalDownloadRoute($request->input('content', ''))
+        );
         $thread->save();
 
         // Process any temporary attachments
