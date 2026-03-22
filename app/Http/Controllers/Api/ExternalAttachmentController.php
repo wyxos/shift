@@ -45,6 +45,14 @@ class ExternalAttachmentController extends Controller
         return $isSubmitter || $hasAccess;
     }
 
+    private function isExternalUserRequest(): bool
+    {
+        return request()->has('project') &&
+            request()->offsetGet('user.id') !== null &&
+            request()->offsetGet('user.environment') !== null &&
+            request()->offsetGet('user.url') !== null;
+    }
+
     /**
      * Upload a temporary attachment.
      *
@@ -454,28 +462,24 @@ class ExternalAttachmentController extends Controller
      *
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
      */
-    public function download(Attachment $attachment)
+    public function download(Request $request, Attachment $attachment)
     {
         // Check if the file exists
         if (! Storage::exists($attachment->path)) {
             return response()->json(['error' => 'File not found'], 404);
         }
 
+        $task = $this->getTaskFromAttachment($attachment);
+
+        if (! $task) {
+            return response()->json(['error' => 'Attachment not associated with a task'], 404);
+        }
+
         // Check if this is an external user request (has project parameter and user context)
-        $isExternalUserRequest = request()->has('project') &&
-                                 request()->offsetGet('user.id') !== null &&
-                                 request()->offsetGet('user.environment') !== null &&
-                                 request()->offsetGet('user.url') !== null;
+        $isExternalUserRequest = $this->isExternalUserRequest();
 
         if ($isExternalUserRequest) {
             // External user access control
-            // Get the task that this attachment belongs to (either directly or through a thread)
-            $task = $this->getTaskFromAttachment($attachment);
-
-            if (! $task) {
-                return response()->json(['error' => 'Attachment not associated with a task'], 404);
-            }
-
             $project = $this->resolveProjectFromRequest();
             if ($project === null || $task->project_id !== $project->id) {
                 return response()->json(['error' => 'Task not found in the specified project'], 404);
@@ -490,9 +494,9 @@ class ExternalAttachmentController extends Controller
             if (! $this->externalUserHasAccess($task, $externalUser)) {
                 return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
             }
+        } elseif (! Task::query()->visibleTo($request->user()?->id)->whereKey($task->id)->exists()) {
+            return response()->json(['error' => 'Attachment not found'], 404);
         }
-        // For regular authenticated users, no additional access control is needed
-        // They can access attachments through normal Laravel authentication
 
         return Storage::response($attachment->path, $attachment->original_filename);
     }

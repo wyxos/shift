@@ -17,7 +17,8 @@
         "sentry/sentry-laravel": "^4.15",
         "spatie/laravel-activitylog": "^4.10",
         "tightenco/ziggy": "^2.4",
-        "wyxos/shift-core": "^0.1.0"
+        "wyxos/shift-core": "^0.1.0",
+        "ext-dom": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
