@@ -869,3 +869,38 @@ test('store requires an environment before syncing external collaborators', func
         ->assertJsonValidationErrors(['environment'])
         ->assertJsonPath('errors.environment.0', 'Select an environment before tagging external collaborators.');
 });
+
+test('store sanitizes dangerous external description html', function () {
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', [
+            'title' => 'Sanitized External Task',
+            'description' => implode('', [
+                '<p>Hello</p>',
+                '<script>alert(1)</script>',
+                '<blockquote class="shift-reply extra" data-reply-to="42"><p>Reply</p></blockquote>',
+                '<p><a href="javascript:alert(1)">bad</a></p>',
+            ]),
+            'project' => $this->project->token,
+            'priority' => 'high',
+            'status' => 'pending',
+            'user' => $this->externalUserData,
+            'metadata' => [
+                'url' => 'https://example.com/task/sanitized',
+                'environment' => 'testing',
+            ],
+        ]);
+
+    $response->assertCreated();
+
+    $task = Task::where('title', 'Sanitized External Task')->firstOrFail();
+
+    expect($task->description)->toContain('data-reply-to="42"');
+    expect($task->description)->toContain('class="shift-reply"');
+    expect($task->description)->not->toContain('<script');
+    expect($task->description)->not->toContain('javascript:');
+
+    $responseDescription = (string) $response->json('description');
+    expect($responseDescription)->toContain('data-reply-to="42"');
+    expect($responseDescription)->not->toContain('<script');
+    expect($responseDescription)->not->toContain('javascript:');
+});

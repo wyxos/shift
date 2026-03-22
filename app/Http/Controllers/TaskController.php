@@ -190,6 +190,10 @@ class TaskController extends Controller
 
         $attributes = $request->validate($rules);
 
+        if (array_key_exists('description', $attributes)) {
+            $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
+        }
+
         if (! $this->visibleProjectsQuery()->whereKey($attributes['project_id'])->exists()) {
             throw ValidationException::withMessages([
                 'project_id' => 'The selected project is invalid.',
@@ -674,6 +678,10 @@ class TaskController extends Controller
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
         ]);
+        if (array_key_exists('description', $attributes)) {
+            $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
+        }
+
         $selectedEnvironment = $this->resolveTaskEnvironment(
             $task->project()->with('environments')->firstOrFail(),
             $attributes['environment'] ?? null,
@@ -847,6 +855,10 @@ class TaskController extends Controller
             'external_user_ids' => 'nullable|array',
             'external_user_ids.*' => 'exists:external_users,id',
         ]);
+        if (array_key_exists('description', $attributes)) {
+            $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
+        }
+
         $selectedEnvironment = $this->resolveTaskEnvironment(
             $task->project()->with('environments')->firstOrFail(),
             $attributes['environment'] ?? null,

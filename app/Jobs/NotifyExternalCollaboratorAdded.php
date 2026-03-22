@@ -16,9 +16,7 @@ class NotifyExternalCollaboratorAdded implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $externalUserId, public int $taskId)
-    {
-    }
+    public function __construct(public int $externalUserId, public int $taskId) {}
 
     public function handle(ExternalNotificationService $notificationService): void
     {
@@ -28,6 +26,8 @@ class NotifyExternalCollaboratorAdded implements ShouldQueue
         if (! $externalUser || ! $task) {
             return;
         }
+
+        $task->loadMissing('project');
 
         $payload = [
             'type' => 'task',
@@ -42,7 +42,9 @@ class NotifyExternalCollaboratorAdded implements ShouldQueue
         $response = $notificationService->sendNotification(
             $externalUser->url,
             'task.collaborator_added',
-            $payload
+            $payload,
+            [],
+            $task->project?->token,
         );
 
         $editUrl = rtrim($externalUser->url, '/').'/shift/tasks?task='.$task->id;

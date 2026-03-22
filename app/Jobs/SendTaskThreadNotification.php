@@ -64,6 +64,8 @@ class SendTaskThreadNotification implements ShouldQueue
             return;
         }
 
+        $thread->loadMissing('task.project');
+
         $notificationService = new ExternalNotificationService;
         $url = $this->externalUserData['url'];
         $email = $this->externalUserData['email'];
@@ -72,7 +74,9 @@ class SendTaskThreadNotification implements ShouldQueue
         $response = $notificationService->sendNotification(
             $url,
             'thread.update',
-            $this->payload
+            $this->payload,
+            [],
+            $thread->task?->project?->token,
         );
 
         // Create notification object with additional URL for email

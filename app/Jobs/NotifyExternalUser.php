@@ -36,6 +36,8 @@ class NotifyExternalUser implements ShouldQueue
             return;
         }
 
+        $task->loadMissing('project');
+
         $payload = [
             'type' => 'task',
             'user_id' => $externalUser->external_id,
@@ -49,7 +51,9 @@ class NotifyExternalUser implements ShouldQueue
         $response = $notificationService->sendNotification(
             $externalUser->url,
             'task.created',
-            $payload
+            $payload,
+            [],
+            $task->project?->token,
         );
 
         $editUrl = rtrim($externalUser->url, '/').'/shift/tasks?task='.$task->id;

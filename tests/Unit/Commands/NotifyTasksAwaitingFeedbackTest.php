@@ -1,6 +1,5 @@
 <?php
 
-use App\Console\Commands\NotifyTasksAwaitingFeedback;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
@@ -23,11 +22,12 @@ beforeEach(function () {
 test('it sends notifications to external users with tasks awaiting feedback', function () {
     // Create a project
     $project = Project::factory()->create();
+    $project->generateApiToken();
 
     // Create an external user
     $externalUser = ExternalUser::factory()->create([
         'project_id' => $project->id,
-        'url' => 'https://example.com'
+        'url' => 'https://example.com',
     ]);
 
     // Create a task with awaiting-feedback status submitted by the external user
@@ -35,7 +35,7 @@ test('it sends notifications to external users with tasks awaiting feedback', fu
         'project_id' => $project->id,
         'status' => 'awaiting-feedback',
         'submitter_type' => ExternalUser::class,
-        'submitter_id' => $externalUser->id
+        'submitter_id' => $externalUser->id,
     ]);
 
     // Create another task with a different status (should not trigger notification)
@@ -43,7 +43,7 @@ test('it sends notifications to external users with tasks awaiting feedback', fu
         'project_id' => $project->id,
         'status' => 'in-progress',
         'submitter_type' => ExternalUser::class,
-        'submitter_id' => $externalUser->id
+        'submitter_id' => $externalUser->id,
     ]);
 
     // Mock the response from the external API
@@ -60,7 +60,9 @@ test('it sends notifications to external users with tasks awaiting feedback', fu
                 return $payload['type'] === 'tasks_awaiting_feedback' &&
                        in_array($task->id, $payload['task_ids']) &&
                        $payload['task_count'] === 1;
-            })
+            }),
+            [],
+            $project->token,
         )
         ->andReturn($mockResponse);
 
@@ -84,10 +86,11 @@ test('it sends notifications to external users with tasks awaiting feedback', fu
 test('it does not send notifications when no tasks are awaiting feedback', function () {
     // Create a project
     $project = Project::factory()->create();
+    $project->generateApiToken();
 
     // Create an external user
     $externalUser = ExternalUser::factory()->create([
-        'project_id' => $project->id
+        'project_id' => $project->id,
     ]);
 
     // Create a task with a status other than awaiting-feedback
@@ -95,7 +98,7 @@ test('it does not send notifications when no tasks are awaiting feedback', funct
         'project_id' => $project->id,
         'status' => 'in-progress',
         'submitter_type' => ExternalUser::class,
-        'submitter_id' => $externalUser->id
+        'submitter_id' => $externalUser->id,
     ]);
 
     // The notification service should not be called
@@ -112,11 +115,12 @@ test('it does not send notifications when no tasks are awaiting feedback', funct
 test('it only notifies about tasks submitted by external users', function () {
     // Create a project
     $project = Project::factory()->create();
+    $project->generateApiToken();
 
     // Create an external user
     $externalUser = ExternalUser::factory()->create([
         'project_id' => $project->id,
-        'url' => 'https://example.com'
+        'url' => 'https://example.com',
     ]);
 
     // Create a regular user
@@ -127,7 +131,7 @@ test('it only notifies about tasks submitted by external users', function () {
         'project_id' => $project->id,
         'status' => 'awaiting-feedback',
         'submitter_type' => ExternalUser::class,
-        'submitter_id' => $externalUser->id
+        'submitter_id' => $externalUser->id,
     ]);
 
     // Create a task with awaiting-feedback status submitted by a regular user
@@ -135,7 +139,7 @@ test('it only notifies about tasks submitted by external users', function () {
         'project_id' => $project->id,
         'status' => 'awaiting-feedback',
         'submitter_type' => User::class,
-        'submitter_id' => $user->id
+        'submitter_id' => $user->id,
     ]);
 
     // Mock the response from the external API
@@ -152,7 +156,9 @@ test('it only notifies about tasks submitted by external users', function () {
                 return $payload['type'] === 'tasks_awaiting_feedback' &&
                        in_array($externalTask->id, $payload['task_ids']) &&
                        $payload['task_count'] === 1;
-            })
+            }),
+            [],
+            $project->token,
         )
         ->andReturn($mockResponse);
 
