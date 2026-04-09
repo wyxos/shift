@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ShiftEditor from '@/components/ShiftEditor.vue';
 import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
@@ -126,10 +127,12 @@ function formatTaskTime(value?: string | null) {
 
                         <div class="space-y-2">
                             <Label class="text-muted-foreground">Description</Label>
-                            <textarea
+                            <ShiftEditor
                                 v-model="editDescriptionModel"
-                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex min-h-24 w-full min-w-0 rounded-md border bg-transparent text-foreground px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                :enable-ai-improve="state.aiImproveEnabled"
+                                :temp-identifier="state.editTempIdentifier"
                                 data-testid="task-edit-description"
+                                min-height="180"
                             />
                         </div>
 

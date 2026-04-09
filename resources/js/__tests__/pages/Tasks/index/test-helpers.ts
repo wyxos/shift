@@ -211,12 +211,14 @@ vi.mock('@/components/ShiftEditor.vue', () => ({
         props: ['modelValue'],
         emits: ['update:modelValue', 'send', 'uploading'],
         render() {
+            const previewText = String(this.modelValue ?? '').replace(/<[^>]+>/g, '');
             return h('div', { ...this.$attrs, class: 'shift-editor-stub' }, [
                 h('textarea', {
                     'data-testid': 'stub-editor-input',
                     value: this.modelValue,
                     onInput: (e: Event) => this.$emit('update:modelValue', (e.target as HTMLTextAreaElement).value),
                 }),
+                h('div', { 'data-testid': 'stub-editor-preview' }, previewText),
                 h(
                     'button',
                     {
@@ -236,14 +238,18 @@ vi.mock('@shared/components/ShiftEditor.vue', () => ({
         props: ['modelValue'],
         emits: ['update:modelValue', 'send', 'uploading'],
         render() {
+            const previewText = String(this.modelValue ?? '').replace(/<[^>]+>/g, '');
             return h(
                 'div',
                 { ...this.$attrs, class: 'shift-editor-stub' },
-                h('textarea', {
-                    'data-testid': 'stub-editor-input',
-                    value: this.modelValue,
-                    onInput: (e: Event) => this.$emit('update:modelValue', (e.target as HTMLTextAreaElement).value),
-                }),
+                [
+                    h('textarea', {
+                        'data-testid': 'stub-editor-input',
+                        value: this.modelValue,
+                        onInput: (e: Event) => this.$emit('update:modelValue', (e.target as HTMLTextAreaElement).value),
+                    }),
+                    h('div', { 'data-testid': 'stub-editor-preview' }, previewText),
+                ],
             );
         },
     },

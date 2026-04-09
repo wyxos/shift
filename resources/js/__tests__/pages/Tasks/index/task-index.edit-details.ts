@@ -95,6 +95,47 @@ describe('Tasks/Index.vue', () => {
         vi.useRealTimers();
     });
 
+    it('renders html-backed task descriptions without exposing raw tags in the edit surface', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '<p>Saved from rich editor</p>',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Edit"]').trigger('click');
+        await flushPromises();
+
+        const description = wrapper.get('[data-testid="task-edit-description"]');
+        const preview = description.get('[data-testid="stub-editor-preview"]');
+
+        expect(preview.text()).toContain('Saved from rich editor');
+        expect(preview.text()).not.toContain('<p>');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
     it('allows any user to change task status from the V2 edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
