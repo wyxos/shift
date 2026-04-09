@@ -35,6 +35,23 @@ vi.mock('axios', () => ({
 import 'emoji-picker-element';
 
 describe('ShiftEditor toolbar', () => {
+    it('renders html-backed model values as rich content instead of raw tags', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                modelValue: '<p>Saved from rich editor</p>',
+            },
+        });
+        await nextTick();
+        await nextTick();
+
+        const editor = wrapper.find('.ProseMirror');
+        expect(editor.exists()).toBe(true);
+
+        const text = editor.text();
+        expect(text).toContain('Saved from rich editor');
+        expect(text).not.toContain('<p>');
+    });
+
     it('hides AI improve action when disabled by parent config', async () => {
         const wrapper = mount(ShiftEditor, {
             props: {
