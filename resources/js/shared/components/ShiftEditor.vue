@@ -19,6 +19,7 @@ import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
 import ReplyQuote from '../extensions/replyQuote';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
+import { renderRichContent } from '../tasks/rich-content';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
 import { useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
@@ -97,12 +98,18 @@ watch(
     () => props.modelValue,
     (val) => {
         const current = editor.value?.getHTML() ?? '';
-        const next = val ?? '';
+        const next = resolveEditorContent(val);
         if (next !== current) {
             editor.value?.commands.setContent(next, false);
         }
     },
 );
+
+function resolveEditorContent(value?: string): string {
+    const content = String(value ?? '');
+    if (!content.trim()) return '';
+    return renderRichContent(content);
+}
 
 function resolveAiImproveUrl(): string | null {
     if (props.aiImproveUrl) return props.aiImproveUrl;
@@ -153,7 +160,7 @@ const editor = useEditor({
             resolveTempUrl: props.resolveTempUrl,
         }),
     ],
-    content: props.modelValue ?? '',
+    content: resolveEditorContent(props.modelValue),
     onUpdate: () => {
         const html = editor.value?.getHTML() ?? '';
         emit('update:modelValue', html);
