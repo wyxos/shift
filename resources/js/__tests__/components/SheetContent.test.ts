@@ -65,7 +65,7 @@ describe('SheetContent', () => {
         expect(content.attributes()).not.toHaveProperty('width-preset');
     });
 
-    it('uses the task preset for full-width task sheets up to 1440px', () => {
+    it('uses fixed viewport widths for task sheets instead of content-sized widths', () => {
         const wrapper = mount(SheetContent, {
             props: {
                 side: 'right',
@@ -75,12 +75,14 @@ describe('SheetContent', () => {
 
         const content = wrapper.get('[data-slot="sheet-content"]');
 
-        expect(content.classes()).toContain('min-[1441px]:w-fit');
-        expect(content.classes()).toContain('min-[1441px]:min-w-[var(--sheet-width-desktop-min)]');
-        expect(content.classes()).toContain('min-[1441px]:max-w-fit');
+        expect(content.classes()).toContain('xl:w-[var(--sheet-width-desktop)]');
+        expect(content.classes()).toContain('min-[1921px]:w-[var(--sheet-width-wide)]');
+        expect(content.classes()).not.toContain('min-[1441px]:w-fit');
+        expect(content.classes()).not.toContain('min-[1441px]:max-w-fit');
         expect(content.classes()).not.toContain('md:w-[var(--sheet-width-tablet)]');
         expect(content.attributes('style')).toContain('--sheet-width-mobile: 100vw;');
-        expect(content.attributes('style')).toContain('--sheet-width-desktop-min: 800px;');
+        expect(content.attributes('style')).toContain('--sheet-width-desktop: 75vw;');
+        expect(content.attributes('style')).toContain('--sheet-width-wide: 50vw;');
         expect(content.attributes()).not.toHaveProperty('widthpreset');
         expect(content.attributes()).not.toHaveProperty('width-preset');
     });

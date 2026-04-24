@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed } from 'vue';
-import { renderRichContent } from '@/shared/tasks/rich-content';
 
 const props = defineProps<{
     state: any;
@@ -16,7 +16,10 @@ const threadComposerHtmlModel = computed({
 </script>
 
 <template>
-    <div class="border-muted-foreground/10 via-background to-background max-h-[70vh] min-h-[28rem] flex-col overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/5 lg:flex lg:h-full lg:max-h-none lg:min-h-0">
+    <div
+        class="border-muted-foreground/10 via-background to-background max-h-[70vh] min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/5 lg:h-full lg:max-h-none lg:min-h-0"
+        data-testid="task-comments-pane"
+    >
         <div class="border-muted-foreground/10 flex items-center justify-between border-b px-4 py-3">
             <div>
                 <h3 class="text-foreground text-sm font-semibold">Comments</h3>
@@ -30,7 +33,12 @@ const threadComposerHtmlModel = computed({
             <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
             <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
-            <div v-for="message in state.threadMessages" :key="message.clientId" :class="message.isYou ? 'justify-end' : 'justify-start'" class="flex">
+            <div
+                v-for="message in state.threadMessages"
+                :key="message.clientId"
+                :class="message.isYou ? 'justify-end' : 'justify-start'"
+                class="flex"
+            >
                 <div class="max-w-[86%]">
                     <ContextMenuRoot @update:open="(open) => state.onCommentContextMenuOpen(message, open)">
                         <ContextMenuTrigger as-child>
@@ -75,7 +83,9 @@ const threadComposerHtmlModel = computed({
                             </div>
                         </ContextMenuTrigger>
                         <ContextMenuPortal>
-                            <ContextMenuContent class="bg-popover text-popover-foreground z-50 min-w-[10rem] overflow-hidden rounded-md border p-1 shadow-md">
+                            <ContextMenuContent
+                                class="bg-popover text-popover-foreground z-50 min-w-[10rem] overflow-hidden rounded-md border p-1 shadow-md"
+                            >
                                 <ContextMenuItem
                                     v-if="!message.isYou"
                                     class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
