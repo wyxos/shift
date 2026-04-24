@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
 import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { axiosGetMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('shows task created timestamp in the edit sheet', async () => {
@@ -79,11 +78,16 @@ describe('Tasks/Index.vue', () => {
 
         const editStatusGroup = wrapper.get('[aria-label="Task status"]');
         const mobilePaneGroup = wrapper.get('[aria-label="Edit task section"]');
+        const editLayout = wrapper.get('[data-testid="task-edit-layout"]');
 
         expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
         expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
         expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toContain('Updated');
+        expect(editLayout.classes()).toContain('lg:grid-cols-2');
+        expect(editLayout.classes()).not.toContain('lg:grid-cols-[1.15fr_0.85fr]');
+        expect(wrapper.get('[data-testid="task-edit-details-pane"]').classes()).toContain('min-w-0');
+        expect(wrapper.get('[data-testid="task-comments-pane"]').classes()).toContain('min-w-0');
         expect(editStatusGroup.classes()).toContain('grid-cols-2');
         expect(editStatusGroup.classes()).toContain('xl:grid-cols-4');
         expect(mobilePaneGroup.classes()).toContain('grid-cols-2');
@@ -190,5 +194,4 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
         vi.useRealTimers();
     });
-
 });
