@@ -64,7 +64,7 @@ function formatTaskTime(value?: string | null) {
             <div class="flex-1 overflow-auto px-6 pb-4">
                 <div v-if="state.editLoading" class="text-muted-foreground py-10 text-center text-sm">Loading task...</div>
                 <div v-else-if="state.editError" class="text-destructive py-10 text-center text-sm">{{ state.editError }}</div>
-                <div v-else-if="state.editTask" class="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                <div v-else-if="state.editTask" class="grid min-h-0 gap-4 lg:grid-cols-2" data-testid="task-edit-layout">
                     <div class="lg:hidden">
                         <ButtonGroup
                             v-model="editMobilePaneModel"
@@ -75,19 +75,29 @@ function formatTaskTime(value?: string | null) {
                             test-id-prefix="edit-mobile-pane"
                         />
                     </div>
-                    <div :class="state.editMobilePane === 'comments' ? 'hidden lg:block' : 'block'" class="space-y-4">
+                    <div
+                        :class="state.editMobilePane === 'comments' ? 'hidden lg:block' : 'block'"
+                        class="min-w-0 space-y-4"
+                        data-testid="task-edit-details-pane"
+                    >
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div class="space-y-1">
-                                <div class="text-muted-foreground text-xs uppercase tracking-wide">Created by</div>
-                                <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">{{ state.editTaskCreatorLabel }}</div>
+                                <div class="text-muted-foreground text-xs tracking-wide uppercase">Created by</div>
+                                <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">
+                                    {{ state.editTaskCreatorLabel }}
+                                </div>
                             </div>
                             <div class="space-y-1">
-                                <div class="text-muted-foreground text-xs uppercase tracking-wide">Created</div>
-                                <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">{{ formatTaskTime(state.editTask.created_at) }}</div>
+                                <div class="text-muted-foreground text-xs tracking-wide uppercase">Created</div>
+                                <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">
+                                    {{ formatTaskTime(state.editTask.created_at) }}
+                                </div>
                             </div>
                             <div class="space-y-1">
-                                <div class="text-muted-foreground text-xs uppercase tracking-wide">Updated</div>
-                                <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">Updated {{ formatTaskTime(state.editTask.updated_at) }}</div>
+                                <div class="text-muted-foreground text-xs tracking-wide uppercase">Updated</div>
+                                <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">
+                                    Updated {{ formatTaskTime(state.editTask.updated_at) }}
+                                </div>
                             </div>
                         </div>
 
@@ -95,7 +105,7 @@ function formatTaskTime(value?: string | null) {
                             <Label class="text-muted-foreground">Title</Label>
                             <input
                                 v-model="editTitleModel"
-                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent text-foreground px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                                 data-testid="task-edit-title"
                                 type="text"
                             />
@@ -152,7 +162,10 @@ function formatTaskTime(value?: string | null) {
 
                         <div class="space-y-2">
                             <Label class="text-muted-foreground">Environment</Label>
-                            <div data-testid="edit-task-environment" class="text-foreground rounded-md border border-dashed border-muted-foreground/30 bg-muted/10 px-3 py-2 text-sm">
+                            <div
+                                data-testid="edit-task-environment"
+                                class="text-foreground border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed px-3 py-2 text-sm"
+                            >
                                 {{ state.editTaskEnvironmentLabel }}
                             </div>
                         </div>
@@ -165,21 +178,35 @@ function formatTaskTime(value?: string | null) {
                                     :key="attachment.id"
                                     class="border-muted-foreground/20 bg-muted/10 text-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                                 >
-                                    <a :href="attachment.url" class="hover:text-foreground min-w-0 flex-1 truncate transition" rel="noreferrer" target="_blank">
+                                    <a
+                                        :href="attachment.url"
+                                        class="hover:text-foreground min-w-0 flex-1 truncate transition"
+                                        rel="noreferrer"
+                                        target="_blank"
+                                    >
                                         {{ attachment.original_filename }}
                                     </a>
-                                    <Button v-if="state.isOwner" size="sm" type="button" variant="outline" @click="state.removeAttachmentFromTask(attachment.id)">
+                                    <Button
+                                        v-if="state.isOwner"
+                                        size="sm"
+                                        type="button"
+                                        variant="outline"
+                                        @click="state.removeAttachmentFromTask(attachment.id)"
+                                    >
                                         Remove
                                     </Button>
                                 </div>
                             </div>
-                            <div v-else class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-md border border-dashed p-3 text-sm">
+                            <div
+                                v-else
+                                class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-md border border-dashed p-3 text-sm"
+                            >
                                 No attachments available
                             </div>
                         </div>
                     </div>
 
-                    <TaskCommentsPane :class="state.editMobilePane === 'details' ? 'hidden lg:block' : 'block'" :state="state" />
+                    <TaskCommentsPane :class="state.editMobilePane === 'details' ? 'hidden lg:flex' : 'flex'" :state="state" />
                 </div>
             </div>
 
