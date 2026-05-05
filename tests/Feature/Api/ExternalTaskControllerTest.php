@@ -288,6 +288,37 @@ test('store dispatches create notification jobs for tagged external collaborator
         return $job->taskId === $task->id
             && $job->externalUserId === $externalUser->id;
     });
+
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task) {
+        return $job->taskId === $task->id
+            && $job->externalUserId === $this->externalUser->id;
+    });
+});
+
+test('store does not dispatch create notification job for the external submitter', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $taskData = [
+        'title' => 'New External Task Without Collaborators',
+        'project' => $this->project->token,
+        'user' => $this->externalUserData,
+        'metadata' => [
+            'url' => 'https://example.com/task/self-notification',
+            'environment' => 'testing',
+        ],
+    ];
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', $taskData);
+
+    $response->assertCreated();
+
+    $task = Task::query()->where('title', 'New External Task Without Collaborators')->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task) {
+        return $job->taskId === $task->id
+            && $job->externalUserId === $this->externalUser->id;
+    });
 });
 
 test('update updates task', function () {
