@@ -30,7 +30,7 @@
             }
         </style>
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'SHIFT') }}</title>
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
 {{--        <link rel="preconnect" href="https://fonts.bunny.net">--}}

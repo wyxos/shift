@@ -21,7 +21,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Confirm your password" description="This is a secure area of the application. Please confirm your password before continuing.">
+    <AuthLayout title="Confirm your SHIFT password" description="Confirm your password before continuing in SHIFT.">
         <Head title="Confirm password" />
 
         <form @submit.prevent="submit">

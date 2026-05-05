@@ -17,7 +17,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Verify email" description="Please verify your email address by clicking on the link we just emailed to you.">
+    <AuthLayout title="Verify your SHIFT email" description="Use the verification link we emailed to finish securing your SHIFT account.">
         <Head title="Email verification" />
 
         <div v-if="status === 'verification-link-sent'" class="mb-4 text-center text-sm font-medium text-green-600">

@@ -60,9 +60,9 @@ class OrganisationInvitationNotification extends Notification implements ShouldQ
 
         return (new MailMessage)
             ->subject('You have been invited to join an organisation')
-            ->line('You have been invited to join the organisation: ' . $this->organisation->name)
+            ->line('You have been invited to join the organisation: '.$this->organisation->name)
             ->action('Register to join', $url)
-            ->line('Thank you for using our application!');
+            ->line('Please do not reply to this email directly.');
     }
 
     /**

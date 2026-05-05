@@ -53,9 +53,9 @@ class OrganisationAccessNotification extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject('You have been granted access to an organisation')
-            ->line('You have been granted access to the organisation: ' . $this->organisation->name)
+            ->line('You have been granted access to the organisation: '.$this->organisation->name)
             ->action('View Organisation', route('organisations.index', ['highlight' => $this->organisation->id]))
-            ->line('Thank you for using our application!');
+            ->line('Please do not reply to this email directly.');
     }
 
     /**
