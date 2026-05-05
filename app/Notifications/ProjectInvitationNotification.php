@@ -60,9 +60,9 @@ class ProjectInvitationNotification extends Notification implements ShouldQueue
 
         return (new MailMessage)
             ->subject('You have been invited to join a project')
-            ->line('You have been invited to join the project: ' . $this->project->name)
+            ->line('You have been invited to join the project: '.$this->project->name)
             ->action('Register to join', $url)
-            ->line('Thank you for using our application!');
+            ->line('Please do not reply to this email directly.');
     }
 
     /**

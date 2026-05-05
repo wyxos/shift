@@ -44,7 +44,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthBase title="Create an account" description="Enter your details below to create your account">
+    <AuthBase title="Create your SHIFT account" description="Set up access to your SHIFT workspace.">
         <Head title="Register" />
 
         <form @submit.prevent="submit" class="flex flex-col gap-6">

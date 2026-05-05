@@ -1,11 +1,12 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "wyxos/shift",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "The SHIFT task tracking portal.",
     "keywords": [
-        "laravel",
-        "framework"
+        "shift",
+        "task-tracking",
+        "client-intake"
     ],
     "license": "MIT",
     "require": {

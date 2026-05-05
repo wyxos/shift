@@ -53,11 +53,11 @@ class ProjectUserRegisteredNotification extends Notification implements ShouldQu
     {
         return (new MailMessage)
             ->subject('New User Registration in Your Project')
-            ->line('A new user has completed registration for your project: ' . $this->project->name)
-            ->line('User: ' . $this->registeredUser->name)
-            ->line('Email: ' . $this->registeredUser->email)
-            ->action('View Project', url('/projects/' . $this->project->id))
-            ->line('Thank you for using our application!');
+            ->line('A new user has completed registration for your project: '.$this->project->name)
+            ->line('User: '.$this->registeredUser->name)
+            ->line('Email: '.$this->registeredUser->email)
+            ->action('View Project', url('/projects/'.$this->project->id))
+            ->line('Please do not reply to this email directly.');
     }
 
     /**
