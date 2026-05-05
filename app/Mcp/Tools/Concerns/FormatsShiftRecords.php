@@ -108,14 +108,137 @@ trait FormatsShiftRecords
      */
     protected function notification(DatabaseNotification $notification): array
     {
-        return [
+        $data = is_array($notification->data) ? $notification->data : [];
+        $taskIds = $this->notificationTaskIds($data);
+        $projectIds = $this->notificationProjectIds($data);
+
+        $summary = [
             'id' => $notification->id,
             'type' => $notification->type,
+            'name' => class_basename($notification->type),
             'notifiable' => $this->person($notification->notifiable),
-            'data' => $notification->data,
             'read_at' => $this->date($notification->read_at),
             'created_at' => $this->date($notification->created_at),
         ];
+
+        if ($taskIds !== []) {
+            $summary['task_ids'] = $taskIds;
+        }
+
+        if ($projectIds !== []) {
+            $summary['project_ids'] = $projectIds;
+        }
+
+        if (isset($data['thread_id'])) {
+            $summary['thread_id'] = (int) $data['thread_id'];
+        }
+
+        if (isset($data['type']) && is_string($data['type'])) {
+            $summary['thread_type'] = $data['type'];
+        }
+
+        if (isset($data['tasks']) && is_array($data['tasks'])) {
+            $summary['task_count'] = count($data['tasks']);
+        }
+
+        if ($link = $this->notificationLink($data)) {
+            $summary['link'] = $link;
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<int>
+     */
+    protected function notificationTaskIds(array $data): array
+    {
+        $ids = [];
+
+        if (isset($data['task_id'])) {
+            $ids[] = (int) $data['task_id'];
+        }
+
+        if (isset($data['tasks']) && is_array($data['tasks'])) {
+            foreach ($data['tasks'] as $task) {
+                if (is_array($task) && isset($task['task_id'])) {
+                    $ids[] = (int) $task['task_id'];
+                }
+            }
+        }
+
+        return $this->uniquePositiveIntegers($ids);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<int>
+     */
+    protected function notificationProjectIds(array $data): array
+    {
+        $ids = [];
+
+        if (isset($data['project_id'])) {
+            $ids[] = (int) $data['project_id'];
+        }
+
+        if (isset($data['tasks']) && is_array($data['tasks'])) {
+            foreach ($data['tasks'] as $task) {
+                if (is_array($task) && isset($task['project_id'])) {
+                    $ids[] = (int) $task['project_id'];
+                }
+            }
+        }
+
+        return $this->uniquePositiveIntegers($ids);
+    }
+
+    /**
+     * @param  array<int>  $values
+     * @return array<int>
+     */
+    protected function uniquePositiveIntegers(array $values): array
+    {
+        return array_values(array_unique(array_filter(
+            $values,
+            fn (int $value): bool => $value > 0
+        )));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{site: string, host: string|null, path: string|null}|null
+     */
+    protected function notificationLink(array $data): ?array
+    {
+        $url = $data['url'] ?? null;
+
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        $path = parse_url($url, PHP_URL_PATH);
+
+        return [
+            'site' => $this->notificationLinkSite($url, is_string($host) ? $host : null),
+            'host' => is_string($host) ? $host : null,
+            'path' => is_string($path) ? $path : null,
+        ];
+    }
+
+    protected function notificationLinkSite(string $url, ?string $host): string
+    {
+        if ($host === null) {
+            return str_starts_with($url, '/') ? 'shift' : 'unknown';
+        }
+
+        $shiftHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        return is_string($shiftHost) && strcasecmp($host, $shiftHost) === 0
+            ? 'shift'
+            : 'consuming_project';
     }
 
     /**

@@ -24,7 +24,7 @@ class ListNotificationsTool extends Tool
 
     protected string $name = 'list_notifications';
 
-    protected string $description = 'List SHIFT database notifications, optionally filtered by internal user email, task ID, notification type, or unread status.';
+    protected string $description = 'List sanitized SHIFT database notification summaries, optionally filtered by internal user email, task ID, notification type, or unread status. Raw notification payload content is not returned.';
 
     public function handle(Request $request): ResponseFactory
     {
