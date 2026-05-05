@@ -16,6 +16,7 @@ use App\Models\TaskCollaborator;
 use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use App\Notifications\TaskThreadUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Server\Registrar;
@@ -311,8 +312,39 @@ test('list notifications filters database notifications by user and task', funct
         'unread_only' => true,
     ])
         ->assertOk()
-        ->assertSee([$notificationId, 'TaskCreationNotification', 'recipient@example.com', 'Notification target task'])
-        ->assertDontSee(['other@example.com', 'Other user task notification']);
+        ->assertSee([$notificationId, 'TaskCreationNotification', 'recipient@example.com', 'shift'])
+        ->assertDontSee(['other@example.com', 'Notification target task', 'Other user task notification', 'task_title']);
+});
+
+test('list notifications omits raw notification content and classifies links', function () {
+    $user = User::factory()->create(['email' => 'recipient@example.com']);
+    $task = Task::factory()->create(['title' => 'Sensitive task title']);
+    $notificationId = (string) Str::uuid();
+
+    DB::table('notifications')->insert([
+        'id' => $notificationId,
+        'type' => TaskThreadUpdated::class,
+        'notifiable_type' => User::class,
+        'notifiable_id' => $user->id,
+        'data' => json_encode([
+            'task_id' => $task->id,
+            'task_title' => $task->title,
+            'type' => 'external',
+            'content' => '<p>Private HTML thread body</p>',
+            'url' => 'https://voidcare.com/shift/tasks?task='.$task->id,
+            'thread_id' => 123,
+        ], JSON_THROW_ON_ERROR),
+        'read_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    ShiftServer::actingAs($user)->tool(ListNotificationsTool::class, [
+        'task_id' => $task->id,
+    ])
+        ->assertOk()
+        ->assertSee([$notificationId, 'TaskThreadUpdated', 'consuming_project', 'voidcare.com', '/shift/tasks', 'external'])
+        ->assertDontSee(['Sensitive task title', 'Private HTML thread body', '<p>', 'task_title', 'content']);
 });
 
 test('configured sanctum and project tokens restrict local mcp reads to the token project', function () {
