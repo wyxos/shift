@@ -62,7 +62,7 @@ class TaskCreationNotification extends Notification implements ShouldQueue
             ->line('Priority: '.ucfirst($this->task->priority))
             ->line('Status: '.ucfirst(str_replace('_', ' ', $this->task->status)))
             ->action('View Task', $url)
-            ->line('Thank you for using our application!');
+            ->line('Please do not reply to this email directly.');
     }
 
     /**

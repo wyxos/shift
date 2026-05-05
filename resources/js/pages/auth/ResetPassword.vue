@@ -31,7 +31,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Reset password" description="Please enter your new password below">
+    <AuthLayout title="Reset your SHIFT password" description="Choose a new password for your SHIFT account.">
         <Head title="Reset password" />
 
         <form @submit.prevent="submit">
