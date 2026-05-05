@@ -1,5 +1,13 @@
 {
     "mcpServers": {
+        "shift": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "mcp:start",
+                "shift"
+            ]
+        },
         "laravel-boost": {
             "command": "php",
             "args": [

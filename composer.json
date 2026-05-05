@@ -11,15 +11,16 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "ext-dom": "*",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
+        "laravel/mcp": "^0.5",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "sentry/sentry-laravel": "^4.15",
         "spatie/laravel-activitylog": "^4.10",
         "tightenco/ziggy": "^2.4",
-        "wyxos/shift-core": "^0.1.0",
-        "ext-dom": "*"
+        "wyxos/shift-core": "^0.1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
