@@ -158,14 +158,9 @@ class TaskCollaboratorService
 
     public function externalTaskCreateAudience(Task $task): Collection
     {
-        $task->loadMissing(['submitter', 'externalCollaborators']);
+        $task->loadMissing('externalCollaborators');
 
         $users = collect();
-
-        if ($task->submitter instanceof ExternalUser) {
-            $users->push($task->submitter);
-        }
-
         foreach ($task->externalCollaborators as $collaborator) {
             if (! $users->contains('id', $collaborator->id)) {
                 $users->push($collaborator);
