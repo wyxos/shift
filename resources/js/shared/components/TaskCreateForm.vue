@@ -110,6 +110,7 @@ function updateField(field: keyof TaskCreateDraft, value: string) {
                     :ai-improve-url="aiImproveUrl"
                     :resolve-temp-url="resolveTempUrl"
                     :placeholder="descriptionPlaceholder"
+                    :sendable="false"
                     :data-testid="descriptionTestId"
                     @update:modelValue="updateField('description', $event)"
                     @uploading="emit('update:uploading', $event)"
