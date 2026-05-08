@@ -143,6 +143,7 @@ function formatTaskTime(value?: string | null) {
                                 :temp-identifier="state.editTempIdentifier"
                                 data-testid="task-edit-description"
                                 min-height="180"
+                                :sendable="false"
                             />
                         </div>
 

@@ -26,6 +26,8 @@ describe('Tasks/Index.vue', () => {
 
         await wrapper.get('[data-testid="open-create-task"]').trigger('click');
 
+        expect(wrapper.get('[data-testid="create-description-editor"]').find('[data-testid="stub-send"]').exists()).toBe(false);
+
         const submit = wrapper.get('[data-testid="submit-create-task"]');
         expect(submit.attributes('disabled')).toBeDefined();
 
