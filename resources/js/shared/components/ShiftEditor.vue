@@ -51,6 +51,7 @@ const props = withDefaults(
         removeTempUrl?: string;
         resolveTempUrl?: (data: any) => string;
         clearOnSend?: boolean;
+        sendable?: boolean;
         cancelable?: boolean;
         aiImproveUrl?: string;
         aiContext?: string;
@@ -58,6 +59,7 @@ const props = withDefaults(
     }>(),
     {
         clearOnSend: true,
+        sendable: true,
         cancelable: false,
         enableAiImprove: true,
     },
@@ -201,6 +203,7 @@ const editor = useEditor({
         },
         handleKeyDown: (_view: any, event: KeyboardEvent) => {
             if (event.key !== 'Enter') return false;
+            if (!props.sendable) return false;
             if (event.shiftKey || event.isComposing) return false;
             if (isInRichBlockNeedingEnter(editor.value)) return false;
 
@@ -254,6 +257,7 @@ function onEmojiClick(ev: Event) {
 }
 
 function onSend() {
+    if (!props.sendable) return;
     if (isUploading.value) return;
     const html = editor.value?.getHTML() ?? '';
     const toSend: SentAttachment[] = attachments.value.map((a) => ({
@@ -296,7 +300,7 @@ defineExpose({ editor, reset });
 
         <div class="flex flex-col gap-2">
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
-            <div class="flex items-center justify-end gap-2 p-2 px-1">
+            <div class="flex items-center justify-start gap-2 p-2 px-1">
                 <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-gray-100" @click="showEmoji = !showEmoji">
                     <Smile :size="18" />
                 </button>
@@ -326,6 +330,7 @@ defineExpose({ editor, reset });
                     <X :size="18" />
                 </button>
                 <button
+                    v-if="props.sendable"
                     type="button"
                     data-testid="toolbar-send"
                     class="ml-auto rounded p-1 text-blue-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"

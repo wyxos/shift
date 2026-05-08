@@ -140,6 +140,7 @@ async function createTask() {
             </SheetHeader>
 
             <TaskCreateForm
+                class="min-h-0 flex-1"
                 :model-value="{
                     title: createForm.title,
                     priority: createForm.priority,

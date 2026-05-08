@@ -154,6 +154,26 @@ describe('ShiftEditor toolbar', () => {
         expect(afterShiftEnter?.length ?? 0).toBe(1);
     });
 
+    it('can render as a description editor without send semantics', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                sendable: false,
+            },
+        });
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>Draft description</p>');
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="toolbar-send"]').exists()).toBe(false);
+
+        await wrapper.find('.ProseMirror').trigger('keydown', { key: 'Enter' });
+        await nextTick();
+
+        expect(wrapper.emitted('send')?.length ?? 0).toBe(0);
+        expect(ed?.getHTML() ?? '').toContain('Draft description');
+    });
+
     it('does not submit on Enter while inside a list item', async () => {
         const wrapper = mount(ShiftEditor);
         await nextTick();
