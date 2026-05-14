@@ -80,7 +80,7 @@ describe('AppSidebarHeader', () => {
         vi.unstubAllGlobals();
     });
 
-    it('renders one appearance cycle button before the notification badge', () => {
+    it('renders the appearance toggle without moving actions or notifications', () => {
         const wrapper = mount(AppSidebarHeader, {
             props: {
                 breadcrumbs: [{ title: 'Tasks', href: '/tasks' }] as any,

@@ -26,14 +26,10 @@ export type Option = {
 export type ProjectFilters = {
     search?: string | null;
     sort_by?: string | null;
+    organisation_id?: number | string | null;
 };
 
-export type ProjectAccessUser = {
-    id: number;
-    user_name?: string | null;
-    user_email?: string | null;
-    registration_status?: string | null;
-};
+export type ProjectAccessUser = ManagedAccessUser;
 
 export type SortBy = 'newest' | 'oldest' | 'name';
 
@@ -61,26 +57,16 @@ export function normalizeNullableId(value: number | string | null | undefined) {
     return Number(value);
 }
 
-export function projectScopeLabel(project: ProjectRow) {
-    if (project.client_name) {
-        return project.client_name;
-    }
+export function projectClientLabel(project: ProjectRow) {
+    return project.client_name?.trim() || null;
+}
 
+export function projectOrganisationLabel(project: ProjectRow) {
     if (project.organisation_name) {
         return project.organisation_name;
     }
 
-    return 'Standalone project';
+    return 'Standalone';
 }
 
-export function projectScopeVariant(project: ProjectRow) {
-    if (project.client_name || project.organisation_name) {
-        return 'secondary';
-    }
-
-    return 'outline';
-}
-
-export function accessStatusLabel(projectUser: ProjectAccessUser) {
-    return projectUser.registration_status === 'registered' ? 'Registered' : 'Pending invitation';
-}
+import type { ManagedAccessUser } from '../access-users';

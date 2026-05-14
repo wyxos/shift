@@ -48,6 +48,7 @@ type OrganisationOption = {
 type ClientFilters = {
     search?: string | null;
     sort_by?: string | null;
+    organisation_id?: number | string | null;
 };
 
 type SortBy = 'newest' | 'oldest' | 'name';
@@ -90,6 +91,7 @@ const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
+const appliedOrganisationId = computed(() => props.filters.organisation_id ?? null);
 const draftSearchTerm = ref(appliedSearchTerm.value);
 const draftSortBy = ref<SortBy>(appliedSortBy.value);
 
@@ -172,6 +174,7 @@ function buildIndexParams(page = 1) {
     return {
         search: appliedSearchTerm.value.trim() || undefined,
         sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
+        organisation_id: appliedOrganisationId.value || undefined,
         page,
     };
 }

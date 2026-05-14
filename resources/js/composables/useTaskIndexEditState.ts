@@ -49,6 +49,12 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const isOwner = computed(() => Boolean(editTask.value?.is_owner));
     const canManageCollaborators = computed(() => Boolean(editTask.value?.can_manage_collaborators));
     const editTaskCreatorLabel = computed(() => getTaskCreatorName(editTask.value) ?? getTaskCreatorEmail(editTask.value) ?? 'Unknown');
+    const editTaskProjectUsersLabel = computed(() => {
+        const projectId = editTask.value?.project_id ?? null;
+        const projectName = projectId === null ? null : (options.projects.find((project) => project.id === projectId)?.name ?? null);
+
+        return projectName ? `${projectName} users` : 'Project users';
+    });
     const editTaskEnvironmentLabel = computed(() => {
         const projectId = editTask.value?.project_id ?? null;
         const selectedEnvironment = editForm.value.environment;
@@ -447,6 +453,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editTask,
         editTaskCreatorLabel,
         editTaskEnvironmentLabel,
+        editTaskProjectUsersLabel,
         editTempIdentifier,
         editUploading,
         fetchThreads: thread.fetchThreads,

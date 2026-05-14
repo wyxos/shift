@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -26,12 +27,21 @@ class DashboardController extends Controller
                     ->orWhereHas('project.organisation', function ($query) use ($userId) {
                         $query->where('author_id', $userId);
                     })
+                    ->orWhereHas('project.organisation.organisationUsers', function ($query) use ($userId) {
+                        $query->where('user_id', $userId);
+                    })
                     ->orWhereHas('project.client.organisation', function ($query) use ($userId) {
                         $query->where('author_id', $userId);
+                    })
+                    ->orWhereHas('project.client.organisation.organisationUsers', function ($query) use ($userId) {
+                        $query->where('user_id', $userId);
                     })
                     ->orWhereHasMorph('submitter', [User::class], function ($query) use ($userId) {
                         $query->where('users.id', $userId);
                     });
+            })
+            ->when(filled(request('organisation_id')), function (Builder $query) {
+                $this->applyProjectOrganisationFilter($query, request('organisation_id'));
             });
 
         $tasks = (clone $baseQuery)
@@ -173,5 +183,16 @@ class DashboardController extends Controller
                 'projects' => $projectBreakdown,
             ],
         ]);
+    }
+
+    private function applyProjectOrganisationFilter(Builder $query, mixed $organisationId): void
+    {
+        $query->whereHas('project', function (Builder $projectQuery) use ($organisationId) {
+            $projectQuery
+                ->where('organisation_id', $organisationId)
+                ->orWhereHas('client', function (Builder $clientQuery) use ($organisationId) {
+                    $clientQuery->where('organisation_id', $organisationId);
+                });
+        });
     }
 }

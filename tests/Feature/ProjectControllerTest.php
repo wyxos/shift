@@ -71,6 +71,7 @@ test('projects index includes owned and shared projects with ownership context',
         ->has('projects.data', 2)
         ->where('projects.data.0.id', $ownedProject->id)
         ->where('projects.data.0.client_name', 'Acme Client')
+        ->where('projects.data.0.organisation_name', 'Acme Org')
         ->where('projects.data.0.isOwner', true)
         ->where('projects.data.1.id', $sharedProject->id)
         ->where('projects.data.1.organisation_name', 'Partner Org')

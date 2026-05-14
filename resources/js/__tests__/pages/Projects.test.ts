@@ -159,7 +159,7 @@ vi.mock('axios', () => ({
 describe('Projects.vue', () => {
     const mockProjects = {
         data: [
-            { id: 1, name: 'Portal Refresh', isOwner: true, client_name: 'Acme Client', organisation_name: null },
+            { id: 1, name: 'Portal Refresh', isOwner: true, client_name: 'Acme Client', organisation_name: 'Acme Org' },
             { id: 2, name: 'Shared Rollout', isOwner: false, client_name: null, organisation_name: 'Northwind' },
         ],
         current_page: 1,
@@ -179,10 +179,13 @@ describe('Projects.vue', () => {
         { id: 2, name: 'Tailspin' },
     ];
 
+    const mockAccessUsers = [{ id: 7, name: 'Existing User', email: 'existing@example.com' }];
+
     function mountPage() {
         return mount(Projects, {
             props: {
                 projects: mockProjects,
+                accessUsers: mockAccessUsers,
                 clients: mockClients,
                 organisations: mockOrganisations,
                 filters: {
@@ -217,10 +220,15 @@ describe('Projects.vue', () => {
         const wrapper = mountPage();
 
         expect(wrapper.text()).toContain('Portal Refresh');
-        expect(wrapper.find('[data-testid="project-scope-1"]').text()).toContain('Acme Client');
-        expect(wrapper.find('[data-testid="project-grant-1"]').exists()).toBe(true);
-        expect(wrapper.find('[data-testid="project-grant-2"]').exists()).toBe(false);
-        expect(wrapper.text()).toContain('View and collaborate only');
+        expect(wrapper.text()).toContain('Acme Client');
+        expect(wrapper.text()).not.toContain('Project #1');
+        expect(wrapper.find('[data-testid="project-scope-1"]').text()).toContain('Acme Org');
+        expect(wrapper.find('[data-testid="project-grant-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-manage-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="project-manage-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-access-1"]').text()).toBe('Owner');
+        expect(wrapper.find('[data-testid="project-access-2"]').text()).toBe('Shared');
+        expect(wrapper.text()).not.toContain('View and collaborate only');
     });
 
     it('applies filters and preserves pagination state', async () => {
@@ -245,7 +253,7 @@ describe('Projects.vue', () => {
         );
     });
 
-    it('preserves create, edit, delete, and grant access flows', async () => {
+    it('preserves create, edit, delete, and manage access add flows', async () => {
         const wrapper = mountPage();
 
         await wrapper.get('[data-testid="open-create-project"]').trigger('click');
@@ -267,10 +275,10 @@ describe('Projects.vue', () => {
 
         expect(inertiaMocks.routerDelete).toHaveBeenCalledWith('/projects/1', expect.objectContaining({ preserveScroll: true }));
 
-        await wrapper.get('[data-testid="project-grant-1"]').trigger('click');
-        await wrapper.get('[data-testid="grant-project-email"]').setValue('new.user@example.com');
-        await wrapper.get('[data-testid="grant-project-name"]').setValue('New User');
-        await wrapper.get('[data-testid="grant-project-submit"]').trigger('click');
+        await wrapper.get('[data-testid="project-manage-1"]').trigger('click');
+        await flushPromises();
+        await wrapper.get('[data-testid="project-access-email"]').setValue('new.user@example.com');
+        await wrapper.get('[data-testid="project-access-submit"]').trigger('click');
 
         const grantAccessForm = inertiaMocks.formInstances.find((form) => 'project_id' in form && 'email' in form && 'name' in form);
         expect(grantAccessForm?.post).toHaveBeenCalledWith('/projects/1/users', expect.objectContaining({ preserveScroll: true }));

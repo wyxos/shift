@@ -151,6 +151,7 @@ function formatTaskTime(value?: string | null) {
                             <TaskCollaboratorField
                                 :disabled="state.editLoading || state.editUploading"
                                 :environment="state.editForm.environment"
+                                :external-label="state.editTaskProjectUsersLabel"
                                 :model-value="state.editForm.collaborators"
                                 :project-id="state.editTask.project_id ?? null"
                                 :read-only="!state.canManageCollaborators"

@@ -29,6 +29,10 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
     const providedPriorities = normalizeStringList(providedFilters.priority);
     const providedSearchTerm = typeof providedFilters.search === 'string' ? providedFilters.search : '';
     const providedEnvironmentTerm = typeof providedFilters.environment === 'string' ? providedFilters.environment : '';
+    const providedOrganisationId =
+        typeof providedFilters.organisation_id === 'number' || typeof providedFilters.organisation_id === 'string'
+            ? String(providedFilters.organisation_id)
+            : '';
     const providedSortBy =
         typeof providedFilters.sort_by === 'string' && allowedSortBy.has(providedFilters.sort_by)
             ? providedFilters.sort_by
@@ -105,6 +109,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             priority: appliedPriorities.value,
             search: appliedSearchTerm.value || undefined,
             environment: appliedEnvironmentTerm.value || undefined,
+            organisation_id: providedOrganisationId || undefined,
             sort_by: appliedSortBy.value,
             page,
         };

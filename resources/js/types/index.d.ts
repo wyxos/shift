@@ -18,12 +18,19 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface SidebarOrganisation {
+    id: number;
+    name: string;
+    isOwner: boolean;
+}
+
 export interface SharedData extends PageProps {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
     ziggy: Config & { location: string };
     sidebarOpen: boolean;
+    sidebarOrganisations?: SidebarOrganisation[];
     shift?: {
         ai_enabled: boolean;
     };

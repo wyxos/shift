@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Organisation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -54,6 +56,24 @@ class HandleInertiaRequests extends Middleware
             'shift' => [
                 'ai_enabled' => (bool) config('shift_ai.enabled', false),
             ],
+            'sidebarOrganisations' => fn () => $request->user()
+                ? Organisation::query()
+                    ->where(function (Builder $query) use ($request) {
+                        $query->where('author_id', $request->user()->id)
+                            ->orWhereHas('organisationUsers', function (Builder $query) use ($request) {
+                                $query->where('user_id', $request->user()->id);
+                            });
+                    })
+                    ->orderBy('name')
+                    ->limit(5)
+                    ->get(['id', 'name', 'author_id'])
+                    ->map(fn (Organisation $organisation) => [
+                        'id' => $organisation->id,
+                        'name' => $organisation->name,
+                        'isOwner' => $organisation->author_id === $request->user()->id,
+                    ])
+                    ->values()
+                : [],
         ];
     }
 }
