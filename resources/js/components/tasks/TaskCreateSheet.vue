@@ -49,6 +49,8 @@ const defaultProjectId = computed(() => (props.projects.length === 1 ? props.pro
 const hasProjects = computed(() => props.projects.length > 0);
 const showProjectSelector = computed(() => props.projects.length > 1);
 const canSubmit = computed(() => createForm.value.projectId !== null && createForm.value.title.trim().length > 0);
+const selectedProject = computed(() => props.projects.find((project) => project.id === createForm.value.projectId) ?? null);
+const projectUsersLabel = computed(() => (selectedProject.value ? `${selectedProject.value.name} users` : 'Project users'));
 
 const createForm = ref<TaskCreateDraft>({
     title: '',
@@ -81,6 +83,16 @@ function openCreate() {
 
 function closeCreate() {
     createOpen.value = false;
+}
+
+function updateProject(projectId: number | null) {
+    if (createForm.value.projectId === projectId) {
+        return;
+    }
+
+    createForm.value.projectId = projectId;
+    createForm.value.environment = null;
+    createForm.value.collaborators = emptyTaskCollaborators();
 }
 
 async function createTask() {
@@ -161,8 +173,15 @@ async function createTask() {
             >
                 <div v-if="showProjectSelector" class="space-y-2">
                     <label class="flex items-center gap-2 text-sm leading-none font-medium select-none">Project</label>
-                    <select v-model="createForm.projectId" :class="inputClass" data-testid="create-task-project">
-                        <option :value="null">Select a project</option>
+                    <select
+                        :value="createForm.projectId ?? ''"
+                        :class="inputClass"
+                        data-testid="create-task-project"
+                        @change="
+                            updateProject(($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)
+                        "
+                    >
+                        <option value="">Select a project</option>
                         <option v-for="project in projects" :key="project.id" :value="project.id">
                             {{ project.name }}
                         </option>
@@ -176,7 +195,12 @@ async function createTask() {
                     test-id="create-task-environment"
                 />
 
-                <TaskCollaboratorField v-model="createForm.collaborators" :environment="createForm.environment" :project-id="createForm.projectId" />
+                <TaskCollaboratorField
+                    v-model="createForm.collaborators"
+                    :environment="createForm.environment"
+                    :external-label="projectUsersLabel"
+                    :project-id="createForm.projectId"
+                />
                 <p class="text-muted-foreground text-xs">On create, the submitter and selected collaborators are notified.</p>
 
                 <template #actions>

@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Building2, FolderKanban, Pencil, Trash2, UserPlus, Users } from 'lucide-vue-next';
+import { Building2, FolderKanban, Pencil, Trash2, Users } from 'lucide-vue-next';
 
 type OrganisationRow = {
     id: number;
@@ -19,7 +19,6 @@ const { organisations } = defineProps<{
 const emit = defineEmits<{
     'open-edit': [organisation: OrganisationRow];
     'open-delete': [organisation: OrganisationRow];
-    'open-invite': [organisation: OrganisationRow];
     'open-manage-users': [organisation: OrganisationRow];
 }>();
 
@@ -60,7 +59,6 @@ function projectsLabel(count?: number | null) {
                         </div>
                         <div class="min-w-0">
                             <div class="truncate font-medium">{{ organisation.name }}</div>
-                            <div class="text-muted-foreground text-xs">Created {{ formatDate(organisation.created_at) }}</div>
                         </div>
                     </div>
                 </TableCell>
@@ -76,16 +74,6 @@ function projectsLabel(count?: number | null) {
                 <TableCell class="text-muted-foreground">{{ formatDate(organisation.created_at) }}</TableCell>
                 <TableCell>
                     <div class="flex flex-wrap justify-end gap-2">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            :data-testid="`organisation-invite-${organisation.id}`"
-                            title="Invite user"
-                            @click="emit('open-invite', organisation)"
-                        >
-                            <UserPlus class="h-4 w-4" />
-                            <span class="sr-only">Invite user</span>
-                        </Button>
                         <Button
                             size="sm"
                             variant="outline"

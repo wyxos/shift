@@ -18,6 +18,10 @@ class ClientController extends Controller
                 $query->where('author_id', auth()->id());
             })
             ->when(
+                filled(request('organisation_id')),
+                fn (Builder $query) => $query->where('organisation_id', request('organisation_id'))
+            )
+            ->when(
                 request('search'),
                 fn (Builder $query, string $search) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%'])
             );
@@ -36,7 +40,7 @@ class ClientController extends Controller
 
         return inertia('Clients')
             ->with([
-                'filters' => request()->only(['search', 'sort_by']),
+                'filters' => request()->only(['search', 'sort_by', 'organisation_id']),
                 'clients' => $clients
                     ->paginate(10)
                     ->withQueryString()

@@ -61,6 +61,12 @@ class TaskController extends Controller
             $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$filters['search'].'%']);
         }
 
+        if (filled($filters['organisation_id'] ?? null)) {
+            $query->whereHas('project', function (Builder $projectQuery) use ($filters) {
+                $this->applyProjectOrganisationFilter($projectQuery, $filters['organisation_id']);
+            });
+        }
+
         if (filled($filters['project_id'] ?? null)) {
             $query->where('project_id', $filters['project_id']);
         }
@@ -92,12 +98,29 @@ class TaskController extends Controller
                 ->whereHas('client.organisation', function ($organisationQuery) use ($userId) {
                     $organisationQuery->where('author_id', $userId);
                 })
+                ->orWhereHas('client.organisation.organisationUsers', function ($organisationUserQuery) use ($userId) {
+                    $organisationUserQuery->where('user_id', $userId);
+                })
                 ->orWhereHas('organisation', function ($organisationQuery) use ($userId) {
                     $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhereHas('organisation.organisationUsers', function ($organisationUserQuery) use ($userId) {
+                    $organisationUserQuery->where('user_id', $userId);
                 })
                 ->orWhere('author_id', $userId)
                 ->orWhereHas('projectUser', function ($projectUserQuery) use ($userId) {
                     $projectUserQuery->where('user_id', $userId);
+                });
+        });
+    }
+
+    private function applyProjectOrganisationFilter(Builder $query, mixed $organisationId): void
+    {
+        $query->where(function (Builder $projectQuery) use ($organisationId) {
+            $projectQuery
+                ->where('organisation_id', $organisationId)
+                ->orWhereHas('client', function (Builder $clientQuery) use ($organisationId) {
+                    $clientQuery->where('organisation_id', $organisationId);
                 });
         });
     }
@@ -478,7 +501,7 @@ class TaskController extends Controller
             ->with(['submitter', 'metadata', 'project.organisation', 'project.client'])
             ->latest();
 
-        $this->applyIndexFilters($query, request()->only(['search', 'project_id', 'priority', 'status']));
+        $this->applyIndexFilters($query, request()->only(['search', 'project_id', 'organisation_id', 'priority', 'status']));
 
         $tasks = $query->paginate(10)->withQueryString();
 
@@ -492,7 +515,7 @@ class TaskController extends Controller
 
         return inertia('Tasks/IndexLegacy')
             ->with([
-                'filters' => request()->only(['search', 'project_id', 'priority', 'status']),
+                'filters' => request()->only(['search', 'project_id', 'organisation_id', 'priority', 'status']),
                 'tasks' => $tasks,
                 'projects' => $projects,
             ]);
@@ -515,6 +538,7 @@ class TaskController extends Controller
             $selectedPriorities = $allPriorities;
         }
 
+        $organisationId = request('organisation_id');
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
@@ -530,6 +554,12 @@ class TaskController extends Controller
 
         if ($search !== '') {
             $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$search.'%']);
+        }
+
+        if (filled($organisationId)) {
+            $query->whereHas('project', function (Builder $projectQuery) use ($organisationId) {
+                $this->applyProjectOrganisationFilter($projectQuery, $organisationId);
+            });
         }
 
         if ($environment !== '') {
@@ -578,10 +608,14 @@ class TaskController extends Controller
                     'priority' => $selectedPriorities,
                     'search' => $search,
                     'environment' => $environment !== '' ? $environment : null,
+                    'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
                 'projects' => $this->visibleProjectsQuery()
+                    ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
+                        $this->applyProjectOrganisationFilter($query, $organisationId);
+                    })
                     ->with('environments')
                     ->orderBy('name')
                     ->get()
@@ -627,9 +661,13 @@ class TaskController extends Controller
                 ->values(),
             'internal_available' => true,
             'internal_error' => null,
+            'internal_label' => 'Team',
+            'internal_description' => 'Registered SHIFT users on this project.',
             'external' => $external,
             'external_available' => $externalAvailable,
             'external_error' => $externalError,
+            'external_label' => "{$project->name} users",
+            'external_description' => 'Users available in the selected environment.',
         ]);
     }
 

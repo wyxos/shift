@@ -66,8 +66,14 @@ class Task extends Model
                 ->orWhereHas('project.organisation', function (Builder $organisationQuery) use ($userId) {
                     $organisationQuery->where('author_id', $userId);
                 })
+                ->orWhereHas('project.organisation.organisationUsers', function (Builder $organisationUserQuery) use ($userId) {
+                    $organisationUserQuery->where('user_id', $userId);
+                })
                 ->orWhereHas('project.client.organisation', function (Builder $organisationQuery) use ($userId) {
                     $organisationQuery->where('author_id', $userId);
+                })
+                ->orWhereHas('project.client.organisation.organisationUsers', function (Builder $organisationUserQuery) use ($userId) {
+                    $organisationUserQuery->where('user_id', $userId);
                 })
                 ->orWhereHasMorph('submitter', [User::class], function (Builder $submitterQuery) use ($userId) {
                     $submitterQuery->where('users.id', $userId);

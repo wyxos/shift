@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class ProjectController extends Controller
@@ -16,7 +17,7 @@ class ProjectController extends Controller
         $projects = Project::query()
             ->with([
                 'client:id,name,organisation_id',
-                'client.organisation:id,author_id',
+                'client.organisation:id,name,author_id',
                 'organisation:id,name,author_id',
             ])
             ->where(function (Builder $query) {
@@ -24,13 +25,30 @@ class ProjectController extends Controller
                     ->whereHas('client.organisation', function (Builder $subQuery) {
                         $subQuery->where('author_id', auth()->id());
                     })
+                    ->orWhereHas('client.organisation.organisationUsers', function (Builder $subQuery) {
+                        $subQuery->where('user_id', auth()->id());
+                    })
                     ->orWhereHas('organisation', function (Builder $subQuery) {
                         $subQuery->where('author_id', auth()->id());
+                    })
+                    ->orWhereHas('organisation.organisationUsers', function (Builder $subQuery) {
+                        $subQuery->where('user_id', auth()->id());
                     })
                     ->orWhereHas('projectUser', function (Builder $subQuery) {
                         $subQuery->where('user_id', auth()->id());
                     })
                     ->orWhere('author_id', auth()->id());
+            })
+            ->when(filled(request('organisation_id')), function (Builder $query) {
+                $organisationId = request('organisation_id');
+
+                $query->where(function (Builder $subQuery) use ($organisationId) {
+                    $subQuery
+                        ->where('organisation_id', $organisationId)
+                        ->orWhereHas('client', function (Builder $clientQuery) use ($organisationId) {
+                            $clientQuery->where('organisation_id', $organisationId);
+                        });
+                });
             })
             ->when(
                 request('search'),
@@ -51,14 +69,14 @@ class ProjectController extends Controller
 
         return inertia('Projects')
             ->with([
-                'filters' => request()->only(['search', 'sort_by']),
+                'filters' => request()->only(['search', 'sort_by', 'organisation_id']),
                 'projects' => $projects
                     ->paginate(10)
                     ->withQueryString()
                     ->through(fn (Project $project) => [
                         ...$project->toArray(),
                         'client_name' => $project->client?->name,
-                        'organisation_name' => $project->organisation?->name,
+                        'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
                         'isOwner' => $project->isManagedByUser(auth()->id()),
                     ]),
                 'clients' => Client::query()
@@ -71,6 +89,9 @@ class ProjectController extends Controller
                     ->where('author_id', auth()->id())
                     ->orderBy('name')
                     ->get(['id', 'name']),
+                'accessUsers' => User::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email']),
             ]);
     }
 

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Organisations/Index.vue';
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { fetchMock, getCreateForm, getEditForm, getInviteForm, makeProps, routerDeleteMock, routerGetMock } from './test-helpers';
+import { describe, expect, it } from 'vitest';
+import { fetchMock, getAccessForm, getCreateForm, getEditForm, makeProps, routerDeleteMock } from './test-helpers';
 
 describe('Organisations/Index.vue', () => {
     it('creates a new organisation from the create dialog', async () => {
@@ -51,23 +51,25 @@ describe('Organisations/Index.vue', () => {
         );
     });
 
-    it('invites a user from the row action', async () => {
+    it('adds a user from the manage access dialog', async () => {
         const wrapper = mount(Index, {
-            props: makeProps(),
+            props: makeProps({
+                accessUsers: [{ id: 9, name: 'Existing Staff', email: 'existing@example.com' }],
+            }),
         });
 
-        await wrapper.get('[data-testid="organisation-invite-1"]').trigger('click');
+        await wrapper.get('[data-testid="organisation-manage-1"]').trigger('click');
+        await flushPromises();
 
-        const inviteForm = getInviteForm();
+        const accessForm = getAccessForm();
 
-        expect(inviteForm.organisation_id).toBe(1);
-        expect(inviteForm.organisation_name).toBe('Acme Labs');
+        expect(accessForm.organisation_id).toBe(1);
+        expect(accessForm.organisation_name).toBe('Acme Labs');
 
-        await wrapper.get('[data-testid="invite-organisation-email"]').setValue('staff@example.com');
-        await wrapper.get('[data-testid="invite-organisation-name"]').setValue('Staff Member');
-        await wrapper.get('[data-testid="submit-invite-organisation"]').trigger('click');
+        await wrapper.get('[data-testid="organisation-access-email"]').setValue('staff@example.com');
+        await wrapper.get('[data-testid="organisation-access-submit"]').trigger('click');
 
-        expect(inviteForm.post).toHaveBeenCalledWith(
+        expect(accessForm.post).toHaveBeenCalledWith(
             '/organisations/1/users',
             expect.objectContaining({
                 preserveScroll: true,
@@ -75,7 +77,8 @@ describe('Organisations/Index.vue', () => {
                 onError: expect.any(Function),
             }),
         );
-        expect(inviteForm.reset).toHaveBeenCalled();
+        expect(accessForm.email).toBe('');
+        expect(accessForm.name).toBe('');
     });
 
     it('loads organisation users and removes access from the manage users dialog', async () => {

@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Client;
+use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
@@ -24,17 +26,32 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 2) Create or update the SHIFT development project with static project token
+        // 2) Create a realistic organisation/client owner for the SDK project.
+        $organisation = Organisation::updateOrCreate(
+            ['name' => 'Northwind Organisation'],
+            ['author_id' => $user->id]
+        );
+        $client = Client::updateOrCreate(
+            [
+                'name' => 'Northwind Studio',
+                'organisation_id' => $organisation->id,
+            ],
+            ['organisation_id' => $organisation->id]
+        );
+
+        // 3) Create or update the SHIFT development project with static project token
         $SHIFT_PROJECT = 'zgc5QC5M1hGNmH7qbRSzEn29CBWfOtIPQT6pfM9FdUzfj0Ai6DmeGLcmGQ7s';
         $project = Project::updateOrCreate(
             ['token' => $SHIFT_PROJECT],
             [
                 'name' => 'SHIFT Development Project',
+                'client_id' => $client->id,
+                'organisation_id' => null,
                 'author_id' => $user->id,
             ]
         );
 
-        // 3) Ensure the user is associated with the project (ProjectUser)
+        // 4) Ensure the user is associated with the project (ProjectUser)
         ProjectUser::firstOrCreate(
             [
                 'project_id' => $project->id,
@@ -46,7 +63,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 4) Seed Sanctum personal access token for the user using static SHIFT_TOKEN
+        // 5) Seed Sanctum personal access token for the user using static SHIFT_TOKEN
         //    Format: "{id}|{plain-text-token}" from Sanctum
         $SHIFT_TOKEN = '1|SIw4KgAVyHHMlOuE0AE4AsxO7VTzl8AoKooklTYK641f594f';
         [$tokenId, $plain] = explode('|', $SHIFT_TOKEN, 2);

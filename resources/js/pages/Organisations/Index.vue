@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import DeleteDialog from '@/components/DeleteDialog.vue';
+import { type AccessUserCandidate, type ManagedAccessUser } from '@/components/admin/access-users';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
 import OrganisationCreateDialog from '@/components/admin/organisations/OrganisationCreateDialog.vue';
 import OrganisationEditDialog from '@/components/admin/organisations/OrganisationEditDialog.vue';
-import OrganisationInviteDialog from '@/components/admin/organisations/OrganisationInviteDialog.vue';
 import OrganisationListTable from '@/components/admin/organisations/OrganisationListTable.vue';
 import OrganisationManageUsersDialog from '@/components/admin/organisations/OrganisationManageUsersDialog.vue';
+import DeleteDialog from '@/components/DeleteDialog.vue';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,16 @@ import { Building2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
+    accessUsers?: AccessUserCandidate[];
     organisations: OrganisationPaginator;
     filters: {
         search?: string | null;
         sort_by?: string | null;
+    };
+    panel?: {
+        create?: boolean;
+        manage?: number | null;
+        settings?: number | null;
     };
 }>();
 
@@ -30,8 +36,6 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/organisations',
     },
 ];
-
-
 
 const defaultSortBy: SortBy = 'newest';
 const sortOptions = [
@@ -50,7 +54,9 @@ function normalizeSortBy(value: string | null | undefined): SortBy {
 
 const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
-const inviteDialogOpen = ref(false);
+const manageUsersLoading = ref(false);
+const manageUsersError = ref<string | null>(null);
+const handledPanelIntent = ref<string | null>(null);
 
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
@@ -138,12 +144,6 @@ function openDeleteModal(organisation: OrganisationRow) {
     deleteForm.isActive = true;
 }
 
-function openInviteModal(organisation: OrganisationRow) {
-    inviteForm.organisation_id = organisation.id;
-    inviteForm.organisation_name = organisation.name;
-    inviteDialogOpen.value = true;
-}
-
 const editForm = useForm<{
     id: number | null;
     name: string;
@@ -168,7 +168,7 @@ const deleteForm = useForm<{
     isActive: false,
 });
 
-const inviteForm = useForm<{
+const accessForm = useForm<{
     organisation_id: number | null;
     organisation_name: string;
     email: string;
@@ -183,7 +183,7 @@ const inviteForm = useForm<{
 const manageUsersForm = useForm<{
     organisation_id: number | null;
     organisation_name: string;
-    users: Array<{ id: number; user_name: string; user_email: string }>;
+    users: ManagedAccessUser[];
     isOpen: boolean;
 }>({
     organisation_id: null,
@@ -191,6 +191,8 @@ const manageUsersForm = useForm<{
     users: [],
     isOpen: false,
 });
+
+const accessDisabled = computed(() => accessForm.processing || !accessForm.email.trim() || !accessForm.name.trim());
 
 function submitCreateForm() {
     createForm.post('/organisations', {
@@ -226,16 +228,20 @@ function confirmDelete() {
     });
 }
 
-function inviteUser() {
-    if (!inviteForm.organisation_id) return;
+function addAccess() {
+    if (!accessForm.organisation_id) return;
 
-    inviteForm.post(`/organisations/${inviteForm.organisation_id}/users`, {
+    accessForm.post(`/organisations/${accessForm.organisation_id}/users`, {
         onSuccess: () => {
-            inviteDialogOpen.value = false;
-            inviteForm.reset();
+            const organisationId = accessForm.organisation_id;
+            const organisationName = accessForm.organisation_name;
+
+            accessForm.email = '';
+            accessForm.name = '';
+            void openManageUsersModal({ id: organisationId as number, name: organisationName });
         },
         onError: () => {
-            inviteDialogOpen.value = true;
+            manageUsersForm.isOpen = true;
         },
         preserveScroll: true,
     });
@@ -244,13 +250,28 @@ function inviteUser() {
 async function openManageUsersModal(organisation: OrganisationRow) {
     manageUsersForm.organisation_id = organisation.id;
     manageUsersForm.organisation_name = organisation.name;
+    manageUsersForm.users = [];
+    manageUsersForm.isOpen = true;
+    accessForm.organisation_id = organisation.id;
+    accessForm.organisation_name = organisation.name;
+    accessForm.email = '';
+    accessForm.name = '';
+    accessForm.clearErrors?.();
+    manageUsersLoading.value = true;
+    manageUsersError.value = null;
 
     try {
         const response = await fetch(`/organisations/${organisation.id}/users`);
+        if (!response.ok) {
+            throw new Error(`Failed to load users for organisation ${organisation.id}`);
+        }
+
         manageUsersForm.users = await response.json();
-        manageUsersForm.isOpen = true;
     } catch (error) {
         console.error('Error fetching users:', error);
+        manageUsersError.value = 'Unable to load organisation access right now.';
+    } finally {
+        manageUsersLoading.value = false;
     }
 }
 
@@ -268,8 +289,51 @@ function removeAccess(organisationUser: { id: number }) {
     });
 }
 
+watch(
+    () => [props.panel?.create, props.panel?.manage, props.panel?.settings, organisationRows.value],
+    () => {
+        if (props.panel?.create) {
+            createForm.isActive = true;
+        }
 
+        const settingsId = props.panel?.settings;
 
+        if (settingsId) {
+            const intent = `settings:${settingsId}`;
+
+            if (handledPanelIntent.value !== intent) {
+                const organisation = organisationRows.value.find((row) => row.id === settingsId);
+
+                if (organisation) {
+                    handledPanelIntent.value = intent;
+                    openEditModal(organisation);
+                }
+            }
+        }
+
+        const manageId = props.panel?.manage;
+
+        if (!manageId) {
+            return;
+        }
+
+        const intent = `manage:${manageId}`;
+
+        if (handledPanelIntent.value === intent) {
+            return;
+        }
+
+        const organisation = organisationRows.value.find((row) => row.id === manageId);
+
+        if (!organisation) {
+            return;
+        }
+
+        handledPanelIntent.value = intent;
+        void openManageUsersModal(organisation);
+    },
+    { immediate: true, deep: true },
+);
 </script>
 
 <template>
@@ -321,7 +385,6 @@ function removeAccess(organisationUser: { id: number }) {
                     :organisations="organisationRows"
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"
-                    @open-invite="openInviteModal"
                     @open-manage-users="openManageUsersModal"
                 />
             </AdminListShell>
@@ -350,19 +413,17 @@ function removeAccess(organisationUser: { id: number }) {
             @update:open="editDialogOpen = $event"
         />
 
-        <OrganisationInviteDialog
-            :form="inviteForm"
-            :open="inviteDialogOpen"
-            @cancel="inviteDialogOpen = false"
-            @submit="inviteUser"
-            @update:open="inviteDialogOpen = $event"
-        />
-
         <OrganisationManageUsersDialog
+            :access-disabled="accessDisabled"
+            :access-form="accessForm"
+            :access-users="accessUsers ?? []"
+            :error="manageUsersError"
             :form="manageUsersForm"
+            :loading="manageUsersLoading"
             :open="manageUsersForm.isOpen"
             @cancel="manageUsersForm.isOpen = false"
             @remove-access="removeAccess"
+            @submit-access="addAccess"
             @update:open="manageUsersForm.isOpen = $event"
         />
     </AppLayout>

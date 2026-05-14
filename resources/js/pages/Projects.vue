@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import DeleteDialog from '@/components/DeleteDialog.vue';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
+import { type AccessUserCandidate } from '@/components/admin/access-users';
 import ProjectApiTokenDialog from '@/components/admin/projects/ProjectApiTokenDialog.vue';
 import ProjectCreateDialog from '@/components/admin/projects/ProjectCreateDialog.vue';
 import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue';
-import ProjectGrantAccessDialog from '@/components/admin/projects/ProjectGrantAccessDialog.vue';
 import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
 import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
-import { type Option, type ProjectAccessUser, type ProjectFilters, type ProjectPaginator, type ProjectRow, defaultSortBy, normalizeNullableId, normalizeSortBy, sortOptions, type SortBy } from '@/components/admin/projects/project-shared';
+import {
+    defaultSortBy,
+    normalizeNullableId,
+    normalizeSortBy,
+    sortOptions,
+    type Option,
+    type ProjectAccessUser,
+    type ProjectFilters,
+    type ProjectPaginator,
+    type ProjectRow,
+    type SortBy,
+} from '@/components/admin/projects/project-shared';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
@@ -22,11 +33,13 @@ import { computed, ref, watch } from 'vue';
 const props = withDefaults(
     defineProps<{
         projects: ProjectPaginator;
+        accessUsers?: AccessUserCandidate[];
         clients?: Option[];
         organisations?: Option[];
         filters?: ProjectFilters;
     }>(),
     {
+        accessUsers: () => [],
         clients: () => [],
         organisations: () => [],
         filters: () => ({}),
@@ -39,9 +52,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-
-
-
 const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
 const manageUsersLoading = ref(false);
@@ -50,6 +60,7 @@ const apiTokenLoading = ref(false);
 const apiTokenError = ref<string | null>(null);
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
+const appliedOrganisationId = computed(() => props.filters.organisation_id ?? null);
 const draftSearchTerm = ref(appliedSearchTerm.value);
 const draftSortBy = ref<SortBy>(appliedSortBy.value);
 
@@ -193,6 +204,7 @@ function buildIndexParams(page = 1) {
     return {
         search: appliedSearchTerm.value.trim() || undefined,
         sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
+        organisation_id: appliedOrganisationId.value || undefined,
         page,
     };
 }
@@ -242,19 +254,16 @@ function openDeleteModal(project: ProjectRow) {
     deleteForm.isActive = true;
 }
 
-function openGrantAccessModal(project: ProjectRow) {
-    grantAccessForm.project_id = project.id;
-    grantAccessForm.project_name = project.name;
-    grantAccessForm.email = '';
-    grantAccessForm.name = '';
-    grantAccessForm.isOpen = true;
-}
-
 async function openManageUsersModal(project: ProjectRow) {
     manageUsersForm.project_id = project.id;
     manageUsersForm.project_name = project.name;
     manageUsersForm.users = [];
     manageUsersForm.isOpen = true;
+    grantAccessForm.project_id = project.id;
+    grantAccessForm.project_name = project.name;
+    grantAccessForm.email = '';
+    grantAccessForm.name = '';
+    grantAccessForm.clearErrors?.();
     manageUsersLoading.value = true;
     manageUsersError.value = null;
 
@@ -333,11 +342,15 @@ function grantAccess() {
     grantAccessForm.post(`/projects/${grantAccessForm.project_id}/users`, {
         preserveScroll: true,
         onSuccess: () => {
-            grantAccessForm.reset();
-            grantAccessForm.isOpen = false;
+            const projectId = grantAccessForm.project_id;
+            const projectName = grantAccessForm.project_name;
+
+            grantAccessForm.email = '';
+            grantAccessForm.name = '';
+            void openManageUsersModal({ id: projectId as number, name: projectName });
         },
         onError: () => {
-            grantAccessForm.isOpen = true;
+            manageUsersForm.isOpen = true;
         },
     });
 }
@@ -378,9 +391,6 @@ async function generateApiToken() {
         apiTokenLoading.value = false;
     }
 }
-
-
-
 </script>
 
 <template>
@@ -437,7 +447,6 @@ async function generateApiToken() {
                     @open-api-token="openApiTokenModal"
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"
-                    @open-grant-access="openGrantAccessModal"
                     @open-manage-users="openManageUsersModal"
                 />
             </AdminListShell>
@@ -469,21 +478,17 @@ async function generateApiToken() {
             @submit="saveEdit"
             @update:open="editDialogOpen = $event"
         />
-        <ProjectGrantAccessDialog
-            :form="grantAccessForm"
-            :open="grantAccessForm.isOpen"
-            :disabled="grantAccessDisabled"
-            @cancel="grantAccessForm.isOpen = false"
-            @submit="grantAccess"
-            @update:open="grantAccessForm.isOpen = $event"
-        />
         <ProjectManageUsersDialog
+            :access-disabled="grantAccessDisabled"
+            :access-form="grantAccessForm"
+            :access-users="accessUsers"
             :error="manageUsersError"
             :form="manageUsersForm"
             :loading="manageUsersLoading"
             :open="manageUsersForm.isOpen"
             @cancel="manageUsersForm.isOpen = false"
             @remove-access="removeAccess"
+            @submit-access="grantAccess"
             @update:open="manageUsersForm.isOpen = $event"
         />
         <ProjectApiTokenDialog

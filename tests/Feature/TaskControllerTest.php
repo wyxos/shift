@@ -489,6 +489,7 @@ test('collaborator candidate endpoint requires an environment before external lo
         ->assertOk()
         ->assertJsonPath('external_available', false)
         ->assertJsonPath('external_error', 'Select an environment before tagging external collaborators.')
+        ->assertJsonPath('external_label', "{$project->name} users")
         ->assertJsonCount(2, 'internal');
     $response->assertJsonFragment(['id' => $this->user->id]);
     $response->assertJsonFragment(['id' => $registeredUser->id]);
