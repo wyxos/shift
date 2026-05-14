@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organisation;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class OrganisationController extends Controller
@@ -42,6 +43,14 @@ class OrganisationController extends Controller
             'organisations' => $organisations
                 ->paginate(10)
                 ->withQueryString(),
+            'accessUsers' => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
+            'panel' => [
+                'create' => request()->boolean('create'),
+                'manage' => request()->integer('manage') ?: null,
+                'settings' => request()->integer('settings') ?: null,
+            ],
         ]);
     }
 

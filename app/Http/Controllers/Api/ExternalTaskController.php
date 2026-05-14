@@ -538,8 +538,11 @@ class ExternalTaskController extends Controller
         }
 
         $search = trim((string) $request->input('search', ''));
+        $project->loadMissing(['client.organisation:id,name', 'organisation:id,name']);
+        $organisationName = $project->organisation?->name ?? $project->client?->organisation?->name;
 
         return response()->json([
+            'organisation_name' => $organisationName,
             'users' => $this->taskCollaboratorService
                 ->internalCandidates($project, $search)
                 ->map(fn (\App\Models\User $user) => [

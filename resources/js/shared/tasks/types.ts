@@ -56,6 +56,7 @@ export type TaskIndexFilters = {
     priority?: string[] | string | null;
     search?: string | null;
     environment?: string | null;
+    organisation_id?: number | string | null;
     sort_by?: string | null;
 };
 

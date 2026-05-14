@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Client;
+use App\Models\Organisation;
+use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -69,5 +72,63 @@ test('dashboard returns task metrics and chart datasets', function () {
         ->has('charts.throughput', 8)
         ->has('charts.environments')
         ->has('charts.projects')
+    );
+});
+
+test('dashboard metrics can be scoped to a shared organisation', function () {
+    $user = User::factory()->create();
+    $owner = User::factory()->create();
+
+    $sharedOrganisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+    OrganisationUser::create([
+        'organisation_id' => $sharedOrganisation->id,
+        'user_id' => $user->id,
+        'user_email' => $user->email,
+        'user_name' => $user->name,
+    ]);
+    $sharedClient = Client::factory()->create([
+        'organisation_id' => $sharedOrganisation->id,
+    ]);
+    $sharedProject = Project::factory()->create([
+        'name' => 'Atlas Console',
+        'client_id' => $sharedClient->id,
+        'author_id' => $owner->id,
+    ]);
+    Task::factory()->create([
+        'project_id' => $sharedProject->id,
+        'status' => 'pending',
+        'priority' => 'high',
+    ]);
+
+    $otherOrganisation = Organisation::factory()->create([
+        'author_id' => $user->id,
+    ]);
+    $otherClient = Client::factory()->create([
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'client_id' => $otherClient->id,
+        'author_id' => $user->id,
+    ]);
+    Task::factory()->create([
+        'project_id' => $otherProject->id,
+        'status' => 'completed',
+        'priority' => 'low',
+    ]);
+
+    $response = $this->actingAs($user)->get('/dashboard?organisation_id='.$sharedOrganisation->id);
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard')
+        ->where('metrics.total', 1)
+        ->where('metrics.pending', 1)
+        ->where('metrics.completed', 0)
+        ->where('metrics.open', 1)
+        ->where('metrics.high_priority_open', 1)
+        ->where('charts.projects.0.project', 'Atlas Console')
+        ->where('charts.projects.0.count', 1)
     );
 });

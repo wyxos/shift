@@ -49,7 +49,7 @@ function getCreateForm() {
     return findForm((form) => 'name' in form && 'isActive' in form && !('id' in form));
 }
 
-function getInviteForm() {
+function getAccessForm() {
     return findForm((form) => 'organisation_id' in form && 'email' in form && 'name' in form);
 }
 
@@ -292,15 +292,16 @@ vi.mock('@/components/ui/table', () => ({
     },
 }));
 
-
 beforeEach(() => {
     routerGetMock.mockReset();
     routerDeleteMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
+        ok: true,
         json: async () => [
             {
                 id: 20,
+                user_id: 12,
                 user_name: 'Jane Admin',
                 user_email: 'jane@example.com',
             },
@@ -343,4 +344,4 @@ export function makeProps(overrides: Partial<any> = {}) {
     };
 }
 
-export { Index, fetchMock, flushPromises, getCreateForm, getEditForm, getInviteForm, mount, routerDeleteMock, routerGetMock };
+export { fetchMock, flushPromises, getAccessForm, getCreateForm, getEditForm, Index, mount, routerDeleteMock, routerGetMock };

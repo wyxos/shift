@@ -797,6 +797,8 @@ test('toggle priority succeeds with granted access', function () {
 });
 
 test('internal collaborator lookup endpoint returns registered shift users for the project', function () {
+    $this->project->client->organisation->update(['name' => 'Northwind Organisation']);
+
     $registeredUser = User::factory()->create();
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $this->project->id,
@@ -814,6 +816,7 @@ test('internal collaborator lookup endpoint returns registered shift users for t
 
     $response
         ->assertOk()
+        ->assertJsonPath('organisation_name', 'Northwind Organisation')
         ->assertJsonFragment(['id' => $registeredUser->id]);
 });
 

@@ -3,8 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { FolderKanban, KeyRound, Pencil, Trash2, UserPlus, Users } from 'lucide-vue-next';
-import { type ProjectRow, projectScopeLabel, projectScopeVariant } from './project-shared';
+import { KeyRound, Pencil, Trash2, Users } from 'lucide-vue-next';
+import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
 const { projects } = defineProps<{
     projects: ProjectRow[];
@@ -13,7 +13,6 @@ const { projects } = defineProps<{
 const emit = defineEmits<{
     'open-edit': [project: ProjectRow];
     'open-delete': [project: ProjectRow];
-    'open-grant-access': [project: ProjectRow];
     'open-manage-users': [project: ProjectRow];
     'open-api-token': [project: ProjectRow];
 }>();
@@ -24,7 +23,7 @@ const emit = defineEmits<{
         <TableHeader>
             <TableRow>
                 <TableHead>Project</TableHead>
-                <TableHead>Scope</TableHead>
+                <TableHead>Organisation</TableHead>
                 <TableHead>Access</TableHead>
                 <TableHead class="text-right">Actions</TableHead>
             </TableRow>
@@ -35,44 +34,30 @@ const emit = defineEmits<{
                     <TableCell>
                         <div class="flex flex-col gap-1">
                             <span class="font-medium">{{ project.name }}</span>
-                            <span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                                <FolderKanban class="h-3.5 w-3.5" />
-                                Project #{{ project.id }}
+                            <span v-if="projectClientLabel(project)" class="text-muted-foreground text-xs">
+                                {{ projectClientLabel(project) }}
                             </span>
                         </div>
                     </TableCell>
                     <TableCell>
-                        <Badge :data-testid="`project-scope-${project.id}`" :variant="projectScopeVariant(project)" class="gap-1">
-                            <KeyRound class="h-3.5 w-3.5" />
-                            {{ projectScopeLabel(project) }}
+                        <Badge :data-testid="`project-scope-${project.id}`" variant="secondary">
+                            {{ projectOrganisationLabel(project) }}
                         </Badge>
                     </TableCell>
                     <TableCell>
                         <Badge
                             :data-testid="`project-access-${project.id}`"
                             :class="
-                                project.isOwner
-                                    ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
-                                    : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
+                                project.isOwner ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100' : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
                             "
                             variant="secondary"
                         >
-                            {{ project.isOwner ? 'Owner access' : 'Shared access' }}
+                            {{ project.isOwner ? 'Owner' : 'Shared' }}
                         </Badge>
                     </TableCell>
                     <TableCell>
                         <div class="flex flex-wrap justify-end gap-2">
                             <template v-if="project.isOwner">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    :data-testid="`project-grant-${project.id}`"
-                                    @click="emit('open-grant-access', project)"
-                                >
-                                    <UserPlus class="h-4 w-4 sm:mr-2" />
-                                    <span class="hidden sm:inline">Grant</span>
-                                </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -111,7 +96,6 @@ const emit = defineEmits<{
                                     <Trash2 class="h-4 w-4" />
                                 </ActionIconButton>
                             </template>
-                            <span v-else class="text-muted-foreground text-sm">View and collaborate only</span>
                         </div>
                     </TableCell>
                 </TableRow>

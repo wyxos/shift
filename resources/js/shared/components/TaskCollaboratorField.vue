@@ -8,7 +8,7 @@ import {
     type TaskCollaboratorSelection,
 } from '@shared/tasks/collaborators';
 import axios from 'axios';
-import { LoaderCircle, Search, UserPlus, X } from 'lucide-vue-next';
+import { Check, LoaderCircle, Search, UserPlus, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = withDefaults(
@@ -34,11 +34,11 @@ const props = withDefaults(
         readOnly: false,
         disabled: false,
         lookupUrl: null,
-        internalLabel: 'SHIFT',
+        internalLabel: 'Team',
         internalBadgeLabel: null,
         internalDescription: 'Registered SHIFT users on this project.',
-        externalLabel: 'External',
-        externalBadgeLabel: 'External',
+        externalLabel: 'Project users',
+        externalBadgeLabel: 'Guest',
         externalDescription: 'Users available in the selected environment.',
         searchPlaceholder: 'Search collaborators',
     },
@@ -49,6 +49,7 @@ const emit = defineEmits<{
 }>();
 
 const search = ref('');
+const activeGroup = ref<CollaboratorKind>('internal');
 const loading = ref(false);
 const internalOptions = ref<CollaboratorOption[]>([]);
 const externalOptions = ref<CollaboratorOption[]>([]);
@@ -56,13 +57,25 @@ const internalAvailable = ref(true);
 const externalAvailable = ref(true);
 const internalError = ref<string | null>(null);
 const externalError = ref<string | null>(null);
+const responseInternalLabel = ref<string | null>(null);
+const responseExternalLabel = ref<string | null>(null);
+const responseInternalDescription = ref<string | null>(null);
+const responseExternalDescription = ref<string | null>(null);
 let searchTimer: number | null = null;
 
 const selection = computed(() => normalizeTaskCollaborators(props.modelValue));
 const hasSelection = computed(() => selection.value.internal.length > 0 || selection.value.external.length > 0);
 
-
 type CollaboratorKind = 'internal' | 'external';
+
+type CollaboratorGroup = {
+    kind: CollaboratorKind;
+    label: string;
+    description: string;
+    options: CollaboratorOption[];
+    available: boolean;
+    error: string | null;
+};
 
 type CollaboratorBadgeStyle = {
     shell: string;
@@ -86,6 +99,34 @@ const collaboratorBadgeStyles: Record<CollaboratorKind, CollaboratorBadgeStyle> 
     },
 };
 
+const resolvedInternalLabel = computed(() => responseInternalLabel.value ?? props.internalLabel);
+const resolvedExternalLabel = computed(() => responseExternalLabel.value ?? props.externalLabel);
+const resolvedInternalDescription = computed(() => responseInternalDescription.value ?? props.internalDescription);
+const resolvedExternalDescription = computed(() => responseExternalDescription.value ?? props.externalDescription);
+
+const collaboratorGroups = computed<CollaboratorGroup[]>(() => [
+    {
+        kind: 'internal',
+        label: resolvedInternalLabel.value,
+        description: resolvedInternalDescription.value,
+        options: internalOptions.value,
+        available: internalAvailable.value,
+        error: internalError.value,
+    },
+    {
+        kind: 'external',
+        label: resolvedExternalLabel.value,
+        description: resolvedExternalDescription.value,
+        options: externalOptions.value,
+        available: externalAvailable.value,
+        error: externalError.value,
+    },
+]);
+
+const activeCollaboratorGroup = computed(
+    () => collaboratorGroups.value.find((group) => group.kind === activeGroup.value) ?? collaboratorGroups.value[0],
+);
+
 function normalizeBadgeLabel(value?: string | null): string | null {
     if (typeof value !== 'string') {
         return null;
@@ -104,6 +145,23 @@ function collaboratorDisplayValue(collaborator: Pick<CollaboratorOption, 'name' 
     const email = collaborator.email?.trim();
 
     return name || email || 'Unknown collaborator';
+}
+
+function normalizeLookupText(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+
+    return normalized.length > 0 ? normalized : null;
+}
+
+function resetLookupMetadata() {
+    responseInternalLabel.value = null;
+    responseExternalLabel.value = null;
+    responseInternalDescription.value = null;
+    responseExternalDescription.value = null;
 }
 
 function selectedBadgeStyle(kind: CollaboratorKind): CollaboratorBadgeStyle {
@@ -137,6 +195,22 @@ function toggleCollaborator(kind: 'internal' | 'external', collaborator: Collabo
     emitSelection(next);
 }
 
+function groupStatusMessage(group: CollaboratorGroup): string | null {
+    if (group.error) {
+        return group.error;
+    }
+
+    if (!group.available) {
+        return `${group.label} collaborators are unavailable.`;
+    }
+
+    if (group.options.length === 0) {
+        return `No ${group.label.toLowerCase()} collaborators found.`;
+    }
+
+    return null;
+}
+
 function resolveLookupUrl(): string | null {
     if (props.lookupUrl) {
         return props.lookupUrl;
@@ -157,6 +231,7 @@ async function fetchCollaborators() {
         externalAvailable.value = props.environment !== null || props.lookupUrl !== null;
         internalError.value = null;
         externalError.value = null;
+        resetLookupMetadata();
         return;
     }
 
@@ -168,6 +243,7 @@ async function fetchCollaborators() {
         externalAvailable.value = false;
         internalError.value = 'Select a project before tagging collaborators.';
         externalError.value = 'Select a project before tagging collaborators.';
+        resetLookupMetadata();
         return;
     }
 
@@ -187,6 +263,10 @@ async function fetchCollaborators() {
         externalAvailable.value = response.data?.external_available !== false;
         internalError.value = typeof response.data?.internal_error === 'string' ? response.data.internal_error : null;
         externalError.value = typeof response.data?.external_error === 'string' ? response.data.external_error : null;
+        responseInternalLabel.value = normalizeLookupText(response.data?.internal_label);
+        responseExternalLabel.value = normalizeLookupText(response.data?.external_label);
+        responseInternalDescription.value = normalizeLookupText(response.data?.internal_description);
+        responseExternalDescription.value = normalizeLookupText(response.data?.external_description);
     } catch (error: any) {
         const message = error.response?.data?.message || error.message || 'Failed to load collaborators.';
         internalOptions.value = [];
@@ -195,6 +275,7 @@ async function fetchCollaborators() {
         externalAvailable.value = false;
         internalError.value = message;
         externalError.value = message;
+        resetLookupMetadata();
     } finally {
         loading.value = false;
     }
@@ -268,10 +349,7 @@ onBeforeUnmount(() => {
                     >
                         {{ collaboratorBadgeLabel('internal') }}
                     </span>
-                    <span
-                        :class="selectedBadgeStyle('internal').value"
-                        data-collaborator-badge-value-kind="internal"
-                    >
+                    <span :class="selectedBadgeStyle('internal').value" data-collaborator-badge-value-kind="internal">
                         {{ collaboratorDisplayValue(collaborator) }}
                     </span>
                     <button
@@ -298,10 +376,7 @@ onBeforeUnmount(() => {
                     >
                         {{ collaboratorBadgeLabel('external') }}
                     </span>
-                    <span
-                        :class="selectedBadgeStyle('external').value"
-                        data-collaborator-badge-value-kind="external"
-                    >
+                    <span :class="selectedBadgeStyle('external').value" data-collaborator-badge-value-kind="external">
                         {{ collaboratorDisplayValue(collaborator) }}
                     </span>
                     <button
@@ -330,88 +405,77 @@ onBeforeUnmount(() => {
             </div>
 
             <template v-else>
-                <div class="relative">
-                    <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                    <Input v-model="search" class="pl-9" data-testid="task-collaborators-search" :placeholder="searchPlaceholder" />
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <div class="space-y-3 rounded-xl border p-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-medium">{{ internalLabel }}</div>
-                                <div class="text-muted-foreground text-xs">{{ internalDescription }}</div>
-                            </div>
-                            <LoaderCircle v-if="loading" class="text-muted-foreground h-4 w-4 animate-spin" />
-                        </div>
-
-                        <div v-if="internalError" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            {{ internalError }}
-                        </div>
-
-                        <div v-else-if="!internalAvailable" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            {{ internalLabel }} collaborators are unavailable.
-                        </div>
-
-                        <div v-else-if="internalOptions.length === 0" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            No {{ internalLabel.toLowerCase() }} collaborators found.
-                        </div>
-
-                        <div v-else class="max-h-60 space-y-2 overflow-auto pr-1">
-                            <button
-                                v-for="collaborator in internalOptions"
-                                :key="`internal-option-${collaboratorKey(collaborator.id)}`"
-                                type="button"
-                                class="hover:bg-muted/70 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition"
-                                :data-testid="`internal-collaborator-option-${collaboratorKey(collaborator.id)}`"
-                                @click="toggleCollaborator('internal', collaborator)"
-                            >
-                                <span class="min-w-0">
-                                    <span class="block truncate text-sm font-medium">{{ collaborator.name }}</span>
-                                    <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{ collaborator.email }}</span>
-                                </span>
-                                <UserPlus v-if="!isSelected('internal', collaborator)" class="text-muted-foreground h-4 w-4 shrink-0" />
-                                <span v-else class="bg-muted text-foreground inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium">Selected</span>
-                            </button>
+                <div class="bg-background overflow-hidden rounded-md border" data-testid="task-collaborators-dropdown">
+                    <div class="border-b p-2">
+                        <div class="relative">
+                            <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                            <Input v-model="search" class="pr-9 pl-9" data-testid="task-collaborators-search" :placeholder="searchPlaceholder" />
+                            <LoaderCircle
+                                v-if="loading"
+                                class="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin"
+                            />
                         </div>
                     </div>
 
-                    <div class="space-y-3 rounded-xl border p-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-medium">{{ externalLabel }}</div>
-                                <div class="text-muted-foreground text-xs">{{ externalDescription }}</div>
-                            </div>
-                            <LoaderCircle v-if="loading" class="text-muted-foreground h-4 w-4 animate-spin" />
+                    <div class="grid gap-1 border-b p-2 sm:grid-cols-2" data-testid="task-collaborators-group-filter">
+                        <button
+                            v-for="group in collaboratorGroups"
+                            :key="group.kind"
+                            type="button"
+                            class="hover:bg-muted rounded-md border px-3 py-2 text-left transition"
+                            :class="
+                                activeGroup === group.kind
+                                    ? 'border-primary/40 bg-muted text-foreground shadow-xs'
+                                    : 'text-muted-foreground border-transparent'
+                            "
+                            :data-testid="`task-collaborators-group-${group.kind}`"
+                            @click="activeGroup = group.kind"
+                        >
+                            <span class="flex items-start justify-between gap-3">
+                                <span class="min-w-0">
+                                    <span class="block truncate text-sm font-medium">{{ group.label }}</span>
+                                    <span class="text-muted-foreground mt-0.5 block text-xs leading-snug">{{ group.description }}</span>
+                                </span>
+                                <span
+                                    v-if="selection[group.kind].length > 0"
+                                    class="bg-background text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px]"
+                                >
+                                    {{ selection[group.kind].length }}
+                                </span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <div class="max-h-64 overflow-auto p-2">
+                        <div
+                            v-if="groupStatusMessage(activeCollaboratorGroup)"
+                            class="text-muted-foreground rounded-md border border-dashed p-3 text-sm"
+                        >
+                            {{ groupStatusMessage(activeCollaboratorGroup) }}
                         </div>
 
-                        <div v-if="externalError" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            {{ externalError }}
-                        </div>
-
-                        <div v-else-if="!externalAvailable" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            {{ externalLabel }} collaborators are unavailable.
-                        </div>
-
-                        <div v-else-if="externalOptions.length === 0" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
-                            No {{ externalLabel.toLowerCase() }} collaborators found.
-                        </div>
-
-                        <div v-else class="max-h-60 space-y-2 overflow-auto pr-1">
+                        <div v-else class="space-y-1">
                             <button
-                                v-for="collaborator in externalOptions"
-                                :key="`external-option-${collaboratorKey(collaborator.id)}`"
+                                v-for="collaborator in activeCollaboratorGroup.options"
+                                :key="`${activeCollaboratorGroup.kind}-option-${collaboratorKey(collaborator.id)}`"
                                 type="button"
-                                class="hover:bg-muted/70 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition"
-                                :data-testid="`external-collaborator-option-${collaboratorKey(collaborator.id)}`"
-                                @click="toggleCollaborator('external', collaborator)"
+                                class="hover:bg-muted/70 flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition"
+                                :data-testid="`${activeCollaboratorGroup.kind}-collaborator-option-${collaboratorKey(collaborator.id)}`"
+                                @click="toggleCollaborator(activeCollaboratorGroup.kind, collaborator)"
                             >
                                 <span class="min-w-0">
                                     <span class="block truncate text-sm font-medium">{{ collaborator.name }}</span>
-                                    <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{ collaborator.email }}</span>
+                                    <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{
+                                        collaborator.email
+                                    }}</span>
                                 </span>
-                                <UserPlus v-if="!isSelected('external', collaborator)" class="text-muted-foreground h-4 w-4 shrink-0" />
-                                <span v-else class="bg-muted text-foreground inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium">Selected</span>
+                                <Check
+                                    v-if="isSelected(activeCollaboratorGroup.kind, collaborator)"
+                                    class="text-primary h-4 w-4 shrink-0"
+                                    :data-testid="`${activeCollaboratorGroup.kind}-collaborator-selected-${collaboratorKey(collaborator.id)}`"
+                                    aria-hidden="true"
+                                />
+                                <UserPlus v-else class="text-muted-foreground h-4 w-4 shrink-0" />
                             </button>
                         </div>
                     </div>

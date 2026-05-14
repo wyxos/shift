@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
 import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { describe, expect, it } from 'vitest';
+import { axiosGetMock, axiosPostMock, makeTasksPage, sonnerMocks } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('keeps create disabled until a project and title are provided', async () => {
@@ -27,6 +26,10 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="open-create-task"]').trigger('click');
 
         expect(wrapper.get('[data-testid="create-description-editor"]').find('[data-testid="stub-send"]').exists()).toBe(false);
+        expect((wrapper.get('[data-testid="create-task-project"]').element as HTMLSelectElement).value).toBe('');
+        expect((wrapper.get('[data-testid="create-task-project"]').element as HTMLSelectElement).selectedOptions[0]?.textContent).toBe(
+            'Select a project',
+        );
 
         const submit = wrapper.get('[data-testid="submit-create-task"]');
         expect(submit.attributes('disabled')).toBeDefined();
@@ -100,4 +103,52 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
+    it('clears project-dependent environment and collaborators when the selected project changes', async () => {
+        axiosGetMock.mockReset();
+        axiosPostMock.mockResolvedValueOnce({
+            data: {
+                data: {
+                    id: 8,
+                    title: 'Moved project task',
+                },
+            },
+        });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([]),
+                projects: [
+                    { id: 42, name: 'Portal', environments: [{ key: 'staging', label: 'Staging', url: 'https://portal.test' }] },
+                    { id: 43, name: 'Docs', environments: [{ key: 'production', label: 'Production', url: 'https://docs.test' }] },
+                ],
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        await wrapper.get('[data-testid="open-create-task"]').trigger('click');
+        await wrapper.get('[data-testid="create-task-title"]').setValue('Moved project task');
+        await wrapper.get('[data-testid="create-task-project"]').setValue('42');
+        await wrapper.get('[data-testid="set-task-environment"]').trigger('click');
+        await wrapper.get('[data-testid="set-task-collaborators"]').trigger('click');
+
+        await wrapper.get('[data-testid="create-task-project"]').setValue('43');
+        await wrapper.get('[data-testid="create-task-form"]').trigger('submit');
+        await flushPromises();
+
+        expect(axiosPostMock).toHaveBeenCalledWith(
+            '/tasks.v2.store',
+            expect.objectContaining({
+                project_id: 43,
+                environment: null,
+                internal_collaborator_ids: [],
+                external_collaborators: [],
+            }),
+        );
+
+        wrapper.unmount();
+    });
 });
