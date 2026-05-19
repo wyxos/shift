@@ -181,23 +181,12 @@ watch(
     },
 );
 
-const otherCreateErrors = computed<Record<string, string>>(() => {
-    return Object.entries(createForm.errors)
-        .filter(([key]) => !['name', 'client_id', 'organisation_id'].includes(key))
-        .reduce<Record<string, string>>((accumulator, [key, value]) => {
-            accumulator[key] = value;
-            return accumulator;
-        }, {});
-});
+function omitErrors(errors: Record<string, string>, keys: string[]) {
+    return Object.fromEntries(Object.entries(errors).filter(([key]) => !keys.includes(key))) as Record<string, string>;
+}
 
-const otherEditErrors = computed<Record<string, string>>(() => {
-    return Object.entries(editForm.errors)
-        .filter(([key]) => key !== 'name')
-        .reduce<Record<string, string>>((accumulator, [key, value]) => {
-            accumulator[key] = value;
-            return accumulator;
-        }, {});
-});
+const otherCreateErrors = computed(() => omitErrors(createForm.errors, ['name', 'client_id', 'organisation_id']));
+const otherEditErrors = computed(() => omitErrors(editForm.errors, ['name']));
 
 const createDisabled = computed(() => createForm.processing || !createForm.name.trim());
 const editDisabled = computed(() => editForm.processing || !editForm.name.trim());
