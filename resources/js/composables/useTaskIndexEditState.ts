@@ -1,12 +1,12 @@
-import axios from 'axios';
-import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } from 'vue';
-import { toast } from 'vue-sonner';
 import { collaboratorsEqual, emptyTaskCollaborators, normalizeTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
 import { getTaskIdFromQuery, syncTaskQuery } from '@/shared/tasks/history';
 import { getTaskCreatorEmail, getTaskCreatorName, getTaskEnvironment } from '@/shared/tasks/metadata';
 import { projectEnvironmentOptions, type TaskProjectOption } from '@/shared/tasks/projects';
-import { useTaskIndexThreadState } from './useTaskIndexThreadState';
 import type { TaskDetail, TaskIndexEditSnapshot, TaskIndexOpenEditOptions } from '@/shared/tasks/types';
+import axios from 'axios';
+import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } from 'vue';
+import { toast } from 'vue-sonner';
+import { useTaskIndexThreadState } from './useTaskIndexThreadState';
 type UseTaskIndexEditStateOptions = {
     projects: TaskProjectOption[];
     aiImproveEnabled: ComputedRef<boolean>;
@@ -168,7 +168,6 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             environment: editForm.value.environment,
         };
     }
-
     function scheduleTaskAutosave(immediate = false) {
         if (!autosaveArmed.value || !editTask.value) return;
         if (taskSaving.value) {
@@ -188,12 +187,10 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             void saveTaskChanges();
         }, 650);
     }
-
     function showTaskSavingToast() {
         if (taskSaveToastId.value !== null) return;
         taskSaveToastId.value = toast.loading('Saving task changes...');
     }
-
     function showTaskSaveResultToast(success: boolean, message?: string) {
         const id = taskSaveToastId.value ?? undefined;
         taskSaveToastId.value = null;
@@ -203,14 +200,11 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         }
         toast.error('Failed to save task changes', { id, description: message ?? 'Unknown error', duration: 4000 });
     }
-
     async function saveTaskChanges() {
         if (!editTask.value) return;
         if (!hasPendingTaskChanges()) return;
-
         const snapshot = initialEditSnapshot.value;
         if (!snapshot) return;
-
         const taskId = editTask.value.id;
         const needsCollaboratorUpdate = canManageCollaborators.value && hasCollaboratorManagementChanges();
         const needsCoreUpdate = isOwner.value

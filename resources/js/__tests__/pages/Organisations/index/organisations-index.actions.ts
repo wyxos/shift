@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Organisations/Index.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';

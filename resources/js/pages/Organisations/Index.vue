@@ -5,8 +5,9 @@ import OrganisationCreateDialog from '@/components/admin/organisations/Organisat
 import OrganisationEditDialog from '@/components/admin/organisations/OrganisationEditDialog.vue';
 import OrganisationListTable from '@/components/admin/organisations/OrganisationListTable.vue';
 import OrganisationManageUsersDialog from '@/components/admin/organisations/OrganisationManageUsersDialog.vue';
+import OrganisationSettingsPanel from '@/components/admin/organisations/OrganisationSettingsPanel.vue';
+import OrganisationTeamPanel from '@/components/admin/organisations/OrganisationTeamPanel.vue';
 import DeleteDialog from '@/components/DeleteDialog.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
@@ -359,18 +360,6 @@ watch(
     },
     { immediate: true, deep: true },
 );
-
-function teamStatusBadgeClass(status: OrganisationTeamUser['status']) {
-    if (status === 'owner') {
-        return 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200';
-    }
-
-    if (status === 'pending') {
-        return 'border-transparent bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200';
-    }
-
-    return '';
-}
 </script>
 
 <template>
@@ -427,70 +416,17 @@ function teamStatusBadgeClass(status: OrganisationTeamUser['status']) {
                 />
             </AdminListShell>
 
-            <section v-else-if="isTeamMode && activePanelOrganisation" class="bg-card rounded-xl border p-4">
-                <div class="mb-4 flex flex-col gap-1">
-                    <h1 class="text-lg font-semibold">Team</h1>
-                    <p class="text-muted-foreground text-sm">{{ activePanelOrganisation.name }}</p>
-                </div>
-
-                <div class="overflow-hidden rounded-lg border">
-                    <div v-if="activePanelOrganisation.teamUsers.length === 0" class="text-muted-foreground p-4 text-sm">
-                        No users have access to this organisation.
-                    </div>
-                    <div
-                        v-for="teamUser in activePanelOrganisation.teamUsers"
-                        v-else
-                        :key="teamUser.id"
-                        class="flex items-center justify-between gap-4 border-b p-3 last:border-b-0"
-                        :data-testid="`organisation-team-user-${teamUser.id}`"
-                    >
-                        <div class="min-w-0">
-                            <div class="truncate font-medium">
-                                {{ teamUser.name }}
-                                <span class="text-muted-foreground font-normal">({{ teamUser.email }})</span>
-                            </div>
-                        </div>
-                        <Badge :class="teamStatusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
-                    </div>
-                </div>
-            </section>
-
-            <section v-else-if="isSettingsMode && activePanelOrganisation" class="space-y-4">
-                <div class="bg-card rounded-xl border p-4">
-                    <div class="max-w-xl space-y-4">
-                        <div class="space-y-1">
-                            <h1 class="text-lg font-semibold">Settings</h1>
-                            <p class="text-muted-foreground text-sm">{{ activePanelOrganisation.name }}</p>
-                        </div>
-
-                        <div class="space-y-2">
-                            <Label for="settings-organisation-name">Name</Label>
-                            <Input
-                                id="settings-organisation-name"
-                                v-model="editForm.name"
-                                data-testid="settings-organisation-name"
-                                placeholder="Organisation name"
-                            />
-                        </div>
-
-                        <div v-for="(error, key) in editForm.errors" :key="key" class="text-destructive text-sm">{{ error }}</div>
-
-                        <Button data-testid="settings-save-organisation" :disabled="settingsSaveDisabled" @click="saveEdit"> Save changes </Button>
-                    </div>
-                </div>
-
-                <div class="border-destructive/30 bg-card rounded-xl border p-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="space-y-1">
-                            <h2 class="text-destructive font-semibold">Delete organisation</h2>
-                            <p class="text-muted-foreground text-sm">This will permanently remove the organisation.</p>
-                        </div>
-                        <Button data-testid="settings-delete-organisation" variant="destructive" @click="openDeleteModal(activePanelOrganisation)">
-                            Delete organisation
-                        </Button>
-                    </div>
-                </div>
-            </section>
+            <OrganisationTeamPanel v-else-if="isTeamMode && activePanelOrganisation" :organisation="activePanelOrganisation" />
+            <OrganisationSettingsPanel
+                v-else-if="isSettingsMode && activePanelOrganisation"
+                :form="editForm"
+                :name="editForm.name"
+                :organisation="activePanelOrganisation"
+                :save-disabled="settingsSaveDisabled"
+                @delete="openDeleteModal"
+                @save="saveEdit"
+                @update:name="editForm.name = String($event)"
+            />
         </div>
 
         <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
