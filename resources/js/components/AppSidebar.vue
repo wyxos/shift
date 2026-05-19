@@ -42,7 +42,11 @@ const organisations = computed(() => page.props.sidebarOrganisations ?? []);
 
 const routeSelectedOrganisationId = computed(() => {
     const current = new URL(page.url, 'https://shift.test');
-    const id = current.searchParams.get('organisation_id') ?? current.searchParams.get('manage') ?? current.searchParams.get('settings');
+    const id =
+        current.searchParams.get('organisation_id') ??
+        current.searchParams.get('team') ??
+        current.searchParams.get('manage') ??
+        current.searchParams.get('settings');
 
     return id === null ? null : Number(id);
 });
@@ -91,7 +95,7 @@ const organisationNavItems = computed(() => {
         },
         {
             title: 'Team',
-            href: organisationManageHref(organisation),
+            href: organisationTeamHref(organisation),
             icon: Users,
             isVisible: organisation.isOwner,
         },
@@ -104,12 +108,12 @@ const organisationNavItems = computed(() => {
     ].filter((item) => item.isVisible);
 });
 
-function organisationManageHref(organisation: SidebarOrganisation) {
-    return `/organisations?search=${encodeURIComponent(organisation.name)}&manage=${organisation.id}`;
+function organisationTeamHref(organisation: SidebarOrganisation) {
+    return `/organisations?team=${organisation.id}`;
 }
 
 function organisationSettingsHref(organisation: SidebarOrganisation) {
-    return `/organisations?search=${encodeURIComponent(organisation.name)}&settings=${organisation.id}`;
+    return `/organisations?settings=${organisation.id}`;
 }
 
 function organisationContextHref(path: string, organisation: SidebarOrganisation) {
@@ -123,12 +127,30 @@ function isOrganisationItemActive(organisation: SidebarOrganisation) {
 function isOrganisationNavActive(href: string) {
     const target = new URL(href, 'https://shift.test');
     const current = new URL(page.url, 'https://shift.test');
-    const currentOrganisationId =
-        current.searchParams.get('organisation_id') ?? current.searchParams.get('manage') ?? current.searchParams.get('settings');
-    const targetOrganisationId =
-        target.searchParams.get('organisation_id') ?? target.searchParams.get('manage') ?? target.searchParams.get('settings');
 
-    return current.pathname === target.pathname && currentOrganisationId === targetOrganisationId;
+    return current.pathname === target.pathname && organisationRouteState(current) === organisationRouteState(target);
+}
+
+function organisationRouteState(url: URL) {
+    const organisationId = url.searchParams.get('organisation_id');
+
+    if (organisationId) {
+        return `context:${url.pathname}:${organisationId}`;
+    }
+
+    const teamId = url.searchParams.get('team') ?? url.searchParams.get('manage');
+
+    if (teamId) {
+        return `team:${teamId}`;
+    }
+
+    const settingsId = url.searchParams.get('settings');
+
+    if (settingsId) {
+        return `settings:${settingsId}`;
+    }
+
+    return 'none';
 }
 </script>
 
@@ -151,8 +173,8 @@ function isOrganisationNavActive(href: string) {
                 <div v-if="activeOrganisation" :key="`organisation-${activeOrganisation.id}`">
                     <SidebarGroup class="px-2 py-0">
                         <SidebarGroupLabel class="h-auto min-h-8 flex-col items-start justify-center gap-0.5 py-1.5 leading-tight">
-                            <span class="block max-w-full truncate text-sidebar-foreground">{{ activeOrganisation.name }}</span>
-                            <span v-if="!activeOrganisation.isOwner" class="text-sidebar-foreground/60 text-[11px] font-normal leading-none">
+                            <span class="text-sidebar-foreground block max-w-full truncate">{{ activeOrganisation.name }}</span>
+                            <span v-if="!activeOrganisation.isOwner" class="text-sidebar-foreground/60 text-[11px] leading-none font-normal">
                                 shared
                             </span>
                         </SidebarGroupLabel>
@@ -184,11 +206,7 @@ function isOrganisationNavActive(href: string) {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <SidebarMenuItem v-for="organisation in organisations" :key="organisation.id">
-                                    <SidebarMenuButton
-                                        as-child
-                                        :is-active="isOrganisationItemActive(organisation)"
-                                        :tooltip="organisation.name"
-                                    >
+                                    <SidebarMenuButton as-child :is-active="isOrganisationItemActive(organisation)" :tooltip="organisation.name">
                                         <Link :href="organisationContextHref('/dashboard', organisation)">
                                             <Network />
                                             <span class="min-w-0">
@@ -213,7 +231,7 @@ function isOrganisationNavActive(href: string) {
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link
-                                        class="text-muted-foreground hover:text-foreground focus-visible:ring-sidebar-ring block rounded-sm px-2 py-1 pl-8 text-xs leading-5 underline-offset-4 transition hover:underline focus-visible:ring-2 focus-visible:outline-hidden group-data-[collapsible=icon]:hidden"
+                                        class="text-muted-foreground hover:text-foreground focus-visible:ring-sidebar-ring block rounded-sm px-2 py-1 pl-8 text-xs leading-5 underline-offset-4 transition group-data-[collapsible=icon]:hidden hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
                                         href="/organisations"
                                     >
                                         Show more

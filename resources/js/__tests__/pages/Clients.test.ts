@@ -165,7 +165,7 @@ describe('Clients.vue', () => {
         { id: 2, name: 'Tailspin' },
     ];
 
-    function mountPage() {
+    function mountPage(overrides: Record<string, any> = {}) {
         return mount(Clients, {
             props: {
                 clients: mockClients,
@@ -174,6 +174,7 @@ describe('Clients.vue', () => {
                     search: '',
                     sort_by: 'newest',
                 },
+                ...overrides,
             },
         });
     }
@@ -192,6 +193,20 @@ describe('Clients.vue', () => {
         expect(wrapper.find('[data-testid="client-row-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="client-edit-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="client-organisation-2"]').text()).toContain('No organisation assigned');
+    });
+
+    it('hides the organisation column when scoped to an organisation', () => {
+        const wrapper = mountPage({
+            filters: {
+                search: '',
+                sort_by: 'newest',
+                organisation_id: 1,
+            },
+        });
+
+        expect(wrapper.text()).not.toContain('Organisation');
+        expect(wrapper.find('[data-testid="client-organisation-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="client-row-1"]').text()).toContain('Acme');
     });
 
     it('applies filters and preserves pagination state', async () => {

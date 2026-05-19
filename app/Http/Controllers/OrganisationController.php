@@ -12,6 +12,13 @@ class OrganisationController extends Controller
     {
         $userId = auth()->id();
         $sortBy = request('sort_by');
+        $panel = [
+            'create' => request()->boolean('create'),
+            'team' => request()->integer('team') ?: request()->integer('manage') ?: null,
+            'manage' => request()->integer('manage') ?: null,
+            'settings' => request()->integer('settings') ?: null,
+        ];
+        $panelOrganisationId = $panel['team'] ?: $panel['settings'];
 
         $organisations = Organisation::query()
             ->withCount(['organisationUsers', 'projects'])
@@ -38,6 +45,15 @@ class OrganisationController extends Controller
                 break;
         }
 
+        $panelOrganisation = null;
+
+        if ($panelOrganisationId) {
+            $panelOrganisation = Organisation::query()
+                ->where('author_id', $userId)
+                ->with(['author:id,name,email', 'organisationUsers.user:id,name,email'])
+                ->find($panelOrganisationId);
+        }
+
         return inertia('Organisations/Index')->with([
             'filters' => request()->only(['search', 'sort_by']),
             'organisations' => $organisations
@@ -46,16 +62,40 @@ class OrganisationController extends Controller
             'accessUsers' => User::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
-            'panel' => [
-                'create' => request()->boolean('create'),
-                'manage' => request()->integer('manage') ?: null,
-                'settings' => request()->integer('settings') ?: null,
-            ],
+            'panel' => $panel,
+            'panelOrganisation' => $panelOrganisation ? [
+                'id' => $panelOrganisation->id,
+                'name' => $panelOrganisation->name,
+                'teamUsers' => collect([
+                    $panelOrganisation->author ? [
+                        'id' => 'owner-'.$panelOrganisation->author->id,
+                        'name' => $panelOrganisation->author->name,
+                        'email' => $panelOrganisation->author->email,
+                        'status' => 'owner',
+                        'statusLabel' => 'Owner',
+                    ] : null,
+                ])
+                    ->filter()
+                    ->merge(
+                        $panelOrganisation->organisationUsers->map(fn ($organisationUser) => [
+                            'id' => 'access-'.$organisationUser->id,
+                            'organisationUserId' => $organisationUser->id,
+                            'name' => $organisationUser->user?->name ?: $organisationUser->user_name,
+                            'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
+                            'status' => $organisationUser->user_id ? 'registered' : 'pending',
+                            'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
+                        ])
+                    )
+                    ->values()
+                    ->all(),
+            ] : null,
         ]);
     }
 
     public function destroy(Organisation $organisation)
     {
+        abort_if($organisation->author_id !== auth()->id(), 403);
+
         $organisation->delete();
 
         return redirect()->route('organisations.index')->with('success', 'Organisation deleted successfully.');
@@ -63,11 +103,13 @@ class OrganisationController extends Controller
 
     public function update(Organisation $organisation)
     {
+        abort_if($organisation->author_id !== auth()->id(), 403);
+
         $organisation->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
 
-        return redirect()->route('organisations.index')->with('success', 'Organisation updated successfully.');
+        return redirect()->back()->with('success', 'Organisation updated successfully.');
     }
 
     public function store()

@@ -181,7 +181,7 @@ describe('Projects.vue', () => {
 
     const mockAccessUsers = [{ id: 7, name: 'Existing User', email: 'existing@example.com' }];
 
-    function mountPage() {
+    function mountPage(overrides: Record<string, any> = {}) {
         return mount(Projects, {
             props: {
                 projects: mockProjects,
@@ -192,6 +192,7 @@ describe('Projects.vue', () => {
                     search: '',
                     sort_by: 'newest',
                 },
+                ...overrides,
             },
         });
     }
@@ -229,6 +230,20 @@ describe('Projects.vue', () => {
         expect(wrapper.find('[data-testid="project-access-1"]').text()).toBe('Owner');
         expect(wrapper.find('[data-testid="project-access-2"]').text()).toBe('Shared');
         expect(wrapper.text()).not.toContain('View and collaborate only');
+    });
+
+    it('hides the organisation column when scoped to an organisation', () => {
+        const wrapper = mountPage({
+            filters: {
+                search: '',
+                sort_by: 'newest',
+                organisation_id: 1,
+            },
+        });
+
+        expect(wrapper.text()).not.toContain('Organisation');
+        expect(wrapper.find('[data-testid="project-scope-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-row-1"]').text()).toContain('Portal Refresh');
     });
 
     it('applies filters and preserves pagination state', async () => {

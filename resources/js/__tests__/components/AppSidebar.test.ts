@@ -157,8 +157,28 @@ describe('AppSidebar', () => {
         expect(wrapper.find('a[href="/tasks?organisation_id=3"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/clients?organisation_id=3"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/projects?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/organisations?search=Northwind%20Organisation&manage=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/organisations?search=Northwind%20Organisation&settings=3"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisations?team=3"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisations?settings=3"]').exists()).toBe(true);
+    });
+
+    it('keeps organisation team and settings active states distinct', () => {
+        mockPage.url = '/organisations?team=3';
+        const teamWrapper = mountSidebar();
+
+        const teamLink = teamWrapper.get('a[href="/organisations?team=3"]');
+        const settingsLink = teamWrapper.get('a[href="/organisations?settings=3"]');
+
+        expect(teamLink.element.parentElement?.getAttribute('data-active')).toBe('true');
+        expect(settingsLink.element.parentElement?.getAttribute('data-active')).toBe('false');
+
+        mockPage.url = '/organisations?settings=3';
+        const settingsWrapper = mountSidebar();
+
+        const activeTeamLink = settingsWrapper.get('a[href="/organisations?team=3"]');
+        const activeSettingsLink = settingsWrapper.get('a[href="/organisations?settings=3"]');
+
+        expect(activeTeamLink.element.parentElement?.getAttribute('data-active')).toBe('false');
+        expect(activeSettingsLink.element.parentElement?.getAttribute('data-active')).toBe('true');
     });
 
     it('shows only shared organisation links available to non-owners', () => {
