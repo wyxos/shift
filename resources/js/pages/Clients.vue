@@ -14,11 +14,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
+import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Building2, Pencil, Plus, Search, Trash2, Users } from 'lucide-vue-next';
@@ -114,6 +114,9 @@ watch(filtersOpen, (open) => {
 });
 
 const clientRows = computed(() => props.clients.data ?? []);
+const isOrganisationScoped = computed(
+    () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
+);
 const activeFilterCount = computed(() => {
     let count = 0;
 
@@ -323,7 +326,7 @@ function confirmDelete() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Client</TableHead>
-                            <TableHead>Organisation</TableHead>
+                            <TableHead v-if="!isOrganisationScoped">Organisation</TableHead>
                             <TableHead class="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -339,7 +342,7 @@ function confirmDelete() {
                                         </span>
                                     </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell v-if="!isOrganisationScoped">
                                     <Badge
                                         :data-testid="`client-organisation-${client.id}`"
                                         :variant="client.organisation_name ? 'secondary' : 'outline'"
@@ -372,7 +375,7 @@ function confirmDelete() {
                                 </TableCell>
                             </TableRow>
                         </template>
-                        <TableEmpty v-else :colspan="3">No clients found.</TableEmpty>
+                        <TableEmpty v-else :colspan="isOrganisationScoped ? 2 : 3">No clients found.</TableEmpty>
                     </TableBody>
                 </Table>
             </AdminListShell>

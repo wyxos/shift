@@ -83,6 +83,9 @@ watch(filtersOpen, (open) => {
 });
 
 const projectRows = computed(() => props.projects.data ?? []);
+const isOrganisationScoped = computed(
+    () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
+);
 const activeFilterCount = computed(() => {
     let count = 0;
 
@@ -444,6 +447,7 @@ async function generateApiToken() {
 
                 <ProjectListTable
                     :projects="projectRows"
+                    :show-organisation-column="!isOrganisationScoped"
                     @open-api-token="openApiTokenModal"
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"

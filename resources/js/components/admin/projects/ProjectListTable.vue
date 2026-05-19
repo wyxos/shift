@@ -6,8 +6,9 @@ import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { KeyRound, Pencil, Trash2, Users } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
-const { projects } = defineProps<{
+const { projects, showOrganisationColumn = true } = defineProps<{
     projects: ProjectRow[];
+    showOrganisationColumn?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -23,7 +24,7 @@ const emit = defineEmits<{
         <TableHeader>
             <TableRow>
                 <TableHead>Project</TableHead>
-                <TableHead>Organisation</TableHead>
+                <TableHead v-if="showOrganisationColumn">Organisation</TableHead>
                 <TableHead>Access</TableHead>
                 <TableHead class="text-right">Actions</TableHead>
             </TableRow>
@@ -39,7 +40,7 @@ const emit = defineEmits<{
                             </span>
                         </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell v-if="showOrganisationColumn">
                         <Badge :data-testid="`project-scope-${project.id}`" variant="secondary">
                             {{ projectOrganisationLabel(project) }}
                         </Badge>
@@ -100,7 +101,7 @@ const emit = defineEmits<{
                     </TableCell>
                 </TableRow>
             </template>
-            <TableEmpty v-else :colspan="4">No projects found.</TableEmpty>
+            <TableEmpty v-else :colspan="showOrganisationColumn ? 4 : 3">No projects found.</TableEmpty>
         </TableBody>
     </Table>
 </template>

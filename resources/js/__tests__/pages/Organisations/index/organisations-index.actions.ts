@@ -105,6 +105,90 @@ describe('Organisations/Index.vue', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
+    it('renders the team screen from the organisation sidebar state', () => {
+        const wrapper = mount(Index, {
+            props: makeProps({
+                panel: {
+                    team: 1,
+                    manage: null,
+                    settings: null,
+                    create: false,
+                },
+                panelOrganisation: {
+                    id: 1,
+                    name: 'Acme Labs',
+                    teamUsers: [
+                        {
+                            id: 'owner-7',
+                            name: 'Owner User',
+                            email: 'owner@example.com',
+                            status: 'owner',
+                            statusLabel: 'Owner',
+                        },
+                        {
+                            id: 'access-20',
+                            name: 'Jane Admin',
+                            email: 'jane@example.com',
+                            status: 'registered',
+                            statusLabel: 'Registered',
+                        },
+                    ],
+                },
+            }),
+        });
+
+        expect(wrapper.text()).toContain('Team');
+        expect(wrapper.text()).toContain('Acme Labs');
+        expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner User (owner@example.com)');
+        expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner');
+        expect(wrapper.get('[data-testid="organisation-team-user-access-20"]').text()).toContain('Jane Admin (jane@example.com)');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('renders the settings screen and saves or deletes the selected organisation', async () => {
+        const wrapper = mount(Index, {
+            props: makeProps({
+                panel: {
+                    manage: null,
+                    settings: 1,
+                    create: false,
+                },
+                panelOrganisation: {
+                    id: 1,
+                    name: 'Acme Labs',
+                    teamUsers: [],
+                },
+            }),
+        });
+
+        const settingsInput = wrapper.get('[data-testid="settings-organisation-name"]');
+        expect((settingsInput.element as HTMLInputElement).value).toBe('Acme Labs');
+
+        await settingsInput.setValue('Acme Labs Updated');
+        await wrapper.get('[data-testid="settings-save-organisation"]').trigger('click');
+
+        const editForm = getEditForm();
+
+        expect(editForm.put).toHaveBeenCalledWith(
+            '/organisations/1',
+            expect.objectContaining({
+                preserveScroll: true,
+                onSuccess: expect.any(Function),
+            }),
+        );
+
+        await wrapper.get('[data-testid="settings-delete-organisation"]').trigger('click');
+        await wrapper.get('[data-testid="delete-dialog-confirm"]').trigger('click');
+
+        expect(routerDeleteMock).toHaveBeenCalledWith(
+            '/organisations/1',
+            expect.objectContaining({
+                preserveScroll: true,
+                onSuccess: expect.any(Function),
+            }),
+        );
+    });
+
     it('deletes an organisation after confirmation', async () => {
         const wrapper = mount(Index, {
             props: makeProps(),
