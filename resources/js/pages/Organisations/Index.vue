@@ -6,6 +6,7 @@ import OrganisationEditDialog from '@/components/admin/organisations/Organisatio
 import OrganisationListTable from '@/components/admin/organisations/OrganisationListTable.vue';
 import OrganisationManageUsersDialog from '@/components/admin/organisations/OrganisationManageUsersDialog.vue';
 import DeleteDialog from '@/components/DeleteDialog.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,38 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import { Building2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
+type OrganisationRow = {
+    id: number;
+    name: string;
+    created_at?: string | null;
+    organisation_users_count?: number | null;
+    projects_count?: number | null;
+};
+
+type OrganisationPaginator = {
+    data: OrganisationRow[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+};
+
+type OrganisationIdentity = Pick<OrganisationRow, 'id' | 'name'>;
+
+type OrganisationTeamUser = {
+    id: string;
+    organisationUserId?: number | null;
+    name: string;
+    email: string;
+    status: 'owner' | 'registered' | 'pending';
+    statusLabel: string;
+};
+
+type PanelOrganisation = OrganisationIdentity & {
+    teamUsers: OrganisationTeamUser[];
+};
+
 const props = defineProps<{
     accessUsers?: AccessUserCandidate[];
     organisations: OrganisationPaginator;
@@ -25,9 +58,11 @@ const props = defineProps<{
     };
     panel?: {
         create?: boolean;
+        team?: number | null;
         manage?: number | null;
         settings?: number | null;
     };
+    panelOrganisation?: PanelOrganisation | null;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -56,7 +91,6 @@ const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
 const manageUsersLoading = ref(false);
 const manageUsersError = ref<string | null>(null);
-const handledPanelIntent = ref<string | null>(null);
 
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
@@ -64,6 +98,18 @@ const draftSearchTerm = ref(appliedSearchTerm.value);
 const draftSortBy = ref<SortBy>(appliedSortBy.value);
 
 const organisationRows = computed(() => props.organisations.data ?? []);
+const activeTeamPanelId = computed(() => props.panel?.team ?? props.panel?.manage ?? null);
+const activePanelOrganisation = computed<PanelOrganisation | null>(() => {
+    const panelOrganisationId = activeTeamPanelId.value ?? props.panel?.settings ?? null;
+
+    if (!panelOrganisationId || props.panelOrganisation?.id !== panelOrganisationId) {
+        return null;
+    }
+
+    return props.panelOrganisation;
+});
+const isTeamMode = computed(() => Boolean(activeTeamPanelId.value && activePanelOrganisation.value));
+const isSettingsMode = computed(() => Boolean(props.panel?.settings && activePanelOrganisation.value));
 const activeFilterCount = computed(() => {
     let count = 0;
 
@@ -133,13 +179,13 @@ function onPageChange(page: number) {
     });
 }
 
-function openEditModal(organisation: OrganisationRow) {
+function openEditModal(organisation: OrganisationIdentity) {
     editForm.id = organisation.id;
     editForm.name = organisation.name;
     editDialogOpen.value = true;
 }
 
-function openDeleteModal(organisation: OrganisationRow) {
+function openDeleteModal(organisation: OrganisationIdentity) {
     deleteForm.id = organisation.id;
     deleteForm.isActive = true;
 }
@@ -193,6 +239,7 @@ const manageUsersForm = useForm<{
 });
 
 const accessDisabled = computed(() => accessForm.processing || !accessForm.email.trim() || !accessForm.name.trim());
+const settingsSaveDisabled = computed(() => editForm.processing || !editForm.name.trim());
 
 function submitCreateForm() {
     createForm.post('/organisations', {
@@ -211,7 +258,9 @@ function saveEdit() {
 
     editForm.put(`/organisations/${editForm.id}`, {
         onSuccess: () => {
-            editDialogOpen.value = false;
+            if (!isSettingsMode.value) {
+                editDialogOpen.value = false;
+            }
         },
         preserveScroll: true,
     });
@@ -247,7 +296,7 @@ function addAccess() {
     });
 }
 
-async function openManageUsersModal(organisation: OrganisationRow) {
+async function openManageUsersModal(organisation: OrganisationIdentity) {
     manageUsersForm.organisation_id = organisation.id;
     manageUsersForm.organisation_name = organisation.name;
     manageUsersForm.users = [];
@@ -290,50 +339,38 @@ function removeAccess(organisationUser: { id: number }) {
 }
 
 watch(
-    () => [props.panel?.create, props.panel?.manage, props.panel?.settings, organisationRows.value],
+    () => props.panel?.create,
     () => {
         if (props.panel?.create) {
             createForm.isActive = true;
         }
+    },
+    { immediate: true },
+);
 
-        const settingsId = props.panel?.settings;
+watch(
+    () => (isSettingsMode.value ? activePanelOrganisation.value : null),
+    (organisation) => {
+        if (!organisation) return;
 
-        if (settingsId) {
-            const intent = `settings:${settingsId}`;
-
-            if (handledPanelIntent.value !== intent) {
-                const organisation = organisationRows.value.find((row) => row.id === settingsId);
-
-                if (organisation) {
-                    handledPanelIntent.value = intent;
-                    openEditModal(organisation);
-                }
-            }
-        }
-
-        const manageId = props.panel?.manage;
-
-        if (!manageId) {
-            return;
-        }
-
-        const intent = `manage:${manageId}`;
-
-        if (handledPanelIntent.value === intent) {
-            return;
-        }
-
-        const organisation = organisationRows.value.find((row) => row.id === manageId);
-
-        if (!organisation) {
-            return;
-        }
-
-        handledPanelIntent.value = intent;
-        void openManageUsersModal(organisation);
+        editForm.id = organisation.id;
+        editForm.name = organisation.name;
+        editForm.clearErrors?.();
     },
     { immediate: true, deep: true },
 );
+
+function teamStatusBadgeClass(status: OrganisationTeamUser['status']) {
+    if (status === 'owner') {
+        return 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200';
+    }
+
+    if (status === 'pending') {
+        return 'border-transparent bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200';
+    }
+
+    return '';
+}
 </script>
 
 <template>
@@ -342,6 +379,7 @@ watch(
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
             <AdminListShell
+                v-if="!isTeamMode && !isSettingsMode"
                 v-model:filtersOpen="filtersOpen"
                 :active-filter-count="activeFilterCount"
                 description="Manage organisation access, invitations, and ownership surfaces."
@@ -388,6 +426,71 @@ watch(
                     @open-manage-users="openManageUsersModal"
                 />
             </AdminListShell>
+
+            <section v-else-if="isTeamMode && activePanelOrganisation" class="bg-card rounded-xl border p-4">
+                <div class="mb-4 flex flex-col gap-1">
+                    <h1 class="text-lg font-semibold">Team</h1>
+                    <p class="text-muted-foreground text-sm">{{ activePanelOrganisation.name }}</p>
+                </div>
+
+                <div class="overflow-hidden rounded-lg border">
+                    <div v-if="activePanelOrganisation.teamUsers.length === 0" class="text-muted-foreground p-4 text-sm">
+                        No users have access to this organisation.
+                    </div>
+                    <div
+                        v-for="teamUser in activePanelOrganisation.teamUsers"
+                        v-else
+                        :key="teamUser.id"
+                        class="flex items-center justify-between gap-4 border-b p-3 last:border-b-0"
+                        :data-testid="`organisation-team-user-${teamUser.id}`"
+                    >
+                        <div class="min-w-0">
+                            <div class="truncate font-medium">
+                                {{ teamUser.name }}
+                                <span class="text-muted-foreground font-normal">({{ teamUser.email }})</span>
+                            </div>
+                        </div>
+                        <Badge :class="teamStatusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else-if="isSettingsMode && activePanelOrganisation" class="space-y-4">
+                <div class="bg-card rounded-xl border p-4">
+                    <div class="max-w-xl space-y-4">
+                        <div class="space-y-1">
+                            <h1 class="text-lg font-semibold">Settings</h1>
+                            <p class="text-muted-foreground text-sm">{{ activePanelOrganisation.name }}</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="settings-organisation-name">Name</Label>
+                            <Input
+                                id="settings-organisation-name"
+                                v-model="editForm.name"
+                                data-testid="settings-organisation-name"
+                                placeholder="Organisation name"
+                            />
+                        </div>
+
+                        <div v-for="(error, key) in editForm.errors" :key="key" class="text-destructive text-sm">{{ error }}</div>
+
+                        <Button data-testid="settings-save-organisation" :disabled="settingsSaveDisabled" @click="saveEdit"> Save changes </Button>
+                    </div>
+                </div>
+
+                <div class="border-destructive/30 bg-card rounded-xl border p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="space-y-1">
+                            <h2 class="text-destructive font-semibold">Delete organisation</h2>
+                            <p class="text-muted-foreground text-sm">This will permanently remove the organisation.</p>
+                        </div>
+                        <Button data-testid="settings-delete-organisation" variant="destructive" @click="openDeleteModal(activePanelOrganisation)">
+                            Delete organisation
+                        </Button>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
