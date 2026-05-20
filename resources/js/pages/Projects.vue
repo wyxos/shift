@@ -5,13 +5,13 @@ import { type AccessUserCandidate } from '@/components/admin/access-users';
 import ProjectApiTokenDialog from '@/components/admin/projects/ProjectApiTokenDialog.vue';
 import ProjectCreateDialog from '@/components/admin/projects/ProjectCreateDialog.vue';
 import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue';
+import ProjectFilterControls from '@/components/admin/projects/ProjectFilterControls.vue';
 import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
 import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
 import {
     defaultSortBy,
     normalizeNullableId,
     normalizeSortBy,
-    sortOptions,
     type Option,
     type ProjectAccessUser,
     type ProjectFilters,
@@ -20,14 +20,11 @@ import {
     type SortBy,
 } from '@/components/admin/projects/project-shared';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Plus, Search } from 'lucide-vue-next';
+import { Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 const props = withDefaults(
@@ -416,24 +413,7 @@ async function generateApiToken() {
                 @page-change="onPageChange"
             >
                 <template #filters>
-                    <div class="space-y-2">
-                        <Label for="projects-search">Search</Label>
-                        <div class="relative">
-                            <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                            <Input
-                                id="projects-search"
-                                v-model="draftSearchTerm"
-                                data-testid="filter-search"
-                                placeholder="Search by project name"
-                                class="pl-9"
-                            />
-                        </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label class="text-sm leading-none font-medium">Sort By</Label>
-                        <ButtonGroup v-model="draftSortBy" :columns="3" :options="sortOptions" test-id-prefix="sort-by" />
-                    </div>
+                    <ProjectFilterControls v-model:search-term="draftSearchTerm" v-model:sort-by="draftSortBy" />
                 </template>
 
                 <template #filter-actions>
