@@ -2,7 +2,6 @@
 import { type AccessUserCandidate, type ManagedAccessUser } from '@/components/admin/access-users';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
 import OrganisationCreateDialog from '@/components/admin/organisations/OrganisationCreateDialog.vue';
-import OrganisationEditDialog from '@/components/admin/organisations/OrganisationEditDialog.vue';
 import OrganisationListTable from '@/components/admin/organisations/OrganisationListTable.vue';
 import OrganisationManageUsersDialog from '@/components/admin/organisations/OrganisationManageUsersDialog.vue';
 import OrganisationSettingsPanel from '@/components/admin/organisations/OrganisationSettingsPanel.vue';
@@ -24,6 +23,7 @@ type OrganisationRow = {
     created_at?: string | null;
     organisation_users_count?: number | null;
     projects_count?: number | null;
+    isOwner: boolean;
 };
 
 type OrganisationPaginator = {
@@ -44,9 +44,16 @@ type OrganisationTeamUser = {
     email: string;
     status: 'owner' | 'registered' | 'pending';
     statusLabel: string;
+    projectIds?: number[];
+};
+
+type OrganisationProject = {
+    id: number;
+    name: string;
 };
 
 type PanelOrganisation = OrganisationIdentity & {
+    projects: OrganisationProject[];
     teamUsers: OrganisationTeamUser[];
 };
 
@@ -89,7 +96,6 @@ function normalizeSortBy(value: string | null | undefined): SortBy {
 }
 
 const filtersOpen = ref(false);
-const editDialogOpen = ref(false);
 const manageUsersLoading = ref(false);
 const manageUsersError = ref<string | null>(null);
 
@@ -180,12 +186,6 @@ function onPageChange(page: number) {
     });
 }
 
-function openEditModal(organisation: OrganisationIdentity) {
-    editForm.id = organisation.id;
-    editForm.name = organisation.name;
-    editDialogOpen.value = true;
-}
-
 function openDeleteModal(organisation: OrganisationIdentity) {
     deleteForm.id = organisation.id;
     deleteForm.isActive = true;
@@ -258,11 +258,6 @@ function saveEdit() {
     if (!editForm.id) return;
 
     editForm.put(`/organisations/${editForm.id}`, {
-        onSuccess: () => {
-            if (!isSettingsMode.value) {
-                editDialogOpen.value = false;
-            }
-        },
         preserveScroll: true,
     });
 }
@@ -408,12 +403,7 @@ watch(
                     </Button>
                 </template>
 
-                <OrganisationListTable
-                    :organisations="organisationRows"
-                    @open-delete="openDeleteModal"
-                    @open-edit="openEditModal"
-                    @open-manage-users="openManageUsersModal"
-                />
+                <OrganisationListTable :organisations="organisationRows" @open-delete="openDeleteModal" @open-manage-users="openManageUsersModal" />
             </AdminListShell>
 
             <OrganisationTeamPanel v-else-if="isTeamMode && activePanelOrganisation" :organisation="activePanelOrganisation" />
@@ -442,14 +432,6 @@ watch(
             @cancel="createForm.isActive = false"
             @submit="submitCreateForm"
             @update:open="createForm.isActive = $event"
-        />
-
-        <OrganisationEditDialog
-            :form="editForm"
-            :open="editDialogOpen"
-            @cancel="editDialogOpen = false"
-            @submit="saveEdit"
-            @update:open="editDialogOpen = $event"
         />
 
         <OrganisationManageUsersDialog

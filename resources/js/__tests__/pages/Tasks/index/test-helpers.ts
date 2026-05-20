@@ -327,6 +327,7 @@ vi.mock('@inertiajs/vue3', () => ({
         reload: vi.fn(),
     },
     usePage: () => ({
+        url: '/tasks',
         props: {
             shift: {
                 ai_enabled: false,
@@ -334,7 +335,6 @@ vi.mock('@inertiajs/vue3', () => ({
         },
     }),
 }));
-
 
 beforeEach(() => {
     sonnerMocks.toastLoadingMock.mockClear();
@@ -362,4 +362,4 @@ export function makeTasksPage(tasks: any[]) {
     };
 }
 
-export { Index, axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, flushPromises, mount, router, sonnerMocks };
+export { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, flushPromises, Index, mount, router, sonnerMocks };

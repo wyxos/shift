@@ -87,3 +87,32 @@ test('clients index filters by search and sorts oldest first', function () {
         ->where('filters.sort_by', 'oldest')
     );
 });
+
+test('clients index can be scoped by organisation route', function () {
+    $firstOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $secondOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $scopedClient = Client::factory()->create([
+        'name' => 'Scoped Client',
+        'organisation_id' => $firstOrganisation->id,
+    ]);
+    Client::factory()->create([
+        'name' => 'Other Client',
+        'organisation_id' => $secondOrganisation->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.clients', $firstOrganisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Clients')
+        ->has('clients.data', 1)
+        ->where('clients.data.0.id', $scopedClient->id)
+        ->where('filters.organisation_id', $firstOrganisation->id)
+    );
+});

@@ -128,6 +128,39 @@ test('projects index filters by search and sorts oldest first', function () {
     );
 });
 
+test('projects index can be scoped by organisation route', function () {
+    $firstOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $secondOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $scopedProject = Project::factory()->create([
+        'name' => 'Scoped Project',
+        'client_id' => null,
+        'organisation_id' => $firstOrganisation->id,
+        'author_id' => $this->user->id,
+    ]);
+    Project::factory()->create([
+        'name' => 'Other Project',
+        'client_id' => null,
+        'organisation_id' => $secondOrganisation->id,
+        'author_id' => $this->user->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.projects', $firstOrganisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Projects')
+        ->has('projects.data', 1)
+        ->where('projects.data.0.id', $scopedProject->id)
+        ->where('filters.organisation_id', $firstOrganisation->id)
+    );
+});
+
 test('project managers can generate api tokens', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,

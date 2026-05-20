@@ -8,6 +8,7 @@ use App\Jobs\NotifyExternalCollaboratorAdded;
 use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
+use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -521,7 +522,7 @@ class TaskController extends Controller
             ]);
     }
 
-    public function indexV2()
+    public function indexV2(?Organisation $organisation = null)
     {
         $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
         $allPriorities = ['low', 'medium', 'high'];
@@ -538,7 +539,7 @@ class TaskController extends Controller
             $selectedPriorities = $allPriorities;
         }
 
-        $organisationId = request('organisation_id');
+        $organisationId = $organisation?->id ?? request('organisation_id');
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;

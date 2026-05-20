@@ -1,12 +1,13 @@
+import type { TaskPaginator } from '@/shared/tasks/types';
+import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
-import type { SharedData } from '@/types';
-import type { TaskPaginator } from '@/shared/tasks/types';
 
 type UseTaskIndexListStateOptions = {
     tasks: TaskPaginator;
     buildListQuery: (page: number) => Record<string, unknown>;
+    indexPath?: () => string;
 };
 
 export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
@@ -47,7 +48,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         const next = Math.max(1, Math.min(last, pageNumber));
         if (next === current) return;
 
-        router.get('/tasks', options.buildListQuery(next), {
+        router.get(options.indexPath?.() ?? '/tasks', options.buildListQuery(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,

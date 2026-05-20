@@ -8,17 +8,9 @@ import {
     type AccessUserCandidate,
     type ManagedAccessUser,
 } from '@/components/admin/access-users';
-import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Trash2 } from 'lucide-vue-next';
 
 type ManageUsersForm = {
@@ -49,15 +41,23 @@ const emit = defineEmits<{
     'remove-access': [organisationUser: ManagedAccessUser];
     submitAccess: [];
 }>();
+
+function updateOpen(value: boolean) {
+    emit('update:open', value);
+
+    if (!value) {
+        emit('cancel');
+    }
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Manage Organisation Access</AlertDialogTitle>
-                <AlertDialogDescription>Users with access to {{ form.organisation_name }}</AlertDialogDescription>
-            </AlertDialogHeader>
+    <Dialog :open="open" @update:open="updateOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage Organisation Access</DialogTitle>
+                <DialogDescription>Users with access to {{ form.organisation_name }}</DialogDescription>
+            </DialogHeader>
 
             <AccessUserPicker
                 :candidates="accessUsers"
@@ -95,15 +95,9 @@ const emit = defineEmits<{
                 </div>
             </div>
 
-            <AlertDialogFooter>
-                <AlertDialogCancel
-                    @click="
-                        emit('update:open', false);
-                        emit('cancel');
-                    "
-                    >Close</AlertDialogCancel
-                >
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="updateOpen(false)">Close</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

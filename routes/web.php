@@ -26,6 +26,15 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+    Route::prefix('organisation/{organisation}')->name('organisation.')->group(function () {
+        Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks');
+        Route::get('clients', [ClientController::class, 'index'])->name('clients');
+        Route::get('projects', [ProjectController::class, 'index'])->name('projects');
+        Route::get('team', [OrganisationController::class, 'team'])->name('team');
+        Route::get('settings', [OrganisationController::class, 'settings'])->name('settings');
+    });
+
     // organisations
     Route::get('organisations', [OrganisationController::class, 'index'])->name('organisations.index');
     Route::post('organisations', [OrganisationController::class, 'store'])->name('organisations.store');
@@ -35,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // organisation users (invitations)
     Route::post('organisations/{organisation}/users', [OrganisationUserController::class, 'store'])->name('organisation-users.store');
+    Route::patch('organisations/{organisation}/users/{organisationUser}/projects', [OrganisationUserController::class, 'syncProjects'])->name('organisation-users.projects.sync');
     Route::delete('organisations/{organisation}/users/{organisationUser}', [OrganisationUserController::class, 'destroy'])->name('organisation-users.destroy');
 
     // clients
