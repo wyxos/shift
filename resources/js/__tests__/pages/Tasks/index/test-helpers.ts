@@ -350,15 +350,24 @@ beforeEach(() => {
     (router.reload as any).mockClear();
 });
 
-export function makeTasksPage(tasks: any[]) {
-    const total = tasks.length;
+export function makeTasksPage(
+    tasks: any[],
+    meta: Partial<{
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number;
+        to: number;
+    }> = {},
+) {
+    const total = meta.total ?? tasks.length;
     return {
         data: tasks,
         total,
-        current_page: 1,
-        last_page: 1,
-        from: total ? 1 : 0,
-        to: total,
+        current_page: meta.current_page ?? 1,
+        last_page: meta.last_page ?? 1,
+        from: meta.from ?? (total ? 1 : 0),
+        to: meta.to ?? tasks.length,
     };
 }
 

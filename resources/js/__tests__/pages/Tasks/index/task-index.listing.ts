@@ -40,6 +40,46 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
+    it('refreshes rows when preserved Inertia state receives a new task page', async () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Page one task', status: 'pending', priority: 'high' }], {
+                    current_page: 1,
+                    last_page: 2,
+                    total: 2,
+                    from: 1,
+                    to: 1,
+                }),
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        expect(wrapper.text()).toContain('Page one task');
+
+        await wrapper.setProps({
+            tasks: makeTasksPage([{ id: 2, title: 'Page two task', status: 'in-progress', priority: 'medium' }], {
+                current_page: 2,
+                last_page: 2,
+                total: 2,
+                from: 2,
+                to: 2,
+            }),
+        });
+
+        expect(wrapper.text()).not.toContain('Page one task');
+        expect(wrapper.text()).toContain('Page two task');
+        expect(wrapper.text()).toContain('Page 2 of 2');
+        expect(wrapper.text()).toContain('Showing 2 to 2 of 2 tasks');
+
+        wrapper.unmount();
+    });
+
     it('has filter controls', () => {
         axiosGetMock.mockReset();
 
