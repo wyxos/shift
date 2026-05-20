@@ -2,10 +2,10 @@ import type { TaskPaginator } from '@/shared/tasks/types';
 import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, unref, watch, type Ref } from 'vue';
 
 type UseTaskIndexListStateOptions = {
-    tasks: TaskPaginator;
+    tasks: TaskPaginator | Ref<TaskPaginator>;
     buildListQuery: (page: number) => Record<string, unknown>;
     indexPath?: () => string;
 };
@@ -14,9 +14,9 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     const page = usePage<SharedData>();
     const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
 
-    const tasksPage = ref<TaskPaginator>({ ...options.tasks });
+    const tasksPage = ref<TaskPaginator>({ ...unref(options.tasks) });
     watch(
-        () => options.tasks,
+        () => unref(options.tasks),
         (next) => {
             tasksPage.value = { ...next };
         },

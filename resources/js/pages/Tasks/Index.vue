@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { TaskIndexFilters, TaskPaginator, TaskProjectOption } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { reactive, toRefs } from 'vue';
+import { reactive, toRef, toRefs } from 'vue';
 
 const props = withDefaults(
     defineProps<{
@@ -29,7 +29,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const filtersState = useTaskIndexFilters({ filters: props.filters });
 const listState = useTaskIndexListState({
-    tasks: props.tasks,
+    tasks: toRef(props, 'tasks'),
     buildListQuery: filtersState.buildListQuery,
     indexPath: filtersState.indexPath,
 });
