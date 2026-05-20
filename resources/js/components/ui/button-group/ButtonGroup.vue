@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -29,17 +28,6 @@ const emit = defineEmits<{
     'update:modelValue': [value: string];
 }>();
 
-const columnsClass = computed(() => {
-    switch (props.columns) {
-        case 2:
-            return 'grid-cols-2';
-        case 4:
-            return 'grid-cols-4';
-        default:
-            return 'grid-cols-3';
-    }
-});
-
 function optionButtonClass(option: Option): string {
     const selected = props.modelValue === option.value;
     if (selected) return option.selectedClass ?? '';
@@ -55,7 +43,7 @@ function optionButtonVariant(option: Option): 'default' | 'outline' {
 </script>
 
 <template>
-    <div role="radiogroup" :aria-label="ariaLabel" :class="cn('grid gap-2', columnsClass, props.class)">
+    <div role="radiogroup" :aria-label="ariaLabel" :class="cn('flex flex-wrap items-center gap-2', props.class)">
         <Button
             v-for="option in options"
             :key="option.value"
@@ -65,7 +53,7 @@ function optionButtonVariant(option: Option): 'default' | 'outline' {
             :disabled="disabled"
             :aria-checked="modelValue === option.value"
             :variant="optionButtonVariant(option)"
-            :class="optionButtonClass(option)"
+            :class="cn('w-auto flex-none', optionButtonClass(option))"
             :data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
             @click="emit('update:modelValue', option.value)"
         >
