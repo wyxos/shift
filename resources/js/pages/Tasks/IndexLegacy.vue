@@ -5,11 +5,12 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { OTable, OTableColumn } from '@oruga-ui/oruga-next';
 import debounce from 'lodash/debounce';
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 // Alert dialog components are used in DeleteDialog.vue
 import DeleteDialog from '@/components/DeleteDialog.vue';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Select, type SelectOption } from '@/components/ui/select';
 
 const props = defineProps({
     tasks: {
@@ -238,6 +239,14 @@ const priorityOptions = [
     { value: 'medium', label: 'Medium', class: 'bg-orange-100 text-orange-800' },
     { value: 'high', label: 'High', class: 'bg-red-100 text-red-800' },
 ];
+const projectFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'All Projects' },
+    ...props.projects.map((project: any) => ({ value: project.id, label: project.name })),
+]);
+const priorityFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'All Priorities' },
+    ...priorityOptions.map((option) => ({ value: option.value, label: option.label })),
+]);
 
 // Function to update task status
 function updateTaskStatus(task, status) {
@@ -328,20 +337,17 @@ function updateTaskPriority(task, priority) {
                 <Input v-model="search" class="mb-4 rounded border p-2" placeholder="Search..." type="text" />
 
                 <!-- Project filter -->
-                <select v-model="projectId" class="mb-4 rounded border p-2">
-                    <option value="">All Projects</option>
-                    <option v-for="project in projects" :key="project.id" :value="project.id">
-                        {{ project.name }}
-                    </option>
-                </select>
+                <Select
+                    v-model="projectId"
+                    :options="projectFilterOptions"
+                    class="mb-4 w-56"
+                    searchable
+                    search-placeholder="Search projects..."
+                    test-id="legacy-task-project-filter"
+                />
 
                 <!-- Priority filter -->
-                <select v-model="priority" class="mb-4 rounded border p-2">
-                    <option value="">All Priorities</option>
-                    <option v-for="option in priorityOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                    </option>
-                </select>
+                <Select v-model="priority" :options="priorityFilterOptions" class="mb-4 w-44" test-id="legacy-task-priority-filter" />
 
                 <!-- Status filter checkboxes -->
                 <div class="mb-4 flex flex-wrap items-center gap-4">

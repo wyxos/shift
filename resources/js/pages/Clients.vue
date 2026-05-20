@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, type SelectOption } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
@@ -115,6 +116,7 @@ watch(filtersOpen, (open) => {
 });
 
 const clientRows = computed(() => props.clients.data ?? []);
+const organisationOptions = computed<SelectOption[]>(() => props.organisations.map((organisation) => ({ value: organisation.id, label: organisation.name })));
 const isOrganisationScoped = computed(
     () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
 );
@@ -421,17 +423,15 @@ function confirmDelete() {
 
                     <div class="space-y-2">
                         <Label for="create-client-organisation">Organisation</Label>
-                        <select
-                            id="create-client-organisation"
+                        <Select
                             v-model="createForm.organisation_id"
-                            data-testid="create-client-organisation"
-                            class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                        >
-                            <option :value="null">Select organisation</option>
-                            <option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">
-                                {{ organisation.name }}
-                            </option>
-                        </select>
+                            :options="organisationOptions"
+                            placeholder="Select organisation"
+                            search-placeholder="Search organisations..."
+                            empty-label="No organisations found."
+                            searchable
+                            test-id="create-client-organisation"
+                        />
                         <p v-if="createForm.errors.organisation_id" class="text-sm text-red-500">{{ createForm.errors.organisation_id }}</p>
                     </div>
 

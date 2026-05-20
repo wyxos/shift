@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Input } from '@/components/ui/input';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { Select, type SelectOption } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -57,6 +58,8 @@ const createForm = useForm({
     temp_identifier: tempIdentifier.value,
     external_user_ids: [],
 });
+
+const projectOptions = computed<SelectOption[]>(() => props.projects.map((project: any) => ({ value: project.id, label: project.name })));
 
 // State for external users
 const selectedProjectExternalUsers = ref([]);
@@ -186,15 +189,16 @@ const removeFile = async (file) => {
 
                 <div class="mb-4">
                     <label for="project_id" class="block text-sm font-medium text-gray-700">Project</label>
-                    <select
+                    <Select
                         v-model="createForm.project_id"
-                        id="project_id"
-                        class="focus:ring-opacity-50 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring disabled:bg-gray-200"
-                    >
-                        <option :value="null">Select a project</option>
-                        <!-- Populate with projects -->
-                        <option v-for="project in props.projects" :key="project.id" :value="project.id">{{ project.name }}</option>
-                    </select>
+                        :options="projectOptions"
+                        placeholder="Select a project"
+                        search-placeholder="Search projects..."
+                        empty-label="No projects found."
+                        searchable
+                        class="mt-1"
+                        test-id="legacy-create-task-project"
+                    />
                     <div v-if="createForm.errors.project_id" class="mt-1 text-sm text-red-500">{{ createForm.errors.project_id }}</div>
                 </div>
 
