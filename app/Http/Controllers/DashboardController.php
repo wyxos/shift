@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Organisation;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
@@ -11,9 +12,10 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(?Organisation $organisation = null)
     {
         $userId = auth()->id();
+        $organisationId = $organisation?->id ?? request('organisation_id');
 
         $baseQuery = Task::query()
             ->where(function ($query) use ($userId) {
@@ -40,8 +42,8 @@ class DashboardController extends Controller
                         $query->where('users.id', $userId);
                     });
             })
-            ->when(filled(request('organisation_id')), function (Builder $query) {
-                $this->applyProjectOrganisationFilter($query, request('organisation_id'));
+            ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
+                $this->applyProjectOrganisationFilter($query, $organisationId);
             });
 
         $tasks = (clone $baseQuery)

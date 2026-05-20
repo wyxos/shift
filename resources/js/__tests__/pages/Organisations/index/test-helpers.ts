@@ -6,6 +6,7 @@ import { h, reactive } from 'vue';
 const routerGetMock = vi.fn();
 const routerDeleteMock = vi.fn();
 const fetchMock = vi.fn();
+const axiosPatchMock = vi.fn();
 const formInstances: any[] = [];
 
 function cloneInitial<T>(value: T): T {
@@ -65,6 +66,12 @@ vi.mock('@/layouts/AppLayout.vue', () => ({
 vi.mock('@inertiajs/vue3', () => ({
     Head: {
         render: () => null,
+    },
+    Link: {
+        props: ['href'],
+        render() {
+            return h('a', { ...this.$attrs, href: this.href }, this.$slots.default?.());
+        },
     },
     router: {
         get: (...args: any[]) => routerGetMock(...args),
@@ -177,6 +184,97 @@ vi.mock('@/components/ui/alert-dialog', () => ({
         render() {
             return h('button', { ...this.$attrs }, this.$slots.default?.());
         },
+    },
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+    Dialog: {
+        props: ['open'],
+        emits: ['update:open'],
+        render() {
+            return this.open ? h('div', { class: 'dialog' }, this.$slots.default?.()) : null;
+        },
+    },
+    DialogContent: {
+        render() {
+            return h('div', { class: 'dialog-content' }, this.$slots.default?.());
+        },
+    },
+    DialogHeader: {
+        render() {
+            return h('div', { class: 'dialog-header' }, this.$slots.default?.());
+        },
+    },
+    DialogFooter: {
+        render() {
+            return h('div', { class: 'dialog-footer' }, this.$slots.default?.());
+        },
+    },
+    DialogTitle: {
+        render() {
+            return h('div', { class: 'dialog-title' }, this.$slots.default?.());
+        },
+    },
+    DialogDescription: {
+        render() {
+            return h('div', { class: 'dialog-description' }, this.$slots.default?.());
+        },
+    },
+}));
+
+vi.mock('@/components/ui/sheet', () => ({
+    Sheet: {
+        props: ['open'],
+        emits: ['update:open'],
+        render() {
+            return this.open ? h('div', { class: 'sheet' }, this.$slots.default?.()) : null;
+        },
+    },
+    SheetContent: {
+        render() {
+            return h('div', { class: 'sheet-content' }, this.$slots.default?.());
+        },
+    },
+    SheetHeader: {
+        render() {
+            return h('div', { class: 'sheet-header' }, this.$slots.default?.());
+        },
+    },
+    SheetFooter: {
+        render() {
+            return h('div', { class: 'sheet-footer' }, this.$slots.default?.());
+        },
+    },
+    SheetTitle: {
+        render() {
+            return h('div', { class: 'sheet-title' }, this.$slots.default?.());
+        },
+    },
+    SheetDescription: {
+        render() {
+            return h('div', { class: 'sheet-description' }, this.$slots.default?.());
+        },
+    },
+}));
+
+vi.mock('@/components/ui/checkbox', () => ({
+    Checkbox: {
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
+        render() {
+            return h('input', {
+                ...this.$attrs,
+                type: 'checkbox',
+                checked: this.modelValue,
+                onChange: (event: Event) => this.$emit('update:modelValue', (event.target as HTMLInputElement).checked),
+            });
+        },
+    },
+}));
+
+vi.mock('axios', () => ({
+    default: {
+        patch: (...args: any[]) => axiosPatchMock(...args),
     },
 }));
 
@@ -296,6 +394,8 @@ beforeEach(() => {
     routerGetMock.mockReset();
     routerDeleteMock.mockReset();
     fetchMock.mockReset();
+    axiosPatchMock.mockReset();
+    axiosPatchMock.mockResolvedValue({ data: { project_ids: [30] } });
     fetchMock.mockResolvedValue({
         ok: true,
         json: async () => [
@@ -321,6 +421,7 @@ export function makeProps(overrides: Partial<any> = {}) {
                     created_at: '2026-03-10T09:00:00Z',
                     organisation_users_count: 1,
                     projects_count: 3,
+                    isOwner: true,
                 },
                 {
                     id: 2,
@@ -328,6 +429,7 @@ export function makeProps(overrides: Partial<any> = {}) {
                     created_at: null,
                     organisation_users_count: 4,
                     projects_count: 0,
+                    isOwner: false,
                 },
             ],
             current_page: 1,
@@ -344,4 +446,4 @@ export function makeProps(overrides: Partial<any> = {}) {
     };
 }
 
-export { fetchMock, flushPromises, getAccessForm, getCreateForm, getEditForm, Index, mount, routerDeleteMock, routerGetMock };
+export { axiosPatchMock, fetchMock, flushPromises, getAccessForm, getCreateForm, getEditForm, Index, mount, routerDeleteMock, routerGetMock };

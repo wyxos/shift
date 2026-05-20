@@ -6,6 +6,7 @@ use App\Models\Organisation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -40,6 +41,10 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+        $sidebarOrganisations = null;
+        $resolveSidebarOrganisations = function () use ($request, &$sidebarOrganisations) {
+            return $sidebarOrganisations ??= $this->sidebarOrganisations($request);
+        };
 
         return [
             ...parent::share($request),
@@ -56,24 +61,46 @@ class HandleInertiaRequests extends Middleware
             'shift' => [
                 'ai_enabled' => (bool) config('shift_ai.enabled', false),
             ],
-            'sidebarOrganisations' => fn () => $request->user()
-                ? Organisation::query()
-                    ->where(function (Builder $query) use ($request) {
-                        $query->where('author_id', $request->user()->id)
-                            ->orWhereHas('organisationUsers', function (Builder $query) use ($request) {
-                                $query->where('user_id', $request->user()->id);
-                            });
-                    })
-                    ->orderBy('name')
-                    ->limit(5)
-                    ->get(['id', 'name', 'author_id'])
-                    ->map(fn (Organisation $organisation) => [
-                        'id' => $organisation->id,
-                        'name' => $organisation->name,
-                        'isOwner' => $organisation->author_id === $request->user()->id,
-                    ])
-                    ->values()
-                : [],
+            'sidebarOrganisations' => fn () => $resolveSidebarOrganisations()['items'],
+            'sidebarOrganisationsHasMore' => fn () => $resolveSidebarOrganisations()['hasMore'],
+        ];
+    }
+
+    /**
+     * @return array{items: Collection<int, array{id: int, name: string, isOwner: bool}>, hasMore: bool}
+     */
+    private function sidebarOrganisations(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return [
+                'items' => collect(),
+                'hasMore' => false,
+            ];
+        }
+
+        $organisations = Organisation::query()
+            ->where(function (Builder $query) use ($user) {
+                $query->where('author_id', $user->id)
+                    ->orWhereHas('organisationUsers', function (Builder $query) use ($user) {
+                        $query->where('user_id', $user->id);
+                    });
+            })
+            ->orderBy('name')
+            ->limit(6)
+            ->get(['id', 'name', 'author_id']);
+
+        return [
+            'items' => $organisations
+                ->take(5)
+                ->map(fn (Organisation $organisation) => [
+                    'id' => $organisation->id,
+                    'name' => $organisation->name,
+                    'isOwner' => $organisation->author_id === $user->id,
+                ])
+                ->values(),
+            'hasMore' => $organisations->count() > 5,
         ];
     }
 }

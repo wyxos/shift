@@ -24,8 +24,8 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Plus, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -45,6 +45,7 @@ const props = withDefaults(
         filters: () => ({}),
     },
 );
+const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Projects',
@@ -86,6 +87,14 @@ const projectRows = computed(() => props.projects.data ?? []);
 const isOrganisationScoped = computed(
     () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
 );
+const isScopedOrganisationRoute = computed(() => {
+    if (!isOrganisationScoped.value) return false;
+
+    const current = new URL(page.url, 'https://shift.test');
+
+    return current.pathname === `/organisation/${appliedOrganisationId.value}/projects`;
+});
+const indexPath = computed(() => (isScopedOrganisationRoute.value ? `/organisation/${appliedOrganisationId.value}/projects` : '/projects'));
 const activeFilterCount = computed(() => {
     let count = 0;
 
@@ -193,12 +202,17 @@ const editDisabled = computed(() => editForm.processing || !editForm.name.trim()
 const grantAccessDisabled = computed(() => grantAccessForm.processing || !grantAccessForm.email.trim() || !grantAccessForm.name.trim());
 
 function buildIndexParams(page = 1) {
-    return {
+    const params: Record<string, unknown> = {
         search: appliedSearchTerm.value.trim() || undefined,
         sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
-        organisation_id: appliedOrganisationId.value || undefined,
         page,
     };
+
+    if (!isScopedOrganisationRoute.value) {
+        params.organisation_id = appliedOrganisationId.value || undefined;
+    }
+
+    return params;
 }
 
 function applyFilters() {
@@ -206,7 +220,7 @@ function applyFilters() {
     appliedSortBy.value = draftSortBy.value;
     filtersOpen.value = false;
 
-    router.get('/projects', buildIndexParams(), {
+    router.get(indexPath.value, buildIndexParams(), {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -220,7 +234,7 @@ function resetFilters() {
     appliedSortBy.value = defaultSortBy;
     filtersOpen.value = false;
 
-    router.get('/projects', buildIndexParams(), {
+    router.get(indexPath.value, buildIndexParams(), {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -228,7 +242,7 @@ function resetFilters() {
 }
 
 function onPageChange(page: number) {
-    router.get('/projects', buildIndexParams(page), {
+    router.get(indexPath.value, buildIndexParams(page), {
         preserveScroll: true,
         preserveState: true,
         replace: true,

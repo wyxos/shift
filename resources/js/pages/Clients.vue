@@ -19,8 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { Building2, Pencil, Plus, Search, Trash2, Users } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
@@ -65,6 +65,7 @@ const props = withDefaults(
     },
 );
 
+const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Clients',
@@ -117,6 +118,14 @@ const clientRows = computed(() => props.clients.data ?? []);
 const isOrganisationScoped = computed(
     () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
 );
+const isScopedOrganisationRoute = computed(() => {
+    if (!isOrganisationScoped.value) return false;
+
+    const current = new URL(page.url, 'https://shift.test');
+
+    return current.pathname === `/organisation/${appliedOrganisationId.value}/clients`;
+});
+const indexPath = computed(() => (isScopedOrganisationRoute.value ? `/organisation/${appliedOrganisationId.value}/clients` : '/clients'));
 const activeFilterCount = computed(() => {
     let count = 0;
 
@@ -174,12 +183,17 @@ const createDisabled = computed(() => createForm.processing || !createForm.name.
 const editDisabled = computed(() => editForm.processing || !editForm.name.trim());
 
 function buildIndexParams(page = 1) {
-    return {
+    const params: Record<string, unknown> = {
         search: appliedSearchTerm.value.trim() || undefined,
         sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
-        organisation_id: appliedOrganisationId.value || undefined,
         page,
     };
+
+    if (!isScopedOrganisationRoute.value) {
+        params.organisation_id = appliedOrganisationId.value || undefined;
+    }
+
+    return params;
 }
 
 function applyFilters() {
@@ -187,7 +201,7 @@ function applyFilters() {
     appliedSortBy.value = draftSortBy.value;
     filtersOpen.value = false;
 
-    router.get('/clients', buildIndexParams(), {
+    router.get(indexPath.value, buildIndexParams(), {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -201,7 +215,7 @@ function resetFilters() {
     appliedSortBy.value = defaultSortBy;
     filtersOpen.value = false;
 
-    router.get('/clients', buildIndexParams(), {
+    router.get(indexPath.value, buildIndexParams(), {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -209,7 +223,7 @@ function resetFilters() {
 }
 
 function onPageChange(page: number) {
-    router.get('/clients', buildIndexParams(page), {
+    router.get(indexPath.value, buildIndexParams(page), {
         preserveScroll: true,
         preserveState: true,
         replace: true,

@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ClientController extends Controller
 {
-    public function index()
+    public function index(?Organisation $organisation = null)
     {
         $sortBy = request('sort_by');
+        $organisationId = $organisation?->id ?? request('organisation_id');
 
         $clients = Client::query()
             ->with('organisation:id,name')
@@ -18,8 +19,8 @@ class ClientController extends Controller
                 $query->where('author_id', auth()->id());
             })
             ->when(
-                filled(request('organisation_id')),
-                fn (Builder $query) => $query->where('organisation_id', request('organisation_id'))
+                filled($organisationId),
+                fn (Builder $query) => $query->where('organisation_id', $organisationId)
             )
             ->when(
                 request('search'),
@@ -40,7 +41,10 @@ class ClientController extends Controller
 
         return inertia('Clients')
             ->with([
-                'filters' => request()->only(['search', 'sort_by', 'organisation_id']),
+                'filters' => [
+                    ...request()->only(['search', 'sort_by']),
+                    'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
+                ],
                 'clients' => $clients
                     ->paginate(10)
                     ->withQueryString()

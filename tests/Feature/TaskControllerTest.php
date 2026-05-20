@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ExternalUser;
+use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -34,6 +35,48 @@ test('index displays tasks', function () {
         ->component('Tasks/Index')
         ->has('tasks.data', 3)
         ->has('projects', 1)
+    );
+});
+
+test('tasks index can be scoped by organisation route', function () {
+    $firstOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $secondOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $scopedProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $firstOrganisation->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $secondOrganisation->id,
+    ]);
+
+    $scopedTask = Task::factory()->create([
+        'project_id' => $scopedProject->id,
+        'status' => 'pending',
+    ]);
+    Task::factory()->create([
+        'project_id' => $otherProject->id,
+        'status' => 'pending',
+    ]);
+
+    $scopedTask->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.tasks', $firstOrganisation));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $scopedTask->id)
+        ->where('filters.organisation_id', $firstOrganisation->id)
     );
 });
 

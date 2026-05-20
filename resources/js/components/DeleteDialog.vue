@@ -1,15 +1,6 @@
 <script setup lang="ts">
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ref, watch } from 'vue';
 
 const props = defineProps({
@@ -31,31 +22,36 @@ watch(
         open.value = newVal;
     },
 );
+
+function updateOpen(value: boolean) {
+    open.value = value;
+
+    if (!value) {
+        emits('cancel');
+    }
+}
 </script>
 
 <template>
     <!-- Delete Modal -->
-    <AlertDialog v-model:open="open">
-        <AlertDialogTrigger as-child>
-            <div></div>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>
+    <Dialog :open="open" @update:open="updateOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>
                     <slot name="title"> Delete Record </slot>
-                </AlertDialogTitle>
-                <AlertDialogDescription>
+                </DialogTitle>
+                <DialogDescription>
                     <slot name="description"> Are you sure you want to delete this record? This action cannot be undone. </slot>
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel @click="emits('cancel')">
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="updateOpen(false)">
                     <slot name="cancel"> Cancel </slot>
-                </AlertDialogCancel>
-                <AlertDialogAction @click="emits('confirm')" class="bg-red-500">
+                </Button>
+                <Button type="button" variant="destructive" class="bg-red-500" @click="emits('confirm')">
                     <slot name="confirm"> Delete </slot>
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

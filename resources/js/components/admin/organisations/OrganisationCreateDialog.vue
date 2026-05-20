@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -21,15 +21,23 @@ const emit = defineEmits<{
     cancel: [];
     submit: [];
 }>();
+
+function updateOpen(value: boolean) {
+    emit('update:open', value);
+
+    if (!value) {
+        emit('cancel');
+    }
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Create Organisation</AlertDialogTitle>
-                <AlertDialogDescription>Add a new organisation.</AlertDialogDescription>
-            </AlertDialogHeader>
+    <Dialog :open="open" @update:open="updateOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Create Organisation</DialogTitle>
+                <DialogDescription>Add a new organisation.</DialogDescription>
+            </DialogHeader>
 
             <div class="space-y-4">
                 <div class="space-y-2">
@@ -40,10 +48,10 @@ const emit = defineEmits<{
                 <div v-for="(error, key) in form.errors" :key="key" class="text-destructive text-sm">{{ error }}</div>
             </div>
 
-            <AlertDialogFooter>
-                <AlertDialogCancel @click="emit('update:open', false); emit('cancel')">Cancel</AlertDialogCancel>
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="updateOpen(false)">Cancel</Button>
                 <Button data-testid="submit-create-organisation" :disabled="form.processing" @click="emit('submit')">Create</Button>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

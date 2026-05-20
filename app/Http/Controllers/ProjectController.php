@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ProjectController extends Controller
 {
-    public function index()
+    public function index(?Organisation $organisation = null)
     {
         $sortBy = request('sort_by');
+        $organisationId = $organisation?->id ?? request('organisation_id');
 
         $projects = Project::query()
             ->with([
@@ -39,9 +40,7 @@ class ProjectController extends Controller
                     })
                     ->orWhere('author_id', auth()->id());
             })
-            ->when(filled(request('organisation_id')), function (Builder $query) {
-                $organisationId = request('organisation_id');
-
+            ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $query->where(function (Builder $subQuery) use ($organisationId) {
                     $subQuery
                         ->where('organisation_id', $organisationId)
@@ -69,7 +68,10 @@ class ProjectController extends Controller
 
         return inertia('Projects')
             ->with([
-                'filters' => request()->only(['search', 'sort_by', 'organisation_id']),
+                'filters' => [
+                    ...request()->only(['search', 'sort_by']),
+                    'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
+                ],
                 'projects' => $projects
                     ->paginate(10)
                     ->withQueryString()

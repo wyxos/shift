@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import AppLayout from '@/layouts/AppLayout.vue';
 import TaskEditSheet from '@/components/tasks/index/TaskEditSheet.vue';
 import TaskIndexListCard from '@/components/tasks/index/TaskIndexListCard.vue';
 import { useTaskIndexEditState } from '@/composables/useTaskIndexEditState';
 import { useTaskIndexFilters } from '@/composables/useTaskIndexFilters';
 import { useTaskIndexListState } from '@/composables/useTaskIndexListState';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { TaskIndexFilters, TaskPaginator, TaskProjectOption } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
@@ -31,6 +31,7 @@ const filtersState = useTaskIndexFilters({ filters: props.filters });
 const listState = useTaskIndexListState({
     tasks: props.tasks,
     buildListQuery: filtersState.buildListQuery,
+    indexPath: filtersState.indexPath,
 });
 const editState = useTaskIndexEditState({
     projects: props.projects,

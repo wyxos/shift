@@ -2,17 +2,9 @@
 /* eslint-disable vue/no-mutating-props */
 import AccessUserPicker from '@/components/admin/AccessUserPicker.vue';
 import { accessStatusBadgeClass, accessStatusLabel, accessUserDisplayName, type AccessUserCandidate } from '@/components/admin/access-users';
-import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Trash2 } from 'lucide-vue-next';
 import { type ProjectAccessUser } from './project-shared';
 
@@ -44,15 +36,23 @@ const emit = defineEmits<{
     'remove-access': [projectUser: ProjectAccessUser];
     submitAccess: [];
 }>();
+
+function updateOpen(value: boolean) {
+    emit('update:open', value);
+
+    if (!value) {
+        emit('cancel');
+    }
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Manage Project Access</AlertDialogTitle>
-                <AlertDialogDescription>Users with access to {{ form.project_name }}</AlertDialogDescription>
-            </AlertDialogHeader>
+    <Dialog :open="open" @update:open="updateOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage Project Access</DialogTitle>
+                <DialogDescription>Users with access to {{ form.project_name }}</DialogDescription>
+            </DialogHeader>
 
             <AccessUserPicker
                 :candidates="accessUsers"
@@ -96,16 +96,9 @@ const emit = defineEmits<{
                 </div>
             </div>
 
-            <AlertDialogFooter>
-                <AlertDialogCancel
-                    type="button"
-                    @click="
-                        emit('update:open', false);
-                        emit('cancel');
-                    "
-                    >Close</AlertDialogCancel
-                >
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="updateOpen(false)">Close</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
