@@ -1,6 +1,7 @@
 import Clients from '@/pages/Clients.vue';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { h } from 'vue';
 
 const inertiaMocks = vi.hoisted(() => ({
     routerGet: vi.fn(),
@@ -60,6 +61,34 @@ vi.mock('@/components/ui/button-group', () => ({
                 </button>
             </div>
         `,
+    },
+}));
+
+vi.mock('@/components/ui/select', () => ({
+    Select: {
+        props: ['modelValue', 'options', 'placeholder', 'testId'],
+        emits: ['update:modelValue'],
+        render() {
+            const options = Array.isArray((this as any).options) ? (this as any).options : [];
+
+            return h(
+                'select',
+                {
+                    'data-testid': (this as any).testId,
+                    value: (this as any).modelValue ?? '',
+                    onChange: (event: Event) => {
+                        const value = (event.target as HTMLSelectElement).value;
+                        const option = options.find((item: any) => String(item.value ?? '') === value);
+
+                        (this as any).$emit('update:modelValue', option ? option.value : value || null);
+                    },
+                },
+                [
+                    (this as any).placeholder ? h('option', { value: '' }, (this as any).placeholder) : null,
+                    ...options.map((option: any) => h('option', { value: option.value ?? '' }, option.label)),
+                ],
+            );
+        },
     },
 }));
 

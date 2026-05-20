@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, type SelectOption } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
@@ -35,6 +36,11 @@ const form = useForm({
     email: props.externalUser.email,
     project_id: props.externalUser.project_id || null,
 });
+
+const projectOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'No Project' },
+    ...props.projects.map((project: any) => ({ value: project.id, label: project.name })),
+]);
 
 // Computed property for other errors (not related to specific fields)
 const otherErrors = computed(() => {
@@ -71,16 +77,16 @@ const submitForm = () => {
 
                 <div class="mb-4">
                     <label for="project_id" class="block text-sm font-medium text-gray-700">Project</label>
-                    <select
+                    <Select
                         v-model="form.project_id"
-                        id="project_id"
-                        class="mt-1 block w-full rounded-md border-gray-300 py-2 pr-10 pl-3 text-base focus:border-blue-500 focus:ring-blue-500 focus:outline-none sm:text-sm"
-                    >
-                        <option :value="null">No Project</option>
-                        <option v-for="project in projects" :key="project.id" :value="project.id">
-                            {{ project.name }}
-                        </option>
-                    </select>
+                        :options="projectOptions"
+                        placeholder="No Project"
+                        search-placeholder="Search projects..."
+                        empty-label="No projects found."
+                        searchable
+                        class="mt-1"
+                        test-id="external-user-project"
+                    />
                     <div v-if="form.errors.project_id" class="mt-1 text-sm text-red-500">{{ form.errors.project_id }}</div>
                 </div>
 
