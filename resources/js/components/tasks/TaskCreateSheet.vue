@@ -2,6 +2,7 @@
 import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
 import TaskEnvironmentField from '@/components/tasks/TaskEnvironmentField.vue';
 import { Button } from '@/components/ui/button';
+import { Select, type SelectOption, type SelectOptionValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { emptyTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
 import type { TaskProjectOption } from '@/shared/tasks/projects';
@@ -42,8 +43,6 @@ const createLoading = ref(false);
 const createUploading = ref(false);
 const createError = ref<string | null>(null);
 const createTempIdentifier = ref(Date.now().toString());
-const inputClass =
-    'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]';
 
 const defaultProjectId = computed(() => (props.projects.length === 1 ? props.projects[0].id : null));
 const hasProjects = computed(() => props.projects.length > 0);
@@ -51,6 +50,7 @@ const showProjectSelector = computed(() => props.projects.length > 1);
 const canSubmit = computed(() => createForm.value.projectId !== null && createForm.value.title.trim().length > 0);
 const selectedProject = computed(() => props.projects.find((project) => project.id === createForm.value.projectId) ?? null);
 const projectUsersLabel = computed(() => (selectedProject.value ? `${selectedProject.value.name} users` : 'Project users'));
+const projectOptions = computed<SelectOption[]>(() => props.projects.map((project) => ({ value: project.id, label: project.name })));
 
 const createForm = ref<TaskCreateDraft>({
     title: '',
@@ -93,6 +93,10 @@ function updateProject(projectId: number | null) {
     createForm.value.projectId = projectId;
     createForm.value.environment = null;
     createForm.value.collaborators = emptyTaskCollaborators();
+}
+
+function updateProjectFromSelect(value: SelectOptionValue) {
+    updateProject(typeof value === 'number' ? value : value ? Number(value) : null);
 }
 
 async function createTask() {
@@ -173,19 +177,16 @@ async function createTask() {
             >
                 <div v-if="showProjectSelector" class="space-y-2">
                     <label class="flex items-center gap-2 text-sm leading-none font-medium select-none">Project</label>
-                    <select
-                        :value="createForm.projectId ?? ''"
-                        :class="inputClass"
-                        data-testid="create-task-project"
-                        @change="
-                            updateProject(($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)
-                        "
-                    >
-                        <option value="">Select a project</option>
-                        <option v-for="project in projects" :key="project.id" :value="project.id">
-                            {{ project.name }}
-                        </option>
-                    </select>
+                    <Select
+                        :model-value="createForm.projectId"
+                        :options="projectOptions"
+                        placeholder="Select a project"
+                        search-placeholder="Search projects..."
+                        empty-label="No projects found."
+                        searchable
+                        test-id="create-task-project"
+                        @update:modelValue="updateProjectFromSelect"
+                    />
                 </div>
 
                 <TaskEnvironmentField

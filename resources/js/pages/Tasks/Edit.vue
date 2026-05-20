@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { Select, type SelectOption } from '@/components/ui/select';
 import { useTaskAttachments } from '@/composables/useTaskAttachments';
 import { useTaskThreads } from '@/composables/useTaskThreads';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -52,6 +53,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const title = 'Edit Task';
+const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'awaiting-feedback', label: 'Awaiting Feedback' },
+] satisfies SelectOption[];
+const priorityOptions = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+] satisfies SelectOption[];
 
 const formatCreatedAt = (value?: string): string => {
     if (!value) return '';
@@ -195,16 +207,7 @@ const submitForm = (): void => {
                         <!-- Status Dropdown -->
                         <div class="mb-4">
                             <Label for="status">Status</Label>
-                            <select
-                                id="status"
-                                v-model="editForm.status"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            >
-                                <option value="pending">Pending</option>
-                                <option value="in-progress">In Progress</option>
-                                <option value="completed">Completed</option>
-                                <option value="awaiting-feedback">Awaiting Feedback</option>
-                            </select>
+                            <Select v-model="editForm.status" :options="statusOptions" class="mt-1" test-id="legacy-edit-task-status" />
                             <div v-if="editForm.errors.status" class="mt-1 text-sm text-red-500">
                                 {{ editForm.errors.status }}
                             </div>
@@ -213,15 +216,7 @@ const submitForm = (): void => {
                         <!-- Priority Dropdown -->
                         <div class="mb-4">
                             <Label for="priority">Priority</Label>
-                            <select
-                                id="priority"
-                                v-model="editForm.priority"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            >
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                            </select>
+                            <Select v-model="editForm.priority" :options="priorityOptions" class="mt-1" test-id="legacy-edit-task-priority" />
                             <div v-if="editForm.errors.priority" class="mt-1 text-sm text-red-500">
                                 {{ editForm.errors.priority }}
                             </div>
