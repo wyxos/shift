@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Link } from '@inertiajs/vue3';
 import { Building2, FolderKanban, Pencil, Trash2, Users } from 'lucide-vue-next';
 
 type OrganisationRow = {
@@ -10,6 +11,7 @@ type OrganisationRow = {
     created_at?: string | null;
     organisation_users_count?: number | null;
     projects_count?: number | null;
+    isOwner: boolean;
 };
 
 const { organisations } = defineProps<{
@@ -17,7 +19,6 @@ const { organisations } = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    'open-edit': [organisation: OrganisationRow];
     'open-delete': [organisation: OrganisationRow];
     'open-manage-users': [organisation: OrganisationRow];
 }>();
@@ -35,6 +36,10 @@ function usersLabel(count?: number | null) {
 function projectsLabel(count?: number | null) {
     const total = Number(count ?? 0);
     return `${total} project${total === 1 ? '' : 's'}`;
+}
+
+function settingsHref(organisation: OrganisationRow) {
+    return `/organisation/${organisation.id}/settings`;
 }
 </script>
 
@@ -75,6 +80,7 @@ function projectsLabel(count?: number | null) {
                 <TableCell>
                     <div class="flex flex-wrap justify-end gap-2">
                         <Button
+                            v-if="organisation.isOwner"
                             size="sm"
                             variant="outline"
                             :data-testid="`organisation-manage-${organisation.id}`"
@@ -85,16 +91,20 @@ function projectsLabel(count?: number | null) {
                             <span class="sr-only">Manage users</span>
                         </Button>
                         <Button
+                            v-if="organisation.isOwner"
+                            as-child
                             size="sm"
                             variant="outline"
                             :data-testid="`organisation-edit-${organisation.id}`"
                             title="Edit organisation"
-                            @click="emit('open-edit', organisation)"
                         >
-                            <Pencil class="h-4 w-4" />
-                            <span class="sr-only">Edit organisation</span>
+                            <Link :href="settingsHref(organisation)">
+                                <Pencil class="h-4 w-4" />
+                                <span class="sr-only">Edit organisation</span>
+                            </Link>
                         </Button>
                         <Button
+                            v-if="organisation.isOwner"
                             size="sm"
                             variant="destructive"
                             :data-testid="`organisation-delete-${organisation.id}`"

@@ -31,6 +31,7 @@ export interface SharedData extends PageProps {
     ziggy: Config & { location: string };
     sidebarOpen: boolean;
     sidebarOrganisations?: SidebarOrganisation[];
+    sidebarOrganisationsHasMore?: boolean;
     shift?: {
         ai_enabled: boolean;
     };

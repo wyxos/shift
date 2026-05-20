@@ -127,6 +127,10 @@ vi.mock('@inertiajs/vue3', async () => {
             get: inertiaMocks.routerGet,
             delete: inertiaMocks.routerDelete,
         },
+        usePage: () => ({
+            url: '/clients',
+            props: {},
+        }),
         useForm: vi.fn((initialValues: Record<string, unknown>) => {
             const initial = clone(initialValues);
             const form = reactive({

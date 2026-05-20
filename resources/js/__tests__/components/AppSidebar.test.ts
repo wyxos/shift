@@ -10,6 +10,7 @@ const { mockPage } = vi.hoisted(() => ({
                 { id: 3, name: 'Northwind Organisation', isOwner: true },
                 { id: 4, name: 'Northwind Studio', isOwner: false },
             ],
+            sidebarOrganisationsHasMore: false,
         },
     },
 }));
@@ -115,6 +116,11 @@ vi.mock('@/components/ui/sidebar', async () => {
 describe('AppSidebar', () => {
     beforeEach(() => {
         mockPage.url = '/organisations';
+        mockPage.props.sidebarOrganisations = [
+            { id: 3, name: 'Northwind Organisation', isOwner: true },
+            { id: 4, name: 'Northwind Studio', isOwner: false },
+        ];
+        mockPage.props.sidebarOrganisationsHasMore = false;
     });
 
     function mountSidebar() {
@@ -136,14 +142,30 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Northwind Studio');
         expect(wrapper.text()).toContain('shared');
-        expect(wrapper.find('a[href="/dashboard?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/dashboard?organisation_id=4"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
+    });
+
+    it('hides the organisation show more link when the sidebar list is complete', () => {
+        const wrapper = mountSidebar();
+
+        expect(wrapper.text()).not.toContain('Show more');
+        expect(wrapper.find('a[href="/organisations"]').exists()).toBe(false);
+    });
+
+    it('shows the organisation show more link when the sidebar list is truncated', () => {
+        mockPage.props.sidebarOrganisationsHasMore = true;
+        const wrapper = mountSidebar();
+
+        expect(wrapper.text()).toContain('Show more');
+        expect(wrapper.find('a[href="/organisations"]').exists()).toBe(true);
     });
 
     it('shows owned organisation navigation from a scoped route', () => {
-        mockPage.url = '/dashboard?organisation_id=3';
+        mockPage.url = '/organisation/3/dashboard';
         const wrapper = mountSidebar();
 
+        expect(wrapper.text()).toContain('Back');
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Dashboard');
         expect(wrapper.text()).toContain('Tasks');
@@ -153,36 +175,37 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Settings');
         expect(wrapper.text()).not.toContain('Navigation');
 
-        expect(wrapper.find('a[href="/dashboard?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/tasks?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/clients?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/projects?organisation_id=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/organisations?team=3"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/organisations?settings=3"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/dashboard"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/clients"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/projects"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/team"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/settings"]').exists()).toBe(true);
     });
 
     it('keeps organisation team and settings active states distinct', () => {
-        mockPage.url = '/organisations?team=3';
+        mockPage.url = '/organisation/3/team';
         const teamWrapper = mountSidebar();
 
-        const teamLink = teamWrapper.get('a[href="/organisations?team=3"]');
-        const settingsLink = teamWrapper.get('a[href="/organisations?settings=3"]');
+        const teamLink = teamWrapper.get('a[href="/organisation/3/team"]');
+        const settingsLink = teamWrapper.get('a[href="/organisation/3/settings"]');
 
         expect(teamLink.element.parentElement?.getAttribute('data-active')).toBe('true');
         expect(settingsLink.element.parentElement?.getAttribute('data-active')).toBe('false');
 
-        mockPage.url = '/organisations?settings=3';
+        mockPage.url = '/organisation/3/settings';
         const settingsWrapper = mountSidebar();
 
-        const activeTeamLink = settingsWrapper.get('a[href="/organisations?team=3"]');
-        const activeSettingsLink = settingsWrapper.get('a[href="/organisations?settings=3"]');
+        const activeTeamLink = settingsWrapper.get('a[href="/organisation/3/team"]');
+        const activeSettingsLink = settingsWrapper.get('a[href="/organisation/3/settings"]');
 
         expect(activeTeamLink.element.parentElement?.getAttribute('data-active')).toBe('false');
         expect(activeSettingsLink.element.parentElement?.getAttribute('data-active')).toBe('true');
     });
 
     it('shows only shared organisation links available to non-owners', () => {
-        mockPage.url = '/dashboard?organisation_id=4';
+        mockPage.url = '/organisation/4/dashboard';
         const wrapper = mountSidebar();
 
         expect(wrapper.text()).toContain('shared');
@@ -192,8 +215,8 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).not.toContain('Clients');
         expect(wrapper.text()).not.toContain('Team');
         expect(wrapper.text()).not.toContain('Settings');
-        expect(wrapper.find('a[href="/dashboard?organisation_id=4"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/tasks?organisation_id=4"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/projects?organisation_id=4"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/projects"]').exists()).toBe(true);
     });
 });

@@ -118,7 +118,7 @@ test('dashboard metrics can be scoped to a shared organisation', function () {
         'priority' => 'low',
     ]);
 
-    $response = $this->actingAs($user)->get('/dashboard?organisation_id='.$sharedOrganisation->id);
+    $response = $this->actingAs($user)->get(route('organisation.dashboard', $sharedOrganisation));
 
     $response->assertStatus(200);
     $response->assertInertia(fn (Assert $page) => $page
@@ -131,4 +131,33 @@ test('dashboard metrics can be scoped to a shared organisation', function () {
         ->where('charts.projects.0.project', 'Atlas Console')
         ->where('charts.projects.0.count', 1)
     );
+});
+
+test('sidebar organisation shared data only marks the list as having more when it is truncated', function () {
+    $user = User::factory()->create();
+
+    collect(['Atlas Commerce', 'Cedar Labs', 'Northwind Organisation', 'Northwind Studio', 'QA Org'])
+        ->each(fn (string $name) => Organisation::factory()->create([
+            'author_id' => $user->id,
+            'name' => $name,
+        ]));
+
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('sidebarOrganisations', 5)
+            ->where('sidebarOrganisationsHasMore', false)
+        );
+
+    Organisation::factory()->create([
+        'author_id' => $user->id,
+        'name' => 'Zephyr Console',
+    ]);
+
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('sidebarOrganisations', 5)
+            ->where('sidebarOrganisationsHasMore', true)
+        );
 });

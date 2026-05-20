@@ -3,20 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organisation;
+use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class OrganisationController extends Controller
 {
-    public function index()
+    public function index(?Organisation $organisation = null, ?string $activePanel = null)
     {
         $userId = auth()->id();
         $sortBy = request('sort_by');
+        $routeOrganisationId = $organisation?->id;
         $panel = [
             'create' => request()->boolean('create'),
-            'team' => request()->integer('team') ?: request()->integer('manage') ?: null,
+            'team' => $activePanel === 'team' ? $routeOrganisationId : (request()->integer('team') ?: request()->integer('manage') ?: null),
             'manage' => request()->integer('manage') ?: null,
-            'settings' => request()->integer('settings') ?: null,
+            'settings' => $activePanel === 'settings' ? $routeOrganisationId : (request()->integer('settings') ?: null),
         ];
         $panelOrganisationId = $panel['team'] ?: $panel['settings'];
 
@@ -46,19 +49,42 @@ class OrganisationController extends Controller
         }
 
         $panelOrganisation = null;
+        $panelOrganisationProjects = collect();
+        $panelProjectUsers = collect();
 
         if ($panelOrganisationId) {
             $panelOrganisation = Organisation::query()
                 ->where('author_id', $userId)
                 ->with(['author:id,name,email', 'organisationUsers.user:id,name,email'])
                 ->find($panelOrganisationId);
+
+            if ($panelOrganisation) {
+                $panelOrganisationProjects = Project::query()
+                    ->where(function (Builder $query) use ($panelOrganisation) {
+                        $query
+                            ->where('organisation_id', $panelOrganisation->id)
+                            ->orWhereHas('client', function (Builder $clientQuery) use ($panelOrganisation) {
+                                $clientQuery->where('organisation_id', $panelOrganisation->id);
+                            });
+                    })
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+
+                $panelProjectUsers = ProjectUser::query()
+                    ->whereIn('project_id', $panelOrganisationProjects->pluck('id'))
+                    ->get(['id', 'project_id', 'user_id', 'user_email']);
+            }
         }
 
         return inertia('Organisations/Index')->with([
             'filters' => request()->only(['search', 'sort_by']),
             'organisations' => $organisations
                 ->paginate(10)
-                ->withQueryString(),
+                ->withQueryString()
+                ->through(fn (Organisation $organisation) => [
+                    ...$organisation->toArray(),
+                    'isOwner' => $organisation->author_id === $userId,
+                ]),
             'accessUsers' => User::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
@@ -66,6 +92,13 @@ class OrganisationController extends Controller
             'panelOrganisation' => $panelOrganisation ? [
                 'id' => $panelOrganisation->id,
                 'name' => $panelOrganisation->name,
+                'projects' => $panelOrganisationProjects
+                    ->map(fn (Project $project) => [
+                        'id' => $project->id,
+                        'name' => $project->name,
+                    ])
+                    ->values()
+                    ->all(),
                 'teamUsers' => collect([
                     $panelOrganisation->author ? [
                         'id' => 'owner-'.$panelOrganisation->author->id,
@@ -73,23 +106,51 @@ class OrganisationController extends Controller
                         'email' => $panelOrganisation->author->email,
                         'status' => 'owner',
                         'statusLabel' => 'Owner',
+                        'projectIds' => $panelOrganisationProjects->pluck('id')->values()->all(),
                     ] : null,
                 ])
                     ->filter()
                     ->merge(
-                        $panelOrganisation->organisationUsers->map(fn ($organisationUser) => [
-                            'id' => 'access-'.$organisationUser->id,
-                            'organisationUserId' => $organisationUser->id,
-                            'name' => $organisationUser->user?->name ?: $organisationUser->user_name,
-                            'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
-                            'status' => $organisationUser->user_id ? 'registered' : 'pending',
-                            'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
-                        ])
+                        $panelOrganisation->organisationUsers->map(function ($organisationUser) use ($panelProjectUsers) {
+                            $projectIds = $panelProjectUsers
+                                ->filter(function (ProjectUser $projectUser) use ($organisationUser) {
+                                    if ($organisationUser->user_id) {
+                                        return $projectUser->user_id === $organisationUser->user_id
+                                            || $projectUser->user_email === $organisationUser->user_email;
+                                    }
+
+                                    return $projectUser->user_email === $organisationUser->user_email;
+                                })
+                                ->pluck('project_id')
+                                ->unique()
+                                ->values()
+                                ->all();
+
+                            return [
+                                'id' => 'access-'.$organisationUser->id,
+                                'organisationUserId' => $organisationUser->id,
+                                'name' => $organisationUser->user?->name ?: $organisationUser->user_name,
+                                'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
+                                'status' => $organisationUser->user_id ? 'registered' : 'pending',
+                                'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
+                                'projectIds' => $projectIds,
+                            ];
+                        })
                     )
                     ->values()
                     ->all(),
             ] : null,
         ]);
+    }
+
+    public function team(Organisation $organisation)
+    {
+        return $this->index($organisation, 'team');
+    }
+
+    public function settings(Organisation $organisation)
+    {
+        return $this->index($organisation, 'settings');
     }
 
     public function destroy(Organisation $organisation)

@@ -1,7 +1,7 @@
 import Index from '@/pages/Organisations/Index.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { fetchMock, getAccessForm, getCreateForm, getEditForm, makeProps, routerDeleteMock } from './test-helpers';
+import { axiosPatchMock, fetchMock, getAccessForm, getCreateForm, getEditForm, makeProps, routerDeleteMock } from './test-helpers';
 
 describe('Organisations/Index.vue', () => {
     it('creates a new organisation from the create dialog', async () => {
@@ -26,28 +26,25 @@ describe('Organisations/Index.vue', () => {
         expect(createForm.isActive).toBe(false);
     });
 
-    it('opens the edit dialog with organisation values and saves changes', async () => {
+    it('links owner edit actions to organisation settings', () => {
         const wrapper = mount(Index, {
             props: makeProps(),
         });
 
-        await wrapper.get('[data-testid="organisation-edit-1"]').trigger('click');
+        const editAction = wrapper.get('[data-testid="organisation-edit-1"]');
 
-        const editInput = wrapper.get('[data-testid="edit-organisation-name"]');
-        expect((editInput.element as HTMLInputElement).value).toBe('Acme Labs');
+        expect(editAction.find('a[href="/organisation/1/settings"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="edit-organisation-name"]').exists()).toBe(false);
+    });
 
-        await editInput.setValue('Acme Labs Updated');
-        await wrapper.get('[data-testid="submit-edit-organisation"]').trigger('click');
+    it('hides owner-only organisation actions on shared rows', () => {
+        const wrapper = mount(Index, {
+            props: makeProps(),
+        });
 
-        const editForm = getEditForm();
-
-        expect(editForm.put).toHaveBeenCalledWith(
-            '/organisations/1',
-            expect.objectContaining({
-                preserveScroll: true,
-                onSuccess: expect.any(Function),
-            }),
-        );
+        expect(wrapper.find('[data-testid="organisation-manage-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="organisation-edit-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="organisation-delete-2"]').exists()).toBe(false);
     });
 
     it('adds a user from the manage access dialog', async () => {
@@ -116,6 +113,10 @@ describe('Organisations/Index.vue', () => {
                 panelOrganisation: {
                     id: 1,
                     name: 'Acme Labs',
+                    projects: [
+                        { id: 30, name: 'Portal Refresh' },
+                        { id: 31, name: 'Billing Console' },
+                    ],
                     teamUsers: [
                         {
                             id: 'owner-7',
@@ -123,13 +124,16 @@ describe('Organisations/Index.vue', () => {
                             email: 'owner@example.com',
                             status: 'owner',
                             statusLabel: 'Owner',
+                            projectIds: [30, 31],
                         },
                         {
                             id: 'access-20',
+                            organisationUserId: 20,
                             name: 'Jane Admin',
                             email: 'jane@example.com',
                             status: 'registered',
                             statusLabel: 'Registered',
+                            projectIds: [30],
                         },
                     ],
                 },
@@ -141,7 +145,76 @@ describe('Organisations/Index.vue', () => {
         expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner User (owner@example.com)');
         expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner');
         expect(wrapper.get('[data-testid="organisation-team-user-access-20"]').text()).toContain('Jane Admin (jane@example.com)');
+        expect(wrapper.find('[data-testid="organisation-team-edit-20"]').exists()).toBe(true);
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('edits organisation team member project access and removes organisation access', async () => {
+        const wrapper = mount(Index, {
+            props: makeProps({
+                panel: {
+                    team: 1,
+                    manage: null,
+                    settings: null,
+                    create: false,
+                },
+                panelOrganisation: {
+                    id: 1,
+                    name: 'Acme Labs',
+                    projects: [
+                        { id: 30, name: 'Portal Refresh' },
+                        { id: 31, name: 'Billing Console' },
+                    ],
+                    teamUsers: [
+                        {
+                            id: 'owner-7',
+                            name: 'Owner User',
+                            email: 'owner@example.com',
+                            status: 'owner',
+                            statusLabel: 'Owner',
+                            projectIds: [30, 31],
+                        },
+                        {
+                            id: 'access-20',
+                            organisationUserId: 20,
+                            name: 'Jane Admin',
+                            email: 'jane@example.com',
+                            status: 'registered',
+                            statusLabel: 'Registered',
+                            projectIds: [30],
+                        },
+                    ],
+                },
+            }),
+        });
+
+        expect(wrapper.find('[data-testid="organisation-team-edit-undefined"]').exists()).toBe(false);
+        await wrapper.get('[data-testid="organisation-team-edit-20"]').trigger('click');
+
+        const billingCheckbox = wrapper.get('[data-testid="organisation-team-project-checkbox-31"]');
+        expect((wrapper.get('[data-testid="organisation-team-project-checkbox-30"]').element as HTMLInputElement).checked).toBe(true);
+        expect((billingCheckbox.element as HTMLInputElement).checked).toBe(false);
+
+        await billingCheckbox.setValue(true);
+        await wrapper.get('[data-testid="organisation-team-save-projects"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosPatchMock).toHaveBeenCalledWith(
+            '/organisations/1/users/20/projects',
+            { project_ids: [30, 31] },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+
+        await wrapper.get('[data-testid="organisation-team-edit-20"]').trigger('click');
+        await wrapper.get('[data-testid="organisation-team-remove-access"]').trigger('click');
+
+        expect(routerDeleteMock).toHaveBeenCalledWith(
+            '/organisations/1/users/20',
+            expect.objectContaining({
+                preserveScroll: true,
+                onSuccess: expect.any(Function),
+            }),
+        );
     });
 
     it('renders the settings screen and saves or deletes the selected organisation', async () => {
@@ -155,6 +228,7 @@ describe('Organisations/Index.vue', () => {
                 panelOrganisation: {
                     id: 1,
                     name: 'Acme Labs',
+                    projects: [],
                     teamUsers: [],
                 },
             }),
@@ -172,7 +246,6 @@ describe('Organisations/Index.vue', () => {
             '/organisations/1',
             expect.objectContaining({
                 preserveScroll: true,
-                onSuccess: expect.any(Function),
             }),
         );
 

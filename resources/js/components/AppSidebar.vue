@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData, type SidebarOrganisation } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Briefcase, Folder, LayoutGrid, ListTodo, Network, Plus, Settings, Users } from 'lucide-vue-next';
+import { ArrowLeft, Briefcase, Folder, LayoutGrid, ListTodo, Network, Plus, Settings, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -39,9 +39,16 @@ const mainNavItems: NavItem[] = [
 const footerNavItems: NavItem[] = [];
 
 const organisations = computed(() => page.props.sidebarOrganisations ?? []);
+const hasMoreOrganisations = computed(() => page.props.sidebarOrganisationsHasMore ?? false);
 
 const routeSelectedOrganisationId = computed(() => {
     const current = new URL(page.url, 'https://shift.test');
+    const routeOrganisationId = organisationIdFromScopedPath(current);
+
+    if (routeOrganisationId !== null) {
+        return routeOrganisationId;
+    }
+
     const id =
         current.searchParams.get('organisation_id') ??
         current.searchParams.get('team') ??
@@ -71,25 +78,25 @@ const organisationNavItems = computed(() => {
     return [
         {
             title: 'Dashboard',
-            href: organisationContextHref('/dashboard', organisation),
+            href: organisationPageHref(organisation, 'dashboard'),
             icon: LayoutGrid,
             isVisible: true,
         },
         {
             title: 'Tasks',
-            href: organisationContextHref('/tasks', organisation),
+            href: organisationPageHref(organisation, 'tasks'),
             icon: ListTodo,
             isVisible: true,
         },
         {
             title: 'Clients',
-            href: organisationContextHref('/clients', organisation),
+            href: organisationPageHref(organisation, 'clients'),
             icon: Briefcase,
             isVisible: organisation.isOwner,
         },
         {
             title: 'Projects',
-            href: organisationContextHref('/projects', organisation),
+            href: organisationPageHref(organisation, 'projects'),
             icon: Folder,
             isVisible: true,
         },
@@ -109,15 +116,15 @@ const organisationNavItems = computed(() => {
 });
 
 function organisationTeamHref(organisation: SidebarOrganisation) {
-    return `/organisations?team=${organisation.id}`;
+    return organisationPageHref(organisation, 'team');
 }
 
 function organisationSettingsHref(organisation: SidebarOrganisation) {
-    return `/organisations?settings=${organisation.id}`;
+    return organisationPageHref(organisation, 'settings');
 }
 
-function organisationContextHref(path: string, organisation: SidebarOrganisation) {
-    return `${path}?organisation_id=${organisation.id}`;
+function organisationPageHref(organisation: SidebarOrganisation, page: string) {
+    return `/organisation/${organisation.id}/${page}`;
 }
 
 function isOrganisationItemActive(organisation: SidebarOrganisation) {
@@ -127,15 +134,37 @@ function isOrganisationItemActive(organisation: SidebarOrganisation) {
 function isOrganisationNavActive(href: string) {
     const target = new URL(href, 'https://shift.test');
     const current = new URL(page.url, 'https://shift.test');
+    const currentState = organisationRouteState(current);
+    const targetState = organisationRouteState(target);
 
-    return current.pathname === target.pathname && organisationRouteState(current) === organisationRouteState(target);
+    return currentState !== 'none' && currentState === targetState;
+}
+
+function organisationIdFromScopedPath(url: URL) {
+    const match = url.pathname.match(/^\/organisation\/(\d+)(?:\/|$)/);
+
+    if (!match) {
+        return null;
+    }
+
+    const id = Number(match[1]);
+
+    return Number.isFinite(id) ? id : null;
 }
 
 function organisationRouteState(url: URL) {
+    const scopedMatch = url.pathname.match(/^\/organisation\/(\d+)\/(dashboard|tasks|clients|projects|team|settings)$/);
+
+    if (scopedMatch) {
+        return `${scopedMatch[2]}:${scopedMatch[1]}`;
+    }
+
     const organisationId = url.searchParams.get('organisation_id');
 
     if (organisationId) {
-        return `context:${url.pathname}:${organisationId}`;
+        const page = url.pathname.replace(/^\//, '');
+
+        return `${page}:${organisationId}`;
     }
 
     const teamId = url.searchParams.get('team') ?? url.searchParams.get('manage');
@@ -172,6 +201,18 @@ function organisationRouteState(url: URL) {
             <Transition mode="out-in" name="sidebar-nav-slide">
                 <div v-if="activeOrganisation" :key="`organisation-${activeOrganisation.id}`">
                     <SidebarGroup class="px-2 py-0">
+                        <SidebarGroupContent class="pb-1">
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton as-child size="sm" tooltip="Back">
+                                        <Link href="/dashboard">
+                                            <ArrowLeft />
+                                            <span>Back</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
                         <SidebarGroupLabel class="h-auto min-h-8 flex-col items-start justify-center gap-0.5 py-1.5 leading-tight">
                             <span class="text-sidebar-foreground block max-w-full truncate">{{ activeOrganisation.name }}</span>
                             <span v-if="!activeOrganisation.isOwner" class="text-sidebar-foreground/60 text-[11px] leading-none font-normal">
@@ -207,7 +248,7 @@ function organisationRouteState(url: URL) {
                             <SidebarMenu>
                                 <SidebarMenuItem v-for="organisation in organisations" :key="organisation.id">
                                     <SidebarMenuButton as-child :is-active="isOrganisationItemActive(organisation)" :tooltip="organisation.name">
-                                        <Link :href="organisationContextHref('/dashboard', organisation)">
+                                        <Link :href="organisationPageHref(organisation, 'dashboard')">
                                             <Network />
                                             <span class="min-w-0">
                                                 <span class="block truncate">{{ organisation.name }}</span>
@@ -229,7 +270,7 @@ function organisationRouteState(url: URL) {
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                                <SidebarMenuItem>
+                                <SidebarMenuItem v-if="hasMoreOrganisations">
                                     <Link
                                         class="text-muted-foreground hover:text-foreground focus-visible:ring-sidebar-ring block rounded-sm px-2 py-1 pl-8 text-xs leading-5 underline-offset-4 transition group-data-[collapsible=icon]:hidden hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
                                         href="/organisations"

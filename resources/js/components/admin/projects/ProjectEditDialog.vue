@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -24,15 +24,23 @@ const emit = defineEmits<{
     cancel: [];
     submit: [];
 }>();
+
+function updateOpen(value: boolean) {
+    emit('update:open', value);
+
+    if (!value) {
+        emit('cancel');
+    }
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Edit Project</AlertDialogTitle>
-                <AlertDialogDescription>Update the project name.</AlertDialogDescription>
-            </AlertDialogHeader>
+    <Dialog :open="open" @update:open="updateOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Project</DialogTitle>
+                <DialogDescription>Update the project name.</DialogDescription>
+            </DialogHeader>
 
             <div class="space-y-4">
                 <div class="space-y-2">
@@ -44,10 +52,10 @@ const emit = defineEmits<{
                 <p v-for="(error, key) in otherErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
             </div>
 
-            <AlertDialogFooter>
-                <AlertDialogCancel type="button" @click="emit('update:open', false); emit('cancel')">Cancel</AlertDialogCancel>
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="updateOpen(false)">Cancel</Button>
                 <Button type="button" :disabled="disabled" data-testid="edit-project-submit" @click="emit('submit')">Save</Button>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

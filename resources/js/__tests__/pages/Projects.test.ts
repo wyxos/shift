@@ -105,6 +105,17 @@ vi.mock('@/components/ui/alert-dialog', () => ({
     AlertDialogTitle: { template: '<h2><slot /></h2>' },
     AlertDialogTrigger: { template: '<div><slot /></div>' },
 }));
+vi.mock('@/components/ui/dialog', () => ({
+    Dialog: {
+        props: ['open'],
+        template: '<div v-if="open" class="dialog"><slot /></div>',
+    },
+    DialogContent: { template: '<div><slot /></div>' },
+    DialogDescription: { template: '<p><slot /></p>' },
+    DialogFooter: { template: '<div><slot /></div>' },
+    DialogHeader: { template: '<div><slot /></div>' },
+    DialogTitle: { template: '<h2><slot /></h2>' },
+}));
 vi.mock('@/components/DeleteDialog.vue', () => ({
     default: {
         props: ['isOpen'],
@@ -131,6 +142,10 @@ vi.mock('@inertiajs/vue3', async () => {
             get: inertiaMocks.routerGet,
             delete: inertiaMocks.routerDelete,
         },
+        usePage: () => ({
+            url: '/projects',
+            props: {},
+        }),
         useForm: vi.fn((initialValues: Record<string, unknown>) => {
             const initial = clone(initialValues);
             const form = reactive({
