@@ -8,13 +8,15 @@ describe('shared/tasks/rich-content', () => {
     });
 
     it('sanitizes dangerous html while preserving supported rich content markup', () => {
-        const html = sanitizeRichHtml([
-            '<p>Hello</p>',
-            '<script>alert(1)</script>',
-            '<blockquote class="shift-reply extra" data-reply-to="42" onclick="alert(1)"><p>Reply</p></blockquote>',
-            '<p><img src="/attachments/1/download" class="editor-tile extra" onerror="alert(1)"></p>',
-            '<pre><code class="language-js extra">const x = 1;</code></pre>',
-        ].join(''));
+        const html = sanitizeRichHtml(
+            [
+                '<p>Hello</p>',
+                '<script>alert(1)</script>',
+                '<blockquote class="shift-reply extra" data-reply-to="42" onclick="alert(1)"><p>Reply</p></blockquote>',
+                '<p><img src="/attachments/1/download" class="editor-tile extra" onerror="alert(1)"></p>',
+                '<pre><code class="language-js extra">const x = 1;</code></pre>',
+            ].join(''),
+        );
 
         expect(html).toContain('data-reply-to="42"');
         expect(html).toContain('class="shift-reply"');

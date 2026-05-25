@@ -1,7 +1,7 @@
+import type { TaskDetail } from '@/shared/tasks/types';
+import { useTaskThreadState } from '@/shared/tasks/useTaskThreadState';
 import axios from 'axios';
 import type { ComputedRef, Ref } from 'vue';
-import { useTaskThreadState } from '@/shared/tasks/useTaskThreadState';
-import type { TaskDetail } from '@/shared/tasks/types';
 import { toast } from 'vue-sonner';
 
 type UseTaskIndexThreadStateOptions = {

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -49,8 +58,16 @@ const emit = defineEmits<{
             </div>
 
             <AlertDialogFooter>
-                <AlertDialogCancel @click="emit('update:open', false); emit('cancel')">Cancel</AlertDialogCancel>
-                <AlertDialogAction data-testid="submit-invite-organisation" :disabled="form.processing" @click="emit('submit')">Invite</AlertDialogAction>
+                <AlertDialogCancel
+                    @click="
+                        emit('update:open', false);
+                        emit('cancel');
+                    "
+                    >Cancel</AlertDialogCancel
+                >
+                <AlertDialogAction data-testid="submit-invite-organisation" :disabled="form.processing" @click="emit('submit')"
+                    >Invite</AlertDialogAction
+                >
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

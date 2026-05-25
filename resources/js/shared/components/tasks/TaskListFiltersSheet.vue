@@ -108,12 +108,7 @@ const sortByModel = computed({
 
                     <div class="grid gap-2">
                         <label v-for="option in statusOptions" :key="option.value" class="flex items-center gap-2 text-sm">
-                            <input
-                                v-model="statusesModel"
-                                :data-testid="`status-${option.value}`"
-                                :value="option.value"
-                                type="checkbox"
-                            />
+                            <input v-model="statusesModel" :data-testid="`status-${option.value}`" :value="option.value" type="checkbox" />
                             <span>{{ option.label }}</span>
                         </label>
                     </div>
@@ -127,12 +122,7 @@ const sortByModel = computed({
 
                     <div class="grid gap-2">
                         <label v-for="option in priorityOptions" :key="option.value" class="flex items-center gap-2 text-sm">
-                            <input
-                                v-model="prioritiesModel"
-                                :data-testid="`priority-${option.value}`"
-                                :value="option.value"
-                                type="checkbox"
-                            />
+                            <input v-model="prioritiesModel" :data-testid="`priority-${option.value}`" :value="option.value" type="checkbox" />
                             <span>{{ option.label }}</span>
                         </label>
                     </div>

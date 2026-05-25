@@ -35,7 +35,10 @@ const emit = defineEmits<{
     submit: [];
 }>();
 
-const clientOptions = computed<SelectOption[]>(() => [{ value: null, label: 'No client' }, ...clients.map((client) => ({ value: client.id, label: client.name }))]);
+const clientOptions = computed<SelectOption[]>(() => [
+    { value: null, label: 'No client' },
+    ...clients.map((client) => ({ value: client.id, label: client.name })),
+]);
 const organisationOptions = computed<SelectOption[]>(() => [
     { value: null, label: 'No organisation' },
     ...organisations.map((organisation) => ({ value: organisation.id, label: organisation.name })),

@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
-import { router } from '@inertiajs/vue3';
-import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { mount } from '@vue/test-utils';
+import { describe, expect, it } from 'vitest';
+import { axiosGetMock, makeTasksPage } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('uses distinct status badge colors for each status', () => {
@@ -80,5 +79,4 @@ describe('Tasks/Index.vue', () => {
 
         wrapper.unmount();
     });
-
 });

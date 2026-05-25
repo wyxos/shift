@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
-import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { axiosGetMock, makeTasksPage } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('syncs task id in URL when opening and closing the edit sheet', async () => {
@@ -124,5 +123,4 @@ describe('Tasks/Index.vue', () => {
 
         wrapper.unmount();
     });
-
 });
