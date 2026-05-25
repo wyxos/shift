@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
-import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { axiosGetMock, makeTasksPage, sonnerMocks } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('only enables copy selection when the selection belongs to that comment', async () => {
@@ -66,5 +65,4 @@ describe('Tasks/Index.vue', () => {
         expect((wrapper.vm as any).shouldShowCopySelection(message)).toBe(false);
         wrapper.unmount();
     });
-
 });

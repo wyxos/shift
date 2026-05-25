@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, type HTMLAttributes } from 'vue';
 import { LoaderCircle } from 'lucide-vue-next';
-import { Button } from '../../components/ui/button';
+import { computed, type HTMLAttributes } from 'vue';
 import type { ButtonVariants } from '../../components/ui/button';
+import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/utils';
 
 defineOptions({
