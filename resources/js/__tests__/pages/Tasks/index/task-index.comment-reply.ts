@@ -1,4 +1,3 @@
- 
 import Index from '@/pages/Tasks/Index.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
