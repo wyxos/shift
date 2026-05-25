@@ -119,7 +119,9 @@ withDefaults(defineProps<Props>(), {
                 <li
                     v-for="task in tasks"
                     :key="task.id"
-                    :class="highlightedTaskId === task.id ? 'ring-offset-background rounded-lg bg-sky-500/10 ring-2 ring-sky-500/40 ring-offset-2' : ''"
+                    :class="
+                        highlightedTaskId === task.id ? 'ring-offset-background rounded-lg bg-sky-500/10 ring-2 ring-sky-500/40 ring-offset-2' : ''
+                    "
                     class="flex flex-col gap-3 py-4 transition sm:flex-row sm:items-center sm:gap-4"
                     data-testid="task-row"
                 >
@@ -159,7 +161,9 @@ withDefaults(defineProps<Props>(), {
                 <div class="text-muted-foreground text-xs">Page {{ currentPage }} of {{ lastPage }}</div>
                 <div class="flex items-center gap-2">
                     <Button :disabled="loading || currentPage <= 1" size="sm" variant="outline" @click="goToPage(currentPage - 1)">Previous</Button>
-                    <Button :disabled="loading || currentPage >= lastPage" size="sm" variant="outline" @click="goToPage(currentPage + 1)">Next</Button>
+                    <Button :disabled="loading || currentPage >= lastPage" size="sm" variant="outline" @click="goToPage(currentPage + 1)"
+                        >Next</Button
+                    >
                 </div>
             </div>
         </CardContent>

@@ -116,7 +116,9 @@ watch(filtersOpen, (open) => {
 });
 
 const clientRows = computed(() => props.clients.data ?? []);
-const organisationOptions = computed<SelectOption[]>(() => props.organisations.map((organisation) => ({ value: organisation.id, label: organisation.name })));
+const organisationOptions = computed<SelectOption[]>(() =>
+    props.organisations.map((organisation) => ({ value: organisation.id, label: organisation.name })),
+);
 const isOrganisationScoped = computed(
     () => appliedOrganisationId.value !== null && appliedOrganisationId.value !== undefined && appliedOrganisationId.value !== '',
 );

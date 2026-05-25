@@ -18,11 +18,7 @@ function iconForAttachment(type: string) {
 </script>
 
 <template>
-    <ul
-        v-if="attachments.length"
-        data-testid="attachments-list"
-        class="divide-y divide-slate-200 rounded-md border border-slate-200 bg-slate-50/60"
-    >
+    <ul v-if="attachments.length" data-testid="attachments-list" class="divide-y divide-slate-200 rounded-md border border-slate-200 bg-slate-50/60">
         <li
             v-for="att in attachments"
             :key="att.id"

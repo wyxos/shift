@@ -26,7 +26,24 @@ const ALLOWED_TAGS = new Set([
     'ul',
 ]);
 
-const DROP_WITH_CONTENT = new Set(['base', 'embed', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'object', 'script', 'select', 'style', 'svg', 'textarea']);
+const DROP_WITH_CONTENT = new Set([
+    'base',
+    'embed',
+    'form',
+    'frame',
+    'frameset',
+    'iframe',
+    'input',
+    'link',
+    'math',
+    'meta',
+    'object',
+    'script',
+    'select',
+    'style',
+    'svg',
+    'textarea',
+]);
 const SAFE_IMAGE_DATA_URI_PATTERN = /^data:image\/(?:png|gif|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i;
 
 export function hasHtmlMarkup(content: string): boolean {
@@ -58,14 +75,20 @@ function unwrapElement(element: Element): void {
 }
 
 function normalizeAllowedClasses(value: string, allowed: string[]): string | null {
-    const classes = value.split(/\s+/).map((item) => item.trim()).filter(Boolean);
+    const classes = value
+        .split(/\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
     const filtered = Array.from(new Set(classes.filter((item) => allowed.includes(item))));
 
     return filtered.length > 0 ? filtered.join(' ') : null;
 }
 
 function normalizeCodeClasses(value: string): string | null {
-    const classes = value.split(/\s+/).map((item) => item.trim()).filter(Boolean);
+    const classes = value
+        .split(/\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
     const filtered = Array.from(new Set(classes.filter((item) => item === 'hljs' || item.startsWith('language-'))));
 
     return filtered.length > 0 ? filtered.join(' ') : null;

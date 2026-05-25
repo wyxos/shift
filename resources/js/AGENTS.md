@@ -3,6 +3,7 @@
 Applies inside `resources/js/**` in addition to the repo root file.
 
 ## Frontend Rules
+
 - This subtree is the portal Inertia/Vue UI. The embedded SDK dashboard lives in `../shift-sdk-package/packages/shift-php/ui/`.
 - Treat shared task surfaces as hard-parity areas with the SDK UI: task index and task sheet flows, `ShiftEditor`, `ButtonGroup` interactions, attachment/comment flows, and status/priority visuals.
 - Prefer shared modules under `resources/js/shared/**` and the `@shared/**` alias before creating portal-only duplicates.
@@ -12,6 +13,7 @@ Applies inside `resources/js/**` in addition to the repo root file.
 - Do not edit generated build output in `public/build/**`.
 
 ## High-Value Touch Points
+
 - App bootstrap: `resources/js/app.ts`
 - Shared task behavior: `resources/js/shared/**`
 - Portal task screens: `resources/js/pages/Tasks/**`

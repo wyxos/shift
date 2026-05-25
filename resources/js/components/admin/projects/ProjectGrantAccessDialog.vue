@@ -1,6 +1,14 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,7 +57,14 @@ const emit = defineEmits<{
             </div>
 
             <AlertDialogFooter>
-                <AlertDialogCancel type="button" @click="emit('update:open', false); emit('cancel')">Cancel</AlertDialogCancel>
+                <AlertDialogCancel
+                    type="button"
+                    @click="
+                        emit('update:open', false);
+                        emit('cancel');
+                    "
+                    >Cancel</AlertDialogCancel
+                >
                 <Button type="button" :disabled="disabled" data-testid="grant-project-submit" @click="emit('submit')">Grant Access</Button>
             </AlertDialogFooter>
         </AlertDialogContent>

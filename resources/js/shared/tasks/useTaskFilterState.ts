@@ -1,12 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import {
-    DEFAULT_SORT_BY,
-    getDefaultStatuses,
-    getPriorityOptions,
-    getSortByOptions,
-    getStatusOptions,
-    normalizeStringList,
-} from './presentation';
+import { DEFAULT_SORT_BY, getDefaultStatuses, getPriorityOptions, getSortByOptions, getStatusOptions, normalizeStringList } from './presentation';
 import type { TaskIndexFilters } from './types';
 
 type UseTaskFilterStateOptions = {
@@ -34,9 +27,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             ? String(providedFilters.organisation_id)
             : '';
     const providedSortBy =
-        typeof providedFilters.sort_by === 'string' && allowedSortBy.has(providedFilters.sort_by)
-            ? providedFilters.sort_by
-            : defaultSortBy;
+        typeof providedFilters.sort_by === 'string' && allowedSortBy.has(providedFilters.sort_by) ? providedFilters.sort_by : defaultSortBy;
 
     const filtersOpen = ref(false);
     const appliedStatuses = ref<string[]>(providedStatuses.length ? providedStatuses : [...defaultStatuses]);

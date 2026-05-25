@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Index from '@/pages/Tasks/Index.vue';
-import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { axiosGetMock, axiosPatchMock, axiosPutMock, makeTasksPage } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('includes grouped collaborator payloads in owner autosaves', async () => {
@@ -121,5 +120,4 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
         vi.useRealTimers();
     });
-
 });

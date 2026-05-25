@@ -22,9 +22,9 @@ import type { UploadEndpoints } from '../lib/chunkedUpload';
 import { renderRichContent } from '../tasks/rich-content';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
+import type { SentAttachment } from './shift-editor/types';
 import { useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
-import type { SentAttachment } from './shift-editor/types';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
 
@@ -69,13 +69,22 @@ const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString()
 const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
 const axiosClient = computed(() => props.axiosInstance ?? axios);
-const { attachments, fileInput, formatBytes, isUploadingAttachments, onFileChosen, openFilePicker, removeAttachment, resetAttachments, uploadAttachment } =
-    useShiftEditorAttachments({
-        axiosClient,
-        tempIdentifier,
-        uploadEndpoints: props.uploadEndpoints,
-        removeTempUrl: props.removeTempUrl,
-    });
+const {
+    attachments,
+    fileInput,
+    formatBytes,
+    isUploadingAttachments,
+    onFileChosen,
+    openFilePicker,
+    removeAttachment,
+    resetAttachments,
+    uploadAttachment,
+} = useShiftEditorAttachments({
+    axiosClient,
+    tempIdentifier,
+    uploadEndpoints: props.uploadEndpoints,
+    removeTempUrl: props.removeTempUrl,
+});
 
 // Configure lowlight with a few common languages
 const lowlight = createLowlight();
