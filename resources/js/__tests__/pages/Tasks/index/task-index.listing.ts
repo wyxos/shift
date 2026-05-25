@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 import Index from '@/pages/Tasks/Index.vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
