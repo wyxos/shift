@@ -33,7 +33,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.text()).toContain('Created');
@@ -73,7 +73,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         const editStatusGroup = wrapper.get('[aria-label="Task status"]');
@@ -88,9 +88,11 @@ describe('Tasks/Index.vue', () => {
         expect(editLayout.classes()).not.toContain('lg:grid-cols-[1.15fr_0.85fr]');
         expect(wrapper.get('[data-testid="task-edit-details-pane"]').classes()).toContain('min-w-0');
         expect(wrapper.get('[data-testid="task-comments-pane"]').classes()).toContain('min-w-0');
-        expect(editStatusGroup.classes()).toContain('grid-cols-2');
+        expect(editStatusGroup.classes()).toContain('flex');
+        expect(editStatusGroup.classes()).toContain('flex-wrap');
         expect(editStatusGroup.classes()).toContain('xl:grid-cols-4');
-        expect(mobilePaneGroup.classes()).toContain('grid-cols-2');
+        expect(mobilePaneGroup.classes()).toContain('flex');
+        expect(mobilePaneGroup.classes()).toContain('flex-wrap');
         expect(wrapper.get('[data-testid="edit-mobile-pane-details"]').text()).toContain('Details');
         expect(wrapper.get('[data-testid="edit-mobile-pane-comments"]').text()).toContain('Comments');
         expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
@@ -127,7 +129,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         const description = wrapper.get('[data-testid="task-edit-description"]');
@@ -171,7 +173,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');

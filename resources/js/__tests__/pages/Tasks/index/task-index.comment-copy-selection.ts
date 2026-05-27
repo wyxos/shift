@@ -48,7 +48,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         const message = (wrapper.vm as any).threadMessages.find((item: any) => item.id === 10);

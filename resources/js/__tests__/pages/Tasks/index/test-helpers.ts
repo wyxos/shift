@@ -167,12 +167,11 @@ vi.mock('@/components/ui/button-group', () => ({
         emits: ['update:modelValue'],
         render() {
             const options = Array.isArray((this as any).options) ? (this as any).options : [];
-            const columnsClass = (this as any).columns === 2 ? 'grid-cols-2' : (this as any).columns === 4 ? 'grid-cols-4' : 'grid-cols-3';
 
             return h(
                 'div',
                 {
-                    class: ['button-group-stub', 'grid', columnsClass, (this as any).class],
+                    class: ['button-group-stub', 'flex', 'flex-wrap', 'items-center', 'gap-2', (this as any).class],
                     'aria-label': (this as any).ariaLabel,
                 },
                 options.map((option: any) =>

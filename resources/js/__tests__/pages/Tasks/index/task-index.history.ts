@@ -31,7 +31,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         expect(window.location.search).toContain('task=1');
@@ -42,6 +42,44 @@ describe('Tasks/Index.vue', () => {
 
         expect(window.location.search).toBe('');
         expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks')).toBe(true);
+        wrapper.unmount();
+        pushStateSpy.mockRestore();
+    });
+
+    it('opens task details from the task title', async () => {
+        axiosGetMock.mockReset();
+        const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.get('[data-testid="task-title-1"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+        expect(window.location.search).toContain('task=1');
+        expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks?task=1')).toBe(true);
+
         wrapper.unmount();
         pushStateSpy.mockRestore();
     });

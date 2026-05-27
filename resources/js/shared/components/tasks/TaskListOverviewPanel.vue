@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
 import { getPriorityBadgeClass, getPriorityLabel, getStatusBadgeClass, getStatusLabel } from '@shared/tasks/presentation';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import { Eye, Trash2 } from 'lucide-vue-next';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
 
 type Option = {
@@ -126,7 +126,15 @@ withDefaults(defineProps<Props>(), {
                     data-testid="task-row"
                 >
                     <div class="flex-1">
-                        <div class="text-card-foreground text-lg font-medium">{{ task.title }}</div>
+                        <button
+                            type="button"
+                            class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left text-lg font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                            :aria-label="`Open task details for ${task.title}`"
+                            :data-testid="`task-title-${task.id}`"
+                            @click="openEdit(task.id)"
+                        >
+                            {{ task.title }}
+                        </button>
                         <div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
                             <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
                                 {{ getStatusLabel(task.status) }}
@@ -141,8 +149,8 @@ withDefaults(defineProps<Props>(), {
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <ActionIconButton label="Edit task" title="Edit" @click="openEdit(task.id)">
-                            <Pencil class="h-4 w-4" />
+                        <ActionIconButton label="Open task details" title="Open details" @click="openEdit(task.id)">
+                            <Eye class="h-4 w-4" />
                         </ActionIconButton>
                         <ActionIconButton
                             label="Delete task"
