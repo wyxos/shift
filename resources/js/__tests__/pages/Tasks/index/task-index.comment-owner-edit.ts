@@ -59,7 +59,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Edit"]').trigger('click');
+        await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
         await wrapper.get('[data-testid="comment-bubble-11"]').trigger('dblclick');
