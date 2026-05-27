@@ -31,7 +31,7 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.text()).toContain('UI polish');
 
         for (const row of rows) {
-            expect(row.find('button[title="Edit"]').exists()).toBe(true);
+            expect(row.find('button[title="Open details"]').exists()).toBe(true);
             expect(row.find('button[title="Delete"]').exists()).toBe(true);
         }
 
