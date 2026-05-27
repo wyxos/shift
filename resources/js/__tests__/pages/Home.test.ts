@@ -64,15 +64,19 @@ vi.mock('@/components/ui/card', () => ({
 
 vi.mock('lucide-vue-next', () => ({
     CheckCircle2: { render: () => h('span') },
+    Cloud: { render: () => h('span') },
     FolderKanban: { render: () => h('span') },
     Github: { render: () => h('span') },
     MessageSquare: { render: () => h('span') },
     Paperclip: { render: () => h('span') },
     Plug: { render: () => h('span') },
+    Package: { render: () => h('span') },
+    Server: { render: () => h('span') },
+    Terminal: { render: () => h('span') },
 }));
 
 describe('Home.vue', () => {
-    it('mentions SHIFT only once and describes the open source Laravel-focused scope', () => {
+    it('keeps SHIFT as the hero and describes the Laravel package path', () => {
         const wrapper = mount(Home, {
             global: {
                 mocks: {
@@ -83,13 +87,11 @@ describe('Home.vue', () => {
 
         expect(wrapper.find('h1').text()).toBe('SHIFT');
 
-        const matches = wrapper.text().match(/SHIFT/g) ?? [];
-        expect(matches).toHaveLength(1);
-
         expect(wrapper.text()).toContain('Open source');
         expect(wrapper.text()).toContain('MIT');
         expect(wrapper.text()).toContain('Laravel');
-        expect(wrapper.text()).toContain('other frameworks');
+        expect(wrapper.text()).toContain('wyxos/shift-php');
+        expect(wrapper.text()).toContain('No separate intake object');
         expect(wrapper.text()).not.toContain('See how it works');
     });
 
@@ -110,6 +112,7 @@ describe('Home.vue', () => {
         const links = wrapper.findAll('a');
         expect(links.some((link) => link.text().includes('Log in'))).toBe(true);
         expect(links.some((link) => link.attributes('href')?.includes('github.com/wyxos/shift'))).toBe(true);
+        expect(links.some((link) => link.attributes('href')?.includes('packagist.org/packages/wyxos/shift-php'))).toBe(true);
         expect(links.some((link) => link.attributes('href')?.includes('wyxos.com'))).toBe(true);
         expect(links.some((link) => link.text().includes('Go to Dashboard'))).toBe(false);
     });
@@ -131,5 +134,24 @@ describe('Home.vue', () => {
         const links = wrapper.findAll('a');
         expect(links.some((link) => link.text().includes('Go to Dashboard'))).toBe(true);
         expect(links.some((link) => link.text().includes('Log in'))).toBe(false);
+    });
+
+    it('explains hosted versus self-hosted setup and install commands', () => {
+        const wrapper = mount(Home, {
+            global: {
+                mocks: {
+                    route: (name) => `/${name}`,
+                },
+            },
+        });
+
+        expect(wrapper.text()).toContain('Hosted SHIFT');
+        expect(wrapper.text()).toContain('Self-hosted SHIFT');
+        expect(wrapper.text()).toContain('shift.wyxos.com');
+        expect(wrapper.text()).toContain('No hosted billing layer');
+        expect(wrapper.text()).toContain('composer require wyxos/shift-php');
+        expect(wrapper.text()).toContain('SHIFT_URL=https://shift.wyxos.com');
+        expect(wrapper.text()).toContain('php artisan install:shift');
+        expect(wrapper.text()).toContain('/shift/tasks');
     });
 });
