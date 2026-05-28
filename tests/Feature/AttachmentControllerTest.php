@@ -149,9 +149,9 @@ test('task creation with attachments', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->post(route('tasks.store'), $taskData);
+        ->postJson(route('tasks.v2.store'), $taskData);
 
-    $response->assertRedirect(route('tasks.index'));
+    $response->assertCreated();
 
     // Check that the task was created
     $task = Task::where('title', 'Task with Attachment')->first();
@@ -182,9 +182,9 @@ test('task creation without attachments', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->post(route('tasks.store'), $taskData);
+        ->postJson(route('tasks.v2.store'), $taskData);
 
-    $response->assertRedirect(route('tasks.index'));
+    $response->assertCreated();
 
     // Check that the task was created
     $task = Task::where('title', 'Task without Attachment')->first();
@@ -232,14 +232,16 @@ test('task update with attachments', function () {
     $updateData = [
         'title' => 'Updated Task Title',
         'description' => 'Updated description',
+        'priority' => $task->priority,
+        'status' => $task->status,
         'temp_identifier' => $tempIdentifier,
         'deleted_attachment_ids' => [$attachment->id],
     ];
 
     $response = $this->actingAs($this->user)
-        ->put(route('tasks.update', $task), $updateData);
+        ->putJson(route('tasks.v2.update', $task), $updateData);
 
-    $response->assertRedirect(route('tasks.index'));
+    $response->assertOk();
 
     // Check that the task was updated
     $this->assertDatabaseHas('tasks', [

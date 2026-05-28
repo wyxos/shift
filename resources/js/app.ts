@@ -2,7 +2,6 @@ import 'vue-sonner/style.css';
 import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
-import { OrugaConfig } from '@oruga-ui/oruga-next';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, Fragment, h } from 'vue';
@@ -32,9 +31,6 @@ createInertiaApp({
         createApp({
             render: () => h(Fragment, null, [h(App, props), h(Toaster, { richColors: true })]),
         })
-            .use(OrugaConfig, {
-                iconPack: 'fas',
-            })
             .use(plugin)
             .use(ZiggyVue)
             .mount(el);

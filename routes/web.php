@@ -77,13 +77,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');
 
-    // Use Api\TaskController for API requests
-    Route::post('tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('tasks.store');
-    Route::put('tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('tasks.update');
-    Route::delete('tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('tasks.destroy');
-    Route::patch('tasks/{task}/toggle-status', [\App\Http\Controllers\TaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
-    Route::patch('tasks/{task}/toggle-priority', [\App\Http\Controllers\TaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
-
     // Task Threads
     Route::get('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'index'])->name('task-threads.index');
     Route::post('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'store'])->name('task-threads.store');
