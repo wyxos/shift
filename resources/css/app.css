@@ -2,16 +2,10 @@
 
 @import 'tw-animate-css';
 
-@import '@oruga-ui/theme-oruga/dist/oruga.css';
-
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
 @custom-variant dark (&:is(.dark *));
-
-:root {
-    --oruga-primary: var(--color-primary); /* use your Tailwind variable */
-}
 
 @theme inline {
     --font-sans: Instrument Sans, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
