@@ -273,39 +273,6 @@ test('create route redirects to tasks index', function () {
     $response->assertRedirect(route('tasks.index'));
 });
 
-test('store creates new task', function () {
-    $project = Project::factory()->create([
-        'author_id' => $this->user->id,
-    ]);
-
-    $taskData = [
-        'title' => 'Test Task',
-        'description' => 'Test Description',
-        'project_id' => $project->id,
-        'priority' => 'high',
-        'status' => 'pending',
-    ];
-
-    $response = $this->actingAs($this->user)
-        ->post(route('tasks.store'), $taskData);
-
-    $response->assertRedirect(route('tasks.index'));
-    $response->assertSessionHas('success', 'Task created successfully.');
-
-    $this->assertDatabaseHas('tasks', [
-        'title' => 'Test Task',
-        'description' => 'Test Description',
-        'project_id' => $project->id,
-        'priority' => 'high',
-        'status' => 'pending',
-    ]);
-
-    // Check that the submitter is set correctly
-    $task = Task::where('title', 'Test Task')->first();
-    expect($task->submitter->id)->toEqual($this->user->id);
-    expect($task->submitter_type)->toEqual(User::class);
-});
-
 test('store v2 creates new task and returns json', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -590,7 +557,7 @@ test('edit route redirects to v2 task view', function () {
     $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
-test('update updates task', function () {
+test('update v2 updates an owned task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -605,25 +572,31 @@ test('update updates task', function () {
 
     $updateData = [
         'title' => 'Updated Title',
+        'description' => '<p>Updated description</p>',
         'status' => 'in-progress',
         'priority' => 'high',
     ];
 
     $response = $this->actingAs($this->user)
-        ->put(route('tasks.update', $task), $updateData);
+        ->putJson(route('tasks.v2.update', $task), $updateData);
 
-    $response->assertRedirect(route('tasks.index'));
-    $response->assertSessionHas('success', 'Task updated successfully.');
+    $response
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonPath('task.title', 'Updated Title')
+        ->assertJsonPath('task.status', 'in-progress')
+        ->assertJsonPath('task.priority', 'high');
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
         'title' => 'Updated Title',
+        'description' => '<p>Updated description</p>',
         'status' => 'in-progress',
         'priority' => 'high',
     ]);
 });
 
-test('destroy deletes task', function () {
+test('destroy v2 deletes task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -657,10 +630,11 @@ test('destroy deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertExists($attachment2->path);
 
     $response = $this->actingAs($this->user)
-        ->delete(route('tasks.destroy', $task));
+        ->deleteJson(route('tasks.v2.destroy', $task));
 
-    $response->assertRedirect(route('tasks.index'));
-    $response->assertSessionHas('success', 'Task deleted successfully.');
+    $response
+        ->assertOk()
+        ->assertJsonPath('ok', true);
 
     // Verify task is deleted
     $this->assertDatabaseMissing('tasks', [
@@ -680,81 +654,32 @@ test('destroy deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertMissing($attachment2->path);
 });
 
-test('toggle status updates task status', function () {
+test('update v2 lets an attached collaborator update status', function () {
+    $owner = User::factory()->create();
     $project = Project::factory()->create([
-        'author_id' => $this->user->id,
+        'author_id' => $owner->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
         'status' => 'pending',
     ]);
-    $task->submitter()->associate($this->user)->save();
+    $task->submitter()->associate($owner)->save();
+    $task->internalCollaborators()->attach($this->user->id);
 
     $response = $this->actingAs($this->user)
-        ->patch(route('tasks.toggle-status', $task), [
-            'status' => 'completed',
-        ]);
-
-    $response->assertRedirect();
-    $response->assertSessionHas('status', 'completed');
-    $response->assertSessionHas('message', 'Task status updated successfully');
-
-    $this->assertDatabaseHas('tasks', [
-        'id' => $task->id,
-        'status' => 'completed',
-    ]);
-});
-
-test('toggle status updates task status to awaiting feedback', function () {
-    $project = Project::factory()->create([
-        'author_id' => $this->user->id,
-    ]);
-
-    $task = Task::factory()->create([
-        'project_id' => $project->id,
-        'status' => 'pending',
-    ]);
-    $task->submitter()->associate($this->user)->save();
-
-    $response = $this->actingAs($this->user)
-        ->patch(route('tasks.toggle-status', $task), [
+        ->putJson(route('tasks.v2.update', $task), [
             'status' => 'awaiting-feedback',
         ]);
 
-    $response->assertRedirect();
-    $response->assertSessionHas('status', 'awaiting-feedback');
-    $response->assertSessionHas('message', 'Task status updated successfully');
+    $response
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonPath('task.status', 'awaiting-feedback');
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
         'status' => 'awaiting-feedback',
-    ]);
-});
-
-test('toggle priority updates task priority', function () {
-    $project = Project::factory()->create([
-        'author_id' => $this->user->id,
-    ]);
-
-    $task = Task::factory()->create([
-        'project_id' => $project->id,
-        'priority' => 'low',
-    ]);
-    $task->submitter()->associate($this->user)->save();
-
-    $response = $this->actingAs($this->user)
-        ->patch(route('tasks.toggle-priority', $task), [
-            'priority' => 'high',
-        ]);
-
-    $response->assertRedirect();
-    $response->assertSessionHas('priority', 'high');
-    $response->assertSessionHas('message', 'Task priority updated successfully');
-
-    $this->assertDatabaseHas('tasks', [
-        'id' => $task->id,
-        'priority' => 'high',
     ]);
 });
 

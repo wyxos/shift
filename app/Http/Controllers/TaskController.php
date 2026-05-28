@@ -19,14 +19,12 @@ use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Inertia\Response;
 
 class TaskController extends Controller
 {
@@ -128,8 +126,7 @@ class TaskController extends Controller
 
     private function externalCollaboratorsRequested(array $attributes): bool
     {
-        return ! empty($attributes['external_collaborators'] ?? [])
-            || ! empty($attributes['external_user_ids'] ?? []);
+        return ! empty($attributes['external_collaborators'] ?? []);
     }
 
     private function resolveTaskEnvironment(Project $project, ?string $environment, bool $required): ?string
@@ -189,7 +186,7 @@ class TaskController extends Controller
         ];
     }
 
-    private function validateStoreAttributes(Request $request, bool $allowLegacyExternalUserIds = false): array
+    private function validateStoreAttributes(Request $request): array
     {
         $rules = [
             'title' => 'required|string|max:255',
@@ -206,11 +203,6 @@ class TaskController extends Controller
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
         ];
-
-        if ($allowLegacyExternalUserIds) {
-            $rules['external_user_ids'] = 'nullable|array';
-            $rules['external_user_ids.*'] = 'exists:external_users,id';
-        }
 
         $attributes = $request->validate($rules);
 
@@ -229,21 +221,6 @@ class TaskController extends Controller
 
     private function resolveExternalCollaboratorsForProject(Project $project, ?string $environment, array $attributes): \Illuminate\Support\Collection
     {
-        if (! empty($attributes['external_user_ids'] ?? [])) {
-            $externalUsers = ExternalUser::query()
-                ->where('project_id', $project->id)
-                ->whereIn('id', $attributes['external_user_ids'])
-                ->get();
-
-            if ($externalUsers->count() !== count(array_unique(array_map('intval', $attributes['external_user_ids'])))) {
-                throw ValidationException::withMessages([
-                    'external_user_ids' => 'One or more external collaborators are invalid for this project.',
-                ]);
-            }
-
-            return $externalUsers->values();
-        }
-
         return $this->externalUserService->resolveCollaborators(
             $project,
             $environment,
@@ -494,32 +471,6 @@ class TaskController extends Controller
         }
 
         return $payload;
-    }
-
-    public function index()
-    {
-        $query = $this->visibleTasksQuery()
-            ->with(['submitter', 'metadata', 'project.organisation', 'project.client'])
-            ->latest();
-
-        $this->applyIndexFilters($query, request()->only(['search', 'project_id', 'organisation_id', 'priority', 'status']));
-
-        $tasks = $query->paginate(10)->withQueryString();
-
-        $tasks->through(function (Task $task) {
-            $task->is_external = $task->isExternallySubmitted();
-
-            return $task;
-        });
-
-        $projects = $this->visibleProjectsQuery()->get();
-
-        return inertia('Tasks/IndexLegacy')
-            ->with([
-                'filters' => request()->only(['search', 'project_id', 'organisation_id', 'priority', 'status']),
-                'tasks' => $tasks,
-                'projects' => $projects,
-            ]);
     }
 
     public function indexV2(?Organisation $organisation = null)
@@ -822,199 +773,6 @@ class TaskController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // create task
-
-    public function edit(Task $task)
-    {
-        $task->load(['project', 'attachments', 'externalUsers', 'submitter']);
-
-        // Check if task was submitted by an external user
-        $isExternallySubmitted = $task->isExternallySubmitted();
-
-        if ($isExternallySubmitted) {
-            // If submitted by external user, only show external users from the same environment
-            $submitterEnvironment = $task->submitter->environment;
-            $projectExternalUsers = $task->project->externalUsers()
-                ->where('environment', $submitterEnvironment)
-                ->get();
-        } else {
-            // If submitted by internal user, show all external users from the project
-            $projectExternalUsers = $task->project->externalUsers;
-        }
-
-        // Get the IDs of external users that have access to this task
-        $taskExternalUserIds = $task->externalUsers->pluck('id')->toArray();
-
-        return inertia('Tasks/Edit')
-            ->with([
-                'task' => $task,
-                'project' => $task->project,
-                'projectExternalUsers' => $projectExternalUsers,
-                'taskExternalUserIds' => $taskExternalUserIds,
-                'attachments' => $task->attachments->map(function ($attachment) {
-                    return [
-                        'id' => $attachment->id,
-                        'original_filename' => $attachment->original_filename,
-                        'path' => $attachment->path,
-                        'url' => route('attachments.download', $attachment),
-                    ];
-                }),
-            ]);
-    }
-
-    // edit task
-
-    public function destroy(Task $task)
-    {
-        $task->delete();
-
-        return redirect()->route('tasks.index')->with('success', 'Task deleted successfully.');
-    }
-
-    // delete route
-
-    public function update(Task $task)
-    {
-        // Handle web form submission
-        $attributes = request()->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'environment' => 'nullable|string|max:255',
-            'status' => ['nullable', Rule::enum(TaskStatus::class)],
-            'priority' => ['nullable', Rule::enum(TaskPriority::class)],
-            'temp_identifier' => 'nullable|string',
-            'deleted_attachment_ids' => 'nullable|array',
-            'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
-            'internal_collaborator_ids' => 'nullable|array',
-            'internal_collaborator_ids.*' => 'integer',
-            'external_collaborators' => 'nullable|array',
-            'external_collaborators.*.id' => 'required',
-            'external_collaborators.*.name' => 'required|string|max:255',
-            'external_collaborators.*.email' => 'required|email',
-            'external_user_ids' => 'nullable|array',
-            'external_user_ids.*' => 'exists:external_users,id',
-        ]);
-        if (array_key_exists('description', $attributes)) {
-            $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
-        }
-
-        $selectedEnvironment = $this->resolveTaskEnvironment(
-            $task->project()->with('environments')->firstOrFail(),
-            $attributes['environment'] ?? null,
-            $this->externalCollaboratorsRequested($attributes),
-        );
-        $selectedEnvironmentUrl = $selectedEnvironment !== null
-            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
-            : null;
-
-        $task->update([
-            'title' => $attributes['title'],
-            'description' => $attributes['description'] ?? $task->description,
-            'status' => $attributes['status'] ?? $task->status,
-            'priority' => $attributes['priority'] ?? $task->priority,
-        ]);
-
-        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
-        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
-        $this->sendCollaboratorAddedNotifications($task, $syncResult);
-
-        // Handle deleted attachments
-        if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
-            foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
-                $attachment = Attachment::find($attachmentId);
-
-                if ($attachment && $attachment->attachable_id === $task->id && $attachment->attachable_type === Task::class) {
-                    // Delete the file if it exists
-                    if (Storage::exists($attachment->path)) {
-                        Storage::delete($attachment->path);
-                    }
-
-                    // Delete the attachment record
-                    $attachment->delete();
-                }
-            }
-        }
-
-        // Handle new attachments if temp_identifier is provided
-        if (isset($attributes['temp_identifier'])) {
-            $tempIdentifier = $attributes['temp_identifier'];
-            $tempPath = "temp_attachments/{$tempIdentifier}";
-
-            // Check if temp directory exists
-            if (Storage::exists($tempPath)) {
-                // Get all files in the temp directory
-                $files = Storage::files($tempPath);
-
-                // Create permanent directory if it doesn't exist
-                $permanentPath = "attachments/{$task->id}";
-                if (! Storage::exists($permanentPath)) {
-                    Storage::makeDirectory($permanentPath);
-                }
-
-                // Move each file to the permanent location and create attachment records
-                foreach ($files as $file) {
-                    // Skip metadata files
-                    if (Str::endsWith($file, '.meta')) {
-                        continue;
-                    }
-
-                    // Try to get original filename from metadata
-                    $metadataPath = $file.'.meta';
-                    $originalFilename = basename($file);
-
-                    if (Storage::exists($metadataPath)) {
-                        $metadata = json_decode(Storage::get($metadataPath), true);
-                        if (isset($metadata['original_filename'])) {
-                            $originalFilename = $metadata['original_filename'];
-                        }
-                    }
-
-                    // Generate a unique filename for storage
-                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-                    $storedFilename = pathinfo($originalFilename, PATHINFO_FILENAME).'_'.uniqid().'.'.$extension;
-                    $newPath = "{$permanentPath}/{$storedFilename}";
-
-                    // Move the file
-                    Storage::move($file, $newPath);
-
-                    // Create attachment record
-                    Attachment::create([
-                        'attachable_id' => $task->id,
-                        'attachable_type' => Task::class,
-                        'original_filename' => $originalFilename,
-                        'path' => $newPath,
-                    ]);
-                }
-
-                // Remove the temp directory
-                Storage::deleteDirectory($tempPath);
-            }
-        }
-
-        return redirect()->route('tasks.index')->with('success', 'Task updated successfully.');
-    }
-
-    // put task
-
-    public function create()
-    {
-        $projects = $this->visibleProjectsQuery()
-            ->with('environments')
-            ->get();
-
-        // Load external users for each project
-        $projects->each(function ($project) {
-            $project->load('externalUsers');
-        });
-
-        return inertia('Tasks/Create')
-            ->with([
-                'projects' => $projects->map(fn (Project $project) => $this->serializeProject($project))->values()->all(),
-            ]);
-    }
-
-    // create task
-
     public function storeV2(Request $request): JsonResponse
     {
         $attributes = $this->validateStoreAttributes($request);
@@ -1025,14 +783,6 @@ class TaskController extends Controller
             'ok' => true,
             'data' => $this->serializeTaskDetail($task, false),
         ], 201);
-    }
-
-    public function store(Request $request)
-    {
-        $attributes = $this->validateStoreAttributes($request, true);
-        $this->createTaskFromAttributes($attributes);
-
-        return redirect()->route('tasks.index')->with('success', 'Task created successfully.');
     }
 
     /**
@@ -1052,57 +802,5 @@ class TaskController extends Controller
                 NotifyExternalUser::dispatch($externalUser->id, $task->id);
             }
         }
-    }
-
-    public function show(Task $task)
-    {
-        return inertia('Tasks/Show')
-            ->with([
-                'task' => $task,
-            ]);
-    }
-
-    /**
-     * Update the status of a task.
-     *
-     * @return Response|RedirectResponse
-     */
-    public function toggleStatus(Task $task, Request $request)
-    {
-        $this->ensureTaskVisible($task);
-
-        $validatedData = $request->validate([
-            'status' => ['required', Rule::enum(TaskStatus::class)],
-        ]);
-
-        $task->status = $validatedData['status'];
-        $task->save();
-
-        return back()->with([
-            'status' => $task->status,
-            'message' => 'Task status updated successfully',
-        ]);
-    }
-
-    /**
-     * Update the priority of a task.
-     *
-     * @return Response|RedirectResponse
-     */
-    public function togglePriority(Task $task, Request $request)
-    {
-        $this->ensureTaskVisible($task);
-
-        $validatedData = $request->validate([
-            'priority' => ['required', Rule::enum(TaskPriority::class)],
-        ]);
-
-        $task->priority = $validatedData['priority'];
-        $task->save();
-
-        return back()->with([
-            'priority' => $task->priority,
-            'message' => 'Task priority updated successfully',
-        ]);
     }
 }
