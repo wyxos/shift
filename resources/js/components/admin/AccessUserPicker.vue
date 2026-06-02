@@ -32,6 +32,7 @@ const emit = defineEmits<{
 
 const query = ref(props.email);
 const open = ref(false);
+const interacted = ref(false);
 
 const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filteredCandidates = computed(() => {
@@ -43,11 +44,20 @@ const filteredCandidates = computed(() => {
 
     return props.candidates.filter((candidate) => `${candidate.name} ${candidate.email}`.toLowerCase().includes(needle)).slice(0, 6);
 });
+const showCandidates = computed(() => open.value && (interacted.value || Boolean(normalizedQuery.value)) && filteredCandidates.value.length > 0);
 const hasErrors = computed(() => Object.keys(props.errors ?? {}).length > 0);
 
 watch(
     () => props.email,
     (email) => {
+        if (!email) {
+            query.value = '';
+            open.value = false;
+            interacted.value = false;
+
+            return;
+        }
+
         if (!open.value && email !== query.value) {
             query.value = email;
         }
@@ -57,6 +67,7 @@ watch(
 function updateQuery(value: string) {
     query.value = value;
     open.value = true;
+    interacted.value = true;
     emit('update:email', value.trim());
 
     if (!props.name.trim() || props.name === deriveNameFromEmail(props.email)) {
@@ -64,17 +75,27 @@ function updateQuery(value: string) {
     }
 }
 
+function openSuggestions() {
+    interacted.value = true;
+    open.value = true;
+}
+
+function handleFocus() {
+    open.value = Boolean(normalizedQuery.value);
+}
+
 function selectCandidate(candidate: AccessUserCandidate) {
     query.value = `${candidate.name} (${candidate.email})`;
     open.value = false;
+    interacted.value = false;
     emit('update:email', candidate.email);
     emit('update:name', candidate.name);
 }
 </script>
 
 <template>
-    <div class="bg-muted/20 space-y-3 rounded-lg border p-3">
-        <div class="space-y-2">
+    <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-2">
             <Label :for="`${testIdPrefix}-email`" class="sr-only">Add user</Label>
             <div class="flex gap-2">
                 <div class="relative min-w-0 flex-1">
@@ -87,12 +108,13 @@ function selectCandidate(candidate: AccessUserCandidate) {
                         :data-testid="`${testIdPrefix}-email`"
                         placeholder="Type an email or search users"
                         @blur="open = false"
-                        @focus="open = true"
+                        @click="openSuggestions"
+                        @focus="handleFocus"
                         @keydown.escape.prevent="open = false"
                         @update:model-value="updateQuery"
                     />
                     <div
-                        v-if="open && filteredCandidates.length > 0"
+                        v-if="showCandidates"
                         class="bg-popover text-popover-foreground absolute z-50 mt-1 w-full overflow-hidden rounded-md border shadow-md"
                     >
                         <button

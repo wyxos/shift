@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
 import { getPriorityBadgeClass, getPriorityLabel, getStatusBadgeClass, getStatusLabel } from '@shared/tasks/presentation';
 import { Eye, Trash2 } from 'lucide-vue-next';
@@ -70,10 +70,10 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-    <Card class="w-full">
-        <CardHeader class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section class="flex w-full flex-col gap-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <CardTitle>{{ title }}</CardTitle>
+                <h1 class="text-lg font-semibold">{{ title }}</h1>
                 <p class="text-muted-foreground text-sm">{{ description }}</p>
             </div>
 
@@ -103,9 +103,9 @@ withDefaults(defineProps<Props>(), {
 
                 <slot name="actions" />
             </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
+        <div>
             <div class="text-muted-foreground mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span>Showing {{ from }} to {{ to }} of {{ totalTasks }} tasks</span>
                 <span v-if="activeFilterCount">{{ activeFilterCount }} filter{{ activeFilterCount === 1 ? '' : 's' }} active</span>
@@ -113,57 +113,81 @@ withDefaults(defineProps<Props>(), {
 
             <div v-if="loading" class="text-muted-foreground py-8 text-center">Loading...</div>
             <div v-else-if="error" class="text-destructive py-8 text-center">{{ error }}</div>
-            <div v-else-if="tasks.length === 0" class="text-muted-foreground py-8 text-center">{{ emptyLabel }}</div>
-
-            <ul v-else class="divide-border divide-y">
-                <li
-                    v-for="task in tasks"
-                    :key="task.id"
-                    :class="
-                        highlightedTaskId === task.id ? 'ring-offset-background rounded-lg bg-sky-500/10 ring-2 ring-sky-500/40 ring-offset-2' : ''
-                    "
-                    class="flex flex-col gap-3 py-4 transition sm:flex-row sm:items-center sm:gap-4"
-                    data-testid="task-row"
-                >
-                    <div class="flex-1">
-                        <button
-                            type="button"
-                            class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left text-lg font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                            :aria-label="`Open task details for ${task.title}`"
-                            :data-testid="`task-title-${task.id}`"
-                            @click="openEdit(task.id)"
+            <Table v-else>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Environment</TableHead>
+                        <TableHead class="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableEmpty v-if="tasks.length === 0" :colspan="5">{{ emptyLabel }}</TableEmpty>
+                    <template v-else>
+                        <TableRow
+                            v-for="task in tasks"
+                            :key="task.id"
+                            :class="highlightedTaskId === task.id ? 'bg-sky-500/10 ring-2 ring-sky-500/40 ring-inset' : ''"
+                            data-testid="task-row"
                         >
-                            {{ task.title }}
-                        </button>
-                        <div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-                            <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
-                                {{ getStatusLabel(task.status) }}
-                            </Badge>
-                            <Badge :class="getPriorityBadgeClass(task.priority)" :data-testid="`task-priority-badge-${task.id}`" variant="outline">
-                                {{ getPriorityLabel(task.priority) }}
-                            </Badge>
-                            <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
-                                {{ getTaskEnvironmentLabel(task) }}
-                            </Badge>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <ActionIconButton label="Open task details" title="Open details" @click="openEdit(task.id)">
-                            <Eye class="h-4 w-4" />
-                        </ActionIconButton>
-                        <ActionIconButton
-                            label="Delete task"
-                            title="Delete"
-                            variant="destructive"
-                            :loading="deleteLoading === task.id"
-                            @click="deleteTask(task.id)"
-                        >
-                            <Trash2 class="h-4 w-4" />
-                        </ActionIconButton>
-                    </div>
-                </li>
-            </ul>
+                            <TableCell class="min-w-[18rem] whitespace-normal">
+                                <button
+                                    type="button"
+                                    class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                    :aria-label="`Open task details for ${task.title}`"
+                                    :data-testid="`task-title-${task.id}`"
+                                    @click="openEdit(task.id)"
+                                >
+                                    {{ task.title }}
+                                </button>
+                            </TableCell>
+                            <TableCell>
+                                <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
+                                    {{ getStatusLabel(task.status) }}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Badge
+                                    :class="getPriorityBadgeClass(task.priority)"
+                                    :data-testid="`task-priority-badge-${task.id}`"
+                                    variant="outline"
+                                >
+                                    {{ getPriorityLabel(task.priority) }}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
+                                    {{ getTaskEnvironmentLabel(task) }}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex justify-end gap-2">
+                                    <ActionIconButton
+                                        label="Open task details"
+                                        title="Open details"
+                                        :data-testid="`task-open-${task.id}`"
+                                        @click="openEdit(task.id)"
+                                    >
+                                        <Eye class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        label="Delete task"
+                                        title="Delete"
+                                        variant="destructive"
+                                        :loading="deleteLoading === task.id"
+                                        :data-testid="`task-delete-${task.id}`"
+                                        @click="deleteTask(task.id)"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </ActionIconButton>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </template>
+                </TableBody>
+            </Table>
 
             <div v-if="lastPage > 1" class="mt-4 flex items-center justify-between border-t pt-4">
                 <div class="text-muted-foreground text-xs">Page {{ currentPage }} of {{ lastPage }}</div>
@@ -174,6 +198,6 @@ withDefaults(defineProps<Props>(), {
                     >
                 </div>
             </div>
-        </CardContent>
-    </Card>
+        </div>
+    </section>
 </template>

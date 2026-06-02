@@ -45,6 +45,10 @@ type OrganisationTeamUser = {
     status: 'owner' | 'registered' | 'pending';
     statusLabel: string;
     projectIds?: number[];
+    projectAccessCount?: number;
+    createdAt?: string | null;
+    verifiedAt?: string | null;
+    lastLoginAt?: string | null;
 };
 
 type OrganisationProject = {
@@ -98,6 +102,7 @@ function normalizeSortBy(value: string | null | undefined): SortBy {
 const filtersOpen = ref(false);
 const manageUsersLoading = ref(false);
 const manageUsersError = ref<string | null>(null);
+const manageUsersListVisible = ref(true);
 
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
@@ -283,6 +288,15 @@ function addAccess() {
 
             accessForm.email = '';
             accessForm.name = '';
+
+            if (isTeamMode.value) {
+                router.reload({
+                    only: ['panelOrganisation'],
+                    preserveScroll: true,
+                });
+                return;
+            }
+
             void openManageUsersModal({ id: organisationId as number, name: organisationName });
         },
         onError: () => {
@@ -292,7 +306,10 @@ function addAccess() {
     });
 }
 
-async function openManageUsersModal(organisation: OrganisationIdentity) {
+async function openManageUsersModal(organisation: OrganisationIdentity, options: { showUsers?: boolean } = {}) {
+    const showUsers = options.showUsers ?? true;
+
+    manageUsersListVisible.value = showUsers;
     manageUsersForm.organisation_id = organisation.id;
     manageUsersForm.organisation_name = organisation.name;
     manageUsersForm.users = [];
@@ -302,8 +319,12 @@ async function openManageUsersModal(organisation: OrganisationIdentity) {
     accessForm.email = '';
     accessForm.name = '';
     accessForm.clearErrors?.();
-    manageUsersLoading.value = true;
+    manageUsersLoading.value = showUsers;
     manageUsersError.value = null;
+
+    if (!showUsers) {
+        return;
+    }
 
     try {
         const response = await fetch(`/organisations/${organisation.id}/users`);
@@ -318,6 +339,10 @@ async function openManageUsersModal(organisation: OrganisationIdentity) {
     } finally {
         manageUsersLoading.value = false;
     }
+}
+
+function openTeamInviteModal(organisation: OrganisationIdentity) {
+    void openManageUsersModal(organisation, { showUsers: false });
 }
 
 function removeAccess(organisationUser: { id: number }) {
@@ -406,7 +431,11 @@ watch(
                 <OrganisationListTable :organisations="organisationRows" @open-delete="openDeleteModal" @open-manage-users="openManageUsersModal" />
             </AdminListShell>
 
-            <OrganisationTeamPanel v-else-if="isTeamMode && activePanelOrganisation" :organisation="activePanelOrganisation" />
+            <OrganisationTeamPanel
+                v-else-if="isTeamMode && activePanelOrganisation"
+                :organisation="activePanelOrganisation"
+                @invite="openTeamInviteModal(activePanelOrganisation)"
+            />
             <OrganisationSettingsPanel
                 v-else-if="isSettingsMode && activePanelOrganisation"
                 :form="editForm"
@@ -442,6 +471,7 @@ watch(
             :form="manageUsersForm"
             :loading="manageUsersLoading"
             :open="manageUsersForm.isOpen"
+            :show-users="manageUsersListVisible"
             @cancel="manageUsersForm.isOpen = false"
             @remove-access="removeAccess"
             @submit-access="addAccess"

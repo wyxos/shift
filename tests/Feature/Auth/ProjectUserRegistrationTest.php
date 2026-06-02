@@ -1,25 +1,31 @@
 <?php
 
+use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
+use App\Notifications\ProjectUserRegisteredNotification;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 
-;
-
-test('project owner is not notified when registration is disabled', function () {
+test('invited project users can register and must verify their email', function () {
     Notification::fake();
 
     // Create a project owner
     $projectOwner = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $projectOwner->id,
+    ]);
 
     // Create a project with the owner as the author
     $project = Project::factory()->create([
         'author_id' => $projectOwner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
     ]);
 
     // Create a project user record for an invited user (with email only, no user_id yet)
-    $invitedUserEmail = 'invited@example.com';
+    $invitedUserEmail = 'invited@EXAMPLE.com';
     $invitedUserName = 'Invited User';
 
     ProjectUser::factory()->create([
@@ -30,7 +36,7 @@ test('project owner is not notified when registration is disabled', function () 
         'registration_status' => 'pending',
     ]);
 
-    // Attempt registration via the invitation (disabled)
+    // Register via the invitation
     $response = $this->post('/register', [
         'name' => $invitedUserName,
         'email' => $invitedUserEmail,
@@ -39,15 +45,26 @@ test('project owner is not notified when registration is disabled', function () 
         'project_id' => $project->id,
     ]);
 
-    $response->assertStatus(404);
-    $this->assertGuest();
+    $registeredUser = User::where('email', 'invited@example.com')->firstOrFail();
 
-    // Assert the project user record was not updated
+    $response->assertRedirect(route('projects.index', ['highlight' => $project->id], absolute: false));
+    $this->assertAuthenticatedAs($registeredUser);
+    expect($registeredUser->email_verified_at)->toBeNull();
+
+    // Assert invitation records were linked, but app access is still gated by email verification.
     $this->assertDatabaseHas('project_users', [
         'project_id' => $project->id,
-        'user_email' => $invitedUserEmail,
-        'registration_status' => 'pending',
+        'user_id' => $registeredUser->id,
+        'registration_status' => 'registered',
+    ]);
+    $this->assertDatabaseHas('organisation_users', [
+        'organisation_id' => $organisation->id,
+        'user_id' => $registeredUser->id,
     ]);
 
-    Notification::assertNothingSent();
+    Notification::assertSentTo($registeredUser, VerifyEmail::class);
+    Notification::assertSentTo($projectOwner, ProjectUserRegisteredNotification::class);
+
+    $this->get('/projects')
+        ->assertRedirect(route('verification.notice', absolute: false));
 });

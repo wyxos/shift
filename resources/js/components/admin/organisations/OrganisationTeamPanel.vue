@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import DeleteDialog from '@/components/DeleteDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import { Pencil, Trash2, UserPlus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 type OrganisationTeamUser = {
@@ -16,6 +19,10 @@ type OrganisationTeamUser = {
     status: 'owner' | 'registered' | 'pending';
     statusLabel: string;
     projectIds?: number[];
+    projectAccessCount?: number;
+    createdAt?: string | null;
+    verifiedAt?: string | null;
+    lastLoginAt?: string | null;
 };
 
 type OrganisationProject = {
@@ -32,13 +39,24 @@ const props = defineProps<{
     };
 }>();
 
+const emit = defineEmits<{
+    invite: [];
+}>();
+
 const editingUser = ref<OrganisationTeamUser | null>(null);
 const selectedProjectIds = ref<number[]>([]);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const projectIdsByTeamUser = ref<Record<string, number[]>>({});
+const removingUser = ref<OrganisationTeamUser | null>(null);
 
 const sheetOpen = computed(() => Boolean(editingUser.value));
+const removeDialogOpen = computed(() => Boolean(removingUser.value));
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+});
 
 watch(
     () => props.organisation.teamUsers,
@@ -60,6 +78,26 @@ function statusBadgeClass(status: OrganisationTeamUser['status']) {
     return '';
 }
 
+function formatDate(value: string | null | undefined, fallback: string) {
+    if (!value) {
+        return fallback;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return fallback;
+    }
+
+    return dateFormatter.format(date);
+}
+
+function formatProjectCount(teamUser: OrganisationTeamUser) {
+    const count = teamUser.projectAccessCount ?? teamUser.projectIds?.length ?? 0;
+
+    return `${count} ${count === 1 ? 'project' : 'projects'}`;
+}
+
 function openAccessSheet(teamUser: OrganisationTeamUser) {
     editingUser.value = teamUser;
     selectedProjectIds.value = [...(projectIdsByTeamUser.value[teamUser.id] ?? teamUser.projectIds ?? [])];
@@ -71,6 +109,16 @@ function closeAccessSheet() {
     selectedProjectIds.value = [];
     saving.value = false;
     error.value = null;
+}
+
+function openRemoveConfirmation(teamUser: OrganisationTeamUser) {
+    if (!teamUser.organisationUserId) return;
+
+    removingUser.value = teamUser;
+}
+
+function closeRemoveConfirmation() {
+    removingUser.value = null;
 }
 
 function hasProject(projectId: number) {
@@ -120,56 +168,102 @@ async function saveProjectAccess() {
     }
 }
 
-function removeOrganisationAccess() {
-    if (!editingUser.value?.organisationUserId) return;
+function confirmRemoveOrganisationAccess() {
+    if (!removingUser.value?.organisationUserId) return;
 
-    const organisationUserId = editingUser.value.organisationUserId;
+    const organisationUserId = removingUser.value.organisationUserId;
 
     router.delete(`/organisations/${props.organisation.id}/users/${organisationUserId}`, {
         preserveScroll: true,
-        onSuccess: () => closeAccessSheet(),
+        onSuccess: () => {
+            if (editingUser.value?.organisationUserId === organisationUserId) {
+                closeAccessSheet();
+            }
+
+            closeRemoveConfirmation();
+        },
     });
 }
 </script>
 
 <template>
-    <section class="bg-card rounded-xl border p-4">
-        <div class="mb-4 flex flex-col gap-1">
-            <h1 class="text-lg font-semibold">Team</h1>
-            <p class="text-muted-foreground text-sm">{{ organisation.name }}</p>
+    <section class="flex flex-col gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-lg font-semibold">Team</h1>
+                <p class="text-muted-foreground truncate text-sm">{{ organisation.name }}</p>
+            </div>
+            <Button size="sm" data-testid="organisation-team-invite" @click="emit('invite')">
+                <UserPlus class="mr-2 h-4 w-4" />
+                Invite
+            </Button>
         </div>
 
-        <div class="overflow-hidden rounded-lg border">
-            <div v-if="organisation.teamUsers.length === 0" class="text-muted-foreground p-4 text-sm">No users have access to this organisation.</div>
-            <div
-                v-for="teamUser in organisation.teamUsers"
-                v-else
-                :key="teamUser.id"
-                class="flex flex-col gap-3 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-                :data-testid="`organisation-team-user-${teamUser.id}`"
-            >
-                <div class="min-w-0">
-                    <div class="truncate font-medium">
-                        {{ teamUser.name }}
-                        <span class="text-muted-foreground font-normal">({{ teamUser.email }})</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <Badge :class="statusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
-                    <Button
-                        v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
-                        size="sm"
-                        variant="outline"
-                        :data-testid="`organisation-team-edit-${teamUser.organisationUserId}`"
-                        @click="openAccessSheet(teamUser)"
-                    >
-                        <Pencil class="h-4 w-4 sm:mr-2" />
-                        <span class="hidden sm:inline">Edit</span>
-                        <span class="sr-only sm:hidden">Edit access</span>
-                    </Button>
-                </div>
-            </div>
-        </div>
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Last logged in</TableHead>
+                    <TableHead>Created on</TableHead>
+                    <TableHead>Verified on</TableHead>
+                    <TableHead>Project access</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead class="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                <TableEmpty v-if="organisation.teamUsers.length === 0" :colspan="7">No users have access to this organisation.</TableEmpty>
+
+                <TableRow v-for="teamUser in organisation.teamUsers" v-else :key="teamUser.id" :data-testid="`organisation-team-user-${teamUser.id}`">
+                    <TableCell class="min-w-[15rem] whitespace-normal">
+                        <div class="min-w-0">
+                            <div class="truncate font-medium">
+                                {{ teamUser.name }}
+                                <span class="text-muted-foreground font-normal">({{ teamUser.email }})</span>
+                            </div>
+                        </div>
+                    </TableCell>
+                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-last-login-${teamUser.id}`">
+                        {{ formatDate(teamUser.lastLoginAt, 'Never') }}
+                    </TableCell>
+                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-created-${teamUser.id}`">
+                        {{ formatDate(teamUser.createdAt, 'Unknown') }}
+                    </TableCell>
+                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-verified-${teamUser.id}`">
+                        {{ formatDate(teamUser.verifiedAt, 'Unverified') }}
+                    </TableCell>
+                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-project-count-${teamUser.id}`">
+                        {{ formatProjectCount(teamUser) }}
+                    </TableCell>
+                    <TableCell>
+                        <Badge :class="statusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
+                    </TableCell>
+                    <TableCell>
+                        <div class="flex justify-end gap-2">
+                            <ActionIconButton
+                                v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
+                                label="Edit project access"
+                                title="Edit access"
+                                :data-testid="`organisation-team-edit-${teamUser.organisationUserId}`"
+                                @click="openAccessSheet(teamUser)"
+                            >
+                                <Pencil class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
+                                label="Remove organisation access"
+                                title="Remove from organisation"
+                                variant="destructive"
+                                :data-testid="`organisation-team-remove-${teamUser.organisationUserId}`"
+                                @click="openRemoveConfirmation(teamUser)"
+                            >
+                                <Trash2 class="h-4 w-4" />
+                            </ActionIconButton>
+                        </div>
+                    </TableCell>
+                </TableRow>
+            </TableBody>
+        </Table>
     </section>
 
     <Sheet :open="sheetOpen" @update:open="(open) => !open && closeAccessSheet()">
@@ -179,8 +273,8 @@ function removeOrganisationAccess() {
                 <SheetDescription v-if="editingUser"> {{ editingUser.name }} ({{ editingUser.email }}) </SheetDescription>
             </SheetHeader>
 
-            <div class="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-                <div class="space-y-3">
+            <div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+                <div class="flex flex-col gap-3">
                     <div>
                         <h2 class="text-sm font-medium">Project access</h2>
                         <p class="text-muted-foreground text-sm">Choose the organisation projects this user can access.</p>
@@ -190,7 +284,7 @@ function removeOrganisationAccess() {
                         No projects are available for this organisation.
                     </p>
 
-                    <div v-else class="space-y-2">
+                    <div v-else class="flex flex-col gap-2">
                         <label
                             v-for="project in organisation.projects"
                             :key="project.id"
@@ -208,19 +302,6 @@ function removeOrganisationAccess() {
                 </div>
 
                 <p v-if="error" class="text-destructive text-sm">{{ error }}</p>
-
-                <div class="border-destructive/20 bg-destructive/5 rounded-lg border p-3">
-                    <Button
-                        type="button"
-                        variant="destructive"
-                        :disabled="saving"
-                        data-testid="organisation-team-remove-access"
-                        @click="removeOrganisationAccess"
-                    >
-                        <Trash2 class="mr-2 h-4 w-4" />
-                        Remove from organisation
-                    </Button>
-                </div>
             </div>
 
             <SheetFooter class="border-t sm:flex-row sm:justify-end">
@@ -231,4 +312,13 @@ function removeOrganisationAccess() {
             </SheetFooter>
         </SheetContent>
     </Sheet>
+
+    <DeleteDialog :is-open="removeDialogOpen" @cancel="closeRemoveConfirmation" @confirm="confirmRemoveOrganisationAccess">
+        <template #title>Remove organisation access</template>
+        <template #description>
+            Remove {{ removingUser?.name }} from {{ organisation.name }}? They will also lose access to projects inside this organisation.
+        </template>
+        <template #cancel>Cancel</template>
+        <template #confirm>Remove access</template>
+    </DeleteDialog>
 </template>

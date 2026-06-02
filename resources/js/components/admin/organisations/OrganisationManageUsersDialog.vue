@@ -25,7 +25,16 @@ type AccessForm = {
     processing: boolean;
 };
 
-const { open, form, accessForm, accessUsers, accessDisabled, loading, error } = defineProps<{
+const {
+    open,
+    form,
+    accessForm,
+    accessUsers,
+    accessDisabled,
+    loading,
+    error,
+    showUsers = true,
+} = defineProps<{
     accessDisabled: boolean;
     accessForm: AccessForm;
     accessUsers: AccessUserCandidate[];
@@ -33,6 +42,7 @@ const { open, form, accessForm, accessUsers, accessDisabled, loading, error } = 
     form: ManageUsersForm;
     loading: boolean;
     open: boolean;
+    showUsers?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -55,8 +65,10 @@ function updateOpen(value: boolean) {
     <Dialog :open="open" @update:open="updateOpen">
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Manage Organisation Access</DialogTitle>
-                <DialogDescription>Users with access to {{ form.organisation_name }}</DialogDescription>
+                <DialogTitle>{{ showUsers ? 'Manage Organisation Access' : 'Invite to Organisation' }}</DialogTitle>
+                <DialogDescription>
+                    {{ showUsers ? `Users with access to ${form.organisation_name}` : `Add users to ${form.organisation_name}` }}
+                </DialogDescription>
             </DialogHeader>
 
             <AccessUserPicker
@@ -73,7 +85,7 @@ function updateOpen(value: boolean) {
                 @update:name="accessForm.name = $event"
             />
 
-            <div class="max-h-96 space-y-4 overflow-y-auto pr-1">
+            <div v-if="showUsers" class="max-h-96 space-y-4 overflow-y-auto pr-1">
                 <p v-if="loading" class="text-muted-foreground text-sm">Loading organisation users…</p>
                 <p v-else-if="error" class="text-sm text-red-500">{{ error }}</p>
                 <p v-else-if="form.users.length === 0" class="text-muted-foreground text-sm">No users have access to this organisation.</p>
@@ -96,7 +108,7 @@ function updateOpen(value: boolean) {
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Close</Button>
+                <Button type="button" variant="ghost" @click="updateOpen(false)">Close</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

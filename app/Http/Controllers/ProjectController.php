@@ -21,25 +21,7 @@ class ProjectController extends Controller
                 'client.organisation:id,name,author_id',
                 'organisation:id,name,author_id',
             ])
-            ->where(function (Builder $query) {
-                $query
-                    ->whereHas('client.organisation', function (Builder $subQuery) {
-                        $subQuery->where('author_id', auth()->id());
-                    })
-                    ->orWhereHas('client.organisation.organisationUsers', function (Builder $subQuery) {
-                        $subQuery->where('user_id', auth()->id());
-                    })
-                    ->orWhereHas('organisation', function (Builder $subQuery) {
-                        $subQuery->where('author_id', auth()->id());
-                    })
-                    ->orWhereHas('organisation.organisationUsers', function (Builder $subQuery) {
-                        $subQuery->where('user_id', auth()->id());
-                    })
-                    ->orWhereHas('projectUser', function (Builder $subQuery) {
-                        $subQuery->where('user_id', auth()->id());
-                    })
-                    ->orWhere('author_id', auth()->id());
-            })
+            ->visibleTo(auth()->id())
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $query->where(function (Builder $subQuery) use ($organisationId) {
                     $subQuery
@@ -131,12 +113,7 @@ class ProjectController extends Controller
 
     public function users(Project $project)
     {
-        $hasAccess = $project->client?->organisation?->author_id === auth()->user()->id
-            || $project->organisation?->author_id === auth()->user()->id
-            || $project->author_id === auth()->user()->id
-            || $project->projectUser()->where('user_id', auth()->id())->exists();
-
-        if (! $hasAccess) {
+        if (! $project->isVisibleToUser(auth()->id())) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

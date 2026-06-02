@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Filter } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -58,10 +57,10 @@ function changePage(page: number) {
 </script>
 
 <template>
-    <Card class="w-full">
-        <CardHeader class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section class="flex w-full flex-col gap-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <CardTitle>{{ title }}</CardTitle>
+                <h1 class="text-lg font-semibold">{{ title }}</h1>
                 <p v-if="description" class="text-muted-foreground text-sm">{{ description }}</p>
             </div>
 
@@ -86,7 +85,7 @@ function changePage(page: number) {
                             </div>
                         </SheetHeader>
 
-                        <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
+                        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6">
                             <slot name="filters" />
                         </div>
 
@@ -98,9 +97,9 @@ function changePage(page: number) {
 
                 <slot name="actions" />
             </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
+        <div>
             <div class="text-muted-foreground mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span>Showing {{ from }} to {{ to }} of {{ totalItems }} {{ itemsLabel }}</span>
                 <span v-if="activeFilterCount">{{ activeFilterCount }} filter{{ activeFilterCount === 1 ? '' : 's' }} active</span>
@@ -118,6 +117,6 @@ function changePage(page: number) {
                     <Button size="sm" variant="outline" :disabled="currentPage >= lastPage" @click="changePage(currentPage + 1)">Next</Button>
                 </div>
             </div>
-        </CardContent>
-    </Card>
+        </div>
+    </section>
 </template>

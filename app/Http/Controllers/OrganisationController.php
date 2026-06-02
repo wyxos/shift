@@ -55,7 +55,10 @@ class OrganisationController extends Controller
         if ($panelOrganisationId) {
             $panelOrganisation = Organisation::query()
                 ->where('author_id', $userId)
-                ->with(['author:id,name,email', 'organisationUsers.user:id,name,email'])
+                ->with([
+                    'author:id,name,email,created_at,email_verified_at,last_login_at',
+                    'organisationUsers.user:id,name,email,created_at,email_verified_at,last_login_at',
+                ])
                 ->find($panelOrganisationId);
 
             if ($panelOrganisation) {
@@ -107,35 +110,46 @@ class OrganisationController extends Controller
                         'status' => 'owner',
                         'statusLabel' => 'Owner',
                         'projectIds' => $panelOrganisationProjects->pluck('id')->values()->all(),
+                        'projectAccessCount' => $panelOrganisationProjects->count(),
+                        'createdAt' => $panelOrganisation->author->created_at?->toISOString(),
+                        'verifiedAt' => $panelOrganisation->author->email_verified_at?->toISOString(),
+                        'lastLoginAt' => $panelOrganisation->author->last_login_at?->toISOString(),
                     ] : null,
                 ])
                     ->filter()
                     ->merge(
-                        $panelOrganisation->organisationUsers->map(function ($organisationUser) use ($panelProjectUsers) {
-                            $projectIds = $panelProjectUsers
-                                ->filter(function (ProjectUser $projectUser) use ($organisationUser) {
-                                    if ($organisationUser->user_id) {
-                                        return $projectUser->user_id === $organisationUser->user_id
-                                            || $projectUser->user_email === $organisationUser->user_email;
-                                    }
+                        $panelOrganisation->organisationUsers
+                            ->reject(fn ($organisationUser) => $organisationUser->user_id === $panelOrganisation->author_id
+                                || strcasecmp($organisationUser->user_email, $panelOrganisation->author?->email ?: '') === 0)
+                            ->map(function ($organisationUser) use ($panelProjectUsers) {
+                                $projectIds = $panelProjectUsers
+                                    ->filter(function (ProjectUser $projectUser) use ($organisationUser) {
+                                        if ($organisationUser->user_id) {
+                                            return $projectUser->user_id === $organisationUser->user_id
+                                                || strcasecmp($projectUser->user_email, $organisationUser->user_email) === 0;
+                                        }
 
-                                    return $projectUser->user_email === $organisationUser->user_email;
-                                })
-                                ->pluck('project_id')
-                                ->unique()
-                                ->values()
-                                ->all();
+                                        return strcasecmp($projectUser->user_email, $organisationUser->user_email) === 0;
+                                    })
+                                    ->pluck('project_id')
+                                    ->unique()
+                                    ->values()
+                                    ->all();
 
-                            return [
-                                'id' => 'access-'.$organisationUser->id,
-                                'organisationUserId' => $organisationUser->id,
-                                'name' => $organisationUser->user?->name ?: $organisationUser->user_name,
-                                'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
-                                'status' => $organisationUser->user_id ? 'registered' : 'pending',
-                                'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
-                                'projectIds' => $projectIds,
-                            ];
-                        })
+                                return [
+                                    'id' => 'access-'.$organisationUser->id,
+                                    'organisationUserId' => $organisationUser->id,
+                                    'name' => $organisationUser->user?->name ?: $organisationUser->user_name,
+                                    'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
+                                    'status' => $organisationUser->user_id ? 'registered' : 'pending',
+                                    'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
+                                    'projectIds' => $projectIds,
+                                    'projectAccessCount' => count($projectIds),
+                                    'createdAt' => ($organisationUser->user?->created_at ?: $organisationUser->created_at)?->toISOString(),
+                                    'verifiedAt' => $organisationUser->user?->email_verified_at?->toISOString(),
+                                    'lastLoginAt' => $organisationUser->user?->last_login_at?->toISOString(),
+                                ];
+                            })
                     )
                     ->values()
                     ->all(),

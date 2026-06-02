@@ -5,6 +5,7 @@ import { h, reactive } from 'vue';
 
 const routerGetMock = vi.fn();
 const routerDeleteMock = vi.fn();
+const routerReloadMock = vi.fn();
 const fetchMock = vi.fn();
 const axiosPatchMock = vi.fn();
 const formInstances: any[] = [];
@@ -79,6 +80,7 @@ vi.mock('@inertiajs/vue3', () => ({
             routerDeleteMock(url, options);
             options?.onSuccess?.();
         },
+        reload: (...args: any[]) => routerReloadMock(...args),
     },
     useForm: (initial: Record<string, any>) => buildForm(initial),
 }));
@@ -393,6 +395,7 @@ vi.mock('@/components/ui/table', () => ({
 beforeEach(() => {
     routerGetMock.mockReset();
     routerDeleteMock.mockReset();
+    routerReloadMock.mockReset();
     fetchMock.mockReset();
     axiosPatchMock.mockReset();
     axiosPatchMock.mockResolvedValue({ data: { project_ids: [30] } });
@@ -446,4 +449,16 @@ export function makeProps(overrides: Partial<any> = {}) {
     };
 }
 
-export { axiosPatchMock, fetchMock, flushPromises, getAccessForm, getCreateForm, getEditForm, Index, mount, routerDeleteMock, routerGetMock };
+export {
+    axiosPatchMock,
+    fetchMock,
+    flushPromises,
+    getAccessForm,
+    getCreateForm,
+    getEditForm,
+    Index,
+    mount,
+    routerDeleteMock,
+    routerGetMock,
+    routerReloadMock,
+};
