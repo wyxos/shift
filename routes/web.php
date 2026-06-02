@@ -60,6 +60,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::get('projects/{project}/users', [ProjectController::class, 'users'])->name('projects.users');
     Route::post('projects/{project}/api-token', [ProjectController::class, 'generateApiToken'])->name('projects.api-token');
+    Route::patch('projects/{project}/widget-settings', [ProjectController::class, 'updateWidgetSettings'])->name('projects.widget-settings');
 
     // project users (access control)
     Route::post('projects/{project}/users', [ProjectUserController::class, 'store'])->name('project-users.store');

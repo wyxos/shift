@@ -18,6 +18,10 @@ Route::get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     // Prefix API route names to avoid collisions with web/shift routes
     Route::name('api.')->group(function () {
+        // embedded widget intake
+        Route::get('/widget/config', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'config'])->name('widget.config');
+        Route::post('/widget/tasks', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'store'])->name('widget.tasks.store');
+
         // tasks
         Route::get('/collaborators/internal', [\App\Http\Controllers\Api\ExternalTaskController::class, 'internalCollaborators'])->name('collaborators.internal');
         Route::get('/tasks', [\App\Http\Controllers\Api\ExternalTaskController::class, 'index'])->name('tasks.index');
