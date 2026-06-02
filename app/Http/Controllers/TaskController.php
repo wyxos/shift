@@ -455,6 +455,10 @@ class TaskController extends Controller
 
     public function indexV2(?Organisation $organisation = null)
     {
+        if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
+            abort(404);
+        }
+
         $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
         $allPriorities = ['low', 'medium', 'high'];
         $allowedSortBy = ['updated_at', 'created_at', 'priority'];

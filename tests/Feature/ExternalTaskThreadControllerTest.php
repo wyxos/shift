@@ -11,7 +11,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     Sanctum::actingAs($this->user);
 
-    $this->project = Project::factory()->create();
+    $this->project = Project::factory()->withAuthor($this->user->id)->create();
 
     $this->externalUser = ExternalUser::factory()->create([
         'project_id' => $this->project->id,

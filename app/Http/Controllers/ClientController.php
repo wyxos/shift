@@ -5,11 +5,24 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Organisation;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
+    private function ensureClientManageable(Client $client): void
+    {
+        abort_unless(
+            $client->organisation()->where('author_id', auth()->id())->exists(),
+            403,
+        );
+    }
+
     public function index(?Organisation $organisation = null)
     {
+        if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
+            abort(404);
+        }
+
         $sortBy = request('sort_by');
         $organisationId = $organisation?->id ?? request('organisation_id');
 
@@ -61,6 +74,8 @@ class ClientController extends Controller
 
     public function destroy(Client $client)
     {
+        $this->ensureClientManageable($client);
+
         $client->delete();
 
         return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
@@ -68,6 +83,8 @@ class ClientController extends Controller
 
     public function update(Client $client)
     {
+        $this->ensureClientManageable($client);
+
         $client->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
@@ -79,7 +96,11 @@ class ClientController extends Controller
     {
         Client::create(request()->validate([
             'name' => 'required|string|max:255',
-            'organisation_id' => 'required|exists:organisations,id',
+            'organisation_id' => [
+                'required',
+                Rule::exists('organisations', 'id')
+                    ->where(fn ($query) => $query->where('author_id', auth()->id())),
+            ],
         ]));
 
         return redirect()->route('clients.index')->with('success', 'Client created successfully.');
