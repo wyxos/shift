@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Builder;
 
 class OrganisationController extends Controller
 {
+    private function ensureOrganisationVisible(Organisation $organisation): void
+    {
+        abort_unless($organisation->isVisibleToUser(auth()->id()), 404);
+    }
+
     public function index(?Organisation $organisation = null, ?string $activePanel = null)
     {
         $userId = auth()->id();
@@ -159,11 +164,15 @@ class OrganisationController extends Controller
 
     public function team(Organisation $organisation)
     {
+        $this->ensureOrganisationVisible($organisation);
+
         return $this->index($organisation, 'team');
     }
 
     public function settings(Organisation $organisation)
     {
+        $this->ensureOrganisationVisible($organisation);
+
         return $this->index($organisation, 'settings');
     }
 

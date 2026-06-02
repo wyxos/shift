@@ -23,6 +23,7 @@ class ExternalAttachmentController extends Controller
     private function resolveProjectFromRequest(): ?Project
     {
         return Project::query()
+            ->visibleTo(auth()->id())
             ->where('token', request('project'))
             ->first();
     }
