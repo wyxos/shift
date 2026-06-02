@@ -2,6 +2,7 @@
 
 use App\Models\Client;
 use App\Models\Organisation;
+use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
@@ -158,6 +159,51 @@ test('projects index can be scoped by organisation route', function () {
         ->has('projects.data', 1)
         ->where('projects.data.0.id', $scopedProject->id)
         ->where('filters.organisation_id', $firstOrganisation->id)
+    );
+});
+
+test('organisation members only see projects with explicit project access', function () {
+    $owner = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+    ]);
+
+    $visibleProject = Project::factory()->create([
+        'name' => 'Visible Shared Project',
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+        'author_id' => $owner->id,
+    ]);
+    Project::factory()->create([
+        'name' => 'Hidden Organisation Project',
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+        'author_id' => $owner->id,
+    ]);
+
+    ProjectUser::create([
+        'project_id' => $visibleProject->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.projects', $organisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Projects')
+        ->has('projects.data', 1)
+        ->where('projects.data.0.id', $visibleProject->id)
     );
 });
 

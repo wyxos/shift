@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { KeyRound, Pencil, Trash2, Users } from 'lucide-vue-next';
@@ -59,26 +58,22 @@ const emit = defineEmits<{
                     <TableCell>
                         <div class="flex flex-wrap justify-end gap-2">
                             <template v-if="project.isOwner">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
+                                <ActionIconButton
+                                    label="Manage project access"
+                                    title="Manage access"
                                     :data-testid="`project-manage-${project.id}`"
                                     @click="emit('open-manage-users', project)"
                                 >
-                                    <Users class="h-4 w-4 sm:mr-2" />
-                                    <span class="hidden sm:inline">Manage</span>
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
+                                    <Users class="h-4 w-4" />
+                                </ActionIconButton>
+                                <ActionIconButton
+                                    label="Manage API token"
+                                    title="API token"
                                     :data-testid="`project-token-${project.id}`"
                                     @click="emit('open-api-token', project)"
                                 >
-                                    <KeyRound class="h-4 w-4 sm:mr-2" />
-                                    <span class="hidden sm:inline">Token</span>
-                                </Button>
+                                    <KeyRound class="h-4 w-4" />
+                                </ActionIconButton>
                                 <ActionIconButton
                                     label="Edit project"
                                     title="Edit"

@@ -4,6 +4,7 @@ use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -95,6 +96,13 @@ test('dashboard metrics can be scoped to a shared organisation', function () {
         'name' => 'Atlas Console',
         'client_id' => $sharedClient->id,
         'author_id' => $owner->id,
+    ]);
+    ProjectUser::create([
+        'project_id' => $sharedProject->id,
+        'user_id' => $user->id,
+        'user_email' => $user->email,
+        'user_name' => $user->name,
+        'registration_status' => 'registered',
     ]);
     Task::factory()->create([
         'project_id' => $sharedProject->id,

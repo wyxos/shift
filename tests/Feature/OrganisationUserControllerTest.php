@@ -41,6 +41,32 @@ test('organisation access notification is sent to existing user', function () {
     );
 });
 
+test('organisation invite matches existing users case insensitively', function () {
+    Notification::fake();
+
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $existingUser = User::factory()->create([
+        'email' => 'mixed-case-member@example.com',
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('organisation-users.store', $organisation), [
+            'email' => 'MIXED-CASE-MEMBER@example.com',
+            'name' => $existingUser->name,
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('organisation_users', [
+        'organisation_id' => $organisation->id,
+        'user_id' => $existingUser->id,
+    ]);
+
+    Notification::assertSentTo($existingUser, OrganisationAccessNotification::class);
+});
+
 test('organisation invitation notification is sent to new user', function () {
     Notification::fake();
 
@@ -124,6 +150,43 @@ test('organisation owner can sync a member project access', function () {
     $this->assertDatabaseMissing('project_users', [
         'project_id' => $disabledProject->id,
         'user_id' => $member->id,
+    ]);
+});
+
+test('organisation owner can sync a pending invite project access', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $organisationUser = OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => null,
+        'user_email' => 'pending@example.com',
+        'user_name' => 'Pending Member',
+    ]);
+
+    $project = Project::factory()->create([
+        'organisation_id' => $organisation->id,
+        'client_id' => null,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->patchJson(route('organisation-users.projects.sync', [$organisation, $organisationUser]), [
+            'project_ids' => [$project->id],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJson([
+            'project_ids' => [$project->id],
+        ]);
+
+    $this->assertDatabaseHas('project_users', [
+        'project_id' => $project->id,
+        'user_id' => null,
+        'user_email' => 'pending@example.com',
+        'user_name' => 'Pending Member',
+        'registration_status' => 'pending',
     ]);
 });
 

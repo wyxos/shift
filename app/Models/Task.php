@@ -57,23 +57,8 @@ class Task extends Model
 
         return $query->where(function (Builder $taskQuery) use ($userId) {
             $taskQuery
-                ->whereHas('project.projectUser', function (Builder $projectUserQuery) use ($userId) {
-                    $projectUserQuery->where('user_id', $userId);
-                })
-                ->orWhereHas('project', function (Builder $projectQuery) use ($userId) {
-                    $projectQuery->where('author_id', $userId);
-                })
-                ->orWhereHas('project.organisation', function (Builder $organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
-                })
-                ->orWhereHas('project.organisation.organisationUsers', function (Builder $organisationUserQuery) use ($userId) {
-                    $organisationUserQuery->where('user_id', $userId);
-                })
-                ->orWhereHas('project.client.organisation', function (Builder $organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
-                })
-                ->orWhereHas('project.client.organisation.organisationUsers', function (Builder $organisationUserQuery) use ($userId) {
-                    $organisationUserQuery->where('user_id', $userId);
+                ->whereHas('project', function (Builder $projectQuery) use ($userId) {
+                    $projectQuery->visibleTo($userId);
                 })
                 ->orWhereHasMorph('submitter', [User::class], function (Builder $submitterQuery) use ($userId) {
                     $submitterQuery->where('users.id', $userId);

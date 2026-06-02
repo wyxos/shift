@@ -52,11 +52,17 @@ class ProjectInvitationNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = URL::signedRoute('register', [
+        $parameters = [
             'email' => $this->projectUser->user_email,
             'name' => $this->projectUser->user_name,
             'project_id' => $this->project->id,
-        ]);
+        ];
+
+        if ($organisation = $this->project->accessOrganisation()) {
+            $parameters['organisation_id'] = $organisation->id;
+        }
+
+        $url = URL::signedRoute('register', $parameters);
 
         return (new MailMessage)
             ->subject('You have been invited to join a project')
@@ -72,9 +78,13 @@ class ProjectInvitationNotification extends Notification implements ShouldQueue
      */
     public function toArray(object $notifiable): array
     {
+        $organisation = $this->project->accessOrganisation();
+
         return [
             'project_id' => $this->project->id,
             'project_name' => $this->project->name,
+            'organisation_id' => $organisation?->id,
+            'organisation_name' => $organisation?->name,
         ];
     }
 }

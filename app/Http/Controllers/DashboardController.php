@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Organisation;
 use App\Models\Task;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -18,30 +17,7 @@ class DashboardController extends Controller
         $organisationId = $organisation?->id ?? request('organisation_id');
 
         $baseQuery = Task::query()
-            ->where(function ($query) use ($userId) {
-                $query
-                    ->whereHas('project.projectUser', function ($query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    })
-                    ->orWhereHas('project', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHas('project.organisation', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHas('project.organisation.organisationUsers', function ($query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    })
-                    ->orWhereHas('project.client.organisation', function ($query) use ($userId) {
-                        $query->where('author_id', $userId);
-                    })
-                    ->orWhereHas('project.client.organisation.organisationUsers', function ($query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    })
-                    ->orWhereHasMorph('submitter', [User::class], function ($query) use ($userId) {
-                        $query->where('users.id', $userId);
-                    });
-            })
+            ->visibleTo($userId)
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $this->applyProjectOrganisationFilter($query, $organisationId);
             });
