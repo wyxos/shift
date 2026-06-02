@@ -97,7 +97,7 @@ function updateOpen(value: boolean) {
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Close</Button>
+                <Button type="button" variant="ghost" @click="updateOpen(false)">Close</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

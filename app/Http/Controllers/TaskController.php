@@ -90,27 +90,7 @@ class TaskController extends Controller
 
     private function visibleProjectsQuery(): Builder
     {
-        $userId = auth()->id();
-
-        return Project::query()->where(function ($query) use ($userId) {
-            $query
-                ->whereHas('client.organisation', function ($organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
-                })
-                ->orWhereHas('client.organisation.organisationUsers', function ($organisationUserQuery) use ($userId) {
-                    $organisationUserQuery->where('user_id', $userId);
-                })
-                ->orWhereHas('organisation', function ($organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
-                })
-                ->orWhereHas('organisation.organisationUsers', function ($organisationUserQuery) use ($userId) {
-                    $organisationUserQuery->where('user_id', $userId);
-                })
-                ->orWhere('author_id', $userId)
-                ->orWhereHas('projectUser', function ($projectUserQuery) use ($userId) {
-                    $projectUserQuery->where('user_id', $userId);
-                });
-        });
+        return Project::query()->visibleTo(auth()->id());
     }
 
     private function applyProjectOrganisationFilter(Builder $query, mixed $organisationId): void

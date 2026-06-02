@@ -43,19 +43,37 @@ test('organisations index includes ownership context for owned and shared organi
 });
 
 test('organisations index exposes team users for the selected owner organisation', function () {
+    $ownerCreatedAt = now()->subMonths(4)->startOfSecond();
+    $ownerVerifiedAt = now()->subMonths(3)->startOfSecond();
+    $ownerLastLoginAt = now()->subDay()->startOfSecond();
     $owner = User::factory()->create([
         'name' => 'Owner User',
         'email' => 'owner@example.com',
+        'created_at' => $ownerCreatedAt,
+        'email_verified_at' => $ownerVerifiedAt,
+        'last_login_at' => $ownerLastLoginAt,
     ]);
 
+    $memberCreatedAt = now()->subMonths(2)->startOfSecond();
+    $memberLastLoginAt = now()->subHours(3)->startOfSecond();
     $member = User::factory()->create([
         'name' => 'Jane Admin',
         'email' => 'jane@example.com',
+        'created_at' => $memberCreatedAt,
+        'email_verified_at' => null,
+        'last_login_at' => $memberLastLoginAt,
     ]);
 
     $organisation = Organisation::factory()->create([
         'author_id' => $owner->id,
         'name' => 'Acme Labs',
+    ]);
+
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $owner->id,
+        'user_email' => $owner->email,
+        'user_name' => $owner->name,
     ]);
 
     $client = Client::factory()->create([
@@ -90,11 +108,13 @@ test('organisations index exposes team users for the selected owner organisation
         'registration_status' => 'registered',
     ]);
 
+    $pendingCreatedAt = now()->subWeek()->startOfSecond();
     OrganisationUser::create([
         'organisation_id' => $organisation->id,
         'user_id' => null,
         'user_email' => 'invitee@example.com',
         'user_name' => 'Invited User',
+        'created_at' => $pendingCreatedAt,
     ]);
 
     $response = $this->actingAs($owner)
@@ -108,17 +128,30 @@ test('organisations index exposes team users for the selected owner organisation
         ->where('panelOrganisation.name', 'Acme Labs')
         ->where('panelOrganisation.projects.0.name', 'Atlas Portal')
         ->where('panelOrganisation.projects.1.name', 'Billing Console')
+        ->has('panelOrganisation.teamUsers', 3)
         ->where('panelOrganisation.teamUsers.0.name', 'Owner User')
         ->where('panelOrganisation.teamUsers.0.email', 'owner@example.com')
         ->where('panelOrganisation.teamUsers.0.status', 'owner')
+        ->where('panelOrganisation.teamUsers.0.projectAccessCount', 2)
+        ->where('panelOrganisation.teamUsers.0.createdAt', $ownerCreatedAt->toISOString())
+        ->where('panelOrganisation.teamUsers.0.verifiedAt', $ownerVerifiedAt->toISOString())
+        ->where('panelOrganisation.teamUsers.0.lastLoginAt', $ownerLastLoginAt->toISOString())
         ->where('panelOrganisation.teamUsers.1.name', 'Jane Admin')
         ->where('panelOrganisation.teamUsers.1.email', 'jane@example.com')
         ->where('panelOrganisation.teamUsers.1.organisationUserId', $organisationUser->id)
         ->where('panelOrganisation.teamUsers.1.status', 'registered')
         ->where('panelOrganisation.teamUsers.1.projectIds', [$clientProject->id])
+        ->where('panelOrganisation.teamUsers.1.projectAccessCount', 1)
+        ->where('panelOrganisation.teamUsers.1.createdAt', $memberCreatedAt->toISOString())
+        ->where('panelOrganisation.teamUsers.1.verifiedAt', null)
+        ->where('panelOrganisation.teamUsers.1.lastLoginAt', $memberLastLoginAt->toISOString())
         ->where('panelOrganisation.teamUsers.2.name', 'Invited User')
         ->where('panelOrganisation.teamUsers.2.email', 'invitee@example.com')
         ->where('panelOrganisation.teamUsers.2.status', 'pending')
+        ->where('panelOrganisation.teamUsers.2.projectAccessCount', 0)
+        ->where('panelOrganisation.teamUsers.2.createdAt', $pendingCreatedAt->toISOString())
+        ->where('panelOrganisation.teamUsers.2.verifiedAt', null)
+        ->where('panelOrganisation.teamUsers.2.lastLoginAt', null)
     );
 });
 

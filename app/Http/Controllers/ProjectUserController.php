@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
@@ -28,21 +29,35 @@ class ProjectUserController extends Controller
                    $project->organisation?->author_id === Auth::id() ||
                    $project->author_id === Auth::id();
 
-        if (!$isOwner) {
+        if (! $isOwner) {
             return response()->json(['message' => 'Unauthorized. Only project owners can grant access.'], 403);
         }
 
-        // Check if the user is already a member of the project
-        $existingUser = ProjectUser::where('project_id', $project->id)
-            ->where('user_email', $validated['email'])
-            ->first();
+        $organisation = $project->accessOrganisation();
 
-        if ($existingUser) {
-            return response()->json(['message' => 'User already has access to this project'], 422);
+        if (! $organisation) {
+            return response()->json(['message' => 'Project must belong to an organisation before access can be granted.'], 422);
         }
 
         // Find the user by email if they exist
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::whereRaw('LOWER(email) = LOWER(?)', [$validated['email']])->first();
+
+        // Check if the user is already a member of the project
+        $existingUser = ProjectUser::where('project_id', $project->id)
+            ->where(function ($query) use ($validated, $user) {
+                $query->whereRaw('LOWER(user_email) = LOWER(?)', [$validated['email']]);
+
+                if ($user) {
+                    $query->orWhere('user_id', $user->id);
+                }
+            })
+            ->first();
+
+        if ($existingUser) {
+            OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+
+            return response()->json(['message' => 'User already has access to this project'], 422);
+        }
 
         // Create the project user
         $projectUser = ProjectUser::create([
@@ -53,8 +68,10 @@ class ProjectUserController extends Controller
             'registration_status' => $user ? 'registered' : 'pending', // Set status based on user existence
         ]);
 
+        OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+
         // If the user doesn't exist, send an invitation email
-        if (!$user) {
+        if (! $user) {
             Notification::route('mail', [
                 $validated['email'] => $validated['name'],
             ])->notify(new ProjectInvitationNotification($projectUser, $project));
@@ -77,7 +94,7 @@ class ProjectUserController extends Controller
                    $project->organisation?->author_id === Auth::id() ||
                    $project->author_id === Auth::id();
 
-        if (!$isOwner) {
+        if (! $isOwner) {
             return response()->json(['message' => 'Unauthorized. Only project owners can remove access.'], 403);
         }
 
@@ -99,13 +116,13 @@ class ProjectUserController extends Controller
      * Update the user_id and registration_status when a user registers.
      * This method should be called from the registration process.
      *
-     * @param User $user The newly registered user
+     * @param  User  $user  The newly registered user
      * @return void
      */
     public static function updateUserRegistration(User $user)
     {
         // Find all project users with matching email and pending status
-        $pendingProjectUsers = ProjectUser::where('user_email', $user->email)
+        $pendingProjectUsers = ProjectUser::whereRaw('LOWER(user_email) = LOWER(?)', [$user->email])
             ->where('registration_status', 'pending')
             ->get();
 
@@ -115,6 +132,10 @@ class ProjectUserController extends Controller
                 'user_id' => $user->id,
                 'registration_status' => 'registered',
             ]);
+
+            if ($organisation = $projectUser->project?->accessOrganisation()) {
+                OrganisationUser::ensureForIdentity($organisation, $user, $projectUser->user_email, $projectUser->user_name);
+            }
         }
     }
 }

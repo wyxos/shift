@@ -39,6 +39,10 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'email' => strtolower((string) $request->email),
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
@@ -61,14 +65,18 @@ class RegisteredUserController extends Controller
         if ($request->project_id) {
             // Update the project_user record with the new user_id and set registration_status to registered
             ProjectUser::where('project_id', $request->project_id)
-                ->where('user_email', $request->email)
+                ->whereRaw('LOWER(user_email) = LOWER(?)', [$request->email])
                 ->update([
                     'user_id' => $user->id,
-                    'registration_status' => 'registered'
+                    'registration_status' => 'registered',
                 ]);
 
             // Notify the project owner that a user has completed registration
             $project = Project::find($request->project_id);
+            if ($project && $organisation = $project->accessOrganisation()) {
+                OrganisationUser::ensureForIdentity($organisation, $user, $request->email, $request->name);
+            }
+
             if ($project && $project->author) {
                 $project->author->notify(new ProjectUserRegisteredNotification($user, $project));
             }
@@ -80,8 +88,22 @@ class RegisteredUserController extends Controller
         if ($request->organisation_id) {
             // Update the organisation_user record with the new user_id
             OrganisationUser::where('organisation_id', $request->organisation_id)
-                ->where('user_email', $request->email)
+                ->whereRaw('LOWER(user_email) = LOWER(?)', [$request->email])
                 ->update(['user_id' => $user->id]);
+
+            ProjectUser::whereRaw('LOWER(user_email) = LOWER(?)', [$request->email])
+                ->where('registration_status', 'pending')
+                ->whereHas('project', function ($query) use ($request) {
+                    $query
+                        ->where('organisation_id', $request->organisation_id)
+                        ->orWhereHas('client', function ($clientQuery) use ($request) {
+                            $clientQuery->where('organisation_id', $request->organisation_id);
+                        });
+                })
+                ->update([
+                    'user_id' => $user->id,
+                    'registration_status' => 'registered',
+                ]);
 
             return to_route('organisations.index', ['highlight' => $request->organisation_id]);
         }

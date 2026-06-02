@@ -29,15 +29,15 @@ defineEmits<{
 </script>
 
 <template>
-    <section class="space-y-4">
-        <div class="bg-card rounded-xl border p-4">
-            <div class="max-w-xl space-y-4">
-                <div class="space-y-1">
+    <section class="flex flex-col gap-8">
+        <div class="max-w-xl">
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-1">
                     <h1 class="text-lg font-semibold">Settings</h1>
                     <p class="text-muted-foreground text-sm">{{ organisation.name }}</p>
                 </div>
 
-                <div class="space-y-2">
+                <div class="flex flex-col gap-2">
                     <Label for="settings-organisation-name">Name</Label>
                     <Input
                         id="settings-organisation-name"
@@ -54,9 +54,9 @@ defineEmits<{
             </div>
         </div>
 
-        <div class="border-destructive/30 bg-card rounded-xl border p-4">
+        <div class="border-destructive/30 border-t pt-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="space-y-1">
+                <div class="flex flex-col gap-1">
                     <h2 class="text-destructive font-semibold">Delete organisation</h2>
                     <p class="text-muted-foreground text-sm">This will permanently remove the organisation.</p>
                 </div>

@@ -34,17 +34,10 @@ class OrganisationUserController extends Controller
         }
 
         // Find the user by email if they exist
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::whereRaw('LOWER(email) = LOWER(?)', [$validated['email']])->first();
 
         // Check if the user is already a member of the organisation
-        $existingUser = OrganisationUser::where('organisation_id', $organisation->id)
-            ->where(function ($query) use ($validated, $user) {
-                $query->where('user_email', $validated['email']);
-                if ($user) {
-                    $query->orWhere('user_id', $user->id);
-                }
-            })
-            ->first();
+        $existingUser = OrganisationUser::matchingIdentity($organisation, $user, $validated['email'])->first();
 
         if ($existingUser) {
             return response()->json(['message' => 'User is already a member of this organisation'], 422);
@@ -175,12 +168,12 @@ class OrganisationUserController extends Controller
             ->where(function (Builder $query) use ($organisationUser) {
                 if ($organisationUser->user_id) {
                     $query->where('user_id', $organisationUser->user_id)
-                        ->orWhere('user_email', $organisationUser->user_email);
+                        ->orWhereRaw('LOWER(user_email) = LOWER(?)', [$organisationUser->user_email]);
 
                     return;
                 }
 
-                $query->where('user_email', $organisationUser->user_email);
+                $query->whereRaw('LOWER(user_email) = LOWER(?)', [$organisationUser->user_email]);
             });
     }
 
