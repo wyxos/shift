@@ -8,6 +8,7 @@ import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue
 import ProjectFilterControls from '@/components/admin/projects/ProjectFilterControls.vue';
 import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
 import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
+import ProjectWidgetSettingsDialog from '@/components/admin/projects/ProjectWidgetSettingsDialog.vue';
 import {
     defaultSortBy,
     normalizeNullableId,
@@ -56,6 +57,9 @@ const manageUsersLoading = ref(false);
 const manageUsersError = ref<string | null>(null);
 const apiTokenLoading = ref(false);
 const apiTokenError = ref<string | null>(null);
+const widgetSettingsOpen = ref(false);
+const widgetSettingsLoading = ref(false);
+const widgetSettingsError = ref<string | null>(null);
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
 const appliedOrganisationId = computed(() => props.filters.organisation_id ?? null);
@@ -165,6 +169,18 @@ const apiTokenForm = useForm<{
     project_name: '',
     token: '',
     isOpen: false,
+});
+
+const widgetSettingsForm = ref<{
+    project_id: number | null;
+    project_name: string;
+    external_widget_enabled: boolean;
+    external_widget_guest_submissions_enabled: boolean;
+}>({
+    project_id: null,
+    project_name: '',
+    external_widget_enabled: false,
+    external_widget_guest_submissions_enabled: false,
 });
 
 watch(
@@ -294,6 +310,17 @@ function openApiTokenModal(project: ProjectRow) {
     apiTokenForm.isOpen = true;
 }
 
+function openWidgetSettingsModal(project: ProjectRow) {
+    widgetSettingsForm.value = {
+        project_id: project.id,
+        project_name: project.name,
+        external_widget_enabled: Boolean(project.external_widget_enabled),
+        external_widget_guest_submissions_enabled: Boolean(project.external_widget_guest_submissions_enabled),
+    };
+    widgetSettingsError.value = null;
+    widgetSettingsOpen.value = true;
+}
+
 function closeCreateModal() {
     createForm.isActive = false;
     createForm.reset();
@@ -303,6 +330,11 @@ function closeEditModal() {
     editDialogOpen.value = false;
     editForm.reset();
     editForm.id = null;
+}
+
+function closeWidgetSettingsModal() {
+    widgetSettingsOpen.value = false;
+    widgetSettingsError.value = null;
 }
 
 function submitCreateForm() {
@@ -394,6 +426,39 @@ async function generateApiToken() {
         apiTokenLoading.value = false;
     }
 }
+
+async function saveWidgetSettings() {
+    if (!widgetSettingsForm.value.project_id) return;
+
+    widgetSettingsLoading.value = true;
+    widgetSettingsError.value = null;
+
+    try {
+        await axios.patch(
+            `/projects/${widgetSettingsForm.value.project_id}/widget-settings`,
+            {
+                external_widget_enabled: widgetSettingsForm.value.external_widget_enabled,
+                external_widget_guest_submissions_enabled: widgetSettingsForm.value.external_widget_guest_submissions_enabled,
+            },
+            {
+                headers: {
+                    Accept: 'application/json',
+                },
+            },
+        );
+
+        closeWidgetSettingsModal();
+        router.reload({
+            only: ['projects'],
+            preserveScroll: true,
+        });
+    } catch (error) {
+        console.error('Error saving widget settings:', error);
+        widgetSettingsError.value = 'Unable to save widget settings right now.';
+    } finally {
+        widgetSettingsLoading.value = false;
+    }
+}
 </script>
 
 <template>
@@ -435,6 +500,7 @@ async function generateApiToken() {
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"
                     @open-manage-users="openManageUsersModal"
+                    @open-widget-settings="openWidgetSettingsModal"
                 />
             </AdminListShell>
         </div>
@@ -486,6 +552,15 @@ async function generateApiToken() {
             @cancel="apiTokenForm.isOpen = false"
             @generate="generateApiToken"
             @update:open="apiTokenForm.isOpen = $event"
+        />
+        <ProjectWidgetSettingsDialog
+            :error="widgetSettingsError"
+            :form="widgetSettingsForm"
+            :loading="widgetSettingsLoading"
+            :open="widgetSettingsOpen"
+            @cancel="closeWidgetSettingsModal"
+            @save="saveWidgetSettings"
+            @update:open="widgetSettingsOpen = $event"
         />
     </AppLayout>
 </template>

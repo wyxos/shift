@@ -74,6 +74,8 @@ test('projects index includes owned and shared projects with ownership context',
         ->where('projects.data.0.client_name', 'Acme Client')
         ->where('projects.data.0.organisation_name', 'Acme Org')
         ->where('projects.data.0.isOwner', true)
+        ->where('projects.data.0.external_widget_enabled', false)
+        ->where('projects.data.0.external_widget_guest_submissions_enabled', false)
         ->where('projects.data.1.id', $sharedProject->id)
         ->where('projects.data.1.organisation_name', 'Partner Org')
         ->where('projects.data.1.isOwner', false)
@@ -246,4 +248,57 @@ test('shared project members cannot generate api tokens', function () {
         ->assertForbidden();
 
     expect($project->fresh()->token)->toBeNull();
+});
+
+test('project managers can update widget settings', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'external_widget_enabled' => false,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('projects.widget-settings', $project), [
+            'external_widget_enabled' => true,
+            'external_widget_guest_submissions_enabled' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('external_widget_enabled', true)
+        ->assertJsonPath('external_widget_guest_submissions_enabled', true);
+
+    $project->refresh();
+
+    expect($project->external_widget_enabled)->toBeTrue();
+    expect($project->external_widget_guest_submissions_enabled)->toBeTrue();
+});
+
+test('shared project members cannot update widget settings', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'external_widget_enabled' => false,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('projects.widget-settings', $project), [
+            'external_widget_enabled' => true,
+            'external_widget_guest_submissions_enabled' => true,
+        ])
+        ->assertForbidden();
+
+    expect($project->fresh()->external_widget_enabled)->toBeFalse();
+    expect($project->fresh()->external_widget_guest_submissions_enabled)->toBeFalse();
 });

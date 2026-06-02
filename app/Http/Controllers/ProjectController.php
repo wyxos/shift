@@ -95,6 +95,31 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
     }
 
+    public function updateWidgetSettings(Project $project)
+    {
+        abort_unless(
+            $project->isManagedByUser(auth()->id()),
+            403,
+        );
+
+        $attributes = request()->validate([
+            'external_widget_enabled' => 'required|boolean',
+            'external_widget_guest_submissions_enabled' => 'required|boolean',
+        ]);
+
+        $project->update($attributes);
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'project_id' => $project->id,
+                'external_widget_enabled' => $project->external_widget_enabled,
+                'external_widget_guest_submissions_enabled' => $project->external_widget_guest_submissions_enabled,
+            ]);
+        }
+
+        return redirect()->route('projects.index')->with('success', 'Widget settings updated successfully.');
+    }
+
     public function store()
     {
         $validated = request()->validate([
