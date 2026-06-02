@@ -162,6 +162,14 @@ test('projects index can be scoped by organisation route', function () {
     );
 });
 
+test('projects organisation route is hidden from users without organisation access', function () {
+    $otherOrganisation = Organisation::factory()->create();
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.projects', $otherOrganisation))
+        ->assertNotFound();
+});
+
 test('organisation members only see projects with explicit project access', function () {
     $owner = User::factory()->create();
     $organisation = Organisation::factory()->create([
@@ -246,4 +254,74 @@ test('shared project members cannot generate api tokens', function () {
         ->assertForbidden();
 
     expect($project->fresh()->token)->toBeNull();
+});
+
+test('projects cannot be created for inaccessible organisations', function () {
+    $otherOrganisation = Organisation::factory()->create();
+
+    $this->actingAs($this->user)
+        ->postJson(route('projects.store'), [
+            'name' => 'Blocked Project',
+            'organisation_id' => $otherOrganisation->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('organisation_id');
+
+    $this->assertDatabaseMissing('projects', [
+        'name' => 'Blocked Project',
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+});
+
+test('projects cannot be created for inaccessible clients', function () {
+    $otherOrganisation = Organisation::factory()->create();
+    $client = Client::factory()->create([
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('projects.store'), [
+            'name' => 'Blocked Client Project',
+            'client_id' => $client->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('client_id');
+
+    $this->assertDatabaseMissing('projects', [
+        'name' => 'Blocked Client Project',
+        'client_id' => $client->id,
+    ]);
+});
+
+test('projects the user cannot manage cannot be updated or deleted', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'name' => 'Protected Project',
+    ]);
+
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $this->actingAs($this->user)
+        ->putJson(route('projects.update', $project), [
+            'name' => 'Changed Project',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($this->user)
+        ->deleteJson(route('projects.destroy', $project))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('projects', [
+        'id' => $project->id,
+        'name' => 'Protected Project',
+    ]);
 });
