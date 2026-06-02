@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { KeyRound, Pencil, Trash2, Users } from 'lucide-vue-next';
+import { KeyRound, MessageSquare, Pencil, Trash2, Users } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
 const { projects, showOrganisationColumn = true } = defineProps<{
@@ -15,6 +15,7 @@ const emit = defineEmits<{
     'open-delete': [project: ProjectRow];
     'open-manage-users': [project: ProjectRow];
     'open-api-token': [project: ProjectRow];
+    'open-widget-settings': [project: ProjectRow];
 }>();
 </script>
 
@@ -37,6 +38,17 @@ const emit = defineEmits<{
                             <span v-if="projectClientLabel(project)" class="text-muted-foreground text-xs">
                                 {{ projectClientLabel(project) }}
                             </span>
+                            <div v-if="project.external_widget_enabled" class="flex flex-wrap gap-1">
+                                <Badge :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">Widget</Badge>
+                                <Badge
+                                    v-if="project.external_widget_guest_submissions_enabled"
+                                    :data-testid="`project-widget-guests-${project.id}`"
+                                    class="bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                    variant="secondary"
+                                >
+                                    Guests
+                                </Badge>
+                            </div>
                         </div>
                     </TableCell>
                     <TableCell v-if="showOrganisationColumn">
@@ -73,6 +85,14 @@ const emit = defineEmits<{
                                     @click="emit('open-api-token', project)"
                                 >
                                     <KeyRound class="h-4 w-4" />
+                                </ActionIconButton>
+                                <ActionIconButton
+                                    label="Manage widget settings"
+                                    title="Widget"
+                                    :data-testid="`project-widget-${project.id}`"
+                                    @click="emit('open-widget-settings', project)"
+                                >
+                                    <MessageSquare class="h-4 w-4" />
                                 </ActionIconButton>
                                 <ActionIconButton
                                     label="Edit project"

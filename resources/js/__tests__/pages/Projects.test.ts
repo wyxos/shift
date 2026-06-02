@@ -6,8 +6,10 @@ import { h } from 'vue';
 const inertiaMocks = vi.hoisted(() => ({
     routerGet: vi.fn(),
     routerDelete: vi.fn(),
+    routerReload: vi.fn(),
     formInstances: [] as Array<Record<string, any>>,
     axiosPost: vi.fn(),
+    axiosPatch: vi.fn(),
     fetchMock: vi.fn(),
 }));
 
@@ -107,6 +109,15 @@ vi.mock('@/components/ui/input', () => ({
     },
 }));
 
+vi.mock('@/components/ui/checkbox', () => ({
+    Checkbox: {
+        props: ['modelValue', 'disabled'],
+        emits: ['update:modelValue'],
+        inheritAttrs: false,
+        template:
+            '<input v-bind="$attrs" type="checkbox" :checked="modelValue" :disabled="disabled" @change="$emit(`update:modelValue`, $event.target.checked)" />',
+    },
+}));
 vi.mock('@/components/ui/label', () => ({ Label: { template: '<label><slot /></label>' } }));
 vi.mock('@/components/ui/badge', () => ({ Badge: { template: '<span v-bind="$attrs"><slot /></span>' } }));
 vi.mock('@/components/ui/table', () => ({
@@ -171,6 +182,7 @@ vi.mock('@inertiajs/vue3', async () => {
         router: {
             get: inertiaMocks.routerGet,
             delete: inertiaMocks.routerDelete,
+            reload: inertiaMocks.routerReload,
         },
         usePage: () => ({
             url: '/projects',
@@ -198,6 +210,7 @@ vi.mock('@inertiajs/vue3', async () => {
 vi.mock('axios', () => ({
     default: {
         post: inertiaMocks.axiosPost,
+        patch: inertiaMocks.axiosPatch,
     },
 }));
 
@@ -245,10 +258,13 @@ describe('Projects.vue', () => {
     beforeEach(() => {
         inertiaMocks.routerGet.mockReset();
         inertiaMocks.routerDelete.mockReset();
+        inertiaMocks.routerReload.mockReset();
         inertiaMocks.axiosPost.mockReset();
+        inertiaMocks.axiosPatch.mockReset();
         inertiaMocks.fetchMock.mockReset();
         inertiaMocks.formInstances.length = 0;
         inertiaMocks.axiosPost.mockResolvedValue({ data: { token: 'generated-token' } });
+        inertiaMocks.axiosPatch.mockResolvedValue({ data: {} });
         inertiaMocks.fetchMock.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue([
@@ -272,6 +288,8 @@ describe('Projects.vue', () => {
         expect(wrapper.find('[data-testid="project-grant-1"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-manage-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-manage-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-widget-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="project-widget-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-access-1"]').text()).toBe('Owner');
         expect(wrapper.find('[data-testid="project-access-2"]').text()).toBe('Shared');
         expect(wrapper.text()).not.toContain('View and collaborate only');
@@ -367,5 +385,30 @@ describe('Projects.vue', () => {
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
         expect(wrapper.text()).toContain('generated-token');
+    });
+
+    it('saves widget settings for project owners', async () => {
+        const wrapper = mountPage();
+
+        await wrapper.get('[data-testid="project-widget-1"]').trigger('click');
+        await wrapper.get('[data-testid="project-widget-enabled"]').setValue(true);
+        await wrapper.get('[data-testid="project-widget-guest-submissions"]').setValue(true);
+        await wrapper.get('[data-testid="save-widget-settings"]').trigger('click');
+        await flushPromises();
+
+        expect(inertiaMocks.axiosPatch).toHaveBeenCalledWith(
+            '/projects/1/widget-settings',
+            {
+                external_widget_enabled: true,
+                external_widget_guest_submissions_enabled: true,
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+        expect(inertiaMocks.routerReload).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: ['projects'],
+                preserveScroll: true,
+            }),
+        );
     });
 });
