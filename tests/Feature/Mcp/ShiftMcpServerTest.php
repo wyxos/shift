@@ -10,7 +10,6 @@ use App\Mcp\Tools\SearchTasksTool;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
-use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\TaskCollaborator;
 use App\Models\TaskThread;
@@ -126,8 +125,8 @@ test('web mcp route rejects sanctum tokens without the mcp ability', function ()
         ->assertForbidden();
 });
 
-test('shift mcp server is registered as a local server', function () {
-    expect(app(Registrar::class)->getLocalServer('shift'))->not->toBeNull();
+test('shift mcp server is not registered as a local server', function () {
+    expect(app(Registrar::class)->getLocalServer('shift'))->toBeNull();
 });
 
 test('list projects returns project context without api tokens', function () {
@@ -373,63 +372,23 @@ test('list notifications omits raw notification content and classifies links', f
         ->assertDontSee(['Sensitive task title', 'Private HTML thread body', '<p>', 'task_title', 'content']);
 });
 
-test('configured sanctum and project tokens restrict local mcp reads to the token project', function () {
-    $user = User::factory()->create();
-    $visibleProject = Project::factory()->create([
-        'name' => 'VoidCare Token Project',
-        'token' => 'voidcare-project-token',
-    ]);
-    $otherProject = Project::factory()->create([
-        'name' => 'Other Token Project',
-        'token' => 'other-project-token',
-    ]);
-
-    foreach ([$visibleProject, $otherProject] as $project) {
-        ProjectUser::query()->create([
-            'project_id' => $project->id,
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'user_name' => $user->name,
-        ]);
-    }
-
-    Task::factory()->create([
-        'project_id' => $visibleProject->id,
-        'title' => 'Visible token-scoped task',
-    ]);
-    Task::factory()->create([
-        'project_id' => $otherProject->id,
-        'title' => 'Hidden token-scoped task',
-    ]);
-
-    config([
-        'shift_mcp.auth_token' => $user->createToken('mcp-test', ['mcp:use'])->plainTextToken,
-        'shift_mcp.project_token' => 'voidcare-project-token',
-    ]);
-
-    ShiftServer::tool(SearchTasksTool::class, [
-        'query' => 'token-scoped',
-    ])
-        ->assertOk()
-        ->assertSee('Visible token-scoped task')
-        ->assertDontSee('Hidden token-scoped task');
-});
-
-test('configured local mcp auth token must include the mcp ability', function () {
+test('configured mcp credentials do not authenticate tool calls without a request user', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create();
     Task::factory()->create([
         'project_id' => $project->id,
-        'title' => 'Task behind regular token',
+        'title' => 'Task behind configured MCP credentials',
     ]);
 
     config([
-        'shift_mcp.auth_token' => $user->createToken('regular-api-token')->plainTextToken,
+        'shift_mcp.auth_token' => $user->createToken('mcp-test', ['mcp:use'])->plainTextToken,
+        'shift_mcp.user_email' => $user->email,
+        'shift_mcp.project_token' => $project->token,
     ]);
 
     ShiftServer::tool(SearchTasksTool::class, [
-        'query' => 'regular token',
+        'query' => 'configured MCP credentials',
     ])
         ->assertHasErrors(['authenticated user'])
-        ->assertDontSee('Task behind regular token');
+        ->assertDontSee('Task behind configured MCP credentials');
 });

@@ -16,8 +16,8 @@ class ShiftServer extends Server
     protected string $version = '0.1.0';
 
     protected string $instructions = <<<'MARKDOWN'
-        Read-only access to the SHIFT portal, scoped to the authenticated SHIFT user
-        and optional configured project token. Use these tools to inspect visible
+        Read-only access to the SHIFT portal, scoped to the authenticated SHIFT user.
+        Use these tools to inspect visible
         projects, tasks, task threads, collaborators, and the user's own notification
         records. Do not use this server for mutations; it intentionally exposes no
         write tools.
