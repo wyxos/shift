@@ -10,6 +10,9 @@ export function useProjectIntegrationDialogs() {
     const widgetSettingsOpen = ref(false);
     const widgetSettingsLoading = ref(false);
     const widgetSettingsError = ref<string | null>(null);
+    const mcpSettingsOpen = ref(false);
+    const mcpSettingsLoading = ref(false);
+    const mcpSettingsError = ref<string | null>(null);
 
     const apiTokenForm = useForm<{
         project_id: number | null;
@@ -35,6 +38,16 @@ export function useProjectIntegrationDialogs() {
         external_widget_guest_submissions_enabled: false,
     });
 
+    const mcpSettingsForm = ref<{
+        project_id: number | null;
+        project_name: string;
+        mcp_enabled: boolean;
+    }>({
+        project_id: null,
+        project_name: '',
+        mcp_enabled: false,
+    });
+
     function openApiTokenModal(project: ProjectRow) {
         apiTokenForm.project_id = project.id;
         apiTokenForm.project_name = project.name;
@@ -57,6 +70,21 @@ export function useProjectIntegrationDialogs() {
     function closeWidgetSettingsModal() {
         widgetSettingsOpen.value = false;
         widgetSettingsError.value = null;
+    }
+
+    function openMcpSettingsModal(project: ProjectRow) {
+        mcpSettingsForm.value = {
+            project_id: project.id,
+            project_name: project.name,
+            mcp_enabled: Boolean(project.mcp_enabled),
+        };
+        mcpSettingsError.value = null;
+        mcpSettingsOpen.value = true;
+    }
+
+    function closeMcpSettingsModal() {
+        mcpSettingsOpen.value = false;
+        mcpSettingsError.value = null;
     }
 
     async function generateApiToken() {
@@ -118,15 +146,54 @@ export function useProjectIntegrationDialogs() {
         }
     }
 
+    async function saveMcpSettings() {
+        if (!mcpSettingsForm.value.project_id) return;
+
+        mcpSettingsLoading.value = true;
+        mcpSettingsError.value = null;
+
+        try {
+            await axios.patch(
+                `/projects/${mcpSettingsForm.value.project_id}/mcp-settings`,
+                {
+                    mcp_enabled: mcpSettingsForm.value.mcp_enabled,
+                },
+                {
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                },
+            );
+
+            closeMcpSettingsModal();
+            router.reload({
+                only: ['projects'],
+                preserveScroll: true,
+            });
+        } catch (error) {
+            console.error('Error saving MCP settings:', error);
+            mcpSettingsError.value = 'Unable to save MCP settings right now.';
+        } finally {
+            mcpSettingsLoading.value = false;
+        }
+    }
+
     return {
         apiTokenError,
         apiTokenForm,
         apiTokenLoading,
+        closeMcpSettingsModal,
         closeWidgetSettingsModal,
         generateApiToken,
         openApiTokenModal,
+        openMcpSettingsModal,
         openWidgetSettingsModal,
+        saveMcpSettings,
         saveWidgetSettings,
+        mcpSettingsError,
+        mcpSettingsForm,
+        mcpSettingsLoading,
+        mcpSettingsOpen,
         widgetSettingsError,
         widgetSettingsForm,
         widgetSettingsLoading,

@@ -217,7 +217,14 @@ vi.mock('axios', () => ({
 describe('Projects.vue', () => {
     const mockProjects = {
         data: [
-            { id: 1, name: 'Portal Refresh', isOwner: true, client_name: 'Acme Client', organisation_name: 'Acme Org' },
+            {
+                id: 1,
+                name: 'Portal Refresh',
+                isOwner: true,
+                client_name: 'Acme Client',
+                organisation_name: 'Acme Org',
+                mcp_enabled: true,
+            },
             { id: 2, name: 'Shared Rollout', isOwner: false, client_name: null, organisation_name: 'Northwind' },
         ],
         current_page: 1,
@@ -290,6 +297,9 @@ describe('Projects.vue', () => {
         expect(wrapper.find('[data-testid="project-manage-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-widget-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-widget-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-mcp-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="project-mcp-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-mcp-enabled-1"]').text()).toBe('MCP');
         expect(wrapper.find('[data-testid="project-access-1"]').text()).toBe('Owner');
         expect(wrapper.find('[data-testid="project-access-2"]').text()).toBe('Shared');
         expect(wrapper.text()).not.toContain('View and collaborate only');
@@ -401,6 +411,29 @@ describe('Projects.vue', () => {
             {
                 external_widget_enabled: true,
                 external_widget_guest_submissions_enabled: true,
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+        expect(inertiaMocks.routerReload).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: ['projects'],
+                preserveScroll: true,
+            }),
+        );
+    });
+
+    it('saves mcp settings for project owners', async () => {
+        const wrapper = mountPage();
+
+        await wrapper.get('[data-testid="project-mcp-1"]').trigger('click');
+        await wrapper.get('[data-testid="project-mcp-enabled"]').setValue(false);
+        await wrapper.get('[data-testid="save-mcp-settings"]').trigger('click');
+        await flushPromises();
+
+        expect(inertiaMocks.axiosPatch).toHaveBeenCalledWith(
+            '/projects/1/mcp-settings',
+            {
+                mcp_enabled: false,
             },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );

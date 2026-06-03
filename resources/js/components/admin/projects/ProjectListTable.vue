@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { KeyRound, MessageSquare, Pencil, Trash2, Users } from 'lucide-vue-next';
+import { Bot, KeyRound, MessageSquare, Pencil, Trash2, Users } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
 const { projects, showOrganisationColumn = true } = defineProps<{
@@ -16,6 +16,7 @@ const emit = defineEmits<{
     'open-manage-users': [project: ProjectRow];
     'open-api-token': [project: ProjectRow];
     'open-widget-settings': [project: ProjectRow];
+    'open-mcp-settings': [project: ProjectRow];
 }>();
 </script>
 
@@ -38,8 +39,10 @@ const emit = defineEmits<{
                             <span v-if="projectClientLabel(project)" class="text-muted-foreground text-xs">
                                 {{ projectClientLabel(project) }}
                             </span>
-                            <div v-if="project.external_widget_enabled" class="flex flex-wrap gap-1">
-                                <Badge :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">Widget</Badge>
+                            <div v-if="project.external_widget_enabled || project.mcp_enabled" class="flex flex-wrap gap-1">
+                                <Badge v-if="project.external_widget_enabled" :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">
+                                    Widget
+                                </Badge>
                                 <Badge
                                     v-if="project.external_widget_guest_submissions_enabled"
                                     :data-testid="`project-widget-guests-${project.id}`"
@@ -48,6 +51,7 @@ const emit = defineEmits<{
                                 >
                                     Guests
                                 </Badge>
+                                <Badge v-if="project.mcp_enabled" :data-testid="`project-mcp-enabled-${project.id}`" variant="secondary">MCP</Badge>
                             </div>
                         </div>
                     </TableCell>
@@ -93,6 +97,14 @@ const emit = defineEmits<{
                                     @click="emit('open-widget-settings', project)"
                                 >
                                     <MessageSquare class="h-4 w-4" />
+                                </ActionIconButton>
+                                <ActionIconButton
+                                    label="Manage MCP settings"
+                                    title="MCP"
+                                    :data-testid="`project-mcp-${project.id}`"
+                                    @click="emit('open-mcp-settings', project)"
+                                >
+                                    <Bot class="h-4 w-4" />
                                 </ActionIconButton>
                                 <ActionIconButton
                                     label="Edit project"
