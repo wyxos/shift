@@ -13,6 +13,10 @@ class DashboardController extends Controller
 {
     public function index(?Organisation $organisation = null)
     {
+        if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
+            abort(404);
+        }
+
         $userId = auth()->id();
         $organisationId = $organisation?->id ?? request('organisation_id');
 

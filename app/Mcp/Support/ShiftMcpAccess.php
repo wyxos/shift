@@ -59,15 +59,7 @@ class ShiftMcpAccess
 
     protected function projects(User $user): Builder
     {
-        return Project::query()
-            ->where(function (Builder $query) use ($user): void {
-                $query
-                    ->where('author_id', $user->id)
-                    ->orWhereHas('projectUser', fn (Builder $projectUserQuery) => $projectUserQuery->where('user_id', $user->id))
-                    ->orWhereHas('organisation', fn (Builder $organisationQuery) => $organisationQuery->where('author_id', $user->id))
-                    ->orWhereHas('client.organisation', fn (Builder $organisationQuery) => $organisationQuery->where('author_id', $user->id))
-                    ->orWhereHas('tasks', fn (Builder $taskQuery) => $taskQuery->visibleTo($user->id));
-            });
+        return Project::query()->visibleTo($user->id);
     }
 
     protected function requestUser(Request $request): ?User

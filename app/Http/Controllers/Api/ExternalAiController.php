@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Project;
 use App\Services\Ai\LocalRewriteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,15 @@ class ExternalAiController extends Controller
             'protected_tokens.*' => ['string', 'max:120'],
             'context' => ['nullable', 'string', 'max:12000'],
         ]);
+
+        $project = Project::query()
+            ->visibleTo($request->user()?->id)
+            ->where('token', $attributes['project'])
+            ->first();
+
+        if (! $project) {
+            return response()->json(['error' => 'Project not found'], 404);
+        }
 
         try {
             $improvedHtml = $rewriteService->improveHtml(

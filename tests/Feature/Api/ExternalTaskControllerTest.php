@@ -78,6 +78,41 @@ test('index returns tasks for external user', function () {
     $response->assertJsonCount(2, 'data');
 });
 
+test('project token API calls require authenticated user project access', function () {
+    $otherUser = User::factory()->create();
+    $otherToken = $otherUser->createToken('other-token')->plainTextToken;
+
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+        ]))
+        ->assertNotFound();
+
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->getJson('/api/collaborators/internal?'.http_build_query([
+            'project' => $this->project->token,
+        ]))
+        ->assertNotFound();
+
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->postJson('/api/tasks', [
+            'title' => 'Blocked Cross Token Task',
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'metadata' => [
+                'url' => 'https://example.com/task/blocked',
+                'environment' => 'testing',
+            ],
+        ])
+        ->assertNotFound();
+
+    $this->assertDatabaseMissing('tasks', [
+        'title' => 'Blocked Cross Token Task',
+        'project_id' => $this->project->id,
+    ]);
+});
+
 test('index supports environment filtering and priority sorting', function () {
     $stagingLow = Task::factory()->create([
         'project_id' => $this->project->id,

@@ -141,6 +141,18 @@ test('dashboard metrics can be scoped to a shared organisation', function () {
     );
 });
 
+test('organisation dashboard is hidden from users without organisation access', function () {
+    $owner = User::factory()->create();
+    $unrelatedUser = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    $this->actingAs($unrelatedUser)
+        ->get(route('organisation.dashboard', $organisation))
+        ->assertNotFound();
+});
+
 test('sidebar organisation shared data only marks the list as having more when it is truncated', function () {
     $user = User::factory()->create();
 
