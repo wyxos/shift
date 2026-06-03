@@ -9,6 +9,7 @@ export type ProjectRow = {
     token?: string | null;
     external_widget_enabled?: boolean;
     external_widget_guest_submissions_enabled?: boolean;
+    mcp_enabled?: boolean;
 };
 
 export type ProjectPaginator = {

@@ -114,10 +114,7 @@ class ProjectController extends Controller
 
     public function updateWidgetSettings(Project $project)
     {
-        abort_unless(
-            $project->isManagedByUser(auth()->id()),
-            403,
-        );
+        $this->ensureProjectManageable($project);
 
         $attributes = request()->validate([
             'external_widget_enabled' => 'required|boolean',
@@ -135,6 +132,26 @@ class ProjectController extends Controller
         }
 
         return redirect()->route('projects.index')->with('success', 'Widget settings updated successfully.');
+    }
+
+    public function updateMcpSettings(Project $project)
+    {
+        $this->ensureProjectManageable($project);
+
+        $attributes = request()->validate([
+            'mcp_enabled' => 'required|boolean',
+        ]);
+
+        $project->update($attributes);
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'project_id' => $project->id,
+                'mcp_enabled' => $project->mcp_enabled,
+            ]);
+        }
+
+        return redirect()->route('projects.index')->with('success', 'MCP settings updated successfully.');
     }
 
     public function store()

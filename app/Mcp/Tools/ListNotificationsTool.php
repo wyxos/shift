@@ -44,11 +44,18 @@ class ListNotificationsTool extends Tool
         }
 
         $limit = (int) ($validated['limit'] ?? 20);
+        $projectIds = $access->projectsFor($principal)->pluck('id');
+        $taskIds = $access->tasksFor($principal)->pluck('id');
 
         $notifications = DatabaseNotification::query()
             ->with('notifiable')
             ->where('notifiable_type', User::class)
             ->where('notifiable_id', $principal->user->id)
+            ->where(function ($query) use ($projectIds, $taskIds): void {
+                $query
+                    ->whereIn('data->project_id', $projectIds)
+                    ->orWhereIn('data->task_id', $taskIds);
+            })
             ->when($validated['notifiable_email'] ?? null, function ($query, string $email) use ($principal): void {
                 $query->whereHasMorph('notifiable', [User::class], fn ($userQuery) => $userQuery
                     ->whereKey($principal->user->id)
