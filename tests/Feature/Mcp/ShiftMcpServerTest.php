@@ -281,11 +281,7 @@ test('get task returns task details and collaborators', function () {
         'name' => 'External Collaborator',
         'email' => 'external@example.com',
     ]);
-    $project = Project::factory()->create([
-        'mcp_enabled' => true,
-    ]);
     $task = Task::factory()->create([
-        'project_id' => $project->id,
         'title' => 'Investigate task mail',
         'description' => 'Exact task details for MCP inspection.',
     ]);

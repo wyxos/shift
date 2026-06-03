@@ -6,11 +6,16 @@ use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\ProjectEnvironmentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
+    public function __construct(
+        private readonly ProjectEnvironmentService $projectEnvironmentService,
+    ) {}
+
     private function ensureProjectManageable(Project $project): void
     {
         abort_unless(
@@ -32,6 +37,7 @@ class ProjectController extends Controller
             ->with([
                 'client:id,name,organisation_id',
                 'client.organisation:id,name,author_id',
+                'environments:id,project_id,environment,url,external_widget_enabled,external_widget_guest_submissions_enabled',
                 'organisation:id,name,author_id',
             ])
             ->visibleTo(auth()->id())
@@ -74,6 +80,10 @@ class ProjectController extends Controller
                         ...$project->toArray(),
                         'client_name' => $project->client?->name,
                         'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
+                        'environments' => $project->environments
+                            ->sortBy('environment')
+                            ->map(fn ($environment) => $this->environmentPayload($environment))
+                            ->values(),
                         'isOwner' => $project->isManagedByUser(auth()->id()),
                     ]),
                 'clients' => Client::query()
@@ -119,15 +129,31 @@ class ProjectController extends Controller
         $attributes = request()->validate([
             'external_widget_enabled' => 'required|boolean',
             'external_widget_guest_submissions_enabled' => 'required|boolean',
+            'environments' => 'sometimes|array',
+            'environments.*.id' => 'required|integer',
+            'environments.*.external_widget_enabled' => 'required|boolean',
+            'environments.*.external_widget_guest_submissions_enabled' => 'required|boolean',
         ]);
 
-        $project->update($attributes);
+        $project->update([
+            'external_widget_enabled' => $attributes['external_widget_enabled'],
+            'external_widget_guest_submissions_enabled' => $attributes['external_widget_enabled']
+                ? $attributes['external_widget_guest_submissions_enabled']
+                : false,
+        ]);
+
+        $this->updateEnvironmentWidgetSettings($project, $attributes['environments'] ?? []);
+        $project->load('environments');
 
         if (request()->expectsJson()) {
             return response()->json([
                 'project_id' => $project->id,
                 'external_widget_enabled' => $project->external_widget_enabled,
                 'external_widget_guest_submissions_enabled' => $project->external_widget_guest_submissions_enabled,
+                'environments' => $project->environments
+                    ->sortBy('environment')
+                    ->map(fn ($environment) => $this->environmentPayload($environment))
+                    ->values(),
             ]);
         }
 
@@ -210,5 +236,41 @@ class ProjectController extends Controller
         }
 
         return redirect()->back()->with('token', $token);
+    }
+
+    private function updateEnvironmentWidgetSettings(Project $project, array $environments): void
+    {
+        if ($environments === []) {
+            return;
+        }
+
+        $registrations = $project->environments()
+            ->whereIn('id', collect($environments)->pluck('id')->all())
+            ->get()
+            ->keyBy('id');
+
+        abort_unless($registrations->count() === count($environments), 404);
+
+        foreach ($environments as $environment) {
+            $registration = $registrations->get($environment['id']);
+            $registration->update([
+                'external_widget_enabled' => $environment['external_widget_enabled'],
+                'external_widget_guest_submissions_enabled' => $environment['external_widget_enabled']
+                    ? $environment['external_widget_guest_submissions_enabled']
+                    : false,
+            ]);
+        }
+    }
+
+    private function environmentPayload($environment): array
+    {
+        return [
+            'id' => $environment->id,
+            'key' => $environment->environment,
+            'label' => $this->projectEnvironmentService->label($environment->environment),
+            'url' => $environment->url,
+            'external_widget_enabled' => $environment->external_widget_enabled,
+            'external_widget_guest_submissions_enabled' => $environment->external_widget_guest_submissions_enabled,
+        ];
     }
 }

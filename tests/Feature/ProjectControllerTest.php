@@ -267,20 +267,38 @@ test('project managers can update widget settings', function () {
         'external_widget_enabled' => false,
         'external_widget_guest_submissions_enabled' => false,
     ]);
+    $environment = $project->environments()->create([
+        'environment' => 'testing',
+        'url' => 'https://client-testing.test',
+        'external_widget_enabled' => false,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
 
     $this->actingAs($this->user)
         ->patchJson(route('projects.widget-settings', $project), [
             'external_widget_enabled' => true,
             'external_widget_guest_submissions_enabled' => true,
+            'environments' => [
+                [
+                    'id' => $environment->id,
+                    'external_widget_enabled' => true,
+                    'external_widget_guest_submissions_enabled' => false,
+                ],
+            ],
         ])
         ->assertOk()
         ->assertJsonPath('external_widget_enabled', true)
-        ->assertJsonPath('external_widget_guest_submissions_enabled', true);
+        ->assertJsonPath('external_widget_guest_submissions_enabled', true)
+        ->assertJsonPath('environments.0.id', $environment->id)
+        ->assertJsonPath('environments.0.external_widget_enabled', true)
+        ->assertJsonPath('environments.0.external_widget_guest_submissions_enabled', false);
 
     $project->refresh();
 
     expect($project->external_widget_enabled)->toBeTrue();
     expect($project->external_widget_guest_submissions_enabled)->toBeTrue();
+    expect($environment->fresh()->external_widget_enabled)->toBeTrue();
+    expect($environment->fresh()->external_widget_guest_submissions_enabled)->toBeFalse();
 });
 
 test('shared project members cannot update widget settings', function () {

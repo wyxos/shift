@@ -2,7 +2,12 @@ import { router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
 
-import { type ProjectRow } from './project-shared';
+import { type ProjectEnvironmentRow, type ProjectRow } from './project-shared';
+
+type WidgetEnvironmentSettings = Pick<
+    ProjectEnvironmentRow,
+    'id' | 'key' | 'label' | 'url' | 'external_widget_enabled' | 'external_widget_guest_submissions_enabled'
+>;
 
 export function useProjectIntegrationDialogs() {
     const apiTokenLoading = ref(false);
@@ -31,11 +36,13 @@ export function useProjectIntegrationDialogs() {
         project_name: string;
         external_widget_enabled: boolean;
         external_widget_guest_submissions_enabled: boolean;
+        environments: WidgetEnvironmentSettings[];
     }>({
         project_id: null,
         project_name: '',
         external_widget_enabled: false,
         external_widget_guest_submissions_enabled: false,
+        environments: [],
     });
 
     const mcpSettingsForm = ref<{
@@ -62,6 +69,14 @@ export function useProjectIntegrationDialogs() {
             project_name: project.name,
             external_widget_enabled: Boolean(project.external_widget_enabled),
             external_widget_guest_submissions_enabled: Boolean(project.external_widget_guest_submissions_enabled),
+            environments: (project.environments ?? []).map((environment) => ({
+                id: environment.id,
+                key: environment.key,
+                label: environment.label,
+                url: environment.url,
+                external_widget_enabled: Boolean(environment.external_widget_enabled),
+                external_widget_guest_submissions_enabled: Boolean(environment.external_widget_guest_submissions_enabled),
+            })),
         };
         widgetSettingsError.value = null;
         widgetSettingsOpen.value = true;
@@ -125,6 +140,11 @@ export function useProjectIntegrationDialogs() {
                 {
                     external_widget_enabled: widgetSettingsForm.value.external_widget_enabled,
                     external_widget_guest_submissions_enabled: widgetSettingsForm.value.external_widget_guest_submissions_enabled,
+                    environments: widgetSettingsForm.value.environments.map((environment) => ({
+                        id: environment.id,
+                        external_widget_enabled: Boolean(environment.external_widget_enabled),
+                        external_widget_guest_submissions_enabled: Boolean(environment.external_widget_guest_submissions_enabled),
+                    })),
                 },
                 {
                     headers: {
