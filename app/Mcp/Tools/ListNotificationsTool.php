@@ -54,15 +54,6 @@ class ListNotificationsTool extends Tool
                     ->whereKey($principal->user->id)
                     ->where('email', 'like', "%{$email}%"));
             })
-            ->when($principal->project, function ($query) use ($access, $principal): void {
-                $taskIds = $access->tasksFor($principal)->pluck('id');
-
-                $query->where(function ($query) use ($principal, $taskIds): void {
-                    $query
-                        ->where('data->project_id', $principal->project?->id)
-                        ->orWhereIn('data->task_id', $taskIds);
-                });
-            })
             ->when($validated['task_id'] ?? null, fn ($query, int $taskId) => $query->where('data->task_id', $taskId))
             ->when($validated['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
             ->when((bool) ($validated['unread_only'] ?? false), fn ($query) => $query->whereNull('read_at'))
