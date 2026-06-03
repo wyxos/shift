@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\ExternalUser;
 use App\Models\Project;
+use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
@@ -26,22 +27,32 @@ class ExternalWidgetController extends Controller
     {
         $attributes = $request->validate([
             'project' => 'required|string',
+            'environment' => 'nullable|string|max:255',
         ]);
 
         $project = Project::query()
+            ->with('environments')
             ->where('token', $attributes['project'])
             ->firstOrFail();
+        $environment = $this->environmentRegistration($project, $attributes['environment'] ?? null);
+        $widget = $this->widgetSettings($project, $environment);
 
         return response()->json([
-            'widget_enabled' => $project->external_widget_enabled,
-            'guest_submissions_enabled' => $project->external_widget_guest_submissions_enabled,
+            'widget_enabled' => $widget['enabled'],
+            'guest_submissions_enabled' => $widget['guest_submissions_enabled'],
             'project' => [
                 'id' => $project->id,
                 'name' => $project->name,
             ],
             'widget' => [
-                'enabled' => $project->external_widget_enabled,
-                'guest_submissions_enabled' => $project->external_widget_guest_submissions_enabled,
+                'enabled' => $widget['enabled'],
+                'guest_submissions_enabled' => $widget['guest_submissions_enabled'],
+                'environment' => $environment ? [
+                    'id' => $environment->id,
+                    'key' => $environment->environment,
+                    'label' => $this->projectEnvironmentService->label($environment->environment),
+                    'url' => $environment->url,
+                ] : null,
             ],
         ]);
     }
@@ -71,18 +82,31 @@ class ExternalWidgetController extends Controller
             ->where('token', $attributes['project'])
             ->firstOrFail();
 
-        if (! $project->external_widget_enabled) {
-            return response()->json(['message' => 'The embedded widget is disabled for this project.'], 403);
-        }
+        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
+        $environment = $selectedEnvironment !== null
+            ? $project->environments->firstWhere('environment', $selectedEnvironment)
+            : null;
+        $widget = $this->widgetSettings($project, $environment);
 
         $isAuthenticatedExternalUser = (bool) data_get($attributes, 'user.authenticated', false);
         $isGuestSubmission = $attributes['anonymous'] || ! $isAuthenticatedExternalUser;
 
-        if ($isGuestSubmission && ! $project->external_widget_guest_submissions_enabled) {
-            return response()->json(['message' => 'Guest widget submissions are disabled for this project.'], 403);
+        if (! $widget['enabled']) {
+            return response()->json([
+                'message' => $environment
+                    ? 'The embedded widget is disabled for this environment.'
+                    : 'The embedded widget is disabled for this project.',
+            ], 403);
         }
 
-        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
+        if ($isGuestSubmission && ! $widget['guest_submissions_enabled']) {
+            return response()->json([
+                'message' => $environment
+                    ? 'Guest widget submissions are disabled for this environment.'
+                    : 'Guest widget submissions are disabled for this project.',
+            ], 403);
+        }
+
         $sourceUrl = $this->sourceUrl($attributes);
         $submitter = $attributes['anonymous'] ? null : $this->externalUser($project, $attributes);
 
@@ -140,6 +164,35 @@ class ExternalWidgetController extends Controller
         }
 
         return $environment;
+    }
+
+    private function environmentRegistration(Project $project, ?string $environment): ?ProjectEnvironment
+    {
+        $environment = $this->projectEnvironmentService->normalizeEnvironment($environment);
+
+        if ($environment === null) {
+            return null;
+        }
+
+        return $project->environments->firstWhere('environment', $environment);
+    }
+
+    /**
+     * @return array{enabled: bool, guest_submissions_enabled: bool}
+     */
+    private function widgetSettings(Project $project, ?ProjectEnvironment $environment): array
+    {
+        if ($environment instanceof ProjectEnvironment) {
+            return [
+                'enabled' => $environment->external_widget_enabled,
+                'guest_submissions_enabled' => $environment->external_widget_guest_submissions_enabled,
+            ];
+        }
+
+        return [
+            'enabled' => $project->external_widget_enabled,
+            'guest_submissions_enabled' => $project->external_widget_guest_submissions_enabled,
+        ];
     }
 
     private function sourceUrl(array $attributes): string

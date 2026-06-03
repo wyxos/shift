@@ -87,8 +87,113 @@ test('guest submissions are rejected when guest intake is disabled', function ()
         ->assertJsonPath('message', 'Guest widget submissions are disabled for this project.');
 });
 
+test('config returns environment widget settings when an environment is requested', function () {
+    $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $this->project->environments()->where('environment', 'testing')->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    $response = $this
+        ->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/widget/config?project='.$this->project->token.'&environment=testing');
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('widget.enabled', true)
+        ->assertJsonPath('widget.guest_submissions_enabled', false)
+        ->assertJsonPath('widget.environment.key', 'testing')
+        ->assertJsonPath('widget_enabled', true)
+        ->assertJsonPath('guest_submissions_enabled', false);
+});
+
+test('environment widget settings can disable intake while project default remains enabled', function () {
+    $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $this->project->environments()->where('environment', 'testing')->update([
+        'external_widget_enabled' => false,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    $this
+        ->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/widget/tasks', [
+            'project' => $this->project->token,
+            'kind' => 'issue',
+            'title' => 'Broken checkout',
+            'description' => 'Checkout fails on card entry.',
+            'anonymous' => true,
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://example.com/checkout',
+            ],
+        ])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'The embedded widget is disabled for this environment.');
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('environment guest setting can require authenticated consuming app users', function () {
+    $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $this->project->environments()->where('environment', 'testing')->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    $payload = [
+        'project' => $this->project->token,
+        'kind' => 'feature',
+        'title' => 'Add exports',
+        'description' => 'CSV export would help.',
+        'anonymous' => false,
+        'metadata' => [
+            'environment' => 'testing',
+            'url' => 'https://example.com/reports',
+        ],
+        'user' => [
+            'name' => 'Guest Reporter',
+            'email' => 'guest@example.com',
+            'authenticated' => false,
+        ],
+    ];
+
+    $this
+        ->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/widget/tasks', $payload)
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Guest widget submissions are disabled for this environment.');
+
+    $payload['user'] = [
+        'id' => 123,
+        'name' => 'Session User',
+        'email' => 'session@example.com',
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'authenticated' => true,
+    ];
+
+    $this
+        ->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/widget/tasks', $payload)
+        ->assertCreated()
+        ->assertJsonPath('submitter.name', 'Session User');
+});
+
 test('anonymous submissions create normal tasks without a submitter', function () {
     $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $this->project->environments()->where('environment', 'testing')->update([
         'external_widget_enabled' => true,
         'external_widget_guest_submissions_enabled' => true,
     ]);
@@ -133,6 +238,10 @@ test('authenticated consuming app users can submit when guest submissions are di
         'external_widget_enabled' => true,
         'external_widget_guest_submissions_enabled' => false,
     ]);
+    $this->project->environments()->where('environment', 'testing')->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
 
     $response = $this
         ->withHeader('Authorization', 'Bearer '.$this->token)
@@ -170,6 +279,10 @@ test('authenticated consuming app users can submit when guest submissions are di
 
 test('manual guest submissions create or update external users', function () {
     $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $this->project->environments()->where('environment', 'testing')->update([
         'external_widget_enabled' => true,
         'external_widget_guest_submissions_enabled' => true,
     ]);

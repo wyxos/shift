@@ -90,6 +90,33 @@ test('registering an existing project environment updates its url', function () 
     ]);
 });
 
+test('new project environments inherit project widget defaults', function () {
+    $this->project->update([
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+
+    Sanctum::actingAs($this->owner);
+
+    $response = $this->postJson(route('api.project-environments.register'), [
+        'project' => $this->project->token,
+        'environment' => 'staging',
+        'url' => 'https://client-staging.test',
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.widget.enabled', true)
+        ->assertJsonPath('data.widget.guest_submissions_enabled', false);
+
+    $this->assertDatabaseHas('project_environments', [
+        'project_id' => $this->project->id,
+        'environment' => 'staging',
+        'external_widget_enabled' => true,
+        'external_widget_guest_submissions_enabled' => false,
+    ]);
+});
+
 test('organisation owners can register project environments for nested projects', function () {
     $organisationOwner = User::factory()->create();
     $organisation = Organisation::factory()->create([

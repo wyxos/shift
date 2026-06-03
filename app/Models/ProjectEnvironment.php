@@ -12,6 +12,11 @@ class ProjectEnvironment extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'external_widget_enabled' => 'boolean',
+        'external_widget_guest_submissions_enabled' => 'boolean',
+    ];
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
