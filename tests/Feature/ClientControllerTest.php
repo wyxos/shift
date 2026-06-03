@@ -116,3 +116,52 @@ test('clients index can be scoped by organisation route', function () {
         ->where('filters.organisation_id', $firstOrganisation->id)
     );
 });
+
+test('clients organisation route is hidden from users without organisation access', function () {
+    $otherOrganisation = Organisation::factory()->create();
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.clients', $otherOrganisation))
+        ->assertNotFound();
+});
+
+test('clients cannot be created for inaccessible organisations', function () {
+    $otherOrganisation = Organisation::factory()->create();
+
+    $this->actingAs($this->user)
+        ->postJson(route('clients.store'), [
+            'name' => 'Blocked Client',
+            'organisation_id' => $otherOrganisation->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('organisation_id');
+
+    $this->assertDatabaseMissing('clients', [
+        'name' => 'Blocked Client',
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+});
+
+test('clients in inaccessible organisations cannot be updated or deleted', function () {
+    $otherOrganisation = Organisation::factory()->create();
+    $client = Client::factory()->create([
+        'organisation_id' => $otherOrganisation->id,
+        'name' => 'Protected Client',
+    ]);
+
+    $this->actingAs($this->user)
+        ->putJson(route('clients.update', $client), [
+            'name' => 'Changed Client',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($this->user)
+        ->deleteJson(route('clients.destroy', $client))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('clients', [
+        'id' => $client->id,
+        'name' => 'Protected Client',
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+});

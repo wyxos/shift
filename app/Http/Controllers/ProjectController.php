@@ -7,11 +7,24 @@ use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
+    private function ensureProjectManageable(Project $project): void
+    {
+        abort_unless(
+            $project->isManagedByUser(auth()->id()),
+            403,
+        );
+    }
+
     public function index(?Organisation $organisation = null)
     {
+        if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
+            abort(404);
+        }
+
         $sortBy = request('sort_by');
         $organisationId = $organisation?->id ?? request('organisation_id');
 
@@ -81,6 +94,8 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
+        $this->ensureProjectManageable($project);
+
         $project->delete();
 
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
@@ -88,6 +103,8 @@ class ProjectController extends Controller
 
     public function update(Project $project)
     {
+        $this->ensureProjectManageable($project);
+
         $project->update(request()->validate([
             'name' => 'required|string|max:255',
         ]));
@@ -124,8 +141,18 @@ class ProjectController extends Controller
     {
         $validated = request()->validate([
             'name' => 'required|string|max:255',
-            'client_id' => 'nullable|exists:clients,id',
-            'organisation_id' => 'nullable|exists:organisations,id',
+            'client_id' => [
+                'nullable',
+                Rule::exists('clients', 'id')
+                    ->where(fn ($query) => $query->whereIn('organisation_id', Organisation::query()
+                        ->select('id')
+                        ->where('author_id', auth()->id()))),
+            ],
+            'organisation_id' => [
+                'nullable',
+                Rule::exists('organisations', 'id')
+                    ->where(fn ($query) => $query->where('author_id', auth()->id())),
+            ],
         ]);
 
         Project::create([

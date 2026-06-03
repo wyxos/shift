@@ -162,6 +162,32 @@ test('list projects returns project context without api tokens', function () {
         ->assertDontSee('secret-project-token');
 });
 
+test('list projects does not expose project metadata for task-only collaborators', function () {
+    $owner = User::factory()->create();
+    $collaborator = User::factory()->create();
+    $project = Project::factory()
+        ->withAuthor($owner->id)
+        ->create([
+            'name' => 'Task Only Collaborator Project',
+        ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Visible collaborator task',
+    ]);
+    $task->submitter()->associate($owner)->save();
+    $task->internalCollaborators()->attach($collaborator->id);
+
+    ShiftServer::actingAs($collaborator)->tool(SearchTasksTool::class, [
+        'query' => 'Visible collaborator task',
+    ])
+        ->assertOk()
+        ->assertSee('Visible collaborator task');
+
+    ShiftServer::actingAs($collaborator)->tool(ListProjectsTool::class)
+        ->assertOk()
+        ->assertDontSee('Task Only Collaborator Project');
+});
+
 test('search tasks returns filtered task summaries without full descriptions', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withAuthor($owner->id)->create(['name' => 'VoidCare Portal']);

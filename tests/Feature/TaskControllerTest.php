@@ -2,7 +2,9 @@
 
 use App\Models\ExternalUser;
 use App\Models\Organisation;
+use App\Models\OrganisationUser;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 
@@ -78,6 +80,74 @@ test('tasks index can be scoped by organisation route', function () {
         ->where('tasks.data.0.id', $scopedTask->id)
         ->where('filters.organisation_id', $firstOrganisation->id)
     );
+});
+
+test('tasks organisation route is hidden from users without organisation access', function () {
+    $otherOrganisation = Organisation::factory()->create();
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.tasks', $otherOrganisation))
+        ->assertNotFound();
+});
+
+test('organisation members only see tasks for projects with explicit project access', function () {
+    $owner = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+    ]);
+
+    $visibleProject = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+    $hiddenProject = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+
+    ProjectUser::create([
+        'project_id' => $visibleProject->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $visibleTask = Task::factory()->create([
+        'project_id' => $visibleProject->id,
+        'title' => 'Visible project task',
+        'status' => 'pending',
+    ]);
+    $hiddenTask = Task::factory()->create([
+        'project_id' => $hiddenProject->id,
+        'title' => 'Hidden project task',
+        'status' => 'pending',
+    ]);
+    $visibleTask->submitter()->associate($owner)->save();
+    $hiddenTask->submitter()->associate($owner)->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.tasks', $organisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $visibleTask->id)
+    );
+
+    $this->actingAs($this->user)
+        ->getJson(route('tasks.v2.show', $hiddenTask))
+        ->assertNotFound();
 });
 
 test('tasks v2 defaults to excluding completed tasks', function () {

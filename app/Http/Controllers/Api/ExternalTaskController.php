@@ -35,6 +35,7 @@ class ExternalTaskController extends Controller
     private function resolveProjectFromRequest(): ?Project
     {
         return Project::query()
+            ->visibleTo(auth()->id())
             ->where('token', request('project'))
             ->first();
     }
@@ -408,7 +409,12 @@ class ExternalTaskController extends Controller
             );
         }
 
-        $project = Project::query()->with('environments')->where('token', $attributes['project'])->firstOrFail();
+        $project = $this->resolveProjectFromRequest();
+        if ($project === null) {
+            return response()->json(['error' => 'Project not found'], 404);
+        }
+
+        $project->load('environments');
         $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
 
         $task = Task::create([
