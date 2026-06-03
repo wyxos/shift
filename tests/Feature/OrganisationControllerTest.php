@@ -181,6 +181,23 @@ test('shared organisation users cannot load owner panel data', function () {
     );
 });
 
+test('unrelated users cannot load organisation-scoped routes', function () {
+    $owner = User::factory()->create();
+    $unrelatedUser = User::factory()->create();
+
+    $organisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+    ]);
+
+    $this->actingAs($unrelatedUser)
+        ->get(route('organisation.team', $organisation))
+        ->assertNotFound();
+
+    $this->actingAs($unrelatedUser)
+        ->get(route('organisation.settings', $organisation))
+        ->assertNotFound();
+});
+
 test('only organisation owners can update or delete organisations', function () {
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
