@@ -8,6 +8,7 @@ import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue
 import ProjectFilterControls from '@/components/admin/projects/ProjectFilterControls.vue';
 import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
 import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
+import ProjectMcpSettingsDialog from '@/components/admin/projects/ProjectMcpSettingsDialog.vue';
 import ProjectWidgetSettingsDialog from '@/components/admin/projects/ProjectWidgetSettingsDialog.vue';
 import {
     defaultSortBy,
@@ -64,11 +65,18 @@ const {
     apiTokenError,
     apiTokenForm,
     apiTokenLoading,
+    closeMcpSettingsModal,
     closeWidgetSettingsModal,
     generateApiToken,
     openApiTokenModal,
+    openMcpSettingsModal,
     openWidgetSettingsModal,
+    saveMcpSettings,
     saveWidgetSettings,
+    mcpSettingsError,
+    mcpSettingsForm,
+    mcpSettingsLoading,
+    mcpSettingsOpen,
     widgetSettingsError,
     widgetSettingsForm,
     widgetSettingsLoading,
@@ -402,6 +410,7 @@ function removeAccess(projectUser: ProjectAccessUser) {
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"
                     @open-manage-users="openManageUsersModal"
+                    @open-mcp-settings="openMcpSettingsModal"
                     @open-widget-settings="openWidgetSettingsModal"
                 />
             </AdminListShell>
@@ -463,6 +472,15 @@ function removeAccess(projectUser: ProjectAccessUser) {
             @cancel="closeWidgetSettingsModal"
             @save="saveWidgetSettings"
             @update:open="widgetSettingsOpen = $event"
+        />
+        <ProjectMcpSettingsDialog
+            :error="mcpSettingsError"
+            :form="mcpSettingsForm"
+            :loading="mcpSettingsLoading"
+            :open="mcpSettingsOpen"
+            @cancel="closeMcpSettingsModal"
+            @save="saveMcpSettings"
+            @update:open="mcpSettingsOpen = $event"
         />
     </AppLayout>
 </template>

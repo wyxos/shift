@@ -23,12 +23,15 @@ class ShiftMcpAccess
 
     public function projectsFor(ShiftMcpPrincipal $principal): Builder
     {
-        return $this->projects($principal->user);
+        return $this->projects($principal->user)
+            ->where('mcp_enabled', true);
     }
 
     public function tasksFor(ShiftMcpPrincipal $principal): Builder
     {
-        return Task::query()->visibleTo($principal->user->id);
+        return Task::query()
+            ->visibleTo($principal->user->id)
+            ->whereHas('project', fn (Builder $query) => $query->where('mcp_enabled', true));
     }
 
     protected function projects(User $user): Builder

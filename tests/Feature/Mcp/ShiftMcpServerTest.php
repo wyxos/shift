@@ -53,7 +53,9 @@ test('web mcp route requires sanctum authentication', function () {
 
 test('web mcp route uses the authenticated sanctum user to scope tools', function () {
     $user = User::factory()->create();
-    $visibleProject = Project::factory()->withAuthor($user->id)->create();
+    $visibleProject = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
     Task::factory()->create([
         'project_id' => $visibleProject->id,
         'title' => 'Visible web MCP task',
@@ -103,6 +105,49 @@ test('web mcp route uses the authenticated sanctum user to scope tools', functio
         ->assertDontSee('Hidden web MCP task');
 });
 
+test('web mcp tools only expose projects with mcp enabled', function () {
+    $user = User::factory()->create();
+    $enabledProject = Project::factory()->withAuthor($user->id)->create([
+        'name' => 'Enabled MCP project',
+        'mcp_enabled' => true,
+    ]);
+    $disabledProject = Project::factory()->withAuthor($user->id)->create([
+        'name' => 'Disabled MCP project',
+        'mcp_enabled' => false,
+    ]);
+
+    $enabledTask = Task::factory()->create([
+        'project_id' => $enabledProject->id,
+        'title' => 'Visible MCP task',
+    ]);
+    $disabledTask = Task::factory()->create([
+        'project_id' => $disabledProject->id,
+        'title' => 'Hidden disabled MCP task',
+    ]);
+
+    ShiftServer::actingAs($user)->tool(ListProjectsTool::class)
+        ->assertOk()
+        ->assertSee('Enabled MCP project')
+        ->assertDontSee('Disabled MCP project');
+
+    ShiftServer::actingAs($user)->tool(SearchTasksTool::class, [
+        'query' => 'MCP task',
+    ])
+        ->assertOk()
+        ->assertSee('Visible MCP task')
+        ->assertDontSee('Hidden disabled MCP task');
+
+    ShiftServer::actingAs($user)->tool(GetTaskTool::class, [
+        'task_id' => $enabledTask->id,
+    ])->assertOk();
+
+    ShiftServer::actingAs($user)->tool(GetTaskTool::class, [
+        'task_id' => $disabledTask->id,
+    ])
+        ->assertHasErrors(['not found or is not visible'])
+        ->assertDontSee('Hidden disabled MCP task');
+});
+
 test('web mcp route rejects sanctum tokens without the mcp ability', function () {
     $user = User::factory()->create();
     $token = $user->createToken('regular-api-token')->plainTextToken;
@@ -140,6 +185,7 @@ test('list projects returns project context without api tokens', function () {
         ->create([
             'name' => 'VoidCare Portal',
             'token' => 'secret-project-token',
+            'mcp_enabled' => true,
         ]);
 
     ProjectEnvironment::query()->create([
@@ -168,6 +214,7 @@ test('list projects does not expose project metadata for task-only collaborators
         ->withAuthor($owner->id)
         ->create([
             'name' => 'Task Only Collaborator Project',
+            'mcp_enabled' => true,
         ]);
     $task = Task::factory()->create([
         'project_id' => $project->id,
@@ -189,7 +236,10 @@ test('list projects does not expose project metadata for task-only collaborators
 
 test('search tasks returns filtered task summaries without full descriptions', function () {
     $owner = User::factory()->create();
-    $project = Project::factory()->withAuthor($owner->id)->create(['name' => 'VoidCare Portal']);
+    $project = Project::factory()->withAuthor($owner->id)->create([
+        'name' => 'VoidCare Portal',
+        'mcp_enabled' => true,
+    ]);
 
     $matchingTask = Task::factory()->create([
         'project_id' => $project->id,
@@ -231,7 +281,11 @@ test('get task returns task details and collaborators', function () {
         'name' => 'External Collaborator',
         'email' => 'external@example.com',
     ]);
+    $project = Project::factory()->create([
+        'mcp_enabled' => true,
+    ]);
     $task = Task::factory()->create([
+        'project_id' => $project->id,
         'title' => 'Investigate task mail',
         'description' => 'Exact task details for MCP inspection.',
     ]);
@@ -275,6 +329,7 @@ test('get task hides tasks outside the authenticated users visibility', function
 test('list task threads returns thread content for a task', function () {
     $sender = User::factory()->create(['name' => 'Thread Sender']);
     $project = Project::factory()->withAuthor($sender->id)->create();
+    $project->update(['mcp_enabled' => true]);
     $task = Task::factory()->create([
         'project_id' => $project->id,
     ]);
@@ -298,7 +353,13 @@ test('list task threads returns thread content for a task', function () {
 test('list notifications filters database notifications by user and task', function () {
     $user = User::factory()->create(['email' => 'recipient@example.com']);
     $otherUser = User::factory()->create(['email' => 'other@example.com']);
-    $task = Task::factory()->create(['title' => 'Notification target task']);
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Notification target task',
+    ]);
     $notificationId = (string) Str::uuid();
 
     DB::table('notifications')->insert([
@@ -343,7 +404,13 @@ test('list notifications filters database notifications by user and task', funct
 
 test('list notifications omits raw notification content and classifies links', function () {
     $user = User::factory()->create(['email' => 'recipient@example.com']);
-    $task = Task::factory()->create(['title' => 'Sensitive task title']);
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Sensitive task title',
+    ]);
     $notificationId = (string) Str::uuid();
 
     DB::table('notifications')->insert([
@@ -370,6 +437,50 @@ test('list notifications omits raw notification content and classifies links', f
         ->assertOk()
         ->assertSee([$notificationId, 'TaskThreadUpdated', 'consuming_project', 'voidcare.com', '/shift/tasks', 'external'])
         ->assertDontSee(['Sensitive task title', 'Private HTML thread body', '<p>', 'task_title', 'content']);
+});
+
+test('list notifications omits task notifications for projects without mcp enabled', function () {
+    $user = User::factory()->create(['email' => 'recipient@example.com']);
+    $enabledProject = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $disabledProject = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => false,
+    ]);
+    $enabledTask = Task::factory()->create([
+        'project_id' => $enabledProject->id,
+        'title' => 'Enabled notification task',
+    ]);
+    $disabledTask = Task::factory()->create([
+        'project_id' => $disabledProject->id,
+        'title' => 'Disabled notification task',
+    ]);
+    $enabledNotificationId = (string) Str::uuid();
+    $disabledNotificationId = (string) Str::uuid();
+
+    foreach ([[$enabledNotificationId, $enabledTask], [$disabledNotificationId, $disabledTask]] as [$id, $task]) {
+        DB::table('notifications')->insert([
+            'id' => $id,
+            'type' => TaskCreationNotification::class,
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'data' => json_encode([
+                'project_id' => $task->project_id,
+                'task_id' => $task->id,
+                'task_title' => $task->title,
+                'url' => route('tasks.index', ['task' => $task->id]),
+            ], JSON_THROW_ON_ERROR),
+            'read_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    ShiftServer::actingAs($user)->tool(ListNotificationsTool::class)
+        ->assertOk()
+        ->assertSee($enabledNotificationId)
+        ->assertDontSee($disabledNotificationId)
+        ->assertDontSee('Disabled notification task');
 });
 
 test('configured mcp credentials do not authenticate tool calls without a request user', function () {

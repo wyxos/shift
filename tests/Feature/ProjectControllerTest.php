@@ -76,6 +76,7 @@ test('projects index includes owned and shared projects with ownership context',
         ->where('projects.data.0.isOwner', true)
         ->where('projects.data.0.external_widget_enabled', false)
         ->where('projects.data.0.external_widget_guest_submissions_enabled', false)
+        ->where('projects.data.0.mcp_enabled', false)
         ->where('projects.data.1.id', $sharedProject->id)
         ->where('projects.data.1.organisation_name', 'Partner Org')
         ->where('projects.data.1.isOwner', false)
@@ -309,6 +310,50 @@ test('shared project members cannot update widget settings', function () {
 
     expect($project->fresh()->external_widget_enabled)->toBeFalse();
     expect($project->fresh()->external_widget_guest_submissions_enabled)->toBeFalse();
+});
+
+test('project managers can update mcp settings', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'mcp_enabled' => false,
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('projects.mcp-settings', $project), [
+            'mcp_enabled' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('mcp_enabled', true);
+
+    expect($project->fresh()->mcp_enabled)->toBeTrue();
+});
+
+test('shared project members cannot update mcp settings', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $owner->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'mcp_enabled' => false,
+    ]);
+
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('projects.mcp-settings', $project), [
+            'mcp_enabled' => true,
+        ])
+        ->assertForbidden();
+
+    expect($project->fresh()->mcp_enabled)->toBeFalse();
 });
 
 test('projects cannot be created for inaccessible organisations', function () {
