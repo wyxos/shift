@@ -20,15 +20,20 @@ class ProjectEnvironmentService
             ]);
         }
 
-        return ProjectEnvironment::query()->updateOrCreate(
-            [
-                'project_id' => $project->id,
-                'environment' => $normalizedEnvironment,
-            ],
-            [
-                'url' => $normalizedUrl,
-            ],
-        );
+        $registration = ProjectEnvironment::query()->firstOrNew([
+            'project_id' => $project->id,
+            'environment' => $normalizedEnvironment,
+        ]);
+
+        if (! $registration->exists) {
+            $registration->external_widget_enabled = $project->external_widget_enabled;
+            $registration->external_widget_guest_submissions_enabled = $project->external_widget_guest_submissions_enabled;
+        }
+
+        $registration->url = $normalizedUrl;
+        $registration->save();
+
+        return $registration;
     }
 
     public function find(Project $project, ?string $environment): ?ProjectEnvironment

@@ -18,6 +18,17 @@ const emit = defineEmits<{
     'open-widget-settings': [project: ProjectRow];
     'open-mcp-settings': [project: ProjectRow];
 }>();
+
+function hasWidgetEnabled(project: ProjectRow) {
+    return Boolean(project.external_widget_enabled || project.environments?.some((environment) => environment.external_widget_enabled));
+}
+
+function hasGuestSubmissionsEnabled(project: ProjectRow) {
+    return Boolean(
+        project.external_widget_guest_submissions_enabled ||
+            project.environments?.some((environment) => environment.external_widget_guest_submissions_enabled),
+    );
+}
 </script>
 
 <template>
@@ -39,12 +50,12 @@ const emit = defineEmits<{
                             <span v-if="projectClientLabel(project)" class="text-muted-foreground text-xs">
                                 {{ projectClientLabel(project) }}
                             </span>
-                            <div v-if="project.external_widget_enabled || project.mcp_enabled" class="flex flex-wrap gap-1">
-                                <Badge v-if="project.external_widget_enabled" :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">
+                            <div v-if="hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
+                                <Badge v-if="hasWidgetEnabled(project)" :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">
                                     Widget
                                 </Badge>
                                 <Badge
-                                    v-if="project.external_widget_guest_submissions_enabled"
+                                    v-if="hasGuestSubmissionsEnabled(project)"
                                     :data-testid="`project-widget-guests-${project.id}`"
                                     class="bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
                                     variant="secondary"

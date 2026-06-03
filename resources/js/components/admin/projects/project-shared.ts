@@ -1,3 +1,14 @@
+import type { ManagedAccessUser } from '../access-users';
+
+export type ProjectEnvironmentRow = {
+    id: number;
+    key: string;
+    label: string;
+    url: string;
+    external_widget_enabled?: boolean;
+    external_widget_guest_submissions_enabled?: boolean;
+};
+
 export type ProjectRow = {
     id: number;
     name: string;
@@ -9,6 +20,7 @@ export type ProjectRow = {
     token?: string | null;
     external_widget_enabled?: boolean;
     external_widget_guest_submissions_enabled?: boolean;
+    environments?: ProjectEnvironmentRow[];
     mcp_enabled?: boolean;
 };
 
@@ -71,5 +83,3 @@ export function projectOrganisationLabel(project: ProjectRow) {
 
     return 'Standalone';
 }
-
-import type { ManagedAccessUser } from '../access-users';

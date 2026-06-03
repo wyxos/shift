@@ -48,7 +48,7 @@ class ApiController extends Controller
 
         return back()->with([
             'success' => 'API token created successfully.',
-            'token' => $token->plainTextToken,
+            'token' => $token->plainTextToken
         ]);
     }
 

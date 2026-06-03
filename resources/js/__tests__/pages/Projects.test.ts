@@ -224,6 +224,16 @@ describe('Projects.vue', () => {
                 client_name: 'Acme Client',
                 organisation_name: 'Acme Org',
                 mcp_enabled: true,
+                environments: [
+                    {
+                        id: 10,
+                        key: 'testing',
+                        label: 'Testing',
+                        url: 'https://client-testing.test',
+                        external_widget_enabled: false,
+                        external_widget_guest_submissions_enabled: false,
+                    },
+                ],
             },
             { id: 2, name: 'Shared Rollout', isOwner: false, client_name: null, organisation_name: 'Northwind' },
         ],
@@ -403,6 +413,8 @@ describe('Projects.vue', () => {
         await wrapper.get('[data-testid="project-widget-1"]').trigger('click');
         await wrapper.get('[data-testid="project-widget-enabled"]').setValue(true);
         await wrapper.get('[data-testid="project-widget-guest-submissions"]').setValue(true);
+        await wrapper.get('[data-testid="project-widget-environment-10-enabled"]').setValue(true);
+        await wrapper.get('[data-testid="project-widget-environment-10-guest-submissions"]').setValue(false);
         await wrapper.get('[data-testid="save-widget-settings"]').trigger('click');
         await flushPromises();
 
@@ -411,6 +423,13 @@ describe('Projects.vue', () => {
             {
                 external_widget_enabled: true,
                 external_widget_guest_submissions_enabled: true,
+                environments: [
+                    {
+                        id: 10,
+                        external_widget_enabled: true,
+                        external_widget_guest_submissions_enabled: false,
+                    },
+                ],
             },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );

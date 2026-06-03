@@ -44,6 +44,10 @@ class ProjectEnvironmentController extends Controller
                 'key' => $registration->environment,
                 'label' => $this->projectEnvironmentService->label($registration->environment),
                 'url' => $registration->url,
+                'widget' => [
+                    'enabled' => $registration->external_widget_enabled,
+                    'guest_submissions_enabled' => $registration->external_widget_guest_submissions_enabled,
+                ],
             ],
         ]);
     }
