@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData, type SidebarOrganisation } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ArrowLeft, Briefcase, Folder, LayoutGrid, ListTodo, Network, Plus, Settings, Users } from 'lucide-vue-next';
+import { ArrowLeft, Briefcase, Folder, Inbox, LayoutGrid, ListTodo, Network, Plus, Settings, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -33,6 +33,11 @@ const mainNavItems: NavItem[] = [
         title: 'Tasks',
         href: '/tasks',
         icon: Folder,
+    },
+    {
+        title: 'Requirements',
+        href: '/requirements',
+        icon: Inbox,
     },
 ];
 
@@ -86,6 +91,12 @@ const organisationNavItems = computed(() => {
             title: 'Tasks',
             href: organisationPageHref(organisation, 'tasks'),
             icon: ListTodo,
+            isVisible: true,
+        },
+        {
+            title: 'Requirements',
+            href: organisationPageHref(organisation, 'requirements'),
+            icon: Inbox,
             isVisible: true,
         },
         {
@@ -153,7 +164,7 @@ function organisationIdFromScopedPath(url: URL) {
 }
 
 function organisationRouteState(url: URL) {
-    const scopedMatch = url.pathname.match(/^\/organisation\/(\d+)\/(dashboard|tasks|clients|projects|team|settings)$/);
+    const scopedMatch = url.pathname.match(/^\/organisation\/(\d+)\/(dashboard|tasks|requirements|clients|projects|team|settings)$/);
 
     if (scopedMatch) {
         return `${scopedMatch[2]}:${scopedMatch[1]}`;

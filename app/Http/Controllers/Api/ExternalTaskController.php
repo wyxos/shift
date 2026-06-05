@@ -152,6 +152,26 @@ class ExternalTaskController extends Controller
 
     private function serializeCollaborators(Task $task): array
     {
+        $externalCollaborators = $task->externalCollaborators
+            ->map(fn (ExternalUser $user) => [
+                'id' => $user->external_id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ]);
+
+        if ($task->submitter instanceof ExternalUser) {
+            $submitterAlreadyListed = $externalCollaborators
+                ->contains(fn (array $collaborator) => (string) $collaborator['id'] === (string) $task->submitter->external_id);
+
+            if (! $submitterAlreadyListed) {
+                $externalCollaborators->prepend([
+                    'id' => $task->submitter->external_id,
+                    'name' => $task->submitter->name,
+                    'email' => $task->submitter->email,
+                ]);
+            }
+        }
+
         return [
             'internal_collaborators' => $task->internalCollaborators
                 ->map(fn (\App\Models\User $user) => [
@@ -161,12 +181,7 @@ class ExternalTaskController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'external_collaborators' => $task->externalCollaborators
-                ->map(fn (ExternalUser $user) => [
-                    'id' => $user->external_id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ])
+            'external_collaborators' => $externalCollaborators
                 ->values()
                 ->all(),
         ];
@@ -198,6 +213,11 @@ class ExternalTaskController extends Controller
             'created_at' => $task->created_at?->toIso8601String(),
             'updated_at' => $task->updated_at?->toIso8601String(),
             'environment' => $this->taskEnvironment($task),
+            'phase' => $task->phase(),
+            'finalized' => ! $task->isRequirementPhase(),
+            'submitted_title' => $task->metadata?->submitted_title,
+            'submitted_description' => $task->metadata?->submitted_description,
+            'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,
                 'email' => $task->submitter->email ?? null,
@@ -257,6 +277,7 @@ class ExternalTaskController extends Controller
         $tasksQuery = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->where('project_id', $project->id)
+            ->withoutRequirementPhase()
             ->where(function ($query) use ($externalUser) {
                 // Tasks where the external user is the submitter
                 $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {

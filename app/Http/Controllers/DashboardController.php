@@ -18,6 +18,7 @@ class DashboardController extends Controller
 
         $baseQuery = Task::query()
             ->visibleTo($userId)
+            ->withoutRequirementPhase()
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $this->applyProjectOrganisationFilter($query, $organisationId);
             });
@@ -152,6 +153,7 @@ class DashboardController extends Controller
         ];
 
         return Inertia::render('Dashboard', [
+            'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
             'metrics' => $metrics,
             'charts' => [
                 'status' => $statusBreakdown,

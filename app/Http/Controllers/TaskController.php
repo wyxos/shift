@@ -10,7 +10,9 @@ use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Organisation;
 use App\Models\Project;
+use App\Models\RequirementBatch;
 use App\Models\Task;
+use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
@@ -20,6 +22,7 @@ use App\Services\TaskCollaboratorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -394,6 +397,26 @@ class TaskController extends Controller
 
     private function serializeCollaborators(Task $task): array
     {
+        $externalCollaborators = $task->externalCollaborators
+            ->map(fn (ExternalUser $user) => [
+                'id' => $user->external_id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ]);
+
+        if ($task->submitter instanceof ExternalUser) {
+            $submitterAlreadyListed = $externalCollaborators
+                ->contains(fn (array $collaborator) => (string) $collaborator['id'] === (string) $task->submitter->external_id);
+
+            if (! $submitterAlreadyListed) {
+                $externalCollaborators->prepend([
+                    'id' => $task->submitter->external_id,
+                    'name' => $task->submitter->name,
+                    'email' => $task->submitter->email,
+                ]);
+            }
+        }
+
         return [
             'internal_collaborators' => $task->internalCollaborators
                 ->map(fn (User $user) => [
@@ -403,12 +426,7 @@ class TaskController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'external_collaborators' => $task->externalCollaborators
-                ->map(fn (ExternalUser $user) => [
-                    'id' => $user->external_id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ])
+            'external_collaborators' => $externalCollaborators
                 ->values()
                 ->all(),
         ];
@@ -425,6 +443,48 @@ class TaskController extends Controller
         return $environment;
     }
 
+    private function requirementBatchSummaries($tasks): array
+    {
+        $batchIds = $tasks
+            ->pluck('metadata.requirement_batch_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($batchIds->isEmpty()) {
+            return [];
+        }
+
+        $batches = RequirementBatch::query()
+            ->whereIn('id', $batchIds)
+            ->get(['id', 'title', 'created_at'])
+            ->keyBy('id');
+
+        return $this->visibleTasksQuery()
+            ->with(['metadata:id,task_id,phase,requirement_batch_id'])
+            ->requirementIntake()
+            ->whereHas('metadata', function (Builder $metadataQuery) use ($batchIds) {
+                $metadataQuery->whereIn('requirement_batch_id', $batchIds);
+            })
+            ->get(['id'])
+            ->groupBy(fn (Task $task) => $task->metadata?->requirement_batch_id)
+            ->map(function ($batchTasks, int $batchId) use ($batches) {
+                $batch = $batches->get($batchId);
+                $requirementItems = $batchTasks->filter(fn (Task $task) => $task->isRequirementPhase())->count();
+                $totalItems = $batchTasks->count();
+
+                return [
+                    'id' => $batchId,
+                    'title' => $batch?->title,
+                    'created_at' => $batch?->created_at?->toIso8601String(),
+                    'total_items' => $totalItems,
+                    'requirement_items' => $requirementItems,
+                    'finalized_items' => max($totalItems - $requirementItems, 0),
+                ];
+            })
+            ->all();
+    }
+
     private function serializeTaskDetail(Task $task, bool $includeOwnerState = true): array
     {
         $payload = [
@@ -437,6 +497,11 @@ class TaskController extends Controller
             'created_at' => $task->created_at?->toIso8601String(),
             'updated_at' => $task->updated_at?->toIso8601String(),
             'environment' => $this->taskEnvironment($task),
+            'phase' => $task->phase(),
+            'finalized' => ! $task->isRequirementPhase(),
+            'submitted_title' => $task->metadata?->submitted_title,
+            'submitted_description' => $task->metadata?->submitted_description,
+            'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,
                 'email' => $task->submitter->email ?? null,
@@ -476,7 +541,8 @@ class TaskController extends Controller
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
-            ->with(['metadata:id,task_id,environment', 'submitter']);
+            ->with(['metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at', 'submitter'])
+            ->withoutRequirementPhase();
 
         $query->whereIn('status', $selectedStatuses);
 
@@ -544,6 +610,123 @@ class TaskController extends Controller
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
+                'surface' => 'tasks',
+                'projects' => $this->visibleProjectsQuery()
+                    ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
+                        $this->applyProjectOrganisationFilter($query, $organisationId);
+                    })
+                    ->with('environments')
+                    ->orderBy('name')
+                    ->get()
+                    ->map(fn (Project $project) => $this->serializeProject($project))
+                    ->values()
+                    ->all(),
+            ]);
+    }
+
+    public function requirementsV2(?Organisation $organisation = null)
+    {
+        $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+        $allPriorities = ['low', 'medium', 'high'];
+        $allowedSortBy = ['updated_at', 'created_at', 'priority'];
+        $defaultSortBy = 'updated_at';
+
+        $selectedStatuses = $this->normalizeListFilter(request('status'));
+        if (empty($selectedStatuses)) {
+            $selectedStatuses = $defaultStatuses;
+        }
+
+        $selectedPriorities = $this->normalizeListFilter(request('priority'));
+        if (empty($selectedPriorities)) {
+            $selectedPriorities = $allPriorities;
+        }
+
+        $search = trim((string) request('search', ''));
+        $environment = trim((string) request('environment', ''));
+        $organisationId = $organisation?->id ?? request('organisation_id');
+        $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
+
+        $query = $this->visibleTasksQuery()
+            ->with([
+                'metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at,requirement_batch_id',
+                'metadata.requirementBatch:id,title,created_at',
+                'submitter',
+            ])
+            ->requirementIntake()
+            ->whereIn('status', $selectedStatuses);
+
+        if (count($selectedPriorities) > 0 && count($selectedPriorities) < count($allPriorities)) {
+            $query->whereIn('priority', $selectedPriorities);
+        }
+
+        if ($search !== '') {
+            $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.$search.'%']);
+        }
+
+        if (filled($organisationId)) {
+            $query->whereHas('project', function (Builder $projectQuery) use ($organisationId) {
+                $this->applyProjectOrganisationFilter($projectQuery, $organisationId);
+            });
+        }
+
+        if ($environment !== '') {
+            $query->whereHas('metadata', function ($metadataQuery) use ($environment) {
+                $metadataQuery->whereRaw('LOWER(environment) = LOWER(?)', [$environment]);
+            });
+        }
+
+        if ($sortBy === 'priority') {
+            $query
+                ->orderByRaw("
+                    CASE priority
+                        WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2
+                        WHEN 'low' THEN 3
+                        ELSE 4
+                    END
+                ")
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        } else {
+            $query
+                ->orderByDesc($sortBy)
+                ->orderByDesc('id');
+        }
+
+        $tasks = $query
+            ->paginate(10)
+            ->withQueryString();
+        $batchSummaries = $this->requirementBatchSummaries($tasks->getCollection());
+
+        $tasks->through(function (Task $task) use ($batchSummaries) {
+            $batchId = $task->metadata?->requirement_batch_id;
+
+            return [
+                'id' => $task->id,
+                'title' => $task->title,
+                'status' => $task->status,
+                'priority' => $task->priority,
+                'environment' => $this->taskEnvironment($task),
+                'phase' => $task->phase(),
+                'finalized' => ! $task->isRequirementPhase(),
+                'batch' => $batchId ? ($batchSummaries[$batchId] ?? null) : null,
+                'created_at' => $task->created_at?->toIso8601String(),
+                'updated_at' => $task->updated_at?->toIso8601String(),
+            ];
+        });
+
+        return inertia('Tasks/Index')
+            ->with([
+                'filters' => [
+                    'status' => $selectedStatuses,
+                    'priority' => $selectedPriorities,
+                    'search' => $search,
+                    'environment' => $environment !== '' ? $environment : null,
+                    'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
+                    'sort_by' => $sortBy,
+                ],
+                'tasks' => $tasks,
+                'surface' => 'requirements',
                 'projects' => $this->visibleProjectsQuery()
                     ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                         $this->applyProjectOrganisationFilter($query, $organisationId);
@@ -742,6 +925,93 @@ class TaskController extends Controller
             'ok' => true,
             'task' => $this->serializeTaskDetail($task),
         ]);
+    }
+
+    public function finalizeRequirementV2(Request $request, Task $task): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+        $task->load(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+
+        if (! $task->metadata || ! $task->isRequirementPhase()) {
+            return response()->json([
+                'message' => 'Only requirement-phase items can be finalized.',
+            ], 422);
+        }
+
+        $attributes = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
+
+        DB::transaction(function () use ($task, $attributes) {
+            $this->finalizeRequirementTask($task, $attributes['title'], $attributes['description'] ?? null);
+        });
+
+        $task->load(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+
+        return response()->json([
+            'ok' => true,
+            'task' => $this->serializeTaskDetail($task),
+        ]);
+    }
+
+    public function finalizeRequirementBatchV2(RequirementBatch $requirementBatch): JsonResponse
+    {
+        if (! $this->visibleProjectsQuery()->whereKey($requirementBatch->project_id)->exists()) {
+            abort(404);
+        }
+
+        $tasks = $this->visibleTasksQuery()
+            ->with(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators'])
+            ->requirementIntake()
+            ->whereHas('metadata', function (Builder $metadataQuery) use ($requirementBatch) {
+                $metadataQuery
+                    ->where('requirement_batch_id', $requirementBatch->id)
+                    ->where('phase', 'requirement');
+            })
+            ->orderBy('id')
+            ->get();
+
+        if ($tasks->isEmpty()) {
+            return response()->json([
+                'message' => 'No requirement-phase items are available to finalize for this pack.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($tasks) {
+            $tasks->each(function (Task $task) {
+                $this->finalizeRequirementTask($task, $task->title, $task->description);
+            });
+        });
+
+        $tasks->load(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators']);
+
+        return response()->json([
+            'ok' => true,
+            'finalized_count' => $tasks->count(),
+            'tasks' => $tasks->map(fn (Task $task) => $this->serializeTaskDetail($task))->values()->all(),
+        ]);
+    }
+
+    private function finalizeRequirementTask(Task $task, string $title, ?string $description): void
+    {
+        $task->title = $title;
+        $task->description = $this->sanitizeRichContent($description);
+        $task->save();
+
+        $task->metadata->forceFill([
+            'phase' => 'task',
+            'finalized_at' => now(),
+            'finalized_by' => auth()->id(),
+        ])->save();
+
+        $thread = new TaskThread([
+            'type' => 'internal',
+            'content' => '<p>Requirement finalized as task.</p>',
+            'sender_name' => auth()->user()?->name ?? 'SHIFT',
+        ]);
+        $thread->sender()->associate(auth()->user());
+        $task->threads()->save($thread);
     }
 
     public function destroyV2(Task $task): JsonResponse

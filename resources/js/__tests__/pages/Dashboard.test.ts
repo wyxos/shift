@@ -117,5 +117,20 @@ describe('Dashboard.vue', () => {
         expect(wrapper.text()).toContain('Priority Mix');
         expect(wrapper.text()).toContain('Project Load');
         expect(wrapper.text()).toContain('Environment Exposure');
+        expect(wrapper.find('a[href="/tasks"]').text()).toContain('Open Tasks');
+        expect(wrapper.find('a[href="/requirements"]').text()).toContain('Review Requirements');
+    });
+
+    it('uses organisation-scoped links when shown inside an organisation dashboard', () => {
+        const wrapper = mount(Dashboard, {
+            props: {
+                metrics: mockMetrics,
+                charts: mockCharts,
+                organisationId: 2,
+            },
+        });
+
+        expect(wrapper.find('a[href="/organisation/2/tasks"]').text()).toContain('Open Tasks');
+        expect(wrapper.find('a[href="/organisation/2/requirements"]').text()).toContain('Review Requirements');
     });
 });

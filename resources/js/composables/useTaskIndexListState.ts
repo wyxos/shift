@@ -3,6 +3,7 @@ import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, unref, watch, type Ref } from 'vue';
+import { toast } from 'vue-sonner';
 
 type UseTaskIndexListStateOptions = {
     tasks: TaskPaginator | Ref<TaskPaginator>;
@@ -26,6 +27,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     const taskRows = computed(() => tasksPage.value.data ?? []);
     const error = ref<string | null>(null);
     const deleteLoading = ref<number | null>(null);
+    const requirementBatchFinalizeLoading = ref<number | null>(null);
     const highlightedTaskId = ref<number | null>(null);
     let highlightTimer: number | null = null;
 
@@ -56,8 +58,6 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     }
 
     async function deleteTask(taskId: number) {
-        if (!confirm('Are you sure you want to delete this task?')) return;
-
         deleteLoading.value = taskId;
         error.value = null;
         try {
@@ -67,6 +67,28 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
             error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete task';
         } finally {
             deleteLoading.value = null;
+        }
+    }
+
+    async function finalizeRequirementBatch(batchId: number) {
+        requirementBatchFinalizeLoading.value = batchId;
+        error.value = null;
+
+        try {
+            const response = await axios.patch(route('requirements.v2.batches.finalize', { requirementBatch: batchId }), {});
+            const count = Number(response.data?.finalized_count ?? 0);
+
+            router.reload({ preserveScroll: true, preserveState: true });
+            toast.success('Requirement pack finalized', {
+                description: `${count} ${count === 1 ? 'item' : 'items'} now ${count === 1 ? 'appears' : 'appear'} in the active task list.`,
+            });
+        } catch (e: any) {
+            error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirement pack';
+            toast.error('Failed to finalize requirement pack', {
+                description: error.value,
+            });
+        } finally {
+            requirementBatchFinalizeLoading.value = null;
         }
     }
 
@@ -92,7 +114,9 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         handleTaskCreated,
         highlightedTaskId,
         highlightTask,
+        finalizeRequirementBatch,
         taskRows,
         tasksPage,
+        requirementBatchFinalizeLoading,
     };
 }
