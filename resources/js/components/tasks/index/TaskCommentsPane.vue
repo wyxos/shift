@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
     state: any;
@@ -12,6 +22,33 @@ const state = props.state;
 const threadComposerHtmlModel = computed({
     get: () => state.threadComposerHtml,
     set: (value: string) => state.setThreadComposerHtml(value),
+});
+const deleteDialogOpen = ref(false);
+const pendingDeleteMessage = ref<any | null>(null);
+
+const requestDeleteThreadMessage = (message: any) => {
+    pendingDeleteMessage.value = message;
+    deleteDialogOpen.value = true;
+};
+
+const clearPendingDeleteMessage = () => {
+    pendingDeleteMessage.value = null;
+};
+
+const confirmDeleteThreadMessage = async () => {
+    const message = pendingDeleteMessage.value;
+
+    if (!message) return;
+
+    deleteDialogOpen.value = false;
+    pendingDeleteMessage.value = null;
+    await state.deleteThreadMessage(message);
+};
+
+watch(deleteDialogOpen, (open) => {
+    if (!open) {
+        clearPendingDeleteMessage();
+    }
 });
 </script>
 
@@ -22,7 +59,7 @@ const threadComposerHtmlModel = computed({
     >
         <div class="border-muted-foreground/10 flex items-center justify-between border-b px-4 py-3">
             <div>
-                <h3 class="text-foreground text-sm font-semibold">Comments</h3>
+                <h3 class="text-foreground text-sm font-semibold">{{ state.isRequirementPhase ? 'Clarifications' : 'Comments' }}</h3>
             </div>
             <div class="text-muted-foreground text-xs">
                 {{ state.threadMessages.length }} message{{ state.threadMessages.length === 1 ? '' : 's' }}
@@ -119,7 +156,8 @@ const threadComposerHtmlModel = computed({
                                 <ContextMenuItem
                                     v-if="message.isYou && message.id && !message.pending"
                                     class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.deleteThreadMessage(message)"
+                                    data-testid="delete-thread-message"
+                                    @select="requestDeleteThreadMessage(message)"
                                 >
                                     Delete
                                 </ContextMenuItem>
@@ -150,5 +188,24 @@ const threadComposerHtmlModel = computed({
                 @send="state.handleThreadSend"
             />
         </div>
+
+        <AlertDialog v-model:open="deleteDialogOpen">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete comment</AlertDialogTitle>
+                    <AlertDialogDescription>Delete this comment from the thread? This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        data-testid="confirm-thread-message-delete"
+                        @click="confirmDeleteThreadMessage"
+                    >
+                        Delete comment
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
 </template>

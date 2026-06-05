@@ -5,6 +5,7 @@ import { router, usePage } from '@inertiajs/vue3';
 
 type UseTaskIndexFiltersOptions = {
     filters: TaskIndexFilters;
+    surface?: 'tasks' | 'requirements';
 };
 
 export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
@@ -19,15 +20,24 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
             ? String(options.filters.organisation_id)
             : '';
 
-    function isScopedOrganisationRoute() {
+    function scopedOrganisationRoutePath() {
         if (!providedOrganisationId) return false;
 
         const current = new URL(page.url, 'https://shift.test');
+        const surfacePath = options.surface === 'requirements' ? 'requirements' : 'tasks';
 
-        return current.pathname === `/organisation/${providedOrganisationId}/tasks`;
+        return current.pathname === `/organisation/${providedOrganisationId}/${surfacePath}`;
+    }
+
+    function isScopedOrganisationRoute() {
+        return Boolean(scopedOrganisationRoutePath());
     }
 
     function indexPath() {
+        if (options.surface === 'requirements') {
+            return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/requirements` : '/requirements';
+        }
+
         return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/tasks` : '/tasks';
     }
 

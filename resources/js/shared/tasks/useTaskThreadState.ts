@@ -417,7 +417,6 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     async function deleteThreadMessage(message: ThreadMessage) {
         if (!options.editTask.value) return;
         if (!message.id || !message.isYou || message.pending) return;
-        if (!confirm('Delete this message?')) return;
 
         try {
             await options.deleteThread(options.getTaskId(options.editTask.value), message.id);

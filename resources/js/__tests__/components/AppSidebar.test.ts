@@ -139,9 +139,11 @@ describe('AppSidebar', () => {
         const wrapper = mountSidebar();
 
         expect(wrapper.text()).toContain('Dashboard');
+        expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Northwind Studio');
         expect(wrapper.text()).toContain('shared');
+        expect(wrapper.find('a[href="/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
     });
@@ -169,6 +171,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Dashboard');
         expect(wrapper.text()).toContain('Tasks');
+        expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Clients');
         expect(wrapper.text()).toContain('Projects');
         expect(wrapper.text()).toContain('Team');
@@ -178,6 +181,7 @@ describe('AppSidebar', () => {
         expect(wrapper.find('a[href="/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/clients"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/projects"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/team"]').exists()).toBe(true);
@@ -211,12 +215,14 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('shared');
         expect(wrapper.text()).toContain('Dashboard');
         expect(wrapper.text()).toContain('Tasks');
+        expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Projects');
         expect(wrapper.text()).not.toContain('Clients');
         expect(wrapper.text()).not.toContain('Team');
         expect(wrapper.text()).not.toContain('Settings');
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/projects"]').exists()).toBe(true);
     });
 });

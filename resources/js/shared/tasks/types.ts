@@ -5,9 +5,21 @@ export type Task = {
     title: string;
     status: string;
     priority: string;
+    phase?: 'task' | 'requirement' | string;
+    finalized?: boolean;
+    batch?: RequirementBatchSummary | null;
     environment?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
+};
+
+export type RequirementBatchSummary = {
+    id: number;
+    title?: string | null;
+    created_at?: string | null;
+    total_items: number;
+    requirement_items: number;
+    finalized_items: number;
 };
 
 export type TaskPaginator = {
@@ -32,6 +44,9 @@ export type TaskDetail = Task & {
     created_at?: string;
     submitter?: { name?: string; email?: string } | null;
     environment?: string | null;
+    submitted_title?: string | null;
+    submitted_description?: string | null;
+    finalized_at?: string | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
     can_manage_collaborators?: boolean;

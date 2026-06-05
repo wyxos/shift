@@ -49,6 +49,32 @@ class Task extends Model
         return $query->where('status', $status);
     }
 
+    public function scopeWithoutRequirementPhase(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('metadata', function (Builder $metadataQuery) {
+            $metadataQuery->where('phase', 'requirement');
+        });
+    }
+
+    public function scopeRequirementIntake(Builder $query): Builder
+    {
+        return $query->whereHas('metadata', function (Builder $metadataQuery) {
+            $metadataQuery
+                ->where('intake_type', 'requirement')
+                ->where('source', 'embedded_requirement_pack');
+        });
+    }
+
+    public function phase(): string
+    {
+        return $this->metadata?->phase ?: 'task';
+    }
+
+    public function isRequirementPhase(): bool
+    {
+        return $this->phase() === 'requirement';
+    }
+
     public function scopeVisibleTo(Builder $query, ?int $userId): Builder
     {
         if ($userId === null) {

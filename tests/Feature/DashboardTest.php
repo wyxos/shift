@@ -76,6 +76,43 @@ test('dashboard returns task metrics and chart datasets', function () {
     );
 });
 
+test('dashboard task metrics exclude requirement phase items', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $user->id,
+    ]);
+
+    Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'priority' => 'high',
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'priority' => 'high',
+    ]);
+    $requirement->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+    ]);
+
+    $response = $this->actingAs($user)->get('/dashboard');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard')
+        ->where('metrics.total', 1)
+        ->where('metrics.pending', 1)
+        ->where('metrics.open', 1)
+        ->where('metrics.high_priority_open', 1)
+    );
+});
+
 test('dashboard metrics can be scoped to a shared organisation', function () {
     $user = User::factory()->create();
     $owner = User::factory()->create();
@@ -131,6 +168,7 @@ test('dashboard metrics can be scoped to a shared organisation', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard')
+        ->where('organisation_id', $sharedOrganisation->id)
         ->where('metrics.total', 1)
         ->where('metrics.pending', 1)
         ->where('metrics.completed', 0)

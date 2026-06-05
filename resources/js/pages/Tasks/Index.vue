@@ -9,25 +9,36 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { TaskIndexFilters, TaskPaginator, TaskProjectOption } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { reactive, toRef, toRefs } from 'vue';
+import { computed, reactive, toRef, toRefs } from 'vue';
 
 const props = withDefaults(
     defineProps<{
         tasks: TaskPaginator;
         projects?: TaskProjectOption[];
         filters: TaskIndexFilters;
+        surface?: 'tasks' | 'requirements';
     }>(),
     {
         projects: () => [],
+        surface: 'tasks',
     },
 );
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Tasks', href: '/tasks' },
-    { title: 'Tasks', href: '/tasks' },
-];
+const indexHref = computed(() => {
+    const organisationId = props.filters.organisation_id;
 
-const filtersState = useTaskIndexFilters({ filters: props.filters });
+    if (props.surface === 'requirements') {
+        return organisationId ? `/organisation/${organisationId}/requirements` : '/requirements';
+    }
+
+    return organisationId ? `/organisation/${organisationId}/tasks` : '/tasks';
+});
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
+    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
+]);
+
+const filtersState = useTaskIndexFilters({ filters: props.filters, surface: props.surface });
 const listState = useTaskIndexListState({
     tasks: toRef(props, 'tasks'),
     buildListQuery: filtersState.buildListQuery,
@@ -202,7 +213,7 @@ const {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <TaskIndexListCard :filters="filtersModel" :projects="props.projects" :state="combined" />
+            <TaskIndexListCard :filters="filtersModel" :projects="props.projects" :state="combined" :surface="props.surface" />
             <TaskEditSheet :state="combined" />
         </div>
     </AppLayout>

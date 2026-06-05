@@ -38,6 +38,8 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const taskSaving = ref(false);
     const taskSaveError = ref<string | null>(null);
     const pendingTaskSave = ref(false);
+    const requirementFinalizing = ref(false);
+    const requirementFinalizeError = ref<string | null>(null);
     const autosaveArmed = ref(false);
     let taskAutosaveTimer: number | null = null;
     const taskSaveToastId = ref<string | number | null>(null);
@@ -47,6 +49,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editTask,
     });
     const isOwner = computed(() => Boolean(editTask.value?.is_owner));
+    const isRequirementPhase = computed(() => editTask.value?.phase === 'requirement');
     const canManageCollaborators = computed(() => Boolean(editTask.value?.can_manage_collaborators));
     const editTaskCreatorLabel = computed(() => getTaskCreatorName(editTask.value) ?? getTaskCreatorEmail(editTask.value) ?? 'Unknown');
     const editTaskProjectUsersLabel = computed(() => {
@@ -274,6 +277,37 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         }
     }
 
+    async function finalizeRequirement() {
+        if (!editTask.value || !isRequirementPhase.value) return;
+
+        requirementFinalizing.value = true;
+        requirementFinalizeError.value = null;
+
+        try {
+            const response = await axios.patch(route('requirements.v2.finalize', { task: editTask.value.id }), {
+                title: editForm.value.title,
+                description: editForm.value.description,
+            });
+            mergeEditedTask(response.data?.task ?? null);
+            if (editTask.value) {
+                editTask.value.phase = 'task';
+                editTask.value.finalized = true;
+            }
+            initialEditSnapshot.value = currentTaskSnapshot();
+            options.onTaskSaved(editTask.value.id);
+            toast.success('Requirement finalized', {
+                description: 'The item now appears in the active task list.',
+            });
+        } catch (e: any) {
+            requirementFinalizeError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirement';
+            toast.error('Failed to finalize requirement', {
+                description: requirementFinalizeError.value,
+            });
+        } finally {
+            requirementFinalizing.value = false;
+        }
+    }
+
     async function openEdit(taskId: number, options: TaskIndexOpenEditOptions = {}) {
         const { updateHistory = true } = options;
 
@@ -289,6 +323,8 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editUploading.value = false;
         taskSaving.value = false;
         taskSaveError.value = null;
+        requirementFinalizing.value = false;
+        requirementFinalizeError.value = null;
         pendingTaskSave.value = false;
         autosaveArmed.value = false;
         deletedAttachmentIds.value = [];
@@ -355,6 +391,8 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editMobilePane.value = 'details';
         taskSaving.value = false;
         taskSaveError.value = null;
+        requirementFinalizing.value = false;
+        requirementFinalizeError.value = null;
         pendingTaskSave.value = false;
         autosaveArmed.value = false;
         thread.resetThreadState();
@@ -457,6 +495,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         hasUnsavedCommentDraft,
         hasUnsavedTaskChanges,
         isOwner,
+        isRequirementPhase,
         lastTouchTapAt: thread.lastTouchTapAt,
         lastTouchTapId: thread.lastTouchTapId,
         lightboxAlt: thread.lightboxAlt,
@@ -473,7 +512,10 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         onRichContentClick: thread.onRichContentClick,
         openEdit,
         pendingTaskSave,
+        finalizeRequirement,
         removeAttachmentFromTask,
+        requirementFinalizeError,
+        requirementFinalizing,
         resetThreadState: thread.resetThreadState,
         saveTaskChanges,
         scrollCommentsToBottomSoon: thread.scrollCommentsToBottomSoon,

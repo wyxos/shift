@@ -29,6 +29,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('organisation/{organisation}')->name('organisation.')->group(function () {
         Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
         Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks');
+        Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements');
         Route::get('clients', [ClientController::class, 'index'])->name('clients');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects');
         Route::get('team', [OrganisationController::class, 'team'])->name('team');
@@ -68,12 +69,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // tasks
     Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks.index');
+    Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements.index');
     Route::get('tasks-v2', fn () => redirect()->route('tasks.index', request()->query()))->name('tasks.v2');
     Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])->name('tasks.v2.show');
     Route::get('tasks-v2/projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.v2.collaborators');
     Route::post('tasks-v2/tasks', [TaskController::class, 'storeV2'])->name('tasks.v2.store');
     Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
     Route::patch('tasks-v2/tasks/{task}/collaborators', [TaskController::class, 'updateCollaboratorsV2'])->name('tasks.v2.collaborators.update');
+    Route::patch('tasks-v2/tasks/{task}/requirements/finalize', [TaskController::class, 'finalizeRequirementV2'])->name('requirements.v2.finalize');
+    Route::patch('requirements/batches/{requirementBatch}/finalize', [TaskController::class, 'finalizeRequirementBatchV2'])->name('requirements.v2.batches.finalize');
     Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');

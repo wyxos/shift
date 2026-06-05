@@ -54,9 +54,9 @@ function formatTaskTime(value?: string | null) {
         <SheetContent class="flex h-full flex-col p-0" side="right" width-preset="task">
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
-                    <SheetTitle>Edit Task</SheetTitle>
+                    <SheetTitle>{{ state.isRequirementPhase ? 'Edit Requirement' : 'Edit Task' }}</SheetTitle>
                     <SheetDescription class="text-muted-foreground mt-1 text-sm">
-                        {{ state.editTask?.title || 'Task details' }}
+                        {{ state.editTask?.title || (state.isRequirementPhase ? 'Requirement details' : 'Task details') }}
                     </SheetDescription>
                 </div>
             </SheetHeader>
@@ -147,6 +147,20 @@ function formatTaskTime(value?: string | null) {
                             />
                         </div>
 
+                        <div v-if="state.isRequirementPhase && (state.editTask.submitted_title || state.editTask.submitted_description)" class="space-y-2">
+                            <Label class="text-muted-foreground">Original Submission</Label>
+                            <div class="border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed p-3 text-sm">
+                                <div v-if="state.editTask.submitted_title" class="text-foreground font-medium">
+                                    {{ state.editTask.submitted_title }}
+                                </div>
+                                <div
+                                    v-if="state.editTask.submitted_description"
+                                    class="shift-rich text-muted-foreground mt-2"
+                                    v-html="state.editTask.submitted_description"
+                                ></div>
+                            </div>
+                        </div>
+
                         <div class="space-y-2">
                             <TaskCollaboratorField
                                 :disabled="state.editLoading || state.editUploading"
@@ -213,9 +227,19 @@ function formatTaskTime(value?: string | null) {
             </div>
 
             <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                <div class="text-destructive text-sm">{{ state.taskSaveError }}</div>
+                <div class="text-destructive text-sm">{{ state.taskSaveError || state.requirementFinalizeError }}</div>
                 <div class="flex items-center gap-2">
                     <Button type="button" variant="outline" @click="state.attemptCloseEdit">Close</Button>
+                    <Button
+                        v-if="state.isRequirementPhase"
+                        :disabled="state.taskSaving || state.requirementFinalizing"
+                        type="button"
+                        variant="outline"
+                        data-testid="finalize-requirement"
+                        @click="state.finalizeRequirement"
+                    >
+                        {{ state.requirementFinalizing ? 'Finalizing...' : 'Finalize Requirement' }}
+                    </Button>
                     <Button :disabled="state.taskSaving" type="button" variant="default" @click="state.saveTaskChanges">
                         {{ state.taskSaving ? 'Saving...' : 'Save' }}
                     </Button>

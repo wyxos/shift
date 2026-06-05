@@ -1,5 +1,4 @@
 import Index from '@/pages/Tasks/Index.vue';
-import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, vi } from 'vitest';
 import { h } from 'vue';
@@ -14,6 +13,10 @@ const sonnerMocks = vi.hoisted(() => ({
     toastSuccessMock: vi.fn(),
     toastErrorMock: vi.fn(),
     toastDismissMock: vi.fn(),
+}));
+const router = vi.hoisted(() => ({
+    get: vi.fn(),
+    reload: vi.fn(),
 }));
 
 vi.mock('axios', () => ({
@@ -234,6 +237,60 @@ vi.mock('@/components/ui/dialog', () => ({
     },
 }));
 
+vi.mock('@/components/ui/alert-dialog', () => ({
+    AlertDialog: {
+        props: ['open'],
+        emits: ['update:open'],
+        render() {
+            return this.open ? h('div', { class: 'alert-dialog-stub' }, this.$slots.default?.()) : null;
+        },
+    },
+    AlertDialogAction: {
+        render() {
+            return h('button', { ...this.$attrs, type: 'button' }, this.$slots.default?.());
+        },
+    },
+    AlertDialogCancel: {
+        emits: ['click'],
+        render() {
+            return h(
+                'button',
+                {
+                    ...this.$attrs,
+                    type: 'button',
+                    onClick: (event: MouseEvent) => this.$emit('click', event),
+                },
+                this.$slots.default?.(),
+            );
+        },
+    },
+    AlertDialogContent: {
+        render() {
+            return h('div', { class: 'alert-dialog-content-stub' }, this.$slots.default?.());
+        },
+    },
+    AlertDialogDescription: {
+        render() {
+            return h('p', {}, this.$slots.default?.());
+        },
+    },
+    AlertDialogFooter: {
+        render() {
+            return h('div', {}, this.$slots.default?.());
+        },
+    },
+    AlertDialogHeader: {
+        render() {
+            return h('div', {}, this.$slots.default?.());
+        },
+    },
+    AlertDialogTitle: {
+        render() {
+            return h('h2', {}, this.$slots.default?.());
+        },
+    },
+}));
+
 vi.mock('@/components/ShiftEditor.vue', () => ({
     default: {
         props: ['modelValue', 'sendable'],
@@ -350,10 +407,7 @@ vi.mock('@inertiajs/vue3', () => ({
     Head: {
         render: () => null,
     },
-    router: {
-        get: vi.fn(),
-        reload: vi.fn(),
-    },
+    router,
     usePage: () => ({
         url: '/tasks',
         props: {
