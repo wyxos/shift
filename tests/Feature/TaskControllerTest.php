@@ -3,7 +3,9 @@
 use App\Models\ExternalUser;
 use App\Models\Organisation;
 use App\Models\Project;
+use App\Models\RequirementBatch;
 use App\Models\Task;
+use App\Models\TaskThread;
 use App\Models\User;
 
 beforeEach(function () {
@@ -107,6 +109,220 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     );
 });
 
+test('tasks v2 excludes requirement phase items from the active task list', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Active task',
+        'status' => 'pending',
+    ]);
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Requirement item',
+        'status' => 'pending',
+    ]);
+
+    $task->submitter()->associate($this->user)->save();
+    $requirement->submitter()->associate($this->user)->save();
+    $requirement->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Requirement item',
+        'submitted_description' => 'Requirement details.',
+    ]);
+
+    $response = $this->actingAs($this->user)->get(route('tasks.index'));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $task->id)
+        ->where('surface', 'tasks')
+    );
+});
+
+test('requirements index lists requirement intake items for review', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Requirement item',
+        'status' => 'pending',
+    ]);
+    $normalTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Normal task',
+        'status' => 'pending',
+    ]);
+
+    $requirement->submitter()->associate($this->user)->save();
+    $normalTask->submitter()->associate($this->user)->save();
+    $requirement->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Requirement item',
+        'submitted_description' => 'Requirement details.',
+    ]);
+
+    $response = $this->actingAs($this->user)->get(route('requirements.index'));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $requirement->id)
+        ->where('tasks.data.0.phase', 'requirement')
+        ->where('surface', 'requirements')
+    );
+});
+
+test('requirements index includes batch summaries for grouped review', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $batch = RequirementBatch::query()->create([
+        'project_id' => $project->id,
+        'title' => 'June client requirements',
+    ]);
+
+    $firstRequirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Renewal report',
+        'status' => 'pending',
+    ]);
+    $secondRequirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'CSV export',
+        'status' => 'pending',
+    ]);
+
+    foreach ([$firstRequirement, $secondRequirement] as $requirement) {
+        $requirement->submitter()->associate($this->user)->save();
+        $requirement->metadata()->create([
+            'environment' => 'production',
+            'url' => 'https://example.com/requirement',
+            'phase' => 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'requirement_batch_id' => $batch->id,
+            'submitted_title' => $requirement->title,
+            'submitted_description' => 'Client wording.',
+        ]);
+    }
+
+    $response = $this->actingAs($this->user)->get(route('requirements.index'));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 2)
+        ->where('tasks.data.0.batch.id', $batch->id)
+        ->where('tasks.data.0.batch.title', 'June client requirements')
+        ->where('tasks.data.0.batch.total_items', 2)
+        ->where('tasks.data.0.batch.requirement_items', 2)
+        ->where('tasks.data.0.batch.finalized_items', 0)
+    );
+});
+
+test('requirements index can be scoped by organisation route', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $scopedProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'organisation_id' => $organisation->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $scopedRequirement = Task::factory()->create([
+        'project_id' => $scopedProject->id,
+        'title' => 'Scoped requirement',
+        'status' => 'pending',
+    ]);
+    $otherRequirement = Task::factory()->create([
+        'project_id' => $otherProject->id,
+        'title' => 'Other requirement',
+        'status' => 'pending',
+    ]);
+
+    foreach ([$scopedRequirement, $otherRequirement] as $requirement) {
+        $requirement->submitter()->associate($this->user)->save();
+        $requirement->metadata()->create([
+            'environment' => 'production',
+            'url' => 'https://example.com/requirement',
+            'phase' => 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'submitted_title' => $requirement->title,
+            'submitted_description' => 'Client wording.',
+        ]);
+    }
+
+    $response = $this->actingAs($this->user)->get(route('organisation.requirements', $organisation));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $scopedRequirement->id)
+        ->where('surface', 'requirements')
+        ->where('filters.organisation_id', $organisation->id)
+    );
+});
+
+test('task detail includes external requirement submitter in collaborator list', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $externalUser = ExternalUser::query()->create([
+        'external_id' => 'client-123',
+        'name' => 'Client User',
+        'email' => 'client@example.com',
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'project_id' => $project->id,
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Requirement item',
+        'status' => 'pending',
+    ]);
+    $requirement->submitter()->associate($externalUser)->save();
+    $requirement->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Requirement item',
+        'submitted_description' => 'Client wording.',
+    ]);
+
+    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $requirement));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('external_collaborators.0.id', 'client-123')
+        ->assertJsonPath('external_collaborators.0.name', 'Client User')
+        ->assertJsonPath('external_collaborators.0.email', 'client@example.com');
+});
+
 test('tasks v2 show includes created and updated timestamps', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -127,6 +343,77 @@ test('tasks v2 show includes created and updated timestamps', function () {
     $response->assertJsonStructure(['created_at', 'updated_at']);
     expect($response->json('created_at'))->toBeString()->not->toBeEmpty();
     expect($response->json('updated_at'))->toBeString()->not->toBeEmpty();
+});
+
+test('can finalize all open requirement items in a visible batch', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $externalUser = ExternalUser::query()->create([
+        'external_id' => 'client-123',
+        'name' => 'Client User',
+        'email' => 'client@example.com',
+        'environment' => 'production',
+        'url' => 'https://example.com',
+        'project_id' => $project->id,
+    ]);
+
+    $batch = RequirementBatch::query()->create([
+        'project_id' => $project->id,
+        'external_user_id' => $externalUser->id,
+        'title' => 'June client requirements',
+    ]);
+
+    $requirements = collect(['Renewal report', 'CSV export'])->map(function (string $title) use ($project, $externalUser, $batch) {
+        $requirement = Task::factory()->create([
+            'project_id' => $project->id,
+            'title' => $title,
+            'status' => 'pending',
+        ]);
+        $requirement->submitter()->associate($externalUser)->save();
+        $requirement->metadata()->create([
+            'environment' => 'production',
+            'url' => 'https://example.com/requirement',
+            'phase' => 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'requirement_batch_id' => $batch->id,
+            'submitted_title' => $title,
+            'submitted_description' => 'Client wording.',
+        ]);
+
+        $thread = new TaskThread([
+            'type' => 'external',
+            'content' => '<p>Can you clarify scope?</p>',
+            'sender_name' => $externalUser->name,
+        ]);
+        $thread->sender()->associate($externalUser);
+        $requirement->threads()->save($thread);
+
+        return $requirement;
+    });
+
+    $response = $this->actingAs($this->user)
+        ->patchJson(route('requirements.v2.batches.finalize', $batch));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonPath('finalized_count', 2)
+        ->assertJsonCount(2, 'tasks');
+
+    foreach ($requirements as $requirement) {
+        $this->assertDatabaseHas('task_metadata', [
+            'task_id' => $requirement->id,
+            'phase' => 'task',
+            'requirement_batch_id' => $batch->id,
+            'finalized_by' => $this->user->id,
+        ]);
+
+        expect($requirement->threads()->where('content', '<p>Requirement finalized as task.</p>')->exists())->toBeTrue();
+        expect($requirement->threads()->where('content', '<p>Can you clarify scope?</p>')->exists())->toBeTrue();
+    }
 });
 
 test('tasks v2 can filter tasks by environment', function () {

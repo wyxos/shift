@@ -12,11 +12,25 @@ class TaskMetadata extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'finalized_at' => 'datetime',
+    ];
+
     /**
      * Get the task that this metadata belongs to.
      */
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
+    }
+
+    public function requirementBatch(): BelongsTo
+    {
+        return $this->belongsTo(RequirementBatch::class);
+    }
+
+    public function finalizer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'finalized_by');
     }
 }

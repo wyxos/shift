@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { buildThreadAiContext } from '@/shared/tasks/ai';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
-import { computed, type Ref } from 'vue';
+import { computed, ref, watch, type Ref } from 'vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 
 interface Message {
@@ -51,7 +61,7 @@ interface Emits {
 }
 
 const props = defineProps<Props>();
-defineEmits<Emits>();
+const emit = defineEmits<Emits>();
 const page = usePage<SharedData>();
 const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
 const aiContext = computed(() =>
@@ -71,6 +81,30 @@ const setMessagesContainer = (el: Element | null) => {
         target.value = el as HTMLElement | null;
     }
 };
+
+const deleteDialogOpen = ref(false);
+const pendingDeleteMessageId = ref<number | null>(null);
+
+const requestDeleteMessage = (messageId: number) => {
+    pendingDeleteMessageId.value = messageId;
+    deleteDialogOpen.value = true;
+};
+
+const confirmDeleteMessage = () => {
+    const messageId = pendingDeleteMessageId.value;
+
+    if (messageId === null) return;
+
+    deleteDialogOpen.value = false;
+    pendingDeleteMessageId.value = null;
+    emit('deleteMessage', messageId, props.tabType);
+};
+
+watch(deleteDialogOpen, (open) => {
+    if (!open) {
+        pendingDeleteMessageId.value = null;
+    }
+});
 </script>
 
 <template>
@@ -90,7 +124,7 @@ const setMessagesContainer = (el: Element | null) => {
                 :is-message-deletable="isMessageDeletable"
                 :render-markdown="renderMarkdown"
                 :truncate-filename="truncateFilename"
-                @delete-message="$emit('deleteMessage', $event, tabType)"
+                @delete-message="requestDeleteMessage"
             />
         </div>
 
@@ -107,5 +141,24 @@ const setMessagesContainer = (el: Element | null) => {
                 />
             </div>
         </div>
+
+        <AlertDialog v-model:open="deleteDialogOpen">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete message</AlertDialogTitle>
+                    <AlertDialogDescription>Delete this message from the thread? This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        data-testid="confirm-legacy-thread-message-delete"
+                        @click="confirmDeleteMessage"
+                    >
+                        Delete message
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
 </template>

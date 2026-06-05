@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
 import { getPriorityBadgeClass, getPriorityLabel, getStatusBadgeClass, getStatusLabel } from '@shared/tasks/presentation';
-import { Eye, Trash2 } from 'lucide-vue-next';
+import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
+import { computed } from 'vue';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
 
 type Option = {
@@ -17,6 +18,20 @@ type TaskListRow = {
     title: string;
     status: string;
     priority: string;
+    phase?: string | null;
+    finalized?: boolean | null;
+    finalized_at?: string | null;
+    environment?: string | null;
+    batch_id?: number | null;
+    batch_title?: string | null;
+    batch?: {
+        id: number;
+        title?: string | null;
+        created_at?: string | null;
+        total_items: number;
+        requirement_items: number;
+        finalized_items: number;
+    } | null;
 };
 
 interface Props {
@@ -43,6 +58,7 @@ interface Props {
     title?: string;
     description?: string;
     emptyLabel?: string;
+    itemLabel?: string;
     getTaskEnvironmentLabel: (task: TaskListRow) => string;
     setFiltersOpen: (value: boolean) => void;
     setDraftStatuses: (value: string[]) => void;
@@ -56,17 +72,81 @@ interface Props {
     selectAllPriorities: () => void;
     openEdit: (taskId: number) => void | Promise<void>;
     deleteTask: (taskId: number) => void | Promise<void>;
+    finalizeRequirementBatch?: (batchId: number) => void | Promise<void>;
+    requirementBatchFinalizeLoading?: number | null;
     goToPage: (page: number) => void;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     title: 'Tasks',
     description: 'Default view hides completed and closed tasks.',
     emptyLabel: 'No tasks found',
+    itemLabel: 'tasks',
     loading: false,
     error: null,
     deleteLoading: null,
+    finalizeRequirementBatch: undefined,
+    requirementBatchFinalizeLoading: null,
 });
+
+const groupedRequirements = computed(() => {
+    if (props.itemLabel !== 'requirements') {
+        return [];
+    }
+
+    const groups = new Map<string, { key: string; batch: TaskListRow['batch']; tasks: TaskListRow[] }>();
+
+    props.tasks.forEach((task) => {
+        const batch = taskBatch(task);
+        const key = batch?.id ? `batch-${batch.id}` : 'ungrouped';
+        const existing = groups.get(key);
+
+        if (existing) {
+            existing.tasks.push(task);
+            return;
+        }
+
+        groups.set(key, {
+            key,
+            batch,
+            tasks: [task],
+        });
+    });
+
+    return Array.from(groups.values());
+});
+
+function taskBatch(task: TaskListRow) {
+    if (task.batch) return task.batch;
+    if (!task.batch_id) return null;
+
+    return {
+        id: task.batch_id,
+        title: task.batch_title ?? null,
+        created_at: null,
+        total_items: 0,
+        requirement_items: 0,
+        finalized_items: 0,
+    };
+}
+
+function requirementPackTitle(batch: TaskListRow['batch']) {
+    if (batch?.title) return batch.title;
+    if (batch?.id) return `Requirement pack #${batch.id}`;
+    return 'Ungrouped requirements';
+}
+
+function requirementPackMeta(batch: TaskListRow['batch'], tasks: TaskListRow[]) {
+    const total = batch?.total_items || tasks.length;
+    const pending = batch?.requirement_items || tasks.filter((task) => task.phase === 'requirement').length;
+    const finalized = batch?.finalized_items ?? Math.max(total - pending, 0);
+
+    return `${total} ${total === 1 ? 'item' : 'items'} · ${pending} pending · ${finalized} finalized`;
+}
+
+function isFinalizedRequirement(task: TaskListRow) {
+    return task.finalized === true || (task.phase !== undefined && task.phase !== null && task.phase !== 'requirement');
+}
 </script>
 
 <template>
@@ -107,7 +187,7 @@ withDefaults(defineProps<Props>(), {
 
         <div>
             <div class="text-muted-foreground mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span>Showing {{ from }} to {{ to }} of {{ totalTasks }} tasks</span>
+                <span>Showing {{ from }} to {{ to }} of {{ totalTasks }} {{ itemLabel }}</span>
                 <span v-if="activeFilterCount">{{ activeFilterCount }} filter{{ activeFilterCount === 1 ? '' : 's' }} active</span>
             </div>
 
@@ -116,7 +196,7 @@ withDefaults(defineProps<Props>(), {
             <Table v-else>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Task</TableHead>
+                        <TableHead>{{ itemLabel === 'requirements' ? 'Requirement' : 'Task' }}</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead>Environment</TableHead>
@@ -125,6 +205,109 @@ withDefaults(defineProps<Props>(), {
                 </TableHeader>
                 <TableBody>
                     <TableEmpty v-if="tasks.length === 0" :colspan="5">{{ emptyLabel }}</TableEmpty>
+                    <template v-else-if="itemLabel === 'requirements'">
+                        <template v-for="group in groupedRequirements" :key="group.key">
+                            <TableRow data-testid="requirement-pack-row" class="bg-muted/30 hover:bg-muted/40">
+                                <TableCell colspan="5" class="py-3">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="min-w-0">
+                                            <div class="text-foreground truncate text-sm font-semibold">
+                                                {{ requirementPackTitle(group.batch) }}
+                                            </div>
+                                            <div class="text-muted-foreground mt-0.5 text-xs">
+                                                {{ requirementPackMeta(group.batch, group.tasks) }}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            v-if="group.batch?.id && group.batch.requirement_items > 0 && finalizeRequirementBatch"
+                                            :data-testid="`requirement-pack-finalize-${group.batch.id}`"
+                                            :disabled="requirementBatchFinalizeLoading === group.batch.id"
+                                            :aria-label="requirementBatchFinalizeLoading === group.batch.id ? 'Finalizing pack' : 'Finalize pack'"
+                                            class="h-8 w-8 shrink-0 p-0 sm:h-9 sm:w-auto sm:px-3"
+                                            size="sm"
+                                            type="button"
+                                            variant="outline"
+                                            @click="finalizeRequirementBatch(group.batch.id)"
+                                        >
+                                            <CheckCircle2 class="h-4 w-4 sm:mr-2" />
+                                            <span class="hidden sm:inline">
+                                                {{ requirementBatchFinalizeLoading === group.batch.id ? 'Finalizing...' : 'Finalize pack' }}
+                                            </span>
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow
+                                v-for="task in group.tasks"
+                                :key="task.id"
+                                :class="highlightedTaskId === task.id ? 'bg-sky-500/10 ring-2 ring-sky-500/40 ring-inset' : ''"
+                                data-testid="task-row"
+                            >
+                                <TableCell class="min-w-[18rem] whitespace-normal">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                            :aria-label="`Open task details for ${task.title}`"
+                                            :data-testid="`task-title-${task.id}`"
+                                            @click="openEdit(task.id)"
+                                        >
+                                            {{ task.title }}
+                                        </button>
+                                        <Badge
+                                            v-if="isFinalizedRequirement(task)"
+                                            class="border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100"
+                                            :data-testid="`requirement-finalized-badge-${task.id}`"
+                                            variant="outline"
+                                        >
+                                            Finalized
+                                        </Badge>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
+                                        {{ getStatusLabel(task.status) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        :class="getPriorityBadgeClass(task.priority)"
+                                        :data-testid="`task-priority-badge-${task.id}`"
+                                        variant="outline"
+                                    >
+                                        {{ getPriorityLabel(task.priority) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
+                                        {{ getTaskEnvironmentLabel(task) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="flex justify-end gap-2">
+                                        <ActionIconButton
+                                            label="Open requirement details"
+                                            title="Open details"
+                                            :data-testid="`task-open-${task.id}`"
+                                            @click="openEdit(task.id)"
+                                        >
+                                            <Eye class="h-4 w-4" />
+                                        </ActionIconButton>
+                                        <ActionIconButton
+                                            label="Delete requirement"
+                                            title="Delete"
+                                            variant="destructive"
+                                            :loading="deleteLoading === task.id"
+                                            :data-testid="`task-delete-${task.id}`"
+                                            @click="deleteTask(task.id)"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
+                                        </ActionIconButton>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </template>
+                    </template>
                     <template v-else>
                         <TableRow
                             v-for="task in tasks"

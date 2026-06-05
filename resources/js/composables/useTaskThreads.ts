@@ -224,10 +224,6 @@ export function useTaskThreads(taskId: number) {
 
     // Function to delete a message
     const deleteMessage = async (messageId: number, messageType: 'internal' | 'external'): Promise<void> => {
-        if (!confirm('Are you sure you want to delete this message?')) {
-            return;
-        }
-
         try {
             await axios.delete(
                 route('task-threads.destroy', {
