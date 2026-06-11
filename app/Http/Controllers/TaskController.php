@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Jobs\NotifyExternalCollaboratorAdded;
@@ -84,6 +85,26 @@ class TaskController extends Controller
         if (! empty($statuses)) {
             $query->whereIn('status', $statuses);
         }
+    }
+
+    private function applyRequirementStatusFilter(Builder $query, array $statuses): void
+    {
+        $allowed = RequirementStatus::values();
+        $statuses = array_values(array_intersect($statuses, $allowed));
+
+        if (empty($statuses)) {
+            $statuses = $allowed;
+        }
+
+        $query->whereHas('metadata', function (Builder $metadataQuery) use ($statuses) {
+            $metadataQuery->where(function (Builder $statusQuery) use ($statuses) {
+                $statusQuery->whereIn('requirement_status', $statuses);
+
+                if (in_array(RequirementStatus::Submitted->value, $statuses, true)) {
+                    $statusQuery->orWhereNull('requirement_status');
+                }
+            });
+        });
     }
 
     private function ensureTaskVisible(Task $task): void
@@ -483,7 +504,7 @@ class TaskController extends Controller
             ->keyBy('id');
 
         return $this->visibleTasksQuery()
-            ->with(['metadata:id,task_id,phase,requirement_batch_id'])
+            ->with(['metadata:id,task_id,phase,requirement_status,requirement_batch_id'])
             ->requirementIntake()
             ->whereHas('metadata', function (Builder $metadataQuery) use ($batchIds) {
                 $metadataQuery->whereIn('requirement_batch_id', $batchIds);
@@ -493,6 +514,9 @@ class TaskController extends Controller
             ->map(function ($batchTasks, int $batchId) use ($batches) {
                 $batch = $batches->get($batchId);
                 $requirementItems = $batchTasks->filter(fn (Task $task) => $task->isRequirementPhase())->count();
+                $readyItems = $batchTasks
+                    ->filter(fn (Task $task) => $task->isReadyToFinalizeRequirement())
+                    ->count();
                 $totalItems = $batchTasks->count();
 
                 return [
@@ -501,6 +525,7 @@ class TaskController extends Controller
                     'created_at' => $batch?->created_at?->toIso8601String(),
                     'total_items' => $totalItems,
                     'requirement_items' => $requirementItems,
+                    'ready_items' => $readyItems,
                     'finalized_items' => max($totalItems - $requirementItems, 0),
                 ];
             })
@@ -522,6 +547,7 @@ class TaskController extends Controller
             'environment' => $this->taskEnvironment($task),
             'phase' => $task->phase(),
             'finalized' => ! $task->isRequirementPhase(),
+            'requirement_status' => $task->requirementStatus(),
             'submitted_title' => $task->metadata?->submitted_title,
             'submitted_description' => $task->metadata?->submitted_description,
             'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
@@ -546,7 +572,7 @@ class TaskController extends Controller
 
     public function indexV2(?Organisation $organisation = null)
     {
-        $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+        $defaultStatuses = TaskStatus::defaultOpenValues();
         $allPriorities = ['low', 'medium', 'high'];
         $allowedSortBy = ['updated_at', 'created_at', 'priority'];
         $defaultSortBy = 'updated_at';
@@ -568,7 +594,7 @@ class TaskController extends Controller
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
-            ->with(['project:id,name', 'metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at', 'submitter'])
+            ->with(['project:id,name', 'metadata:id,task_id,environment,phase,requirement_status,submitted_title,submitted_description,finalized_at', 'submitter'])
             ->withoutRequirementPhase();
 
         $query->whereIn('status', $selectedStatuses);
@@ -661,12 +687,13 @@ class TaskController extends Controller
 
     public function requirementsV2(?Organisation $organisation = null)
     {
-        $defaultStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+        $defaultStatuses = RequirementStatus::values();
         $allPriorities = ['low', 'medium', 'high'];
         $allowedSortBy = ['updated_at', 'created_at', 'priority'];
         $defaultSortBy = 'updated_at';
 
         $selectedStatuses = $this->normalizeListFilter(request('status'));
+        $selectedStatuses = array_values(array_intersect($selectedStatuses, RequirementStatus::values()));
         if (empty($selectedStatuses)) {
             $selectedStatuses = $defaultStatuses;
         }
@@ -685,12 +712,13 @@ class TaskController extends Controller
         $query = $this->visibleTasksQuery()
             ->with([
                 'project:id,name',
-                'metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at,requirement_batch_id',
+                'metadata:id,task_id,environment,phase,requirement_status,submitted_title,submitted_description,finalized_at,requirement_batch_id',
                 'metadata.requirementBatch:id,title,created_at',
                 'submitter',
             ])
-            ->requirementIntake()
-            ->whereIn('status', $selectedStatuses);
+            ->requirementIntake();
+
+        $this->applyRequirementStatusFilter($query, $selectedStatuses);
 
         if (count($selectedPriorities) > 0 && count($selectedPriorities) < count($allPriorities)) {
             $query->whereIn('priority', $selectedPriorities);
@@ -748,6 +776,7 @@ class TaskController extends Controller
                 'project' => $this->serializeTaskProject($task->project),
                 'title' => $task->title,
                 'status' => $task->status,
+                'requirement_status' => $task->requirementStatus(),
                 'priority' => $task->priority,
                 'environment' => $this->taskEnvironment($task),
                 'phase' => $task->phase(),
@@ -851,6 +880,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'priority' => ['required', Rule::enum(TaskPriority::class)],
             'status' => ['required', Rule::enum(TaskStatus::class)],
+            'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
             'environment' => 'nullable|string|max:255',
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
@@ -881,6 +911,12 @@ class TaskController extends Controller
         $task->description = $attributes['description'] ?? null;
         $task->save();
         $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
+        if ($task->isRequirementPhase() && array_key_exists('requirement_status', $attributes)) {
+            $task->metadata()->updateOrCreate(
+                ['task_id' => $task->id],
+                ['requirement_status' => $attributes['requirement_status'] ?? RequirementStatus::Submitted->value],
+            );
+        }
 
         if (! empty($attributes['deleted_attachment_ids'])) {
             foreach ($attributes['deleted_attachment_ids'] as $attachmentId) {
@@ -974,7 +1010,15 @@ class TaskController extends Controller
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
         ]);
+
+        $requirementStatus = $attributes['requirement_status'] ?? $task->requirementStatus();
+        if ($requirementStatus !== RequirementStatus::ReadyToFinalize->value) {
+            return response()->json([
+                'message' => 'Only ready-to-finalize requirements can be finalized.',
+            ], 422);
+        }
 
         DB::transaction(function () use ($task, $attributes) {
             $this->finalizeRequirementTask($task, $attributes['title'], $attributes['description'] ?? null);
@@ -1003,14 +1047,15 @@ class TaskController extends Controller
             ->whereHas('metadata', function (Builder $metadataQuery) use ($requirementBatch) {
                 $metadataQuery
                     ->where('requirement_batch_id', $requirementBatch->id)
-                    ->where('phase', 'requirement');
+                    ->where('phase', 'requirement')
+                    ->where('requirement_status', RequirementStatus::ReadyToFinalize->value);
             })
             ->orderBy('id')
             ->get();
 
         if ($tasks->isEmpty()) {
             return response()->json([
-                'message' => 'No requirement-phase items are available to finalize for this pack.',
+                'message' => 'No ready-to-finalize requirement items are available to finalize for this group.',
             ], 422);
         }
 
@@ -1037,6 +1082,7 @@ class TaskController extends Controller
 
         $task->metadata->forceFill([
             'phase' => 'task',
+            'requirement_status' => RequirementStatus::ReadyToFinalize->value,
             'finalized_at' => now(),
             'finalized_by' => auth()->id(),
         ])->save();

@@ -459,7 +459,12 @@ onBeforeUnmount(() => {
                                 v-for="collaborator in activeCollaboratorGroup.options"
                                 :key="`${activeCollaboratorGroup.kind}-option-${collaboratorKey(collaborator.id)}`"
                                 type="button"
-                                class="hover:bg-muted/70 flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition"
+                                :class="
+                                    isSelected(activeCollaboratorGroup.kind, collaborator)
+                                        ? 'border-primary/40 bg-primary/10 hover:bg-primary/15'
+                                        : 'hover:bg-muted/70 border-transparent'
+                                "
+                                class="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left transition"
                                 :data-testid="`${activeCollaboratorGroup.kind}-collaborator-option-${collaboratorKey(collaborator.id)}`"
                                 @click="toggleCollaborator(activeCollaboratorGroup.kind, collaborator)"
                             >

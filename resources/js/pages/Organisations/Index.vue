@@ -430,7 +430,7 @@ watch(
                     </Button>
                 </template>
 
-                <OrganisationListTable :organisations="organisationRows" @open-delete="openDeleteModal" @open-manage-users="openManageUsersModal" />
+                <OrganisationListTable :organisations="organisationRows" @open-manage-users="openManageUsersModal" />
             </AdminListShell>
 
             <OrganisationTeamPanel

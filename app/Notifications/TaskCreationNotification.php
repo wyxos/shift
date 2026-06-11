@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\TaskStatus;
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -40,6 +41,12 @@ class TaskCreationNotification extends Notification implements ShouldQueue
         return route('tasks.index', ['task' => $this->task->id]);
     }
 
+    protected function statusLabel(): string
+    {
+        return TaskStatus::tryFrom((string) $this->task->status)?->label()
+            ?? ucfirst(str_replace(['_', '-'], ' ', (string) $this->task->status));
+    }
+
     /**
      * Get the notification's delivery channels.
      */
@@ -60,7 +67,7 @@ class TaskCreationNotification extends Notification implements ShouldQueue
             ->line('A new task has been created in the project: '.$this->task->project->name)
             ->line('Task Title: '.$this->task->title)
             ->line('Priority: '.ucfirst($this->task->priority))
-            ->line('Status: '.ucfirst(str_replace('_', ' ', $this->task->status)))
+            ->line('Status: '.$this->statusLabel())
             ->action('View Task', $url)
             ->line('Please do not reply to this email directly.');
     }

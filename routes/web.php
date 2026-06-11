@@ -39,6 +39,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // organisations
     Route::get('organisations', [OrganisationController::class, 'index'])->name('organisations.index');
+    Route::get('organisations/sidebar', [OrganisationController::class, 'sidebar'])->name('organisations.sidebar');
     Route::post('organisations', [OrganisationController::class, 'store'])->name('organisations.store');
     Route::put('organisations/{organisation}', [OrganisationController::class, 'update'])->name('organisations.update');
     Route::delete('organisations/{organisation}', [OrganisationController::class, 'destroy'])->name('organisations.destroy');

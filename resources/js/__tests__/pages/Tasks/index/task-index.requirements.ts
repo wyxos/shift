@@ -23,7 +23,7 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
-    it('groups requirement rows by submitted pack', () => {
+    it('groups requirement rows by submitted requirements and keeps row state lifecycle-based', () => {
         const wrapper = mount(Index, {
             props: {
                 surface: 'requirements',
@@ -32,8 +32,10 @@ describe('Tasks/Index.vue', () => {
                         id: 1,
                         title: 'Monthly renewal report',
                         status: 'pending',
+                        requirement_status: 'ready-to-finalize',
                         priority: 'medium',
                         phase: 'requirement',
+                        project: { id: 42, name: 'Portal' },
                         can_delete: true,
                         can_finalize_requirement: true,
                         batch: {
@@ -41,6 +43,7 @@ describe('Tasks/Index.vue', () => {
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
+                            ready_items: 2,
                             finalized_items: 0,
                             can_finalize_requirement: true,
                         },
@@ -49,6 +52,7 @@ describe('Tasks/Index.vue', () => {
                         id: 2,
                         title: 'CSV export',
                         status: 'pending',
+                        requirement_status: 'ready-to-finalize',
                         priority: 'medium',
                         phase: 'requirement',
                         can_delete: true,
@@ -58,6 +62,7 @@ describe('Tasks/Index.vue', () => {
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
+                            ready_items: 2,
                             finalized_items: 0,
                             can_finalize_requirement: true,
                         },
@@ -67,7 +72,8 @@ describe('Tasks/Index.vue', () => {
                         title: 'Notification wording',
                         status: 'pending',
                         priority: 'low',
-                        phase: 'requirement',
+                        phase: 'task',
+                        finalized: true,
                         can_delete: true,
                         can_finalize_requirement: true,
                         batch: {
@@ -87,8 +93,12 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.text()).toContain('June client requirements');
         expect(wrapper.text()).toContain('Notification changes');
         expect(wrapper.text()).toContain('2 items');
-        expect(wrapper.text()).toContain('2 pending');
+        expect(wrapper.text()).toContain('2 open');
+        expect(wrapper.text()).toContain('2 ready');
         expect(wrapper.find('[data-testid="requirement-pack-finalize-7"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="task-project-badge-1"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="task-status-badge-1"]').text()).toContain('Ready');
+        expect(wrapper.get('[data-testid="task-status-badge-3"]').text()).toContain('Finalized');
 
         wrapper.unmount();
     });
@@ -127,6 +137,7 @@ describe('Tasks/Index.vue', () => {
                         id: 1,
                         title: 'Monthly renewal report',
                         status: 'pending',
+                        requirement_status: 'ready-to-finalize',
                         priority: 'medium',
                         phase: 'requirement',
                         can_delete: false,
@@ -187,6 +198,7 @@ describe('Tasks/Index.vue', () => {
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
+                            ready_items: 2,
                             finalized_items: 0,
                             can_finalize_requirement: true,
                         },
@@ -195,6 +207,7 @@ describe('Tasks/Index.vue', () => {
                         id: 2,
                         title: 'CSV export',
                         status: 'pending',
+                        requirement_status: 'ready-to-finalize',
                         priority: 'medium',
                         phase: 'requirement',
                         can_delete: true,
@@ -204,6 +217,7 @@ describe('Tasks/Index.vue', () => {
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
+                            ready_items: 2,
                             finalized_items: 0,
                             can_finalize_requirement: true,
                         },
@@ -218,15 +232,15 @@ describe('Tasks/Index.vue', () => {
 
         expect(confirmSpy).not.toHaveBeenCalled();
         expect(axiosPatchMock).not.toHaveBeenCalled();
-        expect(wrapper.text()).toContain('Finalize requirement pack');
-        expect(wrapper.text()).toContain('Finalize all 2 open requirements in June client requirements as active tasks.');
+        expect(wrapper.text()).toContain('Finalize requirements');
+        expect(wrapper.text()).toContain('Finalize all 2 ready requirements in June client requirements as active tasks.');
 
         await wrapper.get('[data-testid="confirm-requirement-pack-finalize"]').trigger('click');
         await flushPromises();
 
         expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.v2.batches.finalize', {});
         expect(router.reload).toHaveBeenCalledWith({ preserveScroll: true, preserveState: true });
-        expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirement pack finalized', {
+        expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirements finalized', {
             description: '2 items now appear in the active task list.',
         });
 
@@ -247,6 +261,7 @@ describe('Tasks/Index.vue', () => {
                     title: 'Export renewal data',
                     priority: 'medium',
                     status: 'pending',
+                    requirement_status: 'ready-to-finalize',
                     phase: 'requirement',
                     finalized: false,
                     created_at: '2026-02-10T17:40:00',
@@ -310,6 +325,10 @@ describe('Tasks/Index.vue', () => {
 
         expect(wrapper.text()).toContain('Clarifications');
         expect(wrapper.text()).toContain('Original requested export.');
+        expect(wrapper.text()).not.toContain('Edit Requirement');
+        expect(wrapper.text()).toContain('Export renewal data');
+        expect(wrapper.text()).toContain('Requirement state');
+        expect(wrapper.text()).toContain('Ready');
 
         await wrapper.get('[data-testid="finalize-requirement"]').trigger('click');
         await flushPromises();
@@ -317,6 +336,7 @@ describe('Tasks/Index.vue', () => {
         expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.v2.finalize', {
             title: 'Export renewal data',
             description: '<p>Original requested export.</p>',
+            requirement_status: 'ready-to-finalize',
         });
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirement finalized', {
             description: 'The item now appears in the active task list.',
@@ -324,6 +344,64 @@ describe('Tasks/Index.vue', () => {
 
         wrapper.unmount();
         vi.useRealTimers();
+    });
+
+    it('keeps requirement finalization unavailable until the requirement is ready', async () => {
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    project_id: 42,
+                    title: 'Parked approval workflow',
+                    priority: 'medium',
+                    status: 'pending',
+                    requirement_status: 'parked',
+                    phase: 'requirement',
+                    finalized: false,
+                    created_at: '2026-02-10T17:40:00',
+                    description: '<p>Wait for budget.</p>',
+                    is_owner: true,
+                    can_edit_requirement: true,
+                    can_finalize_requirement: true,
+                    can_manage_collaborators: true,
+                    attachments: [],
+                    internal_collaborators: [],
+                    external_collaborators: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                surface: 'requirements',
+                tasks: makeTasksPage([
+                    {
+                        id: 1,
+                        title: 'Parked approval workflow',
+                        status: 'pending',
+                        requirement_status: 'parked',
+                        priority: 'medium',
+                        phase: 'requirement',
+                    },
+                ]),
+                filters: {
+                    status: ['submitted', 'in-review', 'awaiting-feedback', 'ready-to-finalize', 'parked', 'declined'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Requirement state');
+        expect(wrapper.text()).toContain('Parked');
+        expect(wrapper.find('[data-testid="finalize-requirement"]').exists()).toBe(false);
+
+        wrapper.unmount();
     });
 
     it('confirms requirement comment deletion in an alert dialog before deleting the thread message', async () => {

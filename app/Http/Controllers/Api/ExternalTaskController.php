@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
@@ -214,6 +215,7 @@ class ExternalTaskController extends Controller
             'environment' => $this->taskEnvironment($task),
             'phase' => $task->phase(),
             'finalized' => ! $task->isRequirementPhase(),
+            'requirement_status' => $task->requirementStatus(),
             'submitted_title' => $task->metadata?->submitted_title,
             'submitted_description' => $task->metadata?->submitted_description,
             'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
@@ -654,6 +656,7 @@ class ExternalTaskController extends Controller
             'description' => 'nullable|string',
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -666,10 +669,17 @@ class ExternalTaskController extends Controller
         }
 
         $task->update([
-            ...$attributes,
+            ...collect($attributes)->except('requirement_status')->all(),
             'status' => $attributes['status'] ?? $task->status,
             'priority' => $attributes['priority'] ?? $task->priority,
         ]);
+
+        if ($task->isRequirementPhase() && array_key_exists('requirement_status', $attributes)) {
+            $task->metadata()->updateOrCreate(
+                ['task_id' => $task->id],
+                ['requirement_status' => $attributes['requirement_status'] ?? RequirementStatus::Submitted->value],
+            );
+        }
 
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {

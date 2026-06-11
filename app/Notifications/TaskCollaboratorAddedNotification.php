@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\TaskStatus;
 use App\Models\Task;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,12 @@ class TaskCollaboratorAddedNotification extends Notification implements ShouldQu
         return route('tasks.index', ['task' => $this->task->id]);
     }
 
+    protected function statusLabel(): string
+    {
+        return TaskStatus::tryFrom((string) $this->task->status)?->label()
+            ?? ucfirst(str_replace(['_', '-'], ' ', (string) $this->task->status));
+    }
+
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
@@ -45,7 +52,7 @@ class TaskCollaboratorAddedNotification extends Notification implements ShouldQu
             ->line('You have been added as a collaborator on an existing task in the project: '.$this->task->project->name)
             ->line('Task Title: '.$this->task->title)
             ->line('Priority: '.ucfirst($this->task->priority))
-            ->line('Status: '.ucfirst(str_replace('_', ' ', $this->task->status)))
+            ->line('Status: '.$this->statusLabel())
             ->action('View Task', $url)
             ->line('Please do not reply to this email directly.');
     }

@@ -3,6 +3,9 @@ import {
     getPriorityBadgeClass,
     getPriorityLabel,
     getPriorityOptions,
+    getRequirementStatusBadgeClass,
+    getRequirementStatusLabel,
+    getRequirementStatusOptions,
     getSortByOptions,
     getStatusBadgeClass,
     getStatusLabel,
@@ -22,7 +25,33 @@ describe('shared/tasks/presentation', () => {
 
     it('computes default statuses by excluding completed/closed', () => {
         const statuses = getStatusOptions({ includeClosed: true });
-        expect(getDefaultStatuses(statuses)).toEqual(['pending', 'in-progress', 'awaiting-feedback']);
+        expect(getDefaultStatuses(statuses)).toEqual(['pending', 'in-progress', 'awaiting-feedback', 'on-hold']);
+    });
+
+    it('exposes on hold as an open task status', () => {
+        const statuses = getStatusOptions({ includeClosed: false });
+
+        expect(statuses.map((option) => option.value)).toContain('on-hold');
+        expect(getStatusLabel('on-hold', statuses)).toBe('On Hold');
+        expect(getStatusBadgeClass('on-hold')).toContain('border-orange-300');
+    });
+
+    it('exposes requirement lifecycle options with neutral awaiting feedback wording', () => {
+        const statuses = getRequirementStatusOptions();
+
+        expect(statuses.map((option) => option.value)).toEqual([
+            'submitted',
+            'in-review',
+            'awaiting-feedback',
+            'ready-to-finalize',
+            'parked',
+            'declined',
+        ]);
+        expect(getRequirementStatusLabel('awaiting-feedback')).toBe('Awaiting Feedback');
+        expect(getRequirementStatusLabel('ready-to-finalize')).toBe('Ready');
+        expect(getRequirementStatusLabel('finalized')).toBe('Finalized');
+        expect(getRequirementStatusBadgeClass('finalized')).toContain('border-emerald-300');
+        expect(getRequirementStatusLabel('unknown')).toBe('unknown');
     });
 
     it('normalizes string list filters', () => {
