@@ -32,6 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements');
         Route::get('clients', [ClientController::class, 'index'])->name('clients');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects');
+        Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users');
         Route::get('team', [OrganisationController::class, 'team'])->name('team');
         Route::get('settings', [OrganisationController::class, 'settings'])->name('settings');
     });

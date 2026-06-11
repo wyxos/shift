@@ -1,4 +1,4 @@
-import { collaboratorsEqual, emptyTaskCollaborators, normalizeTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
+import { collaboratorsEqual, normalizeTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
 import { getTaskIdFromQuery, syncTaskQuery } from '@/shared/tasks/history';
 import { getTaskCreatorEmail, getTaskCreatorName, getTaskEnvironment } from '@/shared/tasks/metadata';
 import { projectEnvironmentOptions, type TaskProjectOption } from '@/shared/tasks/projects';
@@ -6,6 +6,8 @@ import type { TaskDetail, TaskIndexEditSnapshot, TaskIndexOpenEditOptions } from
 import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } from 'vue';
 import { toast } from 'vue-sonner';
+import { defaultTaskEditForm, editMobilePaneOptions } from './taskIndexEditDefaults';
+import { taskIndexThreadBindings } from './taskIndexThreadBindings';
 import { useTaskIndexThreadState } from './useTaskIndexThreadState';
 type UseTaskIndexEditStateOptions = {
     projects: TaskProjectOption[];
@@ -20,21 +22,10 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const editTask = ref<TaskDetail | null>(null);
     const deletedAttachmentIds = ref<number[]>([]);
     const editTempIdentifier = ref(Date.now().toString());
-    const editForm = ref({
-        title: '',
-        priority: 'medium',
-        status: 'pending',
-        description: '',
-        environment: null as string | null,
-        collaborators: emptyTaskCollaborators(),
-    });
+    const editForm = ref(defaultTaskEditForm());
     const confirmCloseOpen = ref(false);
     const initialEditSnapshot = ref<TaskIndexEditSnapshot | null>(null);
     const editMobilePane = ref<'details' | 'comments'>('details');
-    const editMobilePaneOptions = [
-        { value: 'details', label: 'Details' },
-        { value: 'comments', label: 'Comments' },
-    ];
     const taskSaving = ref(false);
     const taskSaveError = ref<string | null>(null);
     const pendingTaskSave = ref(false);
@@ -48,8 +39,14 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editOpen,
         editTask,
     });
-    const isOwner = computed(() => Boolean(editTask.value?.is_owner));
     const isRequirementPhase = computed(() => editTask.value?.phase === 'requirement');
+    const canComment = computed(() => editTask.value?.can_comment !== false);
+    const canEditTaskScope = computed(() => {
+        if (!editTask.value) return false;
+
+        return isRequirementPhase.value ? editTask.value.can_edit_requirement === true : editTask.value.can_edit_task === true;
+    });
+    const canFinalizeRequirement = computed(() => editTask.value?.can_finalize_requirement === true);
     const canManageCollaborators = computed(() => Boolean(editTask.value?.can_manage_collaborators));
     const editTaskCreatorLabel = computed(() => getTaskCreatorName(editTask.value) ?? getTaskCreatorEmail(editTask.value) ?? 'Unknown');
     const editTaskProjectUsersLabel = computed(() => {
@@ -210,13 +207,13 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         if (!snapshot) return;
         const taskId = editTask.value.id;
         const needsCollaboratorUpdate = canManageCollaborators.value && hasCollaboratorManagementChanges();
-        const needsCoreUpdate = isOwner.value
+        const needsCoreUpdate = canEditTaskScope.value
             ? editForm.value.title !== snapshot.title ||
               editForm.value.priority !== snapshot.priority ||
               editForm.value.status !== snapshot.status ||
               (editForm.value.description ?? '') !== (snapshot.description ?? '') ||
               deletedAttachmentIds.value.length > 0
-            : editForm.value.status !== snapshot.status;
+            : false;
 
         if (!needsCoreUpdate && !needsCollaboratorUpdate) return;
 
@@ -238,18 +235,14 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
         try {
             if (needsCoreUpdate) {
-                const payload = isOwner.value
-                    ? {
-                          title: editForm.value.title,
-                          description: editForm.value.description,
-                          priority: editForm.value.priority,
-                          status: editForm.value.status,
-                          temp_identifier: editTempIdentifier.value,
-                          deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
-                      }
-                    : {
-                          status: editForm.value.status,
-                      };
+                const payload = {
+                    title: editForm.value.title,
+                    description: editForm.value.description,
+                    priority: editForm.value.priority,
+                    status: editForm.value.status,
+                    temp_identifier: editTempIdentifier.value,
+                    deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
+                };
 
                 const response = await axios.put(route('tasks.v2.update', { task: taskId }), payload);
                 mergeEditedTask(response.data?.task ?? null);
@@ -279,6 +272,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
     async function finalizeRequirement() {
         if (!editTask.value || !isRequirementPhase.value) return;
+        if (!canFinalizeRequirement.value) return;
 
         requirementFinalizing.value = true;
         requirementFinalizeError.value = null;
@@ -379,14 +373,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editError.value = null;
         editUploading.value = false;
         deletedAttachmentIds.value = [];
-        editForm.value = {
-            title: '',
-            priority: 'medium',
-            status: 'pending',
-            description: '',
-            environment: null,
-            collaborators: emptyTaskCollaborators(),
-        };
+        editForm.value = defaultTaskEditForm();
         initialEditSnapshot.value = null;
         editMobilePane.value = 'details';
         taskSaving.value = false;
@@ -434,6 +421,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     }
 
     function removeAttachmentFromTask(attachmentId: number) {
+        if (!canEditTaskScope.value) return;
         if (!deletedAttachmentIds.value.includes(attachmentId)) {
             deletedAttachmentIds.value = [...deletedAttachmentIds.value, attachmentId];
             scheduleTaskAutosave(true);
@@ -464,16 +452,12 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     return {
         aiImproveEnabled: options.aiImproveEnabled,
         attemptCloseEdit,
+        canComment,
+        canEditTaskScope,
+        canFinalizeRequirement,
         canManageCollaborators,
-        cancelThreadEdit: thread.cancelThreadEdit,
-        commentsScrollRef: thread.commentsScrollRef,
         closeEditNow,
         confirmCloseOpen,
-        contextMenuMessageId: thread.contextMenuMessageId,
-        contextMenuSelectionText: thread.contextMenuSelectionText,
-        copyEntireMessage: thread.copyEntireMessage,
-        copySelectedMessage: thread.copySelectedMessage,
-        deleteThreadMessage: thread.deleteThreadMessage,
         deletedAttachmentIds,
         discardChangesAndClose,
         editError,
@@ -488,55 +472,19 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editTaskProjectUsersLabel,
         editTempIdentifier,
         editUploading,
-        fetchThreads: thread.fetchThreads,
-        handleReplyReferenceClick: thread.handleReplyReferenceClick,
-        handleThreadSend: thread.handleThreadSend,
         hasUnsavedChanges,
-        hasUnsavedCommentDraft,
-        hasUnsavedTaskChanges,
-        isOwner,
         isRequirementPhase,
-        lastTouchTapAt: thread.lastTouchTapAt,
-        lastTouchTapId: thread.lastTouchTapId,
-        lightboxAlt: thread.lightboxAlt,
-        lightboxOpen: thread.lightboxOpen,
-        lightboxSrc: thread.lightboxSrc,
-        onCommentContextMenuOpen: thread.onCommentContextMenuOpen,
-        onCommentsMediaLoadCapture: thread.onCommentsMediaLoadCapture,
         onEditOpenChange,
-        onGlobalClickCapture: thread.onGlobalClickCapture,
-        onGlobalDblClickCapture: thread.onGlobalDblClickCapture,
-        onGlobalKeyDownCapture: thread.onGlobalKeyDownCapture,
-        onMessageDblClick: thread.onMessageDblClick,
-        onMessageTouchEnd: thread.onMessageTouchEnd,
-        onRichContentClick: thread.onRichContentClick,
         openEdit,
-        pendingTaskSave,
         finalizeRequirement,
         removeAttachmentFromTask,
         requirementFinalizeError,
         requirementFinalizing,
-        resetThreadState: thread.resetThreadState,
         saveTaskChanges,
-        scrollCommentsToBottomSoon: thread.scrollCommentsToBottomSoon,
-        shouldShowCopySelection: thread.shouldShowCopySelection,
-        startReplyToMessage: thread.startReplyToMessage,
-        startThreadEdit: thread.startThreadEdit,
         taskAttachments,
         taskSaveError,
         taskSaving,
-        threadAiContext: thread.threadAiContext,
-        threadComposerHtml: thread.threadComposerHtml,
-        threadComposerRef: thread.threadComposerRef,
-        threadComposerUploading: thread.threadComposerUploading,
-        threadEditError: thread.threadEditError,
-        threadEditSaving: thread.threadEditSaving,
-        threadError: thread.threadError,
-        threadLoading: thread.threadLoading,
-        threadMessages: thread.threadMessages,
-        threadSending: thread.threadSending,
-        threadTempIdentifier: thread.threadTempIdentifier,
-        threadEditingId: thread.threadEditingId,
+        ...taskIndexThreadBindings(thread),
         updateEditCollaborators,
     };
 }

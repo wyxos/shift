@@ -26,6 +26,8 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         typeof providedFilters.organisation_id === 'number' || typeof providedFilters.organisation_id === 'string'
             ? String(providedFilters.organisation_id)
             : '';
+    const providedProjectId =
+        typeof providedFilters.project_id === 'number' || typeof providedFilters.project_id === 'string' ? String(providedFilters.project_id) : '';
     const providedSortBy =
         typeof providedFilters.sort_by === 'string' && allowedSortBy.has(providedFilters.sort_by) ? providedFilters.sort_by : defaultSortBy;
 
@@ -34,12 +36,14 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
     const appliedPriorities = ref<string[]>(providedPriorities.length ? providedPriorities : [...allPriorities]);
     const appliedSearchTerm = ref(providedSearchTerm);
     const appliedEnvironmentTerm = ref(providedEnvironmentTerm);
+    const appliedProjectId = ref(providedProjectId);
     const appliedSortBy = ref(providedSortBy);
 
     const draftStatuses = ref<string[]>([...appliedStatuses.value]);
     const draftPriorities = ref<string[]>([...appliedPriorities.value]);
     const draftSearchTerm = ref(appliedSearchTerm.value);
     const draftEnvironmentTerm = ref(appliedEnvironmentTerm.value);
+    const draftProjectId = ref(appliedProjectId.value);
     const draftSortBy = ref(appliedSortBy.value);
 
     watch(filtersOpen, (open) => {
@@ -53,6 +57,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         if (appliedPriorities.value.length && appliedPriorities.value.length < priorityOptions.length) count += 1;
         if (appliedSearchTerm.value.trim()) count += 1;
         if (appliedEnvironmentTerm.value.trim()) count += 1;
+        if (appliedProjectId.value) count += 1;
         if (appliedSortBy.value !== defaultSortBy) count += 1;
         return count;
     });
@@ -62,6 +67,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         draftPriorities.value = [...appliedPriorities.value];
         draftSearchTerm.value = appliedSearchTerm.value;
         draftEnvironmentTerm.value = appliedEnvironmentTerm.value;
+        draftProjectId.value = appliedProjectId.value;
         draftSortBy.value = appliedSortBy.value;
     }
 
@@ -70,6 +76,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedPriorities.value = [...draftPriorities.value];
         appliedSearchTerm.value = draftSearchTerm.value;
         appliedEnvironmentTerm.value = draftEnvironmentTerm.value;
+        appliedProjectId.value = draftProjectId.value;
         appliedSortBy.value = draftSortBy.value;
     }
 
@@ -78,6 +85,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         draftPriorities.value = [...allPriorities];
         draftSearchTerm.value = '';
         draftEnvironmentTerm.value = '';
+        draftProjectId.value = '';
         draftSortBy.value = defaultSortBy;
     }
 
@@ -86,6 +94,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedPriorities.value = [...allPriorities];
         appliedSearchTerm.value = '';
         appliedEnvironmentTerm.value = '';
+        appliedProjectId.value = '';
         appliedSortBy.value = defaultSortBy;
     }
 
@@ -101,6 +110,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             search: appliedSearchTerm.value || undefined,
             environment: appliedEnvironmentTerm.value || undefined,
             organisation_id: providedOrganisationId || undefined,
+            project_id: appliedProjectId.value || undefined,
             sort_by: appliedSortBy.value,
             page,
         };
@@ -119,6 +129,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         allPriorities,
         appliedEnvironmentTerm,
         appliedPriorities,
+        appliedProjectId,
         appliedSearchTerm,
         appliedSortBy,
         appliedStatuses,
@@ -128,6 +139,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         defaultStatuses,
         draftEnvironmentTerm,
         draftPriorities,
+        draftProjectId,
         draftSearchTerm,
         draftSortBy,
         draftStatuses,

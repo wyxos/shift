@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Filter } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -20,7 +21,9 @@ interface Props {
     draftPriorities: string[];
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
+    draftProjectId?: string;
     draftSortBy: string;
+    projectOptions?: Option[];
     statusOptions: Option[];
     priorityOptions: Option[];
     sortByOptions: Option[];
@@ -29,6 +32,7 @@ interface Props {
     setDraftPriorities: (value: string[]) => void;
     setDraftSearchTerm: (value: string) => void;
     setDraftEnvironmentTerm: (value: string) => void;
+    setDraftProjectId?: (value: string) => void;
     setDraftSortBy: (value: string) => void;
     resetFilters: () => void;
     applyFilters: () => void;
@@ -36,7 +40,11 @@ interface Props {
     selectAllPriorities: () => void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    draftProjectId: '',
+    projectOptions: () => [],
+    setDraftProjectId: () => {},
+});
 
 const openModel = computed({
     get: () => props.open,
@@ -52,6 +60,13 @@ const environmentModel = computed({
     get: () => props.draftEnvironmentTerm,
     set: (value: string) => props.setDraftEnvironmentTerm(value),
 });
+
+const projectModel = computed({
+    get: () => props.draftProjectId ?? '',
+    set: (value: string | number | null) => props.setDraftProjectId(value === null || value === undefined ? '' : String(value)),
+});
+
+const projectFilterOptions = computed(() => [{ value: '', label: 'All projects' }, ...props.projectOptions]);
 
 const statusesModel = computed({
     get: () => props.draftStatuses,
@@ -95,6 +110,19 @@ const sortByModel = computed({
                     <Input v-model="searchModel" data-testid="filter-search" placeholder="Search by title" />
                 </div>
 
+                <div v-if="projectOptions.length" class="space-y-2">
+                    <Label class="text-muted-foreground">Project</Label>
+                    <Select
+                        v-model="projectModel"
+                        :options="projectFilterOptions"
+                        placeholder="All projects"
+                        search-placeholder="Search projects..."
+                        empty-label="No projects found."
+                        searchable
+                        test-id="filter-project"
+                    />
+                </div>
+
                 <div class="space-y-2">
                     <Label class="text-muted-foreground">Environment</Label>
                     <Input v-model="environmentModel" data-testid="filter-environment" placeholder="e.g. Production" />
@@ -135,7 +163,7 @@ const sortByModel = computed({
             </div>
 
             <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
                 <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
             </SheetFooter>
         </SheetContent>

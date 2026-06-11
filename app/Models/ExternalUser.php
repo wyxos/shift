@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ExternalUserRole;
 use App\Enums\TaskCollaboratorKind;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,10 @@ class ExternalUser extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected $casts = [
+        'role' => ExternalUserRole::class,
+    ];
 
     /**
      * Get the tasks that this external user is associated with.

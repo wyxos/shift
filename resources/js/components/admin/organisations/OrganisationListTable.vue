@@ -12,6 +12,8 @@ type OrganisationRow = {
     organisation_users_count?: number | null;
     projects_count?: number | null;
     isOwner: boolean;
+    can_delete?: boolean;
+    can_manage_org_access?: boolean;
 };
 
 const { organisations } = defineProps<{
@@ -40,6 +42,14 @@ function projectsLabel(count?: number | null) {
 
 function settingsHref(organisation: OrganisationRow) {
     return `/organisation/${organisation.id}/settings`;
+}
+
+function canManageOrgAccess(organisation: OrganisationRow) {
+    return organisation.can_manage_org_access ?? organisation.isOwner;
+}
+
+function canDeleteOrganisation(organisation: OrganisationRow) {
+    return organisation.can_delete ?? organisation.isOwner;
 }
 </script>
 
@@ -80,7 +90,7 @@ function settingsHref(organisation: OrganisationRow) {
                 <TableCell>
                     <div class="flex flex-wrap justify-end gap-2">
                         <Button
-                            v-if="organisation.isOwner"
+                            v-if="canManageOrgAccess(organisation)"
                             size="sm"
                             variant="outline"
                             :data-testid="`organisation-manage-${organisation.id}`"
@@ -91,7 +101,7 @@ function settingsHref(organisation: OrganisationRow) {
                             <span class="sr-only">Manage users</span>
                         </Button>
                         <Button
-                            v-if="organisation.isOwner"
+                            v-if="canManageOrgAccess(organisation)"
                             as-child
                             size="sm"
                             variant="outline"
@@ -104,7 +114,7 @@ function settingsHref(organisation: OrganisationRow) {
                             </Link>
                         </Button>
                         <Button
-                            v-if="organisation.isOwner"
+                            v-if="canDeleteOrganisation(organisation)"
                             size="sm"
                             variant="destructive"
                             :data-testid="`organisation-delete-${organisation.id}`"

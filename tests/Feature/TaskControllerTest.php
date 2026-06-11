@@ -82,6 +82,41 @@ test('tasks index can be scoped by organisation route', function () {
     );
 });
 
+test('tasks v2 can filter tasks by project query and includes project summary', function () {
+    $firstProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'name' => 'Billing Console',
+    ]);
+    $secondProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'name' => 'Retail Dashboard',
+    ]);
+
+    $firstTask = Task::factory()->create([
+        'project_id' => $firstProject->id,
+        'status' => 'pending',
+    ]);
+    Task::factory()->create([
+        'project_id' => $secondProject->id,
+        'status' => 'pending',
+    ]);
+
+    $firstTask->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('tasks.index', ['project_id' => $firstProject->id]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $firstTask->id)
+        ->where('tasks.data.0.project.id', $firstProject->id)
+        ->where('tasks.data.0.project.name', 'Billing Console')
+        ->where('filters.project_id', $firstProject->id)
+    );
+});
+
 test('tasks v2 defaults to excluding completed tasks', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -282,6 +317,55 @@ test('requirements index can be scoped by organisation route', function () {
         ->where('tasks.data.0.id', $scopedRequirement->id)
         ->where('surface', 'requirements')
         ->where('filters.organisation_id', $organisation->id)
+    );
+});
+
+test('requirements index can filter requirement intake items by project', function () {
+    $firstProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'name' => 'Billing Console',
+    ]);
+    $secondProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'name' => 'Retail Dashboard',
+    ]);
+
+    $firstRequirement = Task::factory()->create([
+        'project_id' => $firstProject->id,
+        'title' => 'Billing requirement',
+        'status' => 'pending',
+    ]);
+    $secondRequirement = Task::factory()->create([
+        'project_id' => $secondProject->id,
+        'title' => 'Retail requirement',
+        'status' => 'pending',
+    ]);
+
+    foreach ([$firstRequirement, $secondRequirement] as $requirement) {
+        $requirement->submitter()->associate($this->user)->save();
+        $requirement->metadata()->create([
+            'environment' => 'production',
+            'url' => 'https://example.com/requirement',
+            'phase' => 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'submitted_title' => $requirement->title,
+            'submitted_description' => 'Client wording.',
+        ]);
+    }
+
+    $response = $this->actingAs($this->user)
+        ->get(route('requirements.index', ['project_id' => $firstProject->id]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $firstRequirement->id)
+        ->where('tasks.data.0.project.id', $firstProject->id)
+        ->where('tasks.data.0.project.name', 'Billing Console')
+        ->where('surface', 'requirements')
+        ->where('filters.project_id', $firstProject->id)
     );
 });
 
@@ -941,7 +1025,7 @@ test('destroy v2 deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertMissing($attachment2->path);
 });
 
-test('update v2 lets an attached collaborator update status', function () {
+test('update v2 blocks an attached collaborator from updating status', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create([
         'author_id' => $owner->id,
@@ -959,14 +1043,11 @@ test('update v2 lets an attached collaborator update status', function () {
             'status' => 'awaiting-feedback',
         ]);
 
-    $response
-        ->assertOk()
-        ->assertJsonPath('ok', true)
-        ->assertJsonPath('task.status', 'awaiting-feedback');
+    $response->assertForbidden();
 
     $this->assertDatabaseHas('tasks', [
         'id' => $task->id,
-        'status' => 'awaiting-feedback',
+        'status' => 'pending',
     ]);
 });
 
@@ -1166,7 +1247,7 @@ test('edit route redirects for external submitted task', function () {
     $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
-test('attached internal collaborator can update collaborators through the v2 collaborator endpoint', function () {
+test('attached internal collaborator cannot update collaborators through the v2 collaborator endpoint', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create([
         'author_id' => $owner->id,
@@ -1202,12 +1283,9 @@ test('attached internal collaborator can update collaborators through the v2 col
             'internal_collaborator_ids' => [$manager->id, $newCollaborator->id],
         ]);
 
-    $response
-        ->assertOk()
-        ->assertJsonPath('task.can_manage_collaborators', true)
-        ->assertJsonPath('task.internal_collaborators.1.id', $newCollaborator->id);
+    $response->assertForbidden();
 
-    $this->assertDatabaseHas('task_collaborators', [
+    $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $task->id,
         'user_id' => $newCollaborator->id,
     ]);
