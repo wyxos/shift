@@ -11,6 +11,7 @@ const inertiaMocks = vi.hoisted(() => ({
     axiosPost: vi.fn(),
     axiosPatch: vi.fn(),
     fetchMock: vi.fn(),
+    pageUrl: '/projects',
 }));
 
 vi.stubGlobal('fetch', inertiaMocks.fetchMock);
@@ -185,7 +186,7 @@ vi.mock('@inertiajs/vue3', async () => {
             reload: inertiaMocks.routerReload,
         },
         usePage: () => ({
-            url: '/projects',
+            url: inertiaMocks.pageUrl,
             props: {},
         }),
         useForm: vi.fn((initialValues: Record<string, unknown>) => {
@@ -212,6 +213,18 @@ vi.mock('axios', () => ({
         post: inertiaMocks.axiosPost,
         patch: inertiaMocks.axiosPatch,
     },
+}));
+vi.mock('lucide-vue-next', () => ({
+    KeyRound: { render: () => h('span') },
+    ListTodo: { render: () => h('span') },
+    MessageSquare: { render: () => h('span') },
+    Pencil: { render: () => h('span') },
+    Plus: { render: () => h('span') },
+    Search: { render: () => h('span') },
+    Trash2: { render: () => h('span') },
+    Users: { render: () => h('span') },
+    UserPlus: { render: () => h('span') },
+    UserSearch: { render: () => h('span') },
 }));
 
 describe('Projects.vue', () => {
@@ -262,6 +275,7 @@ describe('Projects.vue', () => {
         inertiaMocks.axiosPost.mockReset();
         inertiaMocks.axiosPatch.mockReset();
         inertiaMocks.fetchMock.mockReset();
+        inertiaMocks.pageUrl = '/projects';
         inertiaMocks.formInstances.length = 0;
         inertiaMocks.axiosPost.mockResolvedValue({ data: { token: 'generated-token' } });
         inertiaMocks.axiosPatch.mockResolvedValue({ data: {} });
@@ -286,6 +300,8 @@ describe('Projects.vue', () => {
         expect(wrapper.text()).not.toContain('Project #1');
         expect(wrapper.find('[data-testid="project-scope-1"]').text()).toContain('Acme Org');
         expect(wrapper.find('[data-testid="project-grant-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="project-tasks-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="project-external-users-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-manage-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-manage-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-widget-1"]').exists()).toBe(true);
@@ -329,6 +345,34 @@ describe('Projects.vue', () => {
             expect.objectContaining({ page: 2, search: 'Portal', sort_by: 'name' }),
             expect.objectContaining({ preserveScroll: true, preserveState: true, replace: true }),
         );
+    });
+
+    it('links project rows to filtered task and external-user lists', async () => {
+        const wrapper = mountPage();
+
+        await wrapper.get('[data-testid="project-tasks-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenCalledWith('/tasks', { project_id: 1 });
+
+        await wrapper.get('[data-testid="project-external-users-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/external-users', { project_id: 1 });
+    });
+
+    it('keeps project row links scoped when opened from an organisation projects route', async () => {
+        inertiaMocks.pageUrl = '/organisation/3/projects';
+
+        const wrapper = mountPage({
+            filters: {
+                search: '',
+                sort_by: 'newest',
+                organisation_id: 3,
+            },
+        });
+
+        await wrapper.get('[data-testid="project-tasks-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenCalledWith('/organisation/3/tasks', { project_id: 1 });
+
+        await wrapper.get('[data-testid="project-external-users-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/3/external-users', { project_id: 1 });
     });
 
     it('preserves create, edit, delete, and manage access add flows', async () => {

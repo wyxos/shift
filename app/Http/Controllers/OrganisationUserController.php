@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrganisationRole;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
@@ -9,6 +10,7 @@ use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\OrganisationAccessNotification;
 use App\Notifications\OrganisationInvitationNotification;
+use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -17,6 +19,8 @@ use Illuminate\Support\Facades\Notification;
 
 class OrganisationUserController extends Controller
 {
+    public function __construct(private readonly ShiftPermissionService $permissions) {}
+
     /**
      * Store a newly created resource in storage.
      */
@@ -26,11 +30,16 @@ class OrganisationUserController extends Controller
         $validated = $request->validate([
             'email' => 'required|email',
             'name' => 'required|string|max:255',
+            'role' => ['nullable', \Illuminate\Validation\Rule::enum(OrganisationRole::class)],
         ]);
 
-        // Check if the authenticated user is the author of the organisation
-        if ($organisation->author_id !== Auth::id()) {
+        if (! $this->permissions->canManageOrganisationAccess($organisation, Auth::id())) {
             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $role = OrganisationRole::tryFrom($validated['role'] ?? '') ?? OrganisationRole::Developer;
+        if ($role !== OrganisationRole::Developer && ! $this->permissions->canManageOrganisation($organisation, Auth::id())) {
+            return response()->json(['message' => 'Only organisation administrators can assign elevated roles.'], 403);
         }
 
         // Find the user by email if they exist
@@ -49,6 +58,7 @@ class OrganisationUserController extends Controller
             'user_id' => $user ? $user->id : null, // Use null when the user doesn't exist
             'user_email' => $validated['email'],
             'user_name' => $validated['name'],
+            'role' => $role->value,
         ]);
 
         // Send appropriate notification based on whether the user exists or not
@@ -74,7 +84,12 @@ class OrganisationUserController extends Controller
      */
     public function destroy(Organisation $organisation, OrganisationUser $organisationUser)
     {
-        $this->authorizeOrganisationUser($organisation, $organisationUser);
+        if (
+            $organisationUser->organisation_id !== $organisation->id
+            || ! $this->permissions->canManageOrganisation($organisation, Auth::id())
+        ) {
+            abort(403);
+        }
 
         $projectIds = $this->organisationProjectIds($organisation);
         $this->projectUserQuery($organisationUser, $projectIds)->delete();
@@ -96,7 +111,7 @@ class OrganisationUserController extends Controller
             'project_ids.*' => 'integer',
         ]);
 
-        $projectIds = $this->organisationProjectIds($organisation);
+        $projectIds = $this->manageableOrganisationProjectIds($organisation);
         $selectedProjectIds = collect($validated['project_ids'] ?? [])
             ->map(fn ($projectId) => (int) $projectId)
             ->unique()
@@ -137,7 +152,10 @@ class OrganisationUserController extends Controller
 
     private function authorizeOrganisationUser(Organisation $organisation, OrganisationUser $organisationUser): void
     {
-        if ($organisation->author_id !== Auth::id() || $organisationUser->organisation_id !== $organisation->id) {
+        if (
+            $organisationUser->organisation_id !== $organisation->id
+            || ! $this->permissions->canManageOrganisationAccess($organisation, Auth::id())
+        ) {
             abort(403);
         }
     }
@@ -156,6 +174,29 @@ class OrganisationUserController extends Controller
                     });
             })
             ->pluck('id');
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function manageableOrganisationProjectIds(Organisation $organisation): Collection
+    {
+        $projectIds = $this->organisationProjectIds($organisation);
+
+        if ($this->permissions->canManageOrganisation($organisation, Auth::id())) {
+            return $projectIds;
+        }
+
+        if ($projectIds->isEmpty()) {
+            return $projectIds;
+        }
+
+        return Project::query()
+            ->whereIn('id', $projectIds)
+            ->get()
+            ->filter(fn (Project $project) => $this->permissions->canManageProjectAccess($project, Auth::id()))
+            ->pluck('id')
+            ->values();
     }
 
     /**

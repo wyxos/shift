@@ -65,10 +65,7 @@ class ExternalTaskThreadController extends Controller
 
     private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
     {
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalCollaborators()->where('external_users.id', $externalUser->id)->exists();
-
-        return $isSubmitter || $hasAccess;
+        return $this->externalUserService->canCommentOnProjectItem($task, $externalUser);
     }
 
     /**

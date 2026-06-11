@@ -1,10 +1,12 @@
 import ExternalUsersIndex from '@/pages/ExternalUsers/Index.vue';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 
 const routerGetMock = vi.fn();
 const routerVisitMock = vi.fn();
+const routerReloadMock = vi.fn();
+const axiosPutMock = vi.fn();
 
 vi.mock('@/layouts/AppLayout.vue', () => ({
     default: {
@@ -88,6 +90,69 @@ vi.mock('@/components/ui/button-group', () => ({
     },
 }));
 
+vi.mock('@/components/ui/select', () => ({
+    Select: {
+        props: ['modelValue', 'options', 'placeholder', 'testId'],
+        emits: ['update:modelValue'],
+        render() {
+            const options = Array.isArray((this as any).options) ? (this as any).options : [];
+
+            return h(
+                'select',
+                {
+                    'data-testid': (this as any).testId,
+                    value: (this as any).modelValue ?? '',
+                    onChange: (event: Event) => {
+                        const value = (event.target as HTMLSelectElement).value;
+                        const option = options.find((item: any) => String(item.value ?? '') === value);
+
+                        (this as any).$emit('update:modelValue', option ? option.value : value || '');
+                    },
+                },
+                [
+                    (this as any).placeholder ? h('option', { value: '' }, (this as any).placeholder) : null,
+                    ...options.map((option: any) => h('option', { value: option.value ?? '' }, option.label)),
+                ],
+            );
+        },
+    },
+}));
+
+vi.mock('@/components/ui/sheet', () => ({
+    Sheet: {
+        props: ['open'],
+        emits: ['update:open'],
+        render() {
+            return this.open ? h('div', { class: 'sheet-stub', 'data-testid': 'external-user-edit-sheet' }, this.$slots.default?.()) : null;
+        },
+    },
+    SheetContent: {
+        render() {
+            return h('div', { class: 'sheet-content-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetDescription: {
+        render() {
+            return h('p', { class: 'sheet-description-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetFooter: {
+        render() {
+            return h('div', { class: 'sheet-footer-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetHeader: {
+        render() {
+            return h('div', { class: 'sheet-header-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetTitle: {
+        render() {
+            return h('h2', { class: 'sheet-title-stub' }, this.$slots.default?.());
+        },
+    },
+}));
+
 vi.mock('@/components/ui/badge', () => ({
     Badge: {
         render() {
@@ -141,7 +206,14 @@ vi.mock('@inertiajs/vue3', () => ({
     },
     router: {
         get: (...args: unknown[]) => routerGetMock(...args),
+        reload: (...args: unknown[]) => routerReloadMock(...args),
         visit: (...args: unknown[]) => routerVisitMock(...args),
+    },
+}));
+
+vi.mock('axios', () => ({
+    default: {
+        put: (...args: unknown[]) => axiosPutMock(...args),
     },
 }));
 
@@ -157,6 +229,8 @@ describe('ExternalUsers/Index.vue', () => {
                 name: 'Client QA',
                 email: 'qa@example.com',
                 environment: 'Staging',
+                role: 'client_developer',
+                role_label: 'Client Developer',
                 project: { id: 2, name: 'Portal' },
             },
             {
@@ -164,6 +238,8 @@ describe('ExternalUsers/Index.vue', () => {
                 name: 'No Project User',
                 email: null,
                 environment: null,
+                role: 'guest',
+                role_label: 'Guest',
                 project: null,
             },
         ],
@@ -179,11 +255,13 @@ describe('ExternalUsers/Index.vue', () => {
             props: {
                 externalUsers,
                 filters: { search: '', sort_by: null },
+                projects: [{ id: 2, name: 'Portal' }],
             },
         });
 
         expect(wrapper.find('[data-testid="external-user-row-7"]').text()).toContain('Client QA');
         expect(wrapper.find('[data-testid="external-user-environment-7"]').text()).toContain('Staging');
+        expect(wrapper.find('[data-testid="external-user-role-7"]').text()).toContain('Client Developer');
         expect(wrapper.text()).toContain('Portal');
         expect(wrapper.text()).toContain('No project assigned');
     });
@@ -195,10 +273,12 @@ describe('ExternalUsers/Index.vue', () => {
             props: {
                 externalUsers,
                 filters: { search: '', sort_by: null },
+                projects: [{ id: 2, name: 'Portal' }],
             },
         });
 
         await wrapper.get('[data-testid="filter-search"]').setValue('qa');
+        await wrapper.get('[data-testid="filter-project"]').setValue('2');
         await wrapper.get('[data-testid="sort-by-name"]').trigger('click');
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
@@ -206,6 +286,7 @@ describe('ExternalUsers/Index.vue', () => {
             '/external-users',
             {
                 page: 1,
+                project_id: '2',
                 search: 'qa',
                 sort_by: 'name',
             },
@@ -213,25 +294,94 @@ describe('ExternalUsers/Index.vue', () => {
         );
     });
 
-    it('navigates to edit and preserves filters on page change', async () => {
+    it('keeps filters on the organisation scoped route', async () => {
+        routerGetMock.mockReset();
+
+        const wrapper = mount(ExternalUsersIndex, {
+            props: {
+                externalUsers,
+                filters: { search: '', sort_by: null, organisation_id: 3 },
+                projects: [{ id: 2, name: 'Portal' }],
+            },
+        });
+
+        await wrapper.get('[data-testid="filter-project"]').setValue('2');
+        await wrapper.get('[data-testid="filters-apply"]').trigger('click');
+
+        expect(routerGetMock).toHaveBeenCalledWith(
+            '/organisation/3/external-users',
+            expect.objectContaining({
+                page: 1,
+                project_id: '2',
+            }),
+            expect.objectContaining({ replace: true }),
+        );
+    });
+
+    it('opens edit in a sheet and saves inline', async () => {
+        routerVisitMock.mockReset();
+        routerReloadMock.mockReset();
+        axiosPutMock.mockReset();
+        axiosPutMock.mockResolvedValue({ data: { external_user: { id: 7 } } });
+
+        const wrapper = mount(ExternalUsersIndex, {
+            props: {
+                externalUsers,
+                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                projects: [
+                    { id: 2, name: 'Portal' },
+                    { id: 3, name: 'Billing' },
+                ],
+            },
+        });
+
+        await wrapper.get('[data-testid="external-user-edit-7"]').trigger('click');
+
+        expect(routerVisitMock).not.toHaveBeenCalled();
+        expect(wrapper.get('[data-testid="external-user-edit-sheet"]').text()).toContain('Edit external user');
+        expect((wrapper.get('[data-testid="external-user-edit-name"]').element as HTMLInputElement).value).toBe('Client QA');
+
+        await wrapper.get('[data-testid="external-user-edit-name"]').setValue('Client QA Lead');
+        await wrapper.get('[data-testid="external-user-edit-email"]').setValue('lead@example.com');
+        await wrapper.get('[data-testid="external-user-edit-project"]').setValue('3');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(axiosPutMock).toHaveBeenCalledWith(
+            '/external-users/7',
+            {
+                email: 'lead@example.com',
+                name: 'Client QA Lead',
+                project_id: 3,
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+        expect(routerReloadMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: ['externalUsers'],
+                preserveScroll: true,
+            }),
+        );
+    });
+
+    it('preserves filters on page change', async () => {
         routerVisitMock.mockReset();
         routerGetMock.mockReset();
 
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
-                filters: { search: 'qa', sort_by: 'name' },
+                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                projects: [{ id: 2, name: 'Portal' }],
             },
         });
-
-        await wrapper.get('[data-testid="external-user-edit-7"]').trigger('click');
-        expect(routerVisitMock).toHaveBeenCalledWith('/external-users/7/edit');
 
         await wrapper.get('[data-testid="emit-page-change"]').trigger('click');
         expect(routerGetMock).toHaveBeenCalledWith(
             '/external-users',
             {
                 page: 2,
+                project_id: '2',
                 search: 'qa',
                 sort_by: 'name',
             },

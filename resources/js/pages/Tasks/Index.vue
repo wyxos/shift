@@ -6,7 +6,8 @@ import { useTaskIndexEditState } from '@/composables/useTaskIndexEditState';
 import { useTaskIndexFilters } from '@/composables/useTaskIndexFilters';
 import { useTaskIndexListState } from '@/composables/useTaskIndexListState';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { TaskIndexFilters, TaskPaginator, TaskProjectOption } from '@/shared/tasks/types';
+import type { TaskProjectOption } from '@/shared/tasks/projects';
+import type { TaskIndexFilters, TaskPaginator } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, toRef, toRefs } from 'vue';
@@ -65,6 +66,9 @@ const setDraftPriorities = (value: string[]) => {
 const setDraftEnvironmentTerm = (value: string) => {
     filtersState.draftEnvironmentTerm.value = value;
 };
+const setDraftProjectId = (value: string) => {
+    filtersState.draftProjectId.value = value;
+};
 const setDraftSortBy = (value: string) => {
     filtersState.draftSortBy.value = value;
 };
@@ -96,6 +100,7 @@ const onGlobalKeyDownCapture = editState.onGlobalKeyDownCapture;
 const filtersModel = reactive({
     ...filtersState,
     setDraftEnvironmentTerm,
+    setDraftProjectId,
     setDraftPriorities,
     setDraftSearchTerm,
     setDraftSortBy,
@@ -123,6 +128,7 @@ const {
     buildListQuery,
     defaultSortBy,
     draftEnvironmentTerm,
+    draftProjectId,
     draftPriorities,
     draftSearchTerm,
     draftSortBy,
@@ -168,7 +174,6 @@ const {
     hasUnsavedChanges,
     hasUnsavedCommentDraft,
     hasUnsavedTaskChanges,
-    isOwner,
     lastTouchTapAt,
     lastTouchTapId,
     lightboxAlt,

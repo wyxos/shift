@@ -15,6 +15,11 @@ type Option = {
 
 type TaskListRow = {
     id: number;
+    project_id?: number | null;
+    project?: {
+        id: number;
+        name: string;
+    } | null;
     title: string;
     status: string;
     priority: string;
@@ -31,7 +36,10 @@ type TaskListRow = {
         total_items: number;
         requirement_items: number;
         finalized_items: number;
+        can_finalize_requirement?: boolean;
     } | null;
+    can_delete?: boolean;
+    can_finalize_requirement?: boolean;
 };
 
 interface Props {
@@ -51,7 +59,9 @@ interface Props {
     draftPriorities: string[];
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
+    draftProjectId?: string;
     draftSortBy: string;
+    projectOptions?: Option[];
     statusOptions: Option[];
     priorityOptions: Option[];
     sortByOptions: Option[];
@@ -65,6 +75,7 @@ interface Props {
     setDraftPriorities: (value: string[]) => void;
     setDraftSearchTerm: (value: string) => void;
     setDraftEnvironmentTerm: (value: string) => void;
+    setDraftProjectId?: (value: string) => void;
     setDraftSortBy: (value: string) => void;
     resetFilters: () => void;
     applyFilters: () => void;
@@ -87,6 +98,9 @@ const props = withDefaults(defineProps<Props>(), {
     deleteLoading: null,
     finalizeRequirementBatch: undefined,
     requirementBatchFinalizeLoading: null,
+    draftProjectId: '',
+    projectOptions: () => [],
+    setDraftProjectId: () => {},
 });
 
 const groupedRequirements = computed(() => {
@@ -130,6 +144,10 @@ function taskBatch(task: TaskListRow) {
     };
 }
 
+function taskProjectLabel(task: TaskListRow) {
+    return task.project?.name?.trim() || null;
+}
+
 function requirementPackTitle(batch: TaskListRow['batch']) {
     if (batch?.title) return batch.title;
     if (batch?.id) return `Requirement pack #${batch.id}`;
@@ -146,6 +164,49 @@ function requirementPackMeta(batch: TaskListRow['batch'], tasks: TaskListRow[]) 
 
 function isFinalizedRequirement(task: TaskListRow) {
     return task.finalized === true || (task.phase !== undefined && task.phase !== null && task.phase !== 'requirement');
+}
+
+function canDeleteTask(task: TaskListRow) {
+    return task.can_delete === true;
+}
+
+function canFinalizeRequirement(task: TaskListRow) {
+    return task.can_finalize_requirement === true;
+}
+
+function canFinalizeRequirementPack(group: { batch: TaskListRow['batch']; tasks: TaskListRow[] }) {
+    if (!group.batch?.id) return false;
+    if (group.batch.requirement_items <= 0) return false;
+    if (!props.finalizeRequirementBatch) return false;
+    if (typeof group.batch.can_finalize_requirement === 'boolean') {
+        return group.batch.can_finalize_requirement;
+    }
+
+    const openRequirements = group.tasks.filter((task) => !isFinalizedRequirement(task));
+
+    return openRequirements.length > 0 && openRequirements.every(canFinalizeRequirement);
+}
+
+function requirementPackId(group: { batch: TaskListRow['batch'] }) {
+    return group.batch?.id ?? null;
+}
+
+function isRequirementPackFinalizeLoading(group: { batch: TaskListRow['batch'] }) {
+    const batchId = requirementPackId(group);
+
+    return batchId !== null && props.requirementBatchFinalizeLoading === batchId;
+}
+
+function requirementPackFinalizeLabel(group: { batch: TaskListRow['batch'] }) {
+    return isRequirementPackFinalizeLoading(group) ? 'Finalizing...' : 'Finalize pack';
+}
+
+async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
+    const batchId = requirementPackId(group);
+
+    if (batchId === null || !props.finalizeRequirementBatch) return;
+
+    await props.finalizeRequirementBatch(batchId);
 }
 </script>
 
@@ -165,7 +226,9 @@ function isFinalizedRequirement(task: TaskListRow) {
                     :draft-priorities="draftPriorities"
                     :draft-search-term="draftSearchTerm"
                     :draft-environment-term="draftEnvironmentTerm"
+                    :draft-project-id="draftProjectId"
                     :draft-sort-by="draftSortBy"
+                    :project-options="projectOptions"
                     :status-options="statusOptions"
                     :priority-options="priorityOptions"
                     :sort-by-options="sortByOptions"
@@ -174,6 +237,7 @@ function isFinalizedRequirement(task: TaskListRow) {
                     :set-draft-priorities="setDraftPriorities"
                     :set-draft-search-term="setDraftSearchTerm"
                     :set-draft-environment-term="setDraftEnvironmentTerm"
+                    :set-draft-project-id="setDraftProjectId"
                     :set-draft-sort-by="setDraftSortBy"
                     :reset-filters="resetFilters"
                     :apply-filters="applyFilters"
@@ -219,19 +283,19 @@ function isFinalizedRequirement(task: TaskListRow) {
                                             </div>
                                         </div>
                                         <Button
-                                            v-if="group.batch?.id && group.batch.requirement_items > 0 && finalizeRequirementBatch"
-                                            :data-testid="`requirement-pack-finalize-${group.batch.id}`"
-                                            :disabled="requirementBatchFinalizeLoading === group.batch.id"
-                                            :aria-label="requirementBatchFinalizeLoading === group.batch.id ? 'Finalizing pack' : 'Finalize pack'"
+                                            v-if="canFinalizeRequirementPack(group)"
+                                            :data-testid="`requirement-pack-finalize-${requirementPackId(group)}`"
+                                            :disabled="isRequirementPackFinalizeLoading(group)"
+                                            :aria-label="requirementPackFinalizeLabel(group)"
                                             class="h-8 w-8 shrink-0 p-0 sm:h-9 sm:w-auto sm:px-3"
                                             size="sm"
                                             type="button"
                                             variant="outline"
-                                            @click="finalizeRequirementBatch(group.batch.id)"
+                                            @click="finalizeRequirementPack(group)"
                                         >
                                             <CheckCircle2 class="h-4 w-4 sm:mr-2" />
                                             <span class="hidden sm:inline">
-                                                {{ requirementBatchFinalizeLoading === group.batch.id ? 'Finalizing...' : 'Finalize pack' }}
+                                                {{ requirementPackFinalizeLabel(group) }}
                                             </span>
                                         </Button>
                                     </div>
@@ -254,6 +318,9 @@ function isFinalizedRequirement(task: TaskListRow) {
                                         >
                                             {{ task.title }}
                                         </button>
+                                        <Badge v-if="taskProjectLabel(task)" :data-testid="`task-project-badge-${task.id}`" variant="secondary">
+                                            {{ taskProjectLabel(task) }}
+                                        </Badge>
                                         <Badge
                                             v-if="isFinalizedRequirement(task)"
                                             class="border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100"
@@ -294,6 +361,7 @@ function isFinalizedRequirement(task: TaskListRow) {
                                             <Eye class="h-4 w-4" />
                                         </ActionIconButton>
                                         <ActionIconButton
+                                            v-if="canDeleteTask(task)"
                                             label="Delete requirement"
                                             title="Delete"
                                             variant="destructive"
@@ -316,15 +384,20 @@ function isFinalizedRequirement(task: TaskListRow) {
                             data-testid="task-row"
                         >
                             <TableCell class="min-w-[18rem] whitespace-normal">
-                                <button
-                                    type="button"
-                                    class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                                    :aria-label="`Open task details for ${task.title}`"
-                                    :data-testid="`task-title-${task.id}`"
-                                    @click="openEdit(task.id)"
-                                >
-                                    {{ task.title }}
-                                </button>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                        :aria-label="`Open task details for ${task.title}`"
+                                        :data-testid="`task-title-${task.id}`"
+                                        @click="openEdit(task.id)"
+                                    >
+                                        {{ task.title }}
+                                    </button>
+                                    <Badge v-if="taskProjectLabel(task)" :data-testid="`task-project-badge-${task.id}`" variant="secondary">
+                                        {{ taskProjectLabel(task) }}
+                                    </Badge>
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
@@ -356,6 +429,7 @@ function isFinalizedRequirement(task: TaskListRow) {
                                         <Eye class="h-4 w-4" />
                                     </ActionIconButton>
                                     <ActionIconButton
+                                        v-if="canDeleteTask(task)"
                                         label="Delete task"
                                         title="Delete"
                                         variant="destructive"

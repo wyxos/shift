@@ -88,8 +88,8 @@ watch(deleteDialogOpen, (open) => {
                                         : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
                                 "
                                 class="rounded-lg px-3 py-2 text-sm shadow-sm"
-                                @dblclick="state.onMessageDblClick(message, $event)"
-                                @touchend="state.onMessageTouchEnd(message, $event)"
+                                @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
+                                @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
                                 <div v-if="!message.isYou" class="text-foreground/80 mb-1 text-[11px] font-semibold">
                                     {{ message.author }}
@@ -138,23 +138,29 @@ watch(deleteDialogOpen, (open) => {
                                     Copy selection
                                 </ContextMenuItem>
                                 <ContextMenuItem
-                                    v-if="!message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
                                     class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
                                     @select="state.startReplyToMessage(message)"
                                 >
                                     Reply
                                 </ContextMenuItem>
-                                <ContextMenuSeparator v-if="!message.isYou && message.id && !message.pending" class="bg-border -mx-1 my-1 h-px" />
+                                <ContextMenuSeparator
+                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
+                                    class="bg-border -mx-1 my-1 h-px"
+                                />
                                 <ContextMenuItem
-                                    v-if="message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
                                     class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
                                     @select="state.startThreadEdit(message)"
                                 >
                                     Edit
                                 </ContextMenuItem>
-                                <ContextMenuSeparator v-if="message.isYou && message.id && !message.pending" class="bg-border -mx-1 my-1 h-px" />
+                                <ContextMenuSeparator
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
+                                    class="bg-border -mx-1 my-1 h-px"
+                                />
                                 <ContextMenuItem
-                                    v-if="message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
                                     class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
                                     data-testid="delete-thread-message"
                                     @select="requestDeleteThreadMessage(message)"
@@ -174,6 +180,7 @@ watch(deleteDialogOpen, (open) => {
         <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
             <div v-if="state.threadEditError" class="text-destructive mb-2 text-xs">{{ state.threadEditError }}</div>
             <ShiftEditor
+                v-if="state.canComment"
                 ref="state.threadComposerRef"
                 v-model="threadComposerHtmlModel"
                 :enable-ai-improve="state.aiImproveEnabled"
@@ -187,6 +194,7 @@ watch(deleteDialogOpen, (open) => {
                 @uploading="state.setThreadComposerUploading($event)"
                 @send="state.handleThreadSend"
             />
+            <div v-else class="text-muted-foreground py-2 text-sm">Commenting is unavailable for this task.</div>
         </div>
 
         <AlertDialog v-model:open="deleteDialogOpen">

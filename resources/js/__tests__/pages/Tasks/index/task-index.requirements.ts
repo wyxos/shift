@@ -34,12 +34,15 @@ describe('Tasks/Index.vue', () => {
                         status: 'pending',
                         priority: 'medium',
                         phase: 'requirement',
+                        can_delete: true,
+                        can_finalize_requirement: true,
                         batch: {
                             id: 7,
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
                             finalized_items: 0,
+                            can_finalize_requirement: true,
                         },
                     },
                     {
@@ -48,12 +51,15 @@ describe('Tasks/Index.vue', () => {
                         status: 'pending',
                         priority: 'medium',
                         phase: 'requirement',
+                        can_delete: true,
+                        can_finalize_requirement: true,
                         batch: {
                             id: 7,
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
                             finalized_items: 0,
+                            can_finalize_requirement: true,
                         },
                     },
                     {
@@ -62,12 +68,15 @@ describe('Tasks/Index.vue', () => {
                         status: 'pending',
                         priority: 'low',
                         phase: 'requirement',
+                        can_delete: true,
+                        can_finalize_requirement: true,
                         batch: {
                             id: 8,
                             title: 'Notification changes',
                             total_items: 1,
                             requirement_items: 1,
                             finalized_items: 0,
+                            can_finalize_requirement: true,
                         },
                     },
                 ]),
@@ -80,6 +89,69 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.text()).toContain('2 items');
         expect(wrapper.text()).toContain('2 pending');
         expect(wrapper.find('[data-testid="requirement-pack-finalize-7"]').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('hides requirement item and pack finalize controls when the capability is missing', async () => {
+        axiosGetMock.mockReset();
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    project_id: 42,
+                    title: 'Monthly renewal report',
+                    priority: 'medium',
+                    status: 'pending',
+                    phase: 'requirement',
+                    finalized: false,
+                    created_at: '2026-02-10T17:40:00',
+                    description: '<p>Client supplied requirement.</p>',
+                    is_owner: true,
+                    can_comment: true,
+                    can_edit_requirement: false,
+                    can_finalize_requirement: false,
+                    can_manage_collaborators: false,
+                    attachments: [],
+                    internal_collaborators: [],
+                    external_collaborators: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                surface: 'requirements',
+                tasks: makeTasksPage([
+                    {
+                        id: 1,
+                        title: 'Monthly renewal report',
+                        status: 'pending',
+                        priority: 'medium',
+                        phase: 'requirement',
+                        can_delete: false,
+                        can_finalize_requirement: false,
+                        batch: {
+                            id: 7,
+                            title: 'June client requirements',
+                            total_items: 1,
+                            requirement_items: 1,
+                            finalized_items: 0,
+                            can_finalize_requirement: false,
+                        },
+                    },
+                ]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        expect(wrapper.find('[data-testid="requirement-pack-finalize-7"]').exists()).toBe(false);
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="finalize-requirement"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(true);
 
         wrapper.unmount();
     });
@@ -108,12 +180,15 @@ describe('Tasks/Index.vue', () => {
                         status: 'pending',
                         priority: 'medium',
                         phase: 'requirement',
+                        can_delete: true,
+                        can_finalize_requirement: true,
                         batch: {
                             id: 7,
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
                             finalized_items: 0,
+                            can_finalize_requirement: true,
                         },
                     },
                     {
@@ -122,12 +197,15 @@ describe('Tasks/Index.vue', () => {
                         status: 'pending',
                         priority: 'medium',
                         phase: 'requirement',
+                        can_delete: true,
+                        can_finalize_requirement: true,
                         batch: {
                             id: 7,
                             title: 'June client requirements',
                             total_items: 2,
                             requirement_items: 2,
                             finalized_items: 0,
+                            can_finalize_requirement: true,
                         },
                     },
                 ]),
@@ -176,6 +254,8 @@ describe('Tasks/Index.vue', () => {
                     submitted_title: 'Export renewal data',
                     submitted_description: '<p>Original requested export.</p>',
                     is_owner: true,
+                    can_edit_requirement: true,
+                    can_finalize_requirement: true,
                     can_manage_collaborators: true,
                     submitter: { email: 'client@example.com' },
                     attachments: [],

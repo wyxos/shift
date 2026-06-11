@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrganisationRole;
 use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\ProjectInvitationNotification;
+use App\Services\ShiftPermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 
 class ProjectUserController extends Controller
 {
+    public function __construct(private readonly ShiftPermissionService $permissions) {}
+
     /**
      * Store a newly created resource in storage.
      */
@@ -24,13 +28,8 @@ class ProjectUserController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        // Check if the authenticated user is the project owner
-        $isOwner = $project->client?->organisation?->author_id === Auth::id() ||
-                   $project->organisation?->author_id === Auth::id() ||
-                   $project->author_id === Auth::id();
-
-        if (! $isOwner) {
-            return response()->json(['message' => 'Unauthorized. Only project owners can grant access.'], 403);
+        if (! $this->permissions->canManageProjectAccess($project, Auth::id())) {
+            return response()->json(['message' => 'Unauthorized. You cannot grant access to this project.'], 403);
         }
 
         $organisation = $project->accessOrganisation();
@@ -68,7 +67,10 @@ class ProjectUserController extends Controller
             'registration_status' => $user ? 'registered' : 'pending', // Set status based on user existence
         ]);
 
-        OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+        $organisationUser = OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+        if ($organisationUser->role === null) {
+            $organisationUser->forceFill(['role' => OrganisationRole::Developer])->save();
+        }
 
         // If the user doesn't exist, send an invitation email
         if (! $user) {
@@ -89,13 +91,8 @@ class ProjectUserController extends Controller
      */
     public function destroy(Project $project, ProjectUser $projectUser)
     {
-        // Check if the authenticated user is the project owner
-        $isOwner = $project->client?->organisation?->author_id === Auth::id() ||
-                   $project->organisation?->author_id === Auth::id() ||
-                   $project->author_id === Auth::id();
-
-        if (! $isOwner) {
-            return response()->json(['message' => 'Unauthorized. Only project owners can remove access.'], 403);
+        if (! $this->permissions->canManageProjectAccess($project, Auth::id())) {
+            return response()->json(['message' => 'Unauthorized. You cannot remove access from this project.'], 403);
         }
 
         // Check if the projectUser belongs to the project

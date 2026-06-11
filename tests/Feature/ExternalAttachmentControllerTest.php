@@ -1,6 +1,9 @@
 <?php
 
+use App\Enums\ExternalUserRole;
 use App\Models\Attachment;
+use App\Models\ExternalUser;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -294,6 +297,51 @@ test('download returns image inline for image files', function () {
 
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'image/jpeg');
+});
+
+test('external role-visible users can download task attachments', function () {
+    $project = Project::factory()->create([
+        'token' => 'attachment-role-project',
+    ]);
+    $owner = ExternalUser::factory()->create([
+        'project_id' => $project->id,
+        'external_id' => 'owner-1',
+        'environment' => 'testing',
+        'url' => 'https://consumer.test',
+        'role' => ExternalUserRole::Owner,
+    ]);
+    $shiftLeadDeveloper = ExternalUser::factory()->create([
+        'project_id' => $project->id,
+        'external_id' => 'shift-lead-1',
+        'environment' => 'testing',
+        'url' => 'https://consumer.test',
+        'role' => ExternalUserRole::ShiftLeadDeveloper,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+    $task->submitter()->associate($owner)->save();
+    $attachment = Attachment::create([
+        'attachable_id' => $task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'role-visible-document.pdf',
+        'path' => "attachments/{$task->id}/role-visible-document.pdf",
+    ]);
+    Storage::put($attachment->path, 'role visible content');
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->get(route('api.attachments.download', [
+            'attachment' => $attachment,
+            'project' => $project->token,
+            'user' => [
+                'id' => $shiftLeadDeveloper->external_id,
+                'environment' => $shiftLeadDeveloper->environment,
+                'url' => $shiftLeadDeveloper->url,
+            ],
+        ]));
+
+    $response->assertOk();
+    $response->assertHeader('Content-Type', 'application/pdf');
 });
 
 test('download requires authentication', function () {

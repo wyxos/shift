@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrganisationRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -79,9 +80,25 @@ class Project extends Model
             return false;
         }
 
+        $managedByOrganisationAdmin = false;
+        if ($this->client?->organisation) {
+            $managedByOrganisationAdmin = $this->client->organisation->organisationUsers()
+                ->where('user_id', $userId)
+                ->where('role', OrganisationRole::Administrator->value)
+                ->exists();
+        }
+
+        if (! $managedByOrganisationAdmin && $this->organisation) {
+            $managedByOrganisationAdmin = $this->organisation->organisationUsers()
+                ->where('user_id', $userId)
+                ->where('role', OrganisationRole::Administrator->value)
+                ->exists();
+        }
+
         return $this->client?->organisation?->author_id === $userId
             || $this->organisation?->author_id === $userId
-            || $this->author_id === $userId;
+            || $this->author_id === $userId
+            || $managedByOrganisationAdmin;
     }
 
     public function isVisibleToUser(?int $userId): bool
@@ -105,10 +122,22 @@ class Project extends Model
         return $query->where(function (Builder $projectQuery) use ($userId) {
             $projectQuery
                 ->whereHas('client.organisation', function (Builder $organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
+                    $organisationQuery
+                        ->where('author_id', $userId)
+                        ->orWhereHas('organisationUsers', function (Builder $memberQuery) use ($userId) {
+                            $memberQuery
+                                ->where('user_id', $userId)
+                                ->where('role', OrganisationRole::Administrator->value);
+                        });
                 })
                 ->orWhereHas('organisation', function (Builder $organisationQuery) use ($userId) {
-                    $organisationQuery->where('author_id', $userId);
+                    $organisationQuery
+                        ->where('author_id', $userId)
+                        ->orWhereHas('organisationUsers', function (Builder $memberQuery) use ($userId) {
+                            $memberQuery
+                                ->where('user_id', $userId)
+                                ->where('role', OrganisationRole::Administrator->value);
+                        });
                 })
                 ->orWhere('author_id', $userId)
                 ->orWhereHas('projectUser', function (Builder $projectUserQuery) use ($userId) {

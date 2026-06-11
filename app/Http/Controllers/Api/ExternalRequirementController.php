@@ -74,7 +74,7 @@ class ExternalRequirementController extends Controller
             ->withQueryString();
         $batchSummaries = $this->requirementBatchSummaries($project, $externalUser, $requirements->getCollection());
 
-        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries));
+        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser));
 
         return response()->json($requirements);
     }
@@ -104,6 +104,10 @@ class ExternalRequirementController extends Controller
         $environment = $this->resolveEnvironment($project, $attributes);
         $sourceUrl = $this->sourceUrl($attributes);
         $externalUser = $this->currentExternalUser($project, $attributes, true);
+
+        if (! $this->externalUserService->canSubmitRequirements($externalUser)) {
+            return response()->json(['error' => 'Unauthorized to submit requirements for this project'], 403);
+        }
 
         $created = DB::transaction(function () use ($attributes, $project, $environment, $sourceUrl, $externalUser) {
             $batch = RequirementBatch::query()->create([
@@ -153,24 +157,17 @@ class ExternalRequirementController extends Controller
                 'title' => $batch->title,
                 'created_at' => $batch->created_at?->toIso8601String(),
             ],
-            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries))->values()->all(),
+            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser))->values()->all(),
         ], 201);
     }
 
     private function visibleRequirementsQuery(Project $project, ExternalUser $externalUser): Builder
     {
-        return Task::query()
+        $query = Task::query()
             ->where('project_id', $project->id)
-            ->requirementIntake()
-            ->where(function (Builder $query) use ($externalUser) {
-                $query
-                    ->whereHasMorph('submitter', [ExternalUser::class], function (Builder $submitterQuery) use ($externalUser) {
-                        $submitterQuery->where('external_users.id', $externalUser->id);
-                    })
-                    ->orWhereHas('externalCollaborators', function (Builder $collaboratorQuery) use ($externalUser) {
-                        $collaboratorQuery->where('external_users.id', $externalUser->id);
-                    });
-            });
+            ->requirementIntake();
+
+        return $this->externalUserService->constrainVisibleProjectItems($query, $externalUser);
     }
 
     private function requirementBatchSummaries(Project $project, ExternalUser $externalUser, $tasks): array
@@ -263,11 +260,12 @@ class ExternalRequirementController extends Controller
         ) ?? (string) config('app.url');
     }
 
-    private function serializeRequirement(Task $task, array $batchSummaries = []): array
+    private function serializeRequirement(Task $task, array $batchSummaries = [], ?ExternalUser $externalUser = null): array
     {
         $metadata = $task->metadata;
         $phase = $metadata?->phase ?: 'task';
         $batchId = $metadata?->requirement_batch_id;
+        $capabilities = $this->externalUserService->capabilityFlags($task, $externalUser);
 
         return [
             'id' => $task->id,
@@ -284,6 +282,7 @@ class ExternalRequirementController extends Controller
             'submitted_title' => $metadata?->submitted_title,
             'submitted_description' => $metadata?->submitted_description,
             'environment' => $metadata?->environment,
+            ...$capabilities,
             'created_at' => $task->created_at?->toIso8601String(),
             'updated_at' => $task->updated_at?->toIso8601String(),
             'finalized_at' => $metadata?->finalized_at?->toIso8601String(),
