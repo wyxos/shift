@@ -26,14 +26,18 @@ describe('Organisations/Index.vue', () => {
         expect(createForm.isActive).toBe(false);
     });
 
-    it('links owner edit actions to organisation settings', () => {
+    it('links organisation view actions to organisation dashboards', () => {
         const wrapper = mount(Index, {
             props: makeProps(),
         });
 
-        const editAction = wrapper.get('[data-testid="organisation-edit-1"]');
+        const ownerViewAction = wrapper.get('[data-testid="organisation-view-1"]');
+        const sharedViewAction = wrapper.get('[data-testid="organisation-view-2"]');
 
-        expect(editAction.find('a[href="/organisation/1/settings"]').exists()).toBe(true);
+        expect(ownerViewAction.find('a[href="/organisation/1/dashboard"]').exists()).toBe(true);
+        expect(sharedViewAction.find('a[href="/organisation/2/dashboard"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="organisation-edit-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="organisation-delete-1"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="edit-organisation-name"]').exists()).toBe(false);
     });
 
@@ -45,6 +49,7 @@ describe('Organisations/Index.vue', () => {
         expect(wrapper.find('[data-testid="organisation-manage-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="organisation-edit-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="organisation-delete-2"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="organisation-view-2"]').exists()).toBe(true);
     });
 
     it('adds a user from the manage access dialog', async () => {
@@ -319,20 +324,12 @@ describe('Organisations/Index.vue', () => {
         );
     });
 
-    it('deletes an organisation after confirmation', async () => {
+    it('does not expose destructive organisation deletion from the list row', () => {
         const wrapper = mount(Index, {
             props: makeProps(),
         });
 
-        await wrapper.get('[data-testid="organisation-delete-1"]').trigger('click');
-        await wrapper.get('[data-testid="delete-dialog-confirm"]').trigger('click');
-
-        expect(routerDeleteMock).toHaveBeenCalledWith(
-            '/organisations/1',
-            expect.objectContaining({
-                preserveScroll: true,
-                onSuccess: expect.any(Function),
-            }),
-        );
+        expect(wrapper.find('[data-testid="organisation-delete-1"]').exists()).toBe(false);
+        expect(routerDeleteMock).not.toHaveBeenCalled();
     });
 });

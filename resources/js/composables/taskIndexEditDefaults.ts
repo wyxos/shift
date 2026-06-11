@@ -10,6 +10,7 @@ export function defaultTaskEditForm() {
         title: '',
         priority: 'medium',
         status: 'pending',
+        requirement_status: 'submitted',
         description: '',
         environment: null as string | null,
         collaborators: emptyTaskCollaborators(),

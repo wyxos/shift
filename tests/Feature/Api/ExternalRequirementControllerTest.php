@@ -6,6 +6,8 @@ use App\Models\RequirementBatch;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -62,6 +64,7 @@ beforeEach(function () {
             'phase' => $attributes['phase'] ?? 'requirement',
             'source' => 'embedded_requirement_pack',
             'intake_type' => 'requirement',
+            'requirement_status' => $attributes['requirement_status'] ?? 'submitted',
             'requirement_batch_id' => $attributes['requirement_batch_id'] ?? null,
             'submitted_title' => $attributes['submitted_title'] ?? ($attributes['title'] ?? 'Requirement item'),
             'submitted_description' => $attributes['submitted_description'] ?? 'Original requirement details.',
@@ -103,6 +106,7 @@ test('permitted external roles can create a requirement batch with multiple task
         ->assertJsonPath('batch.title', 'June client requirements')
         ->assertJsonCount(2, 'items')
         ->assertJsonPath('items.0.phase', 'requirement')
+        ->assertJsonPath('items.0.requirement_status', 'submitted')
         ->assertJsonPath('items.1.phase', 'requirement');
 
     $batchId = $response->json('batch.id');
@@ -124,11 +128,139 @@ test('permitted external roles can create a requirement batch with multiple task
         $this->assertDatabaseHas('task_metadata', [
             'task_id' => $item['id'],
             'phase' => 'requirement',
+            'requirement_status' => 'submitted',
             'requirement_batch_id' => $batchId,
             'source' => 'embedded_requirement_pack',
             'intake_type' => 'requirement',
         ]);
     }
+});
+
+test('requirement batch submission syncs collaborators and rich editor temp attachments', function () {
+    Storage::fake();
+    Http::fake([
+        'https://example.com/shift/api/collaborators/external*' => Http::response([
+            'environment' => 'testing',
+            'url' => 'https://example.com',
+            'users' => [
+                [
+                    'id' => 'client-456',
+                    'name' => 'Global Client User',
+                    'email' => 'global-client@example.com',
+                ],
+                [
+                    'id' => 'client-789',
+                    'name' => 'Item Client User',
+                    'email' => 'item-client@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $externalUser = ($this->createRoleExternalUser)('client-123', 'client_developer', [
+        'name' => 'Client User',
+        'email' => 'client@example.com',
+    ]);
+    $globalInternalCollaborator = User::factory()->create();
+    $itemInternalCollaborator = User::factory()->create();
+
+    foreach ([$globalInternalCollaborator, $itemInternalCollaborator] as $collaborator) {
+        \App\Models\ProjectUser::factory()->create([
+            'project_id' => $this->project->id,
+            'user_id' => $collaborator->id,
+            'user_email' => $collaborator->email,
+            'user_name' => $collaborator->name,
+            'registration_status' => 'registered',
+        ]);
+    }
+
+    Storage::put('temp_attachments/requirement-temp-1/screenshot.png', 'image-bytes');
+    Storage::put('temp_attachments/requirement-temp-1/screenshot.png.meta', json_encode([
+        'original_filename' => 'screenshot.png',
+    ]));
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/requirements/batches', [
+            'project' => $this->project->token,
+            'title' => 'Collaborator scoped requirements',
+            'user' => ($this->externalPayload)($externalUser),
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://example.com/portal',
+            ],
+            'internal_collaborator_ids' => [$globalInternalCollaborator->id],
+            'external_collaborators' => [
+                [
+                    'id' => 'client-456',
+                    'name' => 'Global Client User',
+                    'email' => 'global-client@example.com',
+                ],
+            ],
+            'items' => [
+                [
+                    'title' => 'Global collaborator item',
+                    'description' => '<p><img src="/shift/api/attachments/temp/requirement-temp-1/screenshot.png"></p>',
+                    'temp_identifier' => 'requirement-temp-1',
+                ],
+                [
+                    'title' => 'Per item collaborator item',
+                    'description' => '<p>Need CSV export.</p>',
+                    'internal_collaborator_ids' => [$itemInternalCollaborator->id],
+                    'external_collaborators' => [
+                        [
+                            'id' => 'client-789',
+                            'name' => 'Item Client User',
+                            'email' => 'item-client@example.com',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+    $response->assertCreated()->assertJsonCount(2, 'items');
+
+    $globalRequirement = Task::query()->where('title', 'Global collaborator item')->firstOrFail();
+    $itemRequirement = Task::query()->where('title', 'Per item collaborator item')->firstOrFail();
+    $globalExternalCollaborator = ExternalUser::query()
+        ->where('project_id', $this->project->id)
+        ->where('external_id', 'client-456')
+        ->firstOrFail();
+    $itemExternalCollaborator = ExternalUser::query()
+        ->where('project_id', $this->project->id)
+        ->where('external_id', 'client-789')
+        ->firstOrFail();
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $globalRequirement->id,
+        'user_id' => $globalInternalCollaborator->id,
+        'kind' => 'internal',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $globalRequirement->id,
+        'external_user_id' => $globalExternalCollaborator->id,
+        'kind' => 'external',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $itemRequirement->id,
+        'user_id' => $itemInternalCollaborator->id,
+        'kind' => 'internal',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $itemRequirement->id,
+        'external_user_id' => $itemExternalCollaborator->id,
+        'kind' => 'external',
+    ]);
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $itemRequirement->id,
+        'user_id' => $globalInternalCollaborator->id,
+    ]);
+
+    $attachment = $globalRequirement->attachments()->firstOrFail();
+    Storage::assertMissing('temp_attachments/requirement-temp-1/screenshot.png');
+    Storage::assertExists($attachment->path);
+
+    expect($globalRequirement->refresh()->description)->toContain("/attachments/{$attachment->id}/download");
+    expect($globalRequirement->metadata?->submitted_description)->toContain("/attachments/{$attachment->id}/download");
 });
 
 test('requirement visibility follows the external role matrix', function () {
@@ -310,6 +442,7 @@ test('external users can list their requirement items including finalized requir
         ->assertJsonPath('data.0.batch.finalized_items', 1)
         ->assertJsonPath('data.1.id', $openRequirement->id)
         ->assertJsonPath('data.1.phase', 'requirement')
+        ->assertJsonPath('data.1.requirement_status', 'submitted')
         ->assertJsonPath('data.1.finalized', false)
         ->assertJsonPath('data.1.can_edit', true)
         ->assertJsonPath('data.1.can_update_status', true)
@@ -402,6 +535,7 @@ test('external submitter can open a requirement item through the task detail end
         ->assertOk()
         ->assertJsonPath('id', $requirement->id)
         ->assertJsonPath('phase', 'requirement')
+        ->assertJsonPath('requirement_status', 'submitted')
         ->assertJsonPath('finalized', false)
         ->assertJsonPath('submitted_title', 'Requirement item')
         ->assertJsonPath('submitted_description', 'Original client wording.')
@@ -433,6 +567,7 @@ test('finalizing a requirement preserves the task id and existing threads', func
         'phase' => 'requirement',
         'source' => 'embedded_requirement_pack',
         'intake_type' => 'requirement',
+        'requirement_status' => 'ready-to-finalize',
         'submitted_title' => 'Initial requirement title',
         'submitted_description' => 'Initial requirement details.',
     ]);
@@ -464,9 +599,53 @@ test('finalizing a requirement preserves the task id and existing threads', func
     $this->assertDatabaseHas('task_metadata', [
         'task_id' => $requirement->id,
         'phase' => 'task',
+        'requirement_status' => 'ready-to-finalize',
         'submitted_title' => 'Initial requirement title',
         'submitted_description' => 'Initial requirement details.',
         'finalized_by' => $this->user->id,
+    ]);
+});
+
+test('parked requirement items cannot be finalized until they are ready', function () {
+    $externalUser = ExternalUser::query()->create([
+        'external_id' => $this->externalUserData['id'],
+        'name' => $this->externalUserData['name'],
+        'email' => $this->externalUserData['email'],
+        'environment' => $this->externalUserData['environment'],
+        'url' => $this->externalUserData['url'],
+        'project_id' => $this->project->id,
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'Parked requirement',
+        'description' => 'Too early for this work.',
+        'status' => 'pending',
+    ]);
+    $requirement->submitter()->associate($externalUser)->save();
+    $requirement->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'requirement_status' => 'parked',
+        'submitted_title' => 'Parked requirement',
+        'submitted_description' => 'Too early for this work.',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('requirements.v2.finalize', $requirement), [
+            'title' => 'Parked requirement',
+            'description' => 'Too early for this work.',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Only ready-to-finalize requirements can be finalized.');
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $requirement->id,
+        'phase' => 'requirement',
+        'requirement_status' => 'parked',
     ]);
 });
 

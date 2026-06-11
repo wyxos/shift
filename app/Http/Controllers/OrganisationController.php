@@ -29,12 +29,7 @@ class OrganisationController extends Controller
 
         $organisations = Organisation::query()
             ->withCount(['organisationUsers', 'projects'])
-            ->where(function (Builder $query) use ($userId) {
-                $query->where('author_id', $userId)
-                    ->orWhereHas('organisationUsers', function (Builder $query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    });
-            })
+            ->visibleToUser($userId)
             ->when(
                 request('search'),
                 fn (Builder $query, string $search) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%'])
@@ -166,6 +161,37 @@ class OrganisationController extends Controller
                     ->values()
                     ->all(),
             ] : null,
+        ]);
+    }
+
+    public function sidebar()
+    {
+        $userId = auth()->id();
+        abort_unless($userId, 401);
+
+        $limit = min(max(request()->integer('limit', 5), 1), 10);
+        $offset = max(request()->integer('offset', 0), 0);
+        $search = trim((string) request('search', ''));
+
+        $organisations = Organisation::query()
+            ->visibleToUser($userId)
+            ->when($search !== '', fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%']))
+            ->orderBy('name')
+            ->skip($offset)
+            ->limit($limit + 1)
+            ->get(['id', 'name', 'author_id']);
+
+        return response()->json([
+            'items' => $organisations
+                ->take($limit)
+                ->map(fn (Organisation $organisation) => [
+                    'id' => $organisation->id,
+                    'name' => $organisation->name,
+                    'isOwner' => $organisation->author_id === $userId,
+                    ...$this->permissions->organisationCapabilities($organisation, $userId),
+                ])
+                ->values(),
+            'hasMore' => $organisations->count() > $limit,
         ]);
     }
 

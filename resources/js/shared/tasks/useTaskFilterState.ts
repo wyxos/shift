@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue';
+import type { TaskFilterOption } from './presentation';
 import { DEFAULT_SORT_BY, getDefaultStatuses, getPriorityOptions, getSortByOptions, getStatusOptions, normalizeStringList } from './presentation';
 import type { TaskIndexFilters } from './types';
 
@@ -6,10 +7,11 @@ type UseTaskFilterStateOptions = {
     includeClosed?: boolean;
     completedStatuses?: string[];
     filters?: TaskIndexFilters;
+    statusOptions?: TaskFilterOption[];
 };
 
 export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
-    const statusOptions = getStatusOptions({ includeClosed: options.includeClosed ?? false });
+    const statusOptions = options.statusOptions ?? getStatusOptions({ includeClosed: options.includeClosed ?? false });
     const priorityOptions = getPriorityOptions();
     const sortByOptions = getSortByOptions();
     const defaultSortBy = DEFAULT_SORT_BY;

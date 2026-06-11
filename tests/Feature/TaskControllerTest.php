@@ -130,17 +130,22 @@ test('tasks v2 defaults to excluding completed tasks', function () {
         'project_id' => $project->id,
         'status' => 'completed',
     ]);
+    $onHoldTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'on-hold',
+    ]);
 
     $pendingTask->submitter()->associate($this->user)->save();
     $completedTask->submitter()->associate($this->user)->save();
+    $onHoldTask->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)->get(route('tasks.index'));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Tasks/Index')
-        ->has('tasks.data', 1)
-        ->where('filters.status', ['pending', 'in-progress', 'awaiting-feedback'])
+        ->has('tasks.data', 2)
+        ->where('filters.status', ['pending', 'in-progress', 'awaiting-feedback', 'on-hold'])
     );
 });
 
@@ -219,7 +224,51 @@ test('requirements index lists requirement intake items for review', function ()
         ->has('tasks.data', 1)
         ->where('tasks.data.0.id', $requirement->id)
         ->where('tasks.data.0.phase', 'requirement')
+        ->where('tasks.data.0.requirement_status', 'submitted')
         ->where('surface', 'requirements')
+    );
+});
+
+test('requirements index filters by requirement lifecycle instead of task status', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $ready = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Ready requirement',
+        'status' => 'pending',
+    ]);
+    $parked = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Parked requirement',
+        'status' => 'pending',
+    ]);
+
+    foreach ([[$ready, 'ready-to-finalize'], [$parked, 'parked']] as [$requirement, $status]) {
+        $requirement->submitter()->associate($this->user)->save();
+        $requirement->metadata()->create([
+            'environment' => 'production',
+            'url' => 'https://example.com/requirement',
+            'phase' => 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'requirement_status' => $status,
+            'submitted_title' => $requirement->title,
+            'submitted_description' => 'Requirement details.',
+        ]);
+    }
+
+    $response = $this->actingAs($this->user)->get(route('requirements.index', ['status' => ['parked']]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $parked->id)
+        ->where('tasks.data.0.status', 'pending')
+        ->where('tasks.data.0.requirement_status', 'parked')
+        ->where('filters.status', ['parked'])
     );
 });
 
@@ -429,7 +478,7 @@ test('tasks v2 show includes created and updated timestamps', function () {
     expect($response->json('updated_at'))->toBeString()->not->toBeEmpty();
 });
 
-test('can finalize all open requirement items in a visible batch', function () {
+test('can finalize ready requirement items in a visible batch without promoting parked items', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -463,6 +512,7 @@ test('can finalize all open requirement items in a visible batch', function () {
             'source' => 'embedded_requirement_pack',
             'intake_type' => 'requirement',
             'requirement_batch_id' => $batch->id,
+            'requirement_status' => 'ready-to-finalize',
             'submitted_title' => $title,
             'submitted_description' => 'Client wording.',
         ]);
@@ -477,6 +527,23 @@ test('can finalize all open requirement items in a visible batch', function () {
 
         return $requirement;
     });
+    $parkedRequirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Budget dependent workflow',
+        'status' => 'pending',
+    ]);
+    $parkedRequirement->submitter()->associate($externalUser)->save();
+    $parkedRequirement->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'requirement_batch_id' => $batch->id,
+        'requirement_status' => 'parked',
+        'submitted_title' => 'Budget dependent workflow',
+        'submitted_description' => 'Park until budget is approved.',
+    ]);
 
     $response = $this->actingAs($this->user)
         ->patchJson(route('requirements.v2.batches.finalize', $batch));
@@ -498,6 +565,13 @@ test('can finalize all open requirement items in a visible batch', function () {
         expect($requirement->threads()->where('content', '<p>Requirement finalized as task.</p>')->exists())->toBeTrue();
         expect($requirement->threads()->where('content', '<p>Can you clarify scope?</p>')->exists())->toBeTrue();
     }
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $parkedRequirement->id,
+        'phase' => 'requirement',
+        'requirement_batch_id' => $batch->id,
+        'requirement_status' => 'parked',
+    ]);
 });
 
 test('tasks v2 can filter tasks by environment', function () {

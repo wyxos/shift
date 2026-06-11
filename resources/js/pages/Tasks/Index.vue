@@ -73,7 +73,7 @@ const setDraftSortBy = (value: string) => {
     filtersState.draftSortBy.value = value;
 };
 
-const setEditField = (field: 'title' | 'priority' | 'status' | 'description', value: string) => {
+const setEditField = (field: 'title' | 'priority' | 'status' | 'requirement_status' | 'description', value: string) => {
     editState.editForm.value = {
         ...editState.editForm.value,
         [field]: value,

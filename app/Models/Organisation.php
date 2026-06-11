@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,5 +30,15 @@ class Organisation extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    public function scopeVisibleToUser(Builder $query, int $userId): Builder
+    {
+        return $query->where(function (Builder $query) use ($userId) {
+            $query->where('author_id', $userId)
+                ->orWhereHas('organisationUsers', function (Builder $query) use ($userId) {
+                    $query->where('user_id', $userId);
+                });
+        });
     }
 }

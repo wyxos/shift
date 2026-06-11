@@ -99,6 +99,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             editForm.value.title,
             editForm.value.priority,
             editForm.value.status,
+            editForm.value.requirement_status,
             editForm.value.description,
             editForm.value.environment,
             JSON.stringify(editForm.value.collaborators),
@@ -120,6 +121,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         if (editForm.value.title !== snap.title) return true;
         if (editForm.value.priority !== snap.priority) return true;
         if (editForm.value.status !== snap.status) return true;
+        if (editForm.value.requirement_status !== snap.requirement_status) return true;
         if ((editForm.value.description ?? '') !== (snap.description ?? '')) return true;
         if ((editForm.value.environment ?? '') !== (snap.environment ?? '')) return true;
         if (!collaboratorsEqual(editForm.value.collaborators, snap.collaborators)) return true;
@@ -130,6 +132,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             title: editForm.value.title,
             priority: editForm.value.priority,
             status: editForm.value.status,
+            requirement_status: editForm.value.requirement_status,
             description: editForm.value.description,
             environment: editForm.value.environment,
             collaborators: normalizeTaskCollaborators(editForm.value.collaborators),
@@ -164,6 +167,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             ...editTask.value,
             title: editForm.value.title,
             status: editForm.value.status,
+            requirement_status: editForm.value.requirement_status,
             priority: editForm.value.priority,
             environment: editForm.value.environment,
         };
@@ -211,6 +215,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             ? editForm.value.title !== snapshot.title ||
               editForm.value.priority !== snapshot.priority ||
               editForm.value.status !== snapshot.status ||
+              editForm.value.requirement_status !== snapshot.requirement_status ||
               (editForm.value.description ?? '') !== (snapshot.description ?? '') ||
               deletedAttachmentIds.value.length > 0
             : false;
@@ -240,6 +245,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                     description: editForm.value.description,
                     priority: editForm.value.priority,
                     status: editForm.value.status,
+                    requirement_status: editForm.value.requirement_status,
                     temp_identifier: editTempIdentifier.value,
                     deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
                 };
@@ -281,6 +287,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             const response = await axios.patch(route('requirements.v2.finalize', { task: editTask.value.id }), {
                 title: editForm.value.title,
                 description: editForm.value.description,
+                requirement_status: editForm.value.requirement_status,
             });
             mergeEditedTask(response.data?.task ?? null);
             if (editTask.value) {
@@ -338,6 +345,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 title: data?.title ?? '',
                 priority: data?.priority ?? 'medium',
                 status: data?.status ?? 'pending',
+                requirement_status: data?.requirement_status ?? 'submitted',
                 description: data?.description ?? '',
                 environment: data?.environment ?? null,
                 collaborators: normalizeTaskCollaborators({
@@ -350,6 +358,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 title: editForm.value.title,
                 priority: editForm.value.priority,
                 status: editForm.value.status,
+                requirement_status: editForm.value.requirement_status,
                 description: editForm.value.description,
                 environment: editForm.value.environment,
                 collaborators: normalizeTaskCollaborators(editForm.value.collaborators),

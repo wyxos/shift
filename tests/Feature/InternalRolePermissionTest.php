@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\OrganisationRole;
+use App\Enums\RequirementStatus;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
@@ -157,6 +158,9 @@ test('client project manager can edit and finalize visible requirements', functi
         'author_id' => $owner->id,
     ]);
     $requirement = createRequirementTask($project);
+    $requirement->metadata->forceFill([
+        'requirement_status' => RequirementStatus::ReadyToFinalize->value,
+    ])->save();
 
     createProjectMember($project, $projectManager, OrganisationRole::ClientProjectManager);
 
