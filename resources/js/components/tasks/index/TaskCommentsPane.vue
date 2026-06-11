@@ -54,7 +54,7 @@ watch(deleteDialogOpen, (open) => {
 
 <template>
     <div
-        class="border-muted-foreground/10 via-background to-background max-h-[70vh] min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/5 lg:h-full lg:max-h-none lg:min-h-0"
+        class="border-muted-foreground/10 bg-background h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border"
         data-testid="task-comments-pane"
     >
         <div class="border-muted-foreground/10 flex items-center justify-between border-b px-4 py-3">

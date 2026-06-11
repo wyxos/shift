@@ -3,7 +3,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
-import { getPriorityBadgeClass, getPriorityLabel, getStatusBadgeClass, getStatusLabel } from '@shared/tasks/presentation';
+import {
+    getPriorityBadgeClass,
+    getPriorityLabel,
+    getRequirementStatusBadgeClass,
+    getRequirementStatusLabel,
+    getStatusBadgeClass,
+    getStatusLabel,
+} from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
@@ -22,6 +29,7 @@ type TaskListRow = {
     } | null;
     title: string;
     status: string;
+    requirement_status?: string | null;
     priority: string;
     phase?: string | null;
     finalized?: boolean | null;
@@ -35,6 +43,7 @@ type TaskListRow = {
         created_at?: string | null;
         total_items: number;
         requirement_items: number;
+        ready_items?: number;
         finalized_items: number;
         can_finalize_requirement?: boolean;
     } | null;
@@ -140,6 +149,7 @@ function taskBatch(task: TaskListRow) {
         created_at: null,
         total_items: 0,
         requirement_items: 0,
+        ready_items: 0,
         finalized_items: 0,
     };
 }
@@ -150,20 +160,27 @@ function taskProjectLabel(task: TaskListRow) {
 
 function requirementPackTitle(batch: TaskListRow['batch']) {
     if (batch?.title) return batch.title;
-    if (batch?.id) return `Requirement pack #${batch.id}`;
+    if (batch?.id) return `Requirement group #${batch.id}`;
     return 'Ungrouped requirements';
 }
 
 function requirementPackMeta(batch: TaskListRow['batch'], tasks: TaskListRow[]) {
     const total = batch?.total_items || tasks.length;
     const pending = batch?.requirement_items || tasks.filter((task) => task.phase === 'requirement').length;
+    const ready = batch?.ready_items ?? tasks.filter((task) => task.requirement_status === 'ready-to-finalize').length;
     const finalized = batch?.finalized_items ?? Math.max(total - pending, 0);
 
-    return `${total} ${total === 1 ? 'item' : 'items'} · ${pending} pending · ${finalized} finalized`;
+    return `${total} ${total === 1 ? 'item' : 'items'} · ${pending} open · ${ready} ready · ${finalized} finalized`;
 }
 
 function isFinalizedRequirement(task: TaskListRow) {
     return task.finalized === true || (task.phase !== undefined && task.phase !== null && task.phase !== 'requirement');
+}
+
+function requirementState(task: TaskListRow) {
+    if (isFinalizedRequirement(task)) return 'finalized';
+
+    return task.requirement_status || 'submitted';
 }
 
 function canDeleteTask(task: TaskListRow) {
@@ -171,12 +188,12 @@ function canDeleteTask(task: TaskListRow) {
 }
 
 function canFinalizeRequirement(task: TaskListRow) {
-    return task.can_finalize_requirement === true;
+    return task.can_finalize_requirement === true && task.requirement_status === 'ready-to-finalize';
 }
 
 function canFinalizeRequirementPack(group: { batch: TaskListRow['batch']; tasks: TaskListRow[] }) {
     if (!group.batch?.id) return false;
-    if (group.batch.requirement_items <= 0) return false;
+    if ((group.batch.ready_items ?? 0) <= 0) return false;
     if (!props.finalizeRequirementBatch) return false;
     if (typeof group.batch.can_finalize_requirement === 'boolean') {
         return group.batch.can_finalize_requirement;
@@ -198,7 +215,7 @@ function isRequirementPackFinalizeLoading(group: { batch: TaskListRow['batch'] }
 }
 
 function requirementPackFinalizeLabel(group: { batch: TaskListRow['batch'] }) {
-    return isRequirementPackFinalizeLoading(group) ? 'Finalizing...' : 'Finalize pack';
+    return isRequirementPackFinalizeLoading(group) ? 'Finalizing...' : 'Finalize';
 }
 
 async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
@@ -230,6 +247,7 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                     :draft-sort-by="draftSortBy"
                     :project-options="projectOptions"
                     :status-options="statusOptions"
+                    :status-label="itemLabel === 'requirements' ? 'State' : 'Status'"
                     :priority-options="priorityOptions"
                     :sort-by-options="sortByOptions"
                     :set-open="setFiltersOpen"
@@ -261,7 +279,7 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                 <TableHeader>
                     <TableRow>
                         <TableHead>{{ itemLabel === 'requirements' ? 'Requirement' : 'Task' }}</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>{{ itemLabel === 'requirements' ? 'State' : 'Status' }}</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead>Environment</TableHead>
                         <TableHead class="text-right">Actions</TableHead>
@@ -318,22 +336,24 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                                         >
                                             {{ task.title }}
                                         </button>
-                                        <Badge v-if="taskProjectLabel(task)" :data-testid="`task-project-badge-${task.id}`" variant="secondary">
-                                            {{ taskProjectLabel(task) }}
-                                        </Badge>
-                                        <Badge
-                                            v-if="isFinalizedRequirement(task)"
-                                            class="border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100"
-                                            :data-testid="`requirement-finalized-badge-${task.id}`"
-                                            variant="outline"
-                                        >
-                                            Finalized
-                                        </Badge>
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge :class="getStatusBadgeClass(task.status)" :data-testid="`task-status-badge-${task.id}`" variant="outline">
-                                        {{ getStatusLabel(task.status) }}
+                                    <Badge
+                                        :class="
+                                            itemLabel === 'requirements'
+                                                ? getRequirementStatusBadgeClass(requirementState(task))
+                                                : getStatusBadgeClass(task.status)
+                                        "
+                                        :data-testid="`task-status-badge-${task.id}`"
+                                        variant="outline"
+                                    >
+                                        <template v-if="itemLabel === 'requirements'">
+                                            {{ getRequirementStatusLabel(requirementState(task)) }}
+                                        </template>
+                                        <template v-else>
+                                            {{ getStatusLabel(task.status) }}
+                                        </template>
                                     </Badge>
                                 </TableCell>
                                 <TableCell>

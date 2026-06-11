@@ -79,12 +79,12 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
             const count = Number(response.data?.finalized_count ?? 0);
 
             router.reload({ preserveScroll: true, preserveState: true });
-            toast.success('Requirement pack finalized', {
+            toast.success('Requirements finalized', {
                 description: `${count} ${count === 1 ? 'item' : 'items'} now ${count === 1 ? 'appears' : 'appear'} in the active task list.`,
             });
         } catch (e: any) {
-            error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirement pack';
-            toast.error('Failed to finalize requirement pack', {
+            error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirements';
+            toast.error('Failed to finalize requirements', {
                 description: error.value,
             });
         } finally {

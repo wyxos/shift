@@ -42,6 +42,38 @@ test('organisations index includes ownership context for owned and shared organi
     );
 });
 
+test('organisation sidebar endpoint pages visible organisations and searches on the backend', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    collect(range(1, 12))->each(fn (int $number) => Organisation::factory()->create([
+        'author_id' => $user->id,
+        'name' => sprintf('Atlas %02d', $number),
+    ]));
+
+    Organisation::factory()->create([
+        'author_id' => $otherUser->id,
+        'name' => 'Atlas Hidden',
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/organisations/sidebar?offset=5&limit=5')
+        ->assertOk()
+        ->assertJsonCount(5, 'items')
+        ->assertJsonPath('items.0.name', 'Atlas 06')
+        ->assertJsonPath('items.4.name', 'Atlas 10')
+        ->assertJsonPath('hasMore', true);
+
+    $this->actingAs($user)
+        ->getJson('/organisations/sidebar?search=atlas&limit=10')
+        ->assertOk()
+        ->assertJsonCount(10, 'items')
+        ->assertJsonPath('items.0.name', 'Atlas 01')
+        ->assertJsonPath('items.9.name', 'Atlas 10')
+        ->assertJsonPath('hasMore', true)
+        ->assertJsonMissing(['name' => 'Atlas Hidden']);
+});
+
 test('organisations index exposes team users for the selected owner organisation', function () {
     $ownerCreatedAt = now()->subMonths(4)->startOfSecond();
     $ownerVerifiedAt = now()->subMonths(3)->startOfSecond();

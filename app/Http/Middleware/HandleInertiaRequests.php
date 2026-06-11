@@ -3,7 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Organisation;
-use Illuminate\Database\Eloquent\Builder;
+use App\Services\ShiftPermissionService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -81,26 +81,52 @@ class HandleInertiaRequests extends Middleware
         }
 
         $organisations = Organisation::query()
-            ->where(function (Builder $query) use ($user) {
-                $query->where('author_id', $user->id)
-                    ->orWhereHas('organisationUsers', function (Builder $query) use ($user) {
-                        $query->where('user_id', $user->id);
-                    });
-            })
+            ->visibleToUser($user->id)
             ->orderBy('name')
             ->limit(6)
             ->get(['id', 'name', 'author_id']);
+        $permissions = app(ShiftPermissionService::class);
+        $items = $organisations->take(5);
+        $selectedOrganisationId = $this->selectedOrganisationId($request);
+
+        if ($selectedOrganisationId && ! $items->contains('id', $selectedOrganisationId)) {
+            $selectedOrganisation = Organisation::query()
+                ->visibleToUser($user->id)
+                ->whereKey($selectedOrganisationId)
+                ->first(['id', 'name', 'author_id']);
+
+            if ($selectedOrganisation) {
+                $items->push($selectedOrganisation);
+            }
+        }
 
         return [
-            'items' => $organisations
-                ->take(5)
+            'items' => $items
                 ->map(fn (Organisation $organisation) => [
                     'id' => $organisation->id,
                     'name' => $organisation->name,
                     'isOwner' => $organisation->author_id === $user->id,
+                    ...$permissions->organisationCapabilities($organisation, $user->id),
                 ])
                 ->values(),
             'hasMore' => $organisations->count() > 5,
         ];
+    }
+
+    private function selectedOrganisationId(Request $request): ?int
+    {
+        if (preg_match('/^organisation\/(\d+)(?:\/|$)/', $request->path(), $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        foreach (['organisation_id', 'team', 'manage', 'settings'] as $key) {
+            $value = $request->query($key);
+
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+        }
+
+        return null;
     }
 }

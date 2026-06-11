@@ -1,3 +1,4 @@
+import { getRequirementStatusOptions } from '@/shared/tasks/presentation';
 import type { TaskIndexFilters } from '@/shared/tasks/types';
 import { useTaskFilterState } from '@/shared/tasks/useTaskFilterState';
 import type { SharedData } from '@/types';
@@ -13,7 +14,8 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     const state = useTaskFilterState({
         filters: options.filters,
         includeClosed: false,
-        completedStatuses: ['completed'],
+        completedStatuses: options.surface === 'requirements' ? [] : ['completed'],
+        statusOptions: options.surface === 'requirements' ? getRequirementStatusOptions() : undefined,
     });
     const providedOrganisationId =
         typeof options.filters.organisation_id === 'number' || typeof options.filters.organisation_id === 'string'

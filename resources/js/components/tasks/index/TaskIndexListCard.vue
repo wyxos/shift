@@ -53,8 +53,10 @@ const taskRows = computed(() => {
 });
 const projectFilterOptions = computed(() => (props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })));
 const deleteNoun = computed(() => (props.surface === 'requirements' ? 'requirement' : 'task'));
-const pendingRequirementBatchTitle = computed(() => pendingRequirementBatch.value?.title || 'this requirement pack');
-const pendingRequirementBatchCount = computed(() => pendingRequirementBatch.value?.requirement_items ?? 0);
+const pendingRequirementBatchTitle = computed(() => pendingRequirementBatch.value?.title || 'these requirements');
+const pendingRequirementBatchCount = computed(
+    () => pendingRequirementBatch.value?.ready_items ?? pendingRequirementBatch.value?.requirement_items ?? 0,
+);
 
 function findTask(taskId: number) {
     return taskRows.value.find((task) => task.id === taskId) ?? null;
@@ -81,6 +83,7 @@ function requestRequirementBatchFinalize(batchId: number) {
         created_at: batch?.created_at ?? null,
         total_items: batch?.total_items ?? 0,
         requirement_items: batch?.requirement_items ?? 0,
+        ready_items: batch?.ready_items ?? 0,
         finalized_items: batch?.finalized_items ?? 0,
     };
 }
@@ -160,16 +163,16 @@ async function confirmRequirementBatchFinalize() {
     <AlertDialog v-model:open="requirementBatchDialogOpen">
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Finalize requirement pack</AlertDialogTitle>
+                <AlertDialogTitle>Finalize requirements</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Finalize all {{ pendingRequirementBatchCount }} open {{ pendingRequirementBatchCount === 1 ? 'requirement' : 'requirements' }} in
+                    Finalize all {{ pendingRequirementBatchCount }} ready {{ pendingRequirementBatchCount === 1 ? 'requirement' : 'requirements' }} in
                     {{ pendingRequirementBatchTitle }} as active tasks.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction data-testid="confirm-requirement-pack-finalize" @click="confirmRequirementBatchFinalize"
-                    >Finalize pack</AlertDialogAction
+                    >Finalize</AlertDialogAction
                 >
             </AlertDialogFooter>
         </AlertDialogContent>

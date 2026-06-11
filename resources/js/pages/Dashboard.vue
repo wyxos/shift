@@ -127,13 +127,17 @@ const statusChartConfig = {
         label: 'Awaiting Feedback',
         color: 'var(--chart-3)',
     },
+    'on-hold': {
+        label: 'On Hold',
+        color: 'var(--chart-5)',
+    },
     completed: {
         label: 'Completed',
         color: 'var(--chart-2)',
     },
     closed: {
         label: 'Closed',
-        color: 'var(--chart-5)',
+        color: 'var(--muted-foreground)',
     },
 } satisfies ChartConfig;
 

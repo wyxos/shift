@@ -25,6 +25,7 @@ interface Props {
     draftSortBy: string;
     projectOptions?: Option[];
     statusOptions: Option[];
+    statusLabel?: string;
     priorityOptions: Option[];
     sortByOptions: Option[];
     setOpen: (value: boolean) => void;
@@ -43,6 +44,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     draftProjectId: '',
     projectOptions: () => [],
+    statusLabel: 'Status',
     setDraftProjectId: () => {},
 });
 
@@ -130,7 +132,7 @@ const sortByModel = computed({
 
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">
-                        <Label class="text-muted-foreground">Status</Label>
+                        <Label class="text-muted-foreground">{{ statusLabel }}</Label>
                         <Button size="sm" variant="ghost" @click="selectAllStatuses">All</Button>
                     </div>
 

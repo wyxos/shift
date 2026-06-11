@@ -68,7 +68,7 @@ test('dashboard returns task metrics and chart datasets', function () {
         ->where('metrics.completed', 1)
         ->where('metrics.open', 2)
         ->where('metrics.high_priority_open', 1)
-        ->has('charts.status', 5)
+        ->has('charts.status', 6)
         ->has('charts.priority', 3)
         ->has('charts.throughput', 8)
         ->has('charts.environments')
@@ -204,6 +204,30 @@ test('sidebar organisation shared data only marks the list as having more when i
         ->get('/dashboard')
         ->assertInertia(fn (Assert $page) => $page
             ->has('sidebarOrganisations', 5)
+            ->where('sidebarOrganisationsHasMore', true)
+        );
+});
+
+test('sidebar organisation shared data includes the active scoped organisation outside the first page', function () {
+    $user = User::factory()->create();
+
+    collect(['Atlas Commerce', 'Cedar Labs', 'Northwind Organisation', 'Northwind Studio', 'QA Org'])
+        ->each(fn (string $name) => Organisation::factory()->create([
+            'author_id' => $user->id,
+            'name' => $name,
+        ]));
+
+    $activeOrganisation = Organisation::factory()->create([
+        'author_id' => $user->id,
+        'name' => 'Zephyr Console',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('organisation.dashboard', $activeOrganisation))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('sidebarOrganisations', 6)
+            ->where('sidebarOrganisations.5.id', $activeOrganisation->id)
+            ->where('sidebarOrganisations.5.name', 'Zephyr Console')
             ->where('sidebarOrganisationsHasMore', true)
         );
 });

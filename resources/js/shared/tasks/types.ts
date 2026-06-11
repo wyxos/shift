@@ -6,6 +6,7 @@ export type Task = {
     project?: TaskProjectSummary | null;
     title: string;
     status: string;
+    requirement_status?: string | null;
     priority: string;
     phase?: 'task' | 'requirement' | string;
     finalized?: boolean;
@@ -31,6 +32,7 @@ export type RequirementBatchSummary = {
     created_at?: string | null;
     total_items: number;
     requirement_items: number;
+    ready_items?: number;
     finalized_items: number;
     can_finalize_requirement?: boolean;
 };
@@ -98,6 +100,7 @@ export type TaskIndexEditSnapshot = {
     title: string;
     priority: string;
     status: string;
+    requirement_status: string;
     description: string;
     environment: string | null;
     collaborators: TaskCollaboratorSelection;
