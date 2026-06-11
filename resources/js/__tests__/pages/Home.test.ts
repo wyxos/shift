@@ -111,6 +111,7 @@ describe('Home.vue', () => {
 
         const links = wrapper.findAll('a');
         expect(links.some((link) => link.text().includes('Log in'))).toBe(true);
+        expect(links.some((link) => link.text().includes('Create account') && link.attributes('href') === '/register')).toBe(true);
         expect(links.some((link) => link.attributes('href')?.includes('github.com/wyxos/shift'))).toBe(true);
         expect(links.some((link) => link.attributes('href')?.includes('packagist.org/packages/wyxos/shift-php'))).toBe(true);
         expect(links.some((link) => link.attributes('href')?.includes('wyxos.com'))).toBe(true);
