@@ -3,11 +3,12 @@ import ShiftEditor from '@/components/ShiftEditor.vue';
 import TaskCollaboratorField from '@/components/tasks/TaskCollaboratorField.vue';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getPriorityOptions, getStatusOptions } from '@/shared/tasks/presentation';
+import { renderRichContent } from '@/shared/tasks/rich-content';
 import { computed } from 'vue';
 import TaskCommentsPane from './TaskCommentsPane.vue';
 
@@ -107,6 +108,7 @@ function formatTaskTime(value?: string | null) {
                                 v-model="editTitleModel"
                                 class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                                 data-testid="task-edit-title"
+                                :disabled="!state.canEditTaskScope || state.taskSaving"
                                 type="text"
                             />
                         </div>
@@ -118,6 +120,7 @@ function formatTaskTime(value?: string | null) {
                                 :aria-label="'Task status'"
                                 :class="'xl:grid-cols-4'"
                                 :columns="2"
+                                :disabled="!state.canEditTaskScope || state.taskSaving"
                                 :options="taskStatusOptions"
                                 test-id-prefix="task-status"
                             />
@@ -130,6 +133,7 @@ function formatTaskTime(value?: string | null) {
                                 :aria-label="'Task priority'"
                                 :class="'xl:grid-cols-3'"
                                 :columns="3"
+                                :disabled="!state.canEditTaskScope || state.taskSaving"
                                 :options="taskPriorityOptions"
                                 test-id-prefix="task-priority"
                             />
@@ -138,6 +142,7 @@ function formatTaskTime(value?: string | null) {
                         <div class="space-y-2">
                             <Label class="text-muted-foreground">Description</Label>
                             <ShiftEditor
+                                v-if="state.canEditTaskScope"
                                 v-model="editDescriptionModel"
                                 :enable-ai-improve="state.aiImproveEnabled"
                                 :temp-identifier="state.editTempIdentifier"
@@ -145,9 +150,18 @@ function formatTaskTime(value?: string | null) {
                                 min-height="180"
                                 :sendable="false"
                             />
+                            <div
+                                v-else
+                                class="shift-rich border-muted-foreground/30 bg-muted/10 text-foreground min-h-24 rounded-md border border-dashed p-3 text-sm"
+                                data-testid="task-edit-description"
+                                v-html="renderRichContent(state.editForm.description)"
+                            ></div>
                         </div>
 
-                        <div v-if="state.isRequirementPhase && (state.editTask.submitted_title || state.editTask.submitted_description)" class="space-y-2">
+                        <div
+                            v-if="state.isRequirementPhase && (state.editTask.submitted_title || state.editTask.submitted_description)"
+                            class="space-y-2"
+                        >
                             <Label class="text-muted-foreground">Original Submission</Label>
                             <div class="border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed p-3 text-sm">
                                 <div v-if="state.editTask.submitted_title" class="text-foreground font-medium">
@@ -203,7 +217,7 @@ function formatTaskTime(value?: string | null) {
                                         {{ attachment.original_filename }}
                                     </a>
                                     <Button
-                                        v-if="state.isOwner"
+                                        v-if="state.canEditTaskScope"
                                         size="sm"
                                         type="button"
                                         variant="outline"
@@ -231,7 +245,7 @@ function formatTaskTime(value?: string | null) {
                 <div class="flex items-center gap-2">
                     <Button type="button" variant="outline" @click="state.attemptCloseEdit">Close</Button>
                     <Button
-                        v-if="state.isRequirementPhase"
+                        v-if="state.isRequirementPhase && state.canFinalizeRequirement"
                         :disabled="state.taskSaving || state.requirementFinalizing"
                         type="button"
                         variant="outline"
@@ -240,7 +254,14 @@ function formatTaskTime(value?: string | null) {
                     >
                         {{ state.requirementFinalizing ? 'Finalizing...' : 'Finalize Requirement' }}
                     </Button>
-                    <Button :disabled="state.taskSaving" type="button" variant="default" @click="state.saveTaskChanges">
+                    <Button
+                        v-if="state.canEditTaskScope || state.canManageCollaborators"
+                        :disabled="state.taskSaving"
+                        type="button"
+                        variant="default"
+                        data-testid="save-task-changes"
+                        @click="state.saveTaskChanges"
+                    >
                         {{ state.taskSaving ? 'Saving...' : 'Save' }}
                     </Button>
                 </div>
@@ -250,10 +271,10 @@ function formatTaskTime(value?: string | null) {
 
     <Dialog v-model:open="confirmCloseOpenModel">
         <DialogContent class="sm:max-w-md">
-            <div class="space-y-2">
-                <div class="text-base font-semibold">Discard changes?</div>
-                <div class="text-muted-foreground text-sm">You have unsaved changes. If you close now, they will be lost.</div>
-            </div>
+            <DialogHeader>
+                <DialogTitle>Discard changes?</DialogTitle>
+                <DialogDescription>You have unsaved changes. If you close now, they will be lost.</DialogDescription>
+            </DialogHeader>
 
             <div class="mt-6 flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" @click="state.setConfirmCloseOpen(false)">Cancel</Button>

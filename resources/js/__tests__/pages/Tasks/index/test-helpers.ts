@@ -110,6 +110,7 @@ vi.mock('@/components/ui/input', () => ({
         emits: ['update:modelValue'],
         render() {
             return h('input', {
+                ...this.$attrs,
                 value: this.modelValue,
                 placeholder: this.placeholder,
                 onInput: (e) => this.$emit('update:modelValue', (e.target as HTMLInputElement).value),
@@ -233,6 +234,21 @@ vi.mock('@/components/ui/dialog', () => ({
     DialogContent: {
         render() {
             return h('div', { class: 'dialog-content-stub' }, this.$slots.default?.());
+        },
+    },
+    DialogDescription: {
+        render() {
+            return h('p', { class: 'dialog-description-stub' }, this.$slots.default?.());
+        },
+    },
+    DialogHeader: {
+        render() {
+            return h('div', { class: 'dialog-header-stub' }, this.$slots.default?.());
+        },
+    },
+    DialogTitle: {
+        render() {
+            return h('h2', { class: 'dialog-title-stub' }, this.$slots.default?.());
         },
     },
 }));

@@ -116,6 +116,7 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '<p>Saved from rich editor</p>',
                     is_owner: false,
+                    can_edit_task: true,
                     submitter: { email: 'someone@example.com' },
                     attachments: [],
                 },
@@ -142,7 +143,7 @@ describe('Tasks/Index.vue', () => {
         vi.useRealTimers();
     });
 
-    it('allows any user to change task status from the V2 edit sheet', async () => {
+    it('allows users with the task edit capability to change task status from the V2 edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
         axiosGetMock.mockReset();
@@ -158,6 +159,8 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '',
                     is_owner: false,
+                    can_comment: true,
+                    can_edit_task: true,
                     submitter: { email: 'someone@example.com' },
                     attachments: [],
                 },
@@ -192,6 +195,56 @@ describe('Tasks/Index.vue', () => {
         });
         expect(sonnerMocks.toastLoadingMock).toHaveBeenCalledWith('Saving task changes...');
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Task changes saved', expect.objectContaining({ id: 'autosave-toast' }));
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('keeps developer users in view and comment mode without task edit controls', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+        axiosGetMock.mockReset();
+        axiosPutMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Developer-visible task',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '<p>Visible details.</p>',
+                    is_owner: false,
+                    can_comment: true,
+                    can_delete: false,
+                    can_edit_task: false,
+                    can_manage_collaborators: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Developer-visible task', status: 'pending', priority: 'high', can_delete: false }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="task-edit-title"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-testid="task-status-in-progress"]').attributes('disabled')).toBeDefined();
+
+        await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
+        vi.advanceTimersByTime(800);
+        await flushPromises();
+
+        expect(axiosPutMock).not.toHaveBeenCalled();
 
         wrapper.unmount();
         vi.useRealTimers();

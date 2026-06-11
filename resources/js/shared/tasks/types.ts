@@ -2,6 +2,8 @@ import type { CollaboratorOption, TaskCollaboratorSelection } from './collaborat
 
 export type Task = {
     id: number;
+    project_id?: number | null;
+    project?: TaskProjectSummary | null;
     title: string;
     status: string;
     priority: string;
@@ -11,6 +13,16 @@ export type Task = {
     environment?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
+    can_comment?: boolean;
+    can_delete?: boolean;
+    can_edit_task?: boolean;
+    can_edit_requirement?: boolean;
+    can_finalize_requirement?: boolean;
+};
+
+export type TaskProjectSummary = {
+    id: number;
+    name: string;
 };
 
 export type RequirementBatchSummary = {
@@ -20,6 +32,7 @@ export type RequirementBatchSummary = {
     total_items: number;
     requirement_items: number;
     finalized_items: number;
+    can_finalize_requirement?: boolean;
 };
 
 export type TaskPaginator = {
@@ -49,6 +62,11 @@ export type TaskDetail = Task & {
     finalized_at?: string | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
+    can_comment?: boolean;
+    can_delete?: boolean;
+    can_edit_task?: boolean;
+    can_edit_requirement?: boolean;
+    can_finalize_requirement?: boolean;
     can_manage_collaborators?: boolean;
     internal_collaborators?: CollaboratorOption[];
     external_collaborators?: CollaboratorOption[];
@@ -72,6 +90,7 @@ export type TaskIndexFilters = {
     search?: string | null;
     environment?: string | null;
     organisation_id?: number | string | null;
+    project_id?: number | string | null;
     sort_by?: string | null;
 };
 

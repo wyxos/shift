@@ -18,6 +18,7 @@ use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
+use App\Services\ShiftPermissionService;
 use App\Services\TaskCollaboratorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +36,7 @@ class TaskController extends Controller
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
+        private readonly ShiftPermissionService $permissions,
     ) {}
 
     private function visibleTasksQuery(): Builder
@@ -157,6 +159,7 @@ class TaskController extends Controller
         return [
             'id' => $project->id,
             'name' => $project->name,
+            ...$this->permissions->projectCapabilities($project, auth()->id()),
             'environments' => $project->environments
                 ->sortBy('environment')
                 ->values()
@@ -166,6 +169,18 @@ class TaskController extends Controller
                     'url' => $environment->url,
                 ])
                 ->all(),
+        ];
+    }
+
+    private function serializeTaskProject(?Project $project): ?array
+    {
+        if (! $project) {
+            return null;
+        }
+
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
         ];
     }
 
@@ -199,6 +214,13 @@ class TaskController extends Controller
             ]);
         }
 
+        $project = Project::query()->findOrFail($attributes['project_id']);
+        if (! $this->permissions->canCreateTaskForProject($project, auth()->id())) {
+            throw ValidationException::withMessages([
+                'project_id' => 'You do not have permission to create tasks for this project.',
+            ]);
+        }
+
         return $attributes;
     }
 
@@ -213,7 +235,7 @@ class TaskController extends Controller
 
     private function canManageCollaborators(Task $task): bool
     {
-        return $this->taskCollaboratorService->canManageForInternalUser($task, auth()->id());
+        return $this->permissions->canManageTaskCollaborators($task, auth()->id());
     }
 
     private function syncCollaborators(Task $task, array $attributes, ?string $environment): array
@@ -490,6 +512,7 @@ class TaskController extends Controller
         $payload = [
             'id' => $task->id,
             'project_id' => $task->project_id,
+            'project' => $this->serializeTaskProject($task->project),
             'title' => $task->title,
             'status' => $task->status,
             'priority' => $task->priority,
@@ -512,7 +535,10 @@ class TaskController extends Controller
 
         if ($includeOwnerState) {
             $payload['is_owner'] = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
-            $payload['can_manage_collaborators'] = $this->canManageCollaborators($task);
+            $payload = [
+                ...$payload,
+                ...$this->permissions->taskCapabilities($task, auth()->id()),
+            ];
         }
 
         return $payload;
@@ -536,12 +562,13 @@ class TaskController extends Controller
         }
 
         $organisationId = $organisation?->id ?? request('organisation_id');
+        $projectId = request('project_id');
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
-            ->with(['metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at', 'submitter'])
+            ->with(['project:id,name', 'metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at', 'submitter'])
             ->withoutRequirementPhase();
 
         $query->whereIn('status', $selectedStatuses);
@@ -558,6 +585,10 @@ class TaskController extends Controller
             $query->whereHas('project', function (Builder $projectQuery) use ($organisationId) {
                 $this->applyProjectOrganisationFilter($projectQuery, $organisationId);
             });
+        }
+
+        if (filled($projectId)) {
+            $query->where('project_id', $projectId);
         }
 
         if ($environment !== '') {
@@ -590,12 +621,15 @@ class TaskController extends Controller
         $tasks->through(function (Task $task) {
             return [
                 'id' => $task->id,
+                'project_id' => $task->project_id,
+                'project' => $this->serializeTaskProject($task->project),
                 'title' => $task->title,
                 'status' => $task->status,
                 'priority' => $task->priority,
                 'environment' => $this->taskEnvironment($task),
                 'created_at' => $task->created_at?->toIso8601String(),
                 'updated_at' => $task->updated_at?->toIso8601String(),
+                ...$this->permissions->taskCapabilities($task, auth()->id()),
             ];
         });
 
@@ -607,6 +641,7 @@ class TaskController extends Controller
                     'search' => $search,
                     'environment' => $environment !== '' ? $environment : null,
                     'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
+                    'project_id' => filled($projectId) ? (int) $projectId : null,
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
@@ -644,10 +679,12 @@ class TaskController extends Controller
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
         $organisationId = $organisation?->id ?? request('organisation_id');
+        $projectId = request('project_id');
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
             ->with([
+                'project:id,name',
                 'metadata:id,task_id,environment,phase,submitted_title,submitted_description,finalized_at,requirement_batch_id',
                 'metadata.requirementBatch:id,title,created_at',
                 'submitter',
@@ -667,6 +704,10 @@ class TaskController extends Controller
             $query->whereHas('project', function (Builder $projectQuery) use ($organisationId) {
                 $this->applyProjectOrganisationFilter($projectQuery, $organisationId);
             });
+        }
+
+        if (filled($projectId)) {
+            $query->where('project_id', $projectId);
         }
 
         if ($environment !== '') {
@@ -703,6 +744,8 @@ class TaskController extends Controller
 
             return [
                 'id' => $task->id,
+                'project_id' => $task->project_id,
+                'project' => $this->serializeTaskProject($task->project),
                 'title' => $task->title,
                 'status' => $task->status,
                 'priority' => $task->priority,
@@ -712,6 +755,7 @@ class TaskController extends Controller
                 'batch' => $batchId ? ($batchSummaries[$batchId] ?? null) : null,
                 'created_at' => $task->created_at?->toIso8601String(),
                 'updated_at' => $task->updated_at?->toIso8601String(),
+                ...$this->permissions->taskCapabilities($task, auth()->id()),
             ];
         });
 
@@ -723,6 +767,7 @@ class TaskController extends Controller
                     'search' => $search,
                     'environment' => $environment !== '' ? $environment : null,
                     'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
+                    'project_id' => filled($projectId) ? (int) $projectId : null,
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
@@ -799,21 +844,7 @@ class TaskController extends Controller
     {
         $this->ensureTaskVisible($task);
 
-        $isOwner = $task->submitter_type === User::class && $task->submitter_id === auth()->id();
-        if (! $isOwner) {
-            $attributes = $request->validate([
-                'status' => ['required', Rule::enum(TaskStatus::class)],
-            ]);
-
-            $task->status = $attributes['status'];
-            $task->save();
-            $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
-
-            return response()->json([
-                'ok' => true,
-                'task' => $this->serializeTaskDetail($task),
-            ]);
-        }
+        abort_unless($this->permissions->canEditTask($task, auth()->id()), 403);
 
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
@@ -930,6 +961,8 @@ class TaskController extends Controller
     public function finalizeRequirementV2(Request $request, Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
+        abort_unless($this->permissions->canFinalizeRequirement($task, auth()->id()), 403);
+
         $task->load(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators']);
 
         if (! $task->metadata || ! $task->isRequirementPhase()) {
@@ -960,6 +993,9 @@ class TaskController extends Controller
         if (! $this->visibleProjectsQuery()->whereKey($requirementBatch->project_id)->exists()) {
             abort(404);
         }
+
+        $project = Project::query()->findOrFail($requirementBatch->project_id);
+        abort_unless($this->permissions->canManageProjectAccess($project, auth()->id()), 403);
 
         $tasks = $this->visibleTasksQuery()
             ->with(['metadata', 'submitter', 'attachments', 'internalCollaborators', 'externalCollaborators'])
@@ -1017,6 +1053,7 @@ class TaskController extends Controller
     public function destroyV2(Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
+        abort_unless($this->permissions->canDeleteTask($task, auth()->id()), 403);
 
         $task->delete();
 

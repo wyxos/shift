@@ -29,7 +29,7 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),
     setup({ el, App, props, plugin }) {
         createApp({
-            render: () => h(Fragment, null, [h(App, props), h(Toaster, { richColors: true })]),
+            render: () => h(Fragment, null, [h(App, props), h(Toaster, { richColors: true, position: 'bottom-center' })]),
         })
             .use(plugin)
             .use(ZiggyVue)

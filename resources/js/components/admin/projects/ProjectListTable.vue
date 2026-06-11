@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { KeyRound, MessageSquare, Pencil, Trash2, Users } from 'lucide-vue-next';
+import { KeyRound, ListTodo, MessageSquare, Pencil, Trash2, Users, UserSearch } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
 const { projects, showOrganisationColumn = true } = defineProps<{
@@ -13,10 +13,28 @@ const { projects, showOrganisationColumn = true } = defineProps<{
 const emit = defineEmits<{
     'open-edit': [project: ProjectRow];
     'open-delete': [project: ProjectRow];
+    'open-external-users': [project: ProjectRow];
     'open-manage-users': [project: ProjectRow];
     'open-api-token': [project: ProjectRow];
+    'open-tasks': [project: ProjectRow];
     'open-widget-settings': [project: ProjectRow];
 }>();
+
+function canManageProjectAccess(project: ProjectRow) {
+    return project.can_manage_project_access ?? project.isOwner === true;
+}
+
+function canManageTechnicalSettings(project: ProjectRow) {
+    return project.can_manage_technical_settings ?? project.isOwner === true;
+}
+
+function canDeleteProject(project: ProjectRow) {
+    return project.can_delete_project ?? project.isOwner === true;
+}
+
+function canEditProject(project: ProjectRow) {
+    return canManageProjectAccess(project);
+}
 </script>
 
 <template>
@@ -69,49 +87,68 @@ const emit = defineEmits<{
                     </TableCell>
                     <TableCell>
                         <div class="flex flex-wrap justify-end gap-2">
-                            <template v-if="project.isOwner">
-                                <ActionIconButton
-                                    label="Manage project access"
-                                    title="Manage access"
-                                    :data-testid="`project-manage-${project.id}`"
-                                    @click="emit('open-manage-users', project)"
-                                >
-                                    <Users class="h-4 w-4" />
-                                </ActionIconButton>
-                                <ActionIconButton
-                                    label="Manage API token"
-                                    title="API token"
-                                    :data-testid="`project-token-${project.id}`"
-                                    @click="emit('open-api-token', project)"
-                                >
-                                    <KeyRound class="h-4 w-4" />
-                                </ActionIconButton>
-                                <ActionIconButton
-                                    label="Manage widget settings"
-                                    title="Widget"
-                                    :data-testid="`project-widget-${project.id}`"
-                                    @click="emit('open-widget-settings', project)"
-                                >
-                                    <MessageSquare class="h-4 w-4" />
-                                </ActionIconButton>
-                                <ActionIconButton
-                                    label="Edit project"
-                                    title="Edit"
-                                    :data-testid="`project-edit-${project.id}`"
-                                    @click="emit('open-edit', project)"
-                                >
-                                    <Pencil class="h-4 w-4" />
-                                </ActionIconButton>
-                                <ActionIconButton
-                                    label="Delete project"
-                                    title="Delete"
-                                    variant="destructive"
-                                    :data-testid="`project-delete-${project.id}`"
-                                    @click="emit('open-delete', project)"
-                                >
-                                    <Trash2 class="h-4 w-4" />
-                                </ActionIconButton>
-                            </template>
+                            <ActionIconButton
+                                label="View project tasks"
+                                title="Tasks"
+                                :data-testid="`project-tasks-${project.id}`"
+                                @click="emit('open-tasks', project)"
+                            >
+                                <ListTodo class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                label="View external users"
+                                title="External users"
+                                :data-testid="`project-external-users-${project.id}`"
+                                @click="emit('open-external-users', project)"
+                            >
+                                <UserSearch class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canManageProjectAccess(project)"
+                                label="Manage project access"
+                                title="Manage access"
+                                :data-testid="`project-manage-${project.id}`"
+                                @click="emit('open-manage-users', project)"
+                            >
+                                <Users class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canManageTechnicalSettings(project)"
+                                label="Manage API token"
+                                title="API token"
+                                :data-testid="`project-token-${project.id}`"
+                                @click="emit('open-api-token', project)"
+                            >
+                                <KeyRound class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canManageTechnicalSettings(project)"
+                                label="Manage widget settings"
+                                title="Widget"
+                                :data-testid="`project-widget-${project.id}`"
+                                @click="emit('open-widget-settings', project)"
+                            >
+                                <MessageSquare class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canEditProject(project)"
+                                label="Edit project"
+                                title="Edit"
+                                :data-testid="`project-edit-${project.id}`"
+                                @click="emit('open-edit', project)"
+                            >
+                                <Pencil class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canDeleteProject(project)"
+                                label="Delete project"
+                                title="Delete"
+                                variant="destructive"
+                                :data-testid="`project-delete-${project.id}`"
+                                @click="emit('open-delete', project)"
+                            >
+                                <Trash2 class="h-4 w-4" />
+                            </ActionIconButton>
                         </div>
                     </TableCell>
                 </TableRow>

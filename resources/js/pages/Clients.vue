@@ -329,7 +329,7 @@ function confirmDelete() {
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
                     <Button data-testid="filters-apply" @click="applyFilters">Apply</Button>
                 </template>
 

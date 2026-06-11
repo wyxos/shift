@@ -51,6 +51,7 @@ const taskRows = computed(() => {
 
     return Array.isArray(rows) ? rows : [];
 });
+const projectFilterOptions = computed(() => (props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })));
 const deleteNoun = computed(() => (props.surface === 'requirements' ? 'requirement' : 'task'));
 const pendingRequirementBatchTitle = computed(() => pendingRequirementBatch.value?.title || 'this requirement pack');
 const pendingRequirementBatchCount = computed(() => pendingRequirementBatch.value?.requirement_items ?? 0);
@@ -105,7 +106,11 @@ async function confirmRequirementBatchFinalize() {
     <TaskListOverviewPanel
         :tasks="state.taskRows"
         :title="surface === 'requirements' ? 'Requirements' : 'Tasks'"
-        :description="surface === 'requirements' ? 'Review submitted requirement items before they become active tasks.' : 'Default view hides completed and closed tasks.'"
+        :description="
+            surface === 'requirements'
+                ? 'Review submitted requirement items before they become active tasks.'
+                : 'Default view hides completed and closed tasks.'
+        "
         :empty-label="surface === 'requirements' ? 'No requirements found' : 'No tasks found'"
         :item-label="surface === 'requirements' ? 'requirements' : 'tasks'"
         :total-tasks="state.tasksPage.total"
@@ -124,7 +129,9 @@ async function confirmRequirementBatchFinalize() {
         :draft-priorities="filters.draftPriorities"
         :draft-search-term="filters.draftSearchTerm"
         :draft-environment-term="filters.draftEnvironmentTerm"
+        :draft-project-id="filters.draftProjectId"
         :draft-sort-by="filters.draftSortBy"
+        :project-options="projectFilterOptions"
         :status-options="filters.statusOptions"
         :priority-options="filters.priorityOptions"
         :sort-by-options="filters.sortByOptions"
@@ -134,6 +141,7 @@ async function confirmRequirementBatchFinalize() {
         :set-draft-priorities="filters.setDraftPriorities"
         :set-draft-search-term="filters.setDraftSearchTerm"
         :set-draft-environment-term="filters.setDraftEnvironmentTerm"
+        :set-draft-project-id="filters.setDraftProjectId"
         :set-draft-sort-by="filters.setDraftSortBy"
         :reset-filters="filters.resetFilters"
         :apply-filters="filters.applyFilters"
@@ -154,13 +162,15 @@ async function confirmRequirementBatchFinalize() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Finalize requirement pack</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Finalize all {{ pendingRequirementBatchCount }} open
-                    {{ pendingRequirementBatchCount === 1 ? 'requirement' : 'requirements' }} in {{ pendingRequirementBatchTitle }} as active tasks.
+                    Finalize all {{ pendingRequirementBatchCount }} open {{ pendingRequirementBatchCount === 1 ? 'requirement' : 'requirements' }} in
+                    {{ pendingRequirementBatchTitle }} as active tasks.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction data-testid="confirm-requirement-pack-finalize" @click="confirmRequirementBatchFinalize">Finalize pack</AlertDialogAction>
+                <AlertDialogAction data-testid="confirm-requirement-pack-finalize" @click="confirmRequirementBatchFinalize"
+                    >Finalize pack</AlertDialogAction
+                >
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

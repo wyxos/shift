@@ -103,7 +103,7 @@ const organisationNavItems = computed(() => {
             title: 'Clients',
             href: organisationPageHref(organisation, 'clients'),
             icon: Briefcase,
-            isVisible: organisation.isOwner,
+            isVisible: canManageOrgAccess(organisation),
         },
         {
             title: 'Projects',
@@ -115,16 +115,20 @@ const organisationNavItems = computed(() => {
             title: 'Team',
             href: organisationTeamHref(organisation),
             icon: Users,
-            isVisible: organisation.isOwner,
+            isVisible: canManageOrgAccess(organisation),
         },
         {
             title: 'Settings',
             href: organisationSettingsHref(organisation),
             icon: Settings,
-            isVisible: organisation.isOwner,
+            isVisible: canManageOrgAccess(organisation),
         },
     ].filter((item) => item.isVisible);
 });
+
+function canManageOrgAccess(organisation: SidebarOrganisation) {
+    return organisation.can_manage_org_access ?? organisation.isOwner;
+}
 
 function organisationTeamHref(organisation: SidebarOrganisation) {
     return organisationPageHref(organisation, 'team');

@@ -28,14 +28,60 @@ beforeEach(function () {
         'environment' => 'testing',
         'url' => 'https://example.com',
     ];
+
+    $this->createRoleExternalUser = function (string $externalId, string $role, array $overrides = []): ExternalUser {
+        return ExternalUser::query()->create([
+            'external_id' => $externalId,
+            'name' => $overrides['name'] ?? 'External '.$externalId,
+            'email' => $overrides['email'] ?? $externalId.'@example.com',
+            'environment' => $overrides['environment'] ?? 'testing',
+            'url' => $overrides['url'] ?? 'https://example.com',
+            'project_id' => $overrides['project_id'] ?? $this->project->id,
+            'role' => $role,
+        ]);
+    };
+
+    $this->externalPayload = fn (ExternalUser $externalUser): array => [
+        'id' => $externalUser->external_id,
+        'name' => $externalUser->name,
+        'email' => $externalUser->email,
+        'environment' => $externalUser->environment,
+        'url' => $externalUser->url,
+    ];
+
+    $this->createRequirement = function (ExternalUser $submitter, array $attributes = []): Task {
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            'title' => $attributes['title'] ?? 'Requirement item',
+            'status' => $attributes['status'] ?? 'pending',
+        ]);
+        $task->submitter()->associate($submitter)->save();
+        $task->metadata()->create([
+            'environment' => $attributes['environment'] ?? 'testing',
+            'url' => $attributes['url'] ?? 'https://example.com/requirement',
+            'phase' => $attributes['phase'] ?? 'requirement',
+            'source' => 'embedded_requirement_pack',
+            'intake_type' => 'requirement',
+            'requirement_batch_id' => $attributes['requirement_batch_id'] ?? null,
+            'submitted_title' => $attributes['submitted_title'] ?? ($attributes['title'] ?? 'Requirement item'),
+            'submitted_description' => $attributes['submitted_description'] ?? 'Original requirement details.',
+        ]);
+
+        return $task;
+    };
 });
 
-test('external users can create a requirement batch with multiple task shaped items', function () {
+test('permitted external roles can create a requirement batch with multiple task shaped items', function () {
+    $externalUser = ($this->createRoleExternalUser)('client-123', 'client_developer', [
+        'name' => 'Client User',
+        'email' => 'client@example.com',
+    ]);
+
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/requirements/batches', [
             'project' => $this->project->token,
             'title' => 'June client requirements',
-            'user' => $this->externalUserData,
+            'user' => ($this->externalPayload)($externalUser),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -84,6 +130,108 @@ test('external users can create a requirement batch with multiple task shaped it
         ]);
     }
 });
+
+test('requirement visibility follows the external role matrix', function () {
+    $owner = ($this->createRoleExternalUser)('owner-requirement-1', 'owner');
+    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-requirement-1', 'client_developer');
+    $shiftLeadDeveloper = ($this->createRoleExternalUser)('shift-lead-requirement-1', 'shift_lead_developer');
+    $shiftDeveloper = ($this->createRoleExternalUser)('shift-developer-requirement-1', 'shift_developer');
+    $user = ($this->createRoleExternalUser)('user-requirement-1', 'user');
+    $guest = ($this->createRoleExternalUser)('guest-requirement-1', 'guest');
+
+    $ownerRequirement = ($this->createRequirement)($owner, ['title' => 'Owner requirement']);
+    $clientDeveloperRequirement = ($this->createRequirement)($clientDeveloper, ['title' => 'Client developer requirement']);
+    $shiftDeveloperRequirement = ($this->createRequirement)($shiftDeveloper, ['title' => 'Shift developer requirement']);
+    $userRequirement = ($this->createRequirement)($user, ['title' => 'User requirement']);
+    $guestRequirement = ($this->createRequirement)($guest, ['title' => 'Guest requirement']);
+    $assignedRequirement = ($this->createRequirement)($guest, ['title' => 'Assigned guest requirement']);
+    $assignedRequirement->externalUsers()->attach($clientDeveloper->id);
+
+    $idsFor = function (ExternalUser $externalUser): array {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+            ->getJson('/api/requirements?'.http_build_query([
+                'project' => $this->project->token,
+                'user' => ($this->externalPayload)($externalUser),
+            ]));
+
+        $response->assertOk();
+
+        return collect($response->json('data'))->pluck('id')->sort()->values()->all();
+    };
+
+    expect($idsFor($owner))->toBe(collect([
+        $ownerRequirement->id,
+        $clientDeveloperRequirement->id,
+        $shiftDeveloperRequirement->id,
+        $userRequirement->id,
+        $guestRequirement->id,
+        $assignedRequirement->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($shiftLeadDeveloper))->toBe(collect([
+        $ownerRequirement->id,
+        $clientDeveloperRequirement->id,
+        $shiftDeveloperRequirement->id,
+        $userRequirement->id,
+        $guestRequirement->id,
+        $assignedRequirement->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($clientDeveloper))->toBe(collect([
+        $ownerRequirement->id,
+        $clientDeveloperRequirement->id,
+        $assignedRequirement->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($shiftDeveloper))->toBe(collect([
+        $ownerRequirement->id,
+        $shiftDeveloperRequirement->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($user))->toBe([$userRequirement->id]);
+    expect($idsFor($guest))->toBe([$guestRequirement->id, $assignedRequirement->id]);
+});
+
+test('requirement submission is restricted to external requirement contributor roles', function (string $role, int $status) {
+    $externalUser = ($this->createRoleExternalUser)('submission-'.$role, $role);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/requirements/batches', [
+            'project' => $this->project->token,
+            'title' => 'Submission role check',
+            'user' => ($this->externalPayload)($externalUser),
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://example.com/portal',
+            ],
+            'items' => [
+                [
+                    'title' => 'Role gated requirement',
+                    'description' => 'Only contributor roles can submit this.',
+                ],
+            ],
+        ]);
+
+    $response->assertStatus($status);
+
+    if ($status === 201) {
+        $response->assertJsonCount(1, 'items');
+
+        return;
+    }
+
+    $this->assertDatabaseMissing('tasks', [
+        'title' => 'Role gated requirement',
+        'project_id' => $this->project->id,
+    ]);
+})->with([
+    'owner' => ['owner', 201],
+    'client developer' => ['client_developer', 201],
+    'shift lead developer' => ['shift_lead_developer', 201],
+    'shift developer' => ['shift_developer', 201],
+    'user' => ['user', 403],
+    'guest' => ['guest', 403],
+]);
 
 test('external users can list their requirement items including finalized requirements', function () {
     $externalUser = ExternalUser::query()->create([
@@ -163,6 +311,11 @@ test('external users can list their requirement items including finalized requir
         ->assertJsonPath('data.1.id', $openRequirement->id)
         ->assertJsonPath('data.1.phase', 'requirement')
         ->assertJsonPath('data.1.finalized', false)
+        ->assertJsonPath('data.1.can_edit', true)
+        ->assertJsonPath('data.1.can_update_status', true)
+        ->assertJsonPath('data.1.can_update_priority', true)
+        ->assertJsonPath('data.1.can_delete', true)
+        ->assertJsonPath('data.1.can_comment', true)
         ->assertJsonPath('data.1.batch.id', $batch->id)
         ->assertJsonPath('data.1.batch.total_items', 2)
         ->assertJsonPath('data.1.batch.requirement_items', 1)
