@@ -18,7 +18,7 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sdk/install', [\App\Http\Controllers\SdkInstallController::class, 'show'])->name('sdk-install.verify');
     Route::post('sdk/install/approve', [\App\Http\Controllers\SdkInstallController::class, 'approve'])->name('sdk-install.approve');
 });
