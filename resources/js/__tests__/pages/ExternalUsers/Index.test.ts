@@ -7,6 +7,8 @@ const routerGetMock = vi.fn();
 const routerVisitMock = vi.fn();
 const routerReloadMock = vi.fn();
 const axiosPutMock = vi.fn();
+const axiosPostMock = vi.fn();
+const axiosDeleteMock = vi.fn();
 
 vi.mock('@/layouts/AppLayout.vue', () => ({
     default: {
@@ -213,6 +215,8 @@ vi.mock('@inertiajs/vue3', () => ({
 
 vi.mock('axios', () => ({
     default: {
+        delete: (...args: unknown[]) => axiosDeleteMock(...args),
+        post: (...args: unknown[]) => axiosPostMock(...args),
         put: (...args: unknown[]) => axiosPutMock(...args),
     },
 }));
@@ -229,9 +233,29 @@ describe('ExternalUsers/Index.vue', () => {
                 name: 'Client QA',
                 email: 'qa@example.com',
                 environment: 'Staging',
-                role: 'client_developer',
-                role_label: 'Client Developer',
+                role: 'owner',
+                role_label: 'Owner',
                 project: { id: 2, name: 'Portal' },
+                linked_accounts: [
+                    {
+                        id: 12,
+                        label: 'Portal SSO',
+                        email: 'linked@example.com',
+                        unlink_url: '/external-users/7/linked-accounts/12',
+                        can_unlink: true,
+                    },
+                ],
+                linkable_accounts: [
+                    {
+                        id: 13,
+                        label: 'Production Login',
+                        email: 'prod@example.com',
+                        environment: 'Production',
+                    },
+                ],
+                links: {
+                    link_accounts: '/external-users/7/linked-accounts',
+                },
             },
             {
                 id: 8,
@@ -250,7 +274,7 @@ describe('ExternalUsers/Index.vue', () => {
         to: 2,
     };
 
-    it('renders external user rows with environment and project details', () => {
+    it('renders combined identity and project context columns with unambiguous role labels', () => {
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
@@ -259,9 +283,12 @@ describe('ExternalUsers/Index.vue', () => {
             },
         });
 
-        expect(wrapper.find('[data-testid="external-user-row-7"]').text()).toContain('Client QA');
-        expect(wrapper.find('[data-testid="external-user-environment-7"]').text()).toContain('Staging');
-        expect(wrapper.find('[data-testid="external-user-role-7"]').text()).toContain('Client Developer');
+        expect(wrapper.findAll('th').map((header) => header.text())).toEqual(['Name', 'Project', 'Role', 'Actions']);
+        expect(wrapper.find('[data-testid="external-user-identity-7"]').text()).toContain('Client QA');
+        expect(wrapper.find('[data-testid="external-user-identity-7"]').text()).toContain('qa@example.com');
+        expect(wrapper.find('[data-testid="external-user-project-environment-7"]').text()).toContain('Portal');
+        expect(wrapper.find('[data-testid="external-user-project-environment-7"]').text()).toContain('Staging');
+        expect(wrapper.find('[data-testid="external-user-role-7"]').text()).toContain('Client Owner');
         expect(wrapper.text()).toContain('Portal');
         expect(wrapper.text()).toContain('No project assigned');
     });
@@ -318,7 +345,7 @@ describe('ExternalUsers/Index.vue', () => {
         );
     });
 
-    it('opens edit in a sheet and saves inline', async () => {
+    it('opens edit in a sheet and saves inline without project reassignment', async () => {
         routerVisitMock.mockReset();
         routerReloadMock.mockReset();
         axiosPutMock.mockReset();
@@ -340,10 +367,13 @@ describe('ExternalUsers/Index.vue', () => {
         expect(routerVisitMock).not.toHaveBeenCalled();
         expect(wrapper.get('[data-testid="external-user-edit-sheet"]').text()).toContain('Edit external user');
         expect((wrapper.get('[data-testid="external-user-edit-name"]').element as HTMLInputElement).value).toBe('Client QA');
+        expect(wrapper.find('[data-testid="external-user-edit-project"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="external-user-project-context"]').text()).toContain('Portal');
+        expect(wrapper.get('[data-testid="external-user-project-context"]').text()).toContain('Staging');
+        expect(wrapper.get('[data-testid="external-user-role-readonly"]').text()).toContain('Client Owner');
 
         await wrapper.get('[data-testid="external-user-edit-name"]').setValue('Client QA Lead');
         await wrapper.get('[data-testid="external-user-edit-email"]').setValue('lead@example.com');
-        await wrapper.get('[data-testid="external-user-edit-project"]').setValue('3');
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 
@@ -352,7 +382,6 @@ describe('ExternalUsers/Index.vue', () => {
             {
                 email: 'lead@example.com',
                 name: 'Client QA Lead',
-                project_id: 3,
             },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
@@ -361,6 +390,77 @@ describe('ExternalUsers/Index.vue', () => {
                 only: ['externalUsers'],
                 preserveScroll: true,
             }),
+        );
+    });
+
+    it('edits roles when allowed and manages linked accounts from the sheet', async () => {
+        routerReloadMock.mockReset();
+        axiosPutMock.mockReset();
+        axiosPostMock.mockReset();
+        axiosDeleteMock.mockReset();
+        axiosPutMock.mockResolvedValue({ data: { external_user: { id: 7 } } });
+        axiosPostMock.mockResolvedValue({ data: {} });
+        axiosDeleteMock.mockResolvedValue({ data: {} });
+
+        const wrapper = mount(ExternalUsersIndex, {
+            props: {
+                canManageExternalRoles: true,
+                canManageLinkedAccounts: true,
+                externalUsers,
+                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                projects: [{ id: 2, name: 'Portal' }],
+                roles: [
+                    { value: 'owner', label: 'Client Owner' },
+                    { value: 'guest', label: 'Guest' },
+                ],
+            },
+        });
+
+        await wrapper.get('[data-testid="external-user-edit-7"]').trigger('click');
+
+        expect(wrapper.get('[data-testid="external-user-edit-role"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('Production Login');
+        expect(wrapper.get('[data-testid="external-user-linked-accounts"]').text()).toContain('Portal SSO');
+        expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('linked@example.com');
+
+        await wrapper.get('[data-testid="external-user-link-account-select"]').setValue('13');
+        await wrapper.get('[data-testid="external-user-link-account-submit"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosPostMock).toHaveBeenCalledWith(
+            '/external-users/7/linked-accounts',
+            {
+                linked_external_user_id: '13',
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+
+        await wrapper.get('[data-testid="external-user-linked-account-unlink-12"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosDeleteMock).toHaveBeenCalledWith(
+            '/external-users/7/linked-accounts/12',
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+        expect(routerReloadMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: ['externalUsers'],
+                preserveScroll: true,
+            }),
+        );
+
+        await wrapper.get('[data-testid="external-user-edit-role"]').setValue('guest');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(axiosPutMock).toHaveBeenCalledWith(
+            '/external-users/7',
+            {
+                email: 'qa@example.com',
+                name: 'Client QA',
+                role: 'guest',
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
     });
 

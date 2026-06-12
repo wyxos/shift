@@ -110,6 +110,35 @@ test('lead developer can invite organisation members and grant project access', 
     ]);
 });
 
+test('task-scope leads can create requirements from the requirements review screen', function (OrganisationRole $role) {
+    $owner = User::factory()->create();
+    $member = User::factory()->create();
+    $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
+    $project = Project::factory()->create([
+        'organisation_id' => $organisation->id,
+        'client_id' => null,
+        'author_id' => $owner->id,
+        'name' => 'Portal Review',
+    ]);
+
+    createProjectMember($project, $member, $role);
+
+    $this->actingAs($member)
+        ->get(route('organisation.requirements', $organisation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tasks/Index')
+            ->has('projects', 1)
+            ->where('projects.0.id', $project->id)
+            ->where('projects.0.can_create_task', true)
+            ->where('surface', 'requirements')
+        );
+})->with([
+    'administrator' => [OrganisationRole::Administrator],
+    'team lead' => [OrganisationRole::ClientProjectManager],
+    'developer lead' => [OrganisationRole::LeadDeveloper],
+]);
+
 test('developer can comment but cannot edit delete or finalize visible requirements', function () {
     $owner = User::factory()->create();
     $developer = User::factory()->create();

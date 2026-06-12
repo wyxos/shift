@@ -51,6 +51,7 @@ const taskRows = computed(() => {
 
     return Array.isArray(rows) ? rows : [];
 });
+const createProjects = computed(() => (props.projects ?? []).filter((project) => project.can_create_task !== false));
 const projectFilterOptions = computed(() => (props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })));
 const deleteNoun = computed(() => (props.surface === 'requirements' ? 'requirement' : 'task'));
 const pendingRequirementBatchTitle = computed(() => pendingRequirementBatch.value?.title || 'these requirements');
@@ -155,8 +156,8 @@ async function confirmRequirementBatchFinalize() {
         :finalize-requirement-batch="surface === 'requirements' ? requestRequirementBatchFinalize : undefined"
         :go-to-page="state.goToPage"
     >
-        <template v-if="surface !== 'requirements'" #actions>
-            <TaskCreateSheet :projects="projects" @created="state.handleTaskCreated" />
+        <template #actions>
+            <TaskCreateSheet v-if="createProjects.length > 0" :projects="createProjects" :surface="surface" @created="state.handleTaskCreated" />
         </template>
     </TaskListOverviewPanel>
 

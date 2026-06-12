@@ -105,6 +105,8 @@ class OrganisationController extends Controller
                     ])
                     ->values()
                     ->all(),
+                'roleOptions' => $this->permissions->organisationRoleOptions($panelOrganisation, $userId),
+                'canManageTeamRoles' => $this->permissions->canManageOrganisationAccess($panelOrganisation, $userId),
                 'teamUsers' => collect([
                     $panelOrganisation->author ? [
                         'id' => 'owner-'.$panelOrganisation->author->id,
@@ -114,6 +116,8 @@ class OrganisationController extends Controller
                         'statusLabel' => 'Owner',
                         'role' => OrganisationRole::Administrator->value,
                         'roleLabel' => OrganisationRole::Administrator->label(),
+                        'canManageRole' => false,
+                        'roleOptions' => [],
                         'projectIds' => $panelOrganisationProjects->pluck('id')->values()->all(),
                         'projectAccessCount' => $panelOrganisationProjects->count(),
                         'createdAt' => $panelOrganisation->author->created_at?->toISOString(),
@@ -126,7 +130,7 @@ class OrganisationController extends Controller
                         $panelOrganisation->organisationUsers
                             ->reject(fn ($organisationUser) => $organisationUser->user_id === $panelOrganisation->author_id
                                 || strcasecmp($organisationUser->user_email, $panelOrganisation->author?->email ?: '') === 0)
-                            ->map(function ($organisationUser) use ($panelProjectUsers) {
+                            ->map(function ($organisationUser) use ($panelOrganisation, $panelProjectUsers, $userId) {
                                 $projectIds = $panelProjectUsers
                                     ->filter(function (ProjectUser $projectUser) use ($organisationUser) {
                                         if ($organisationUser->user_id) {
@@ -150,6 +154,8 @@ class OrganisationController extends Controller
                                     'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
                                     'role' => $organisationUser->role?->value,
                                     'roleLabel' => $organisationUser->role?->label(),
+                                    'canManageRole' => $this->permissions->canManageOrganisationUserRole($panelOrganisation, $organisationUser, $userId),
+                                    'roleOptions' => $this->permissions->organisationRoleOptions($panelOrganisation, $userId, $organisationUser),
                                     'projectIds' => $projectIds,
                                     'projectAccessCount' => count($projectIds),
                                     'createdAt' => ($organisationUser->user?->created_at ?: $organisationUser->created_at)?->toISOString(),

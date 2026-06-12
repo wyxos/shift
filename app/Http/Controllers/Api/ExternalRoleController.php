@@ -39,7 +39,7 @@ class ExternalRoleController extends Controller
 
         return response()->json([
             'capabilities' => [
-                'can_manage_external_roles' => $this->canManageExternalRoles($project, $request, $attributes),
+                'can_manage_external_roles' => $this->canManageExternalRoles($project, $request),
             ],
             'roles' => $this->roles(),
         ]);
@@ -63,7 +63,7 @@ class ExternalRoleController extends Controller
             return response()->json(['message' => 'Project not found'], 404);
         }
 
-        abort_unless($this->canManageExternalRoles($project, $request, $attributes), 403);
+        abort_unless($this->canManageExternalRoles($project, $request), 403);
 
         $environment = $this->environment($attributes);
         $lookup = $this->externalUserService->searchCollaborators(
@@ -106,7 +106,7 @@ class ExternalRoleController extends Controller
             return response()->json(['message' => 'Project not found'], 404);
         }
 
-        abort_unless($this->canManageExternalRoles($project, $request, $attributes), 403);
+        abort_unless($this->canManageExternalRoles($project, $request), 403);
 
         $environment = $this->environment($attributes);
         $url = $this->urlForEnvironment($project, $environment, $attributes);
@@ -134,25 +134,9 @@ class ExternalRoleController extends Controller
             ->first();
     }
 
-    private function canManageExternalRoles(Project $project, Request $request, array $attributes): bool
+    private function canManageExternalRoles(Project $project, Request $request): bool
     {
-        if ($this->permissions->canManageTechnicalSettings($project, $request->user()?->id)) {
-            return true;
-        }
-
-        $externalUser = $this->currentExternalUser($project, $attributes);
-
-        return $externalUser?->role?->canManageExternalRoles() === true;
-    }
-
-    private function currentExternalUser(Project $project, array $attributes): ?ExternalUser
-    {
-        return $this->externalUserService->find(
-            $project,
-            data_get($attributes, 'user.id'),
-            data_get($attributes, 'user.environment') ?? data_get($attributes, 'metadata.environment'),
-            data_get($attributes, 'user.url') ?? data_get($attributes, 'metadata.url'),
-        );
+        return $this->permissions->canManageExternalRoles($project, $request->user()?->id);
     }
 
     private function environment(array $attributes): ?string

@@ -295,6 +295,25 @@ vi.mock('@/components/ui/input', () => ({
     },
 }));
 
+vi.mock('@/components/ui/select', () => ({
+    Select: {
+        props: ['modelValue', 'options', 'testId'],
+        emits: ['update:modelValue'],
+        render() {
+            return h(
+                'select',
+                {
+                    ...this.$attrs,
+                    'data-testid': this.testId,
+                    value: this.modelValue ?? '',
+                    onChange: (event: Event) => this.$emit('update:modelValue', (event.target as HTMLSelectElement).value),
+                },
+                (this.options ?? []).map((option: any) => h('option', { value: option.value ?? '' }, option.label)),
+            );
+        },
+    },
+}));
+
 vi.mock('@/components/ui/button', () => ({
     Button: {
         props: ['variant', 'size', 'disabled'],

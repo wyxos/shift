@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\RequirementStatus;
 use App\Models\ExternalUser;
 use App\Models\Organisation;
 use App\Models\Project;
@@ -744,6 +745,37 @@ test('store v2 creates new task and returns json', function () {
         'description' => '<p>Rich description</p>',
         'project_id' => $project->id,
         'priority' => 'medium',
+    ]);
+});
+
+test('store v2 can create portal requirement items', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.v2.store'), [
+            'title' => 'Portal requirement',
+            'description' => '<p>Review this request.</p>',
+            'project_id' => $project->id,
+            'priority' => 'medium',
+            'phase' => 'requirement',
+        ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('data.title', 'Portal requirement')
+        ->assertJsonPath('data.phase', 'requirement')
+        ->assertJsonPath('data.requirement_status', RequirementStatus::Submitted->value);
+
+    $task = Task::query()->where('title', 'Portal requirement')->firstOrFail();
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $task->id,
+        'phase' => 'requirement',
+        'requirement_status' => RequirementStatus::Submitted->value,
+        'submitted_title' => 'Portal requirement',
+        'submitted_description' => '<p>Review this request.</p>',
     ]);
 });
 

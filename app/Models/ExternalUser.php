@@ -17,6 +17,8 @@ class ExternalUser extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
+        'external_contact_id' => 'integer',
+        'project_environment_id' => 'integer',
         'role' => ExternalUserRole::class,
     ];
 
@@ -34,6 +36,16 @@ class ExternalUser extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(ExternalContact::class, 'external_contact_id');
+    }
+
+    public function projectEnvironment(): BelongsTo
+    {
+        return $this->belongsTo(ProjectEnvironment::class);
     }
 
     /**

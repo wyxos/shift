@@ -110,6 +110,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');
     Route::get('external-users/{externalUser}/edit', [ExternalUserController::class, 'edit'])->name('external-users.edit');
     Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
+    Route::post('external-users/{externalUser}/linked-accounts', [ExternalUserController::class, 'linkAccount'])->name('external-users.linked-accounts.store');
+    Route::delete('external-users/{externalUser}/linked-accounts/{linkedExternalUser}', [ExternalUserController::class, 'unlinkAccount'])->name('external-users.linked-accounts.destroy');
 
     // Users
     Route::get('users', [UserController::class, 'index'])->name('users.index');
