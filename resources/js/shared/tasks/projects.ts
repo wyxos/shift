@@ -7,6 +7,7 @@ export type ProjectEnvironmentOption = {
 export type TaskProjectOption = {
     id: number;
     name: string;
+    can_create_task?: boolean;
     environments: ProjectEnvironmentOption[];
 };
 

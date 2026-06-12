@@ -214,6 +214,7 @@ class TaskController extends Controller
             'environment' => 'nullable|string|max:255',
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
+            'phase' => ['nullable', Rule::in(['task', 'requirement'])],
             'temp_identifier' => 'nullable|string',
             'internal_collaborator_ids' => 'nullable|array',
             'internal_collaborator_ids.*' => 'integer',
@@ -325,6 +326,12 @@ class TaskController extends Controller
 
         $task->submitter()->associate(auth()->user())->save();
         $this->syncTaskEnvironment($task, $environment, $environmentUrl);
+        if (($attributes['phase'] ?? 'task') === 'requirement') {
+            $this->syncPortalRequirementMetadata($task, [
+                ...$attributes,
+                'url' => $environmentUrl ?? config('app.url'),
+            ]);
+        }
         $this->syncCollaborators($task, $attributes, $environment);
 
         $this->sendTaskCreationNotifications($task);
@@ -335,10 +342,34 @@ class TaskController extends Controller
             if ($task->description) {
                 $task->description = $this->replaceTempUrlsInContent($task->description, $attributes['temp_identifier'], $created);
                 $task->save();
+
+                if (($attributes['phase'] ?? 'task') === 'requirement') {
+                    $this->syncPortalRequirementMetadata($task, [
+                        ...$attributes,
+                        'description' => $task->description,
+                        'url' => $environmentUrl ?? config('app.url'),
+                    ]);
+                }
             }
         }
 
         return $task->fresh();
+    }
+
+    private function syncPortalRequirementMetadata(Task $task, array $attributes): void
+    {
+        $task->metadata()->updateOrCreate(
+            ['task_id' => $task->id],
+            [
+                'phase' => 'requirement',
+                'url' => $attributes['url'] ?? $task->metadata?->url ?? config('app.url'),
+                'source' => 'embedded_requirement_pack',
+                'intake_type' => 'requirement',
+                'requirement_status' => RequirementStatus::Submitted->value,
+                'submitted_title' => $attributes['title'],
+                'submitted_description' => $attributes['description'] ?? null,
+            ],
+        );
     }
 
     /**

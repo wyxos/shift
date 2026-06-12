@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\OrganisationRole;
 use App\Models\Organisation;
+use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,6 +78,54 @@ class ShiftPermissionService
         return $this->roleForOrganisation($organisation, $userId)?->canManageAccess() === true;
     }
 
+    public function canAssignOrganisationRole(Organisation $organisation, ?int $userId, OrganisationRole $role): bool
+    {
+        return $this->roleForOrganisation($organisation, $userId)?->canAssignRole($role) === true;
+    }
+
+    public function canManageOrganisationUserRole(Organisation $organisation, OrganisationUser $organisationUser, ?int $userId): bool
+    {
+        if ($organisationUser->organisation_id !== $organisation->id || $this->isOrganisationOwnerUser($organisation, $organisationUser)) {
+            return false;
+        }
+
+        $actingRole = $this->roleForOrganisation($organisation, $userId);
+        $targetRole = $organisationUser->role ?? OrganisationRole::Developer;
+
+        return $actingRole?->canManageRole($targetRole) === true;
+    }
+
+    public function canSetOrganisationUserRole(
+        Organisation $organisation,
+        OrganisationUser $organisationUser,
+        ?int $userId,
+        OrganisationRole $role,
+    ): bool {
+        if (! $this->canManageOrganisationUserRole($organisation, $organisationUser, $userId)) {
+            return false;
+        }
+
+        return $this->roleForOrganisation($organisation, $userId)?->canAssignRole($role) === true;
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    public function organisationRoleOptions(Organisation $organisation, ?int $userId, ?OrganisationUser $organisationUser = null): array
+    {
+        if ($organisationUser && ! $this->canManageOrganisationUserRole($organisation, $organisationUser, $userId)) {
+            return [];
+        }
+
+        return array_map(
+            static fn (OrganisationRole $role) => [
+                'value' => $role->value,
+                'label' => $role->label(),
+            ],
+            OrganisationRole::assignableBy($this->roleForOrganisation($organisation, $userId)),
+        );
+    }
+
     public function canManageProjectAccess(Project $project, ?int $userId): bool
     {
         return $this->roleForProject($project, $userId)?->canManageAccess() === true;
@@ -90,6 +139,11 @@ class ShiftPermissionService
     public function canManageTechnicalSettings(Project $project, ?int $userId): bool
     {
         return $this->roleForProject($project, $userId)?->canManageTechnicalSettings() === true;
+    }
+
+    public function canManageExternalRoles(Project $project, ?int $userId): bool
+    {
+        return $this->roleForProject($project, $userId)?->canManageExternalRoles() === true;
     }
 
     public function canCreateTaskForProject(Project $project, ?int $userId): bool
@@ -210,5 +264,15 @@ class ShiftPermissionService
                         });
                 });
         });
+    }
+
+    private function isOrganisationOwnerUser(Organisation $organisation, OrganisationUser $organisationUser): bool
+    {
+        if ($organisation->author_id === null) {
+            return false;
+        }
+
+        return $organisationUser->user_id === $organisation->author_id
+            || strcasecmp((string) $organisationUser->user_email, (string) $organisation->author?->email) === 0;
     }
 }

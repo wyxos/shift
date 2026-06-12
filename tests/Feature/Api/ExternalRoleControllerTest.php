@@ -55,7 +55,9 @@ test('internal technical managers can assign external roles', function () {
     ]);
 });
 
-test('embedded shift developers can assign external roles', function () {
+test('embedded shift developers cannot assign external roles', function () {
+    $untrustedInternalUser = User::factory()->create();
+    $untrustedToken = $untrustedInternalUser->createToken('untrusted')->plainTextToken;
     $shiftDeveloper = ExternalUser::query()->create([
         'project_id' => $this->project->id,
         'external_id' => 'shift-dev-1',
@@ -66,7 +68,7 @@ test('embedded shift developers can assign external roles', function () {
         'role' => ExternalUserRole::ShiftDeveloper->value,
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$untrustedToken)
         ->putJson('/api/external-roles', [
             'project' => $this->project->token,
             'user' => [
@@ -89,13 +91,15 @@ test('embedded shift developers can assign external roles', function () {
             ],
         ]);
 
-    $response
-        ->assertOk()
-        ->assertJsonPath('user.id', 'client-dev-1')
-        ->assertJsonPath('user.role', ExternalUserRole::ClientDeveloper->value);
+    $response->assertForbidden();
+
+    $this->assertDatabaseMissing('external_users', [
+        'project_id' => $this->project->id,
+        'external_id' => 'client-dev-1',
+    ]);
 });
 
-test('normal embedded users cannot assign external roles without an internal manager token', function () {
+test('developer internal users cannot assign external roles', function () {
     $viewer = ExternalUser::query()->create([
         'project_id' => $this->project->id,
         'external_id' => 'viewer-1',
@@ -111,7 +115,7 @@ test('normal embedded users cannot assign external roles without an internal man
         'user_id' => $plainInternalUser->id,
         'user_email' => $plainInternalUser->email,
         'user_name' => $plainInternalUser->name,
-        'role' => OrganisationRole::ClientProjectManager->value,
+        'role' => OrganisationRole::Developer->value,
     ]);
     ProjectUser::query()->create([
         'project_id' => $this->project->id,
@@ -145,6 +149,52 @@ test('normal embedded users cannot assign external roles without an internal man
             ],
         ])
         ->assertForbidden();
+});
+
+test('client project managers can assign external roles for accessible projects', function () {
+    $projectManager = User::factory()->create();
+    OrganisationUser::query()->create([
+        'organisation_id' => $this->organisation->id,
+        'user_id' => $projectManager->id,
+        'user_email' => $projectManager->email,
+        'user_name' => $projectManager->name,
+        'role' => OrganisationRole::ClientProjectManager->value,
+    ]);
+    ProjectUser::query()->create([
+        'project_id' => $this->project->id,
+        'user_id' => $projectManager->id,
+        'user_email' => $projectManager->email,
+        'user_name' => $projectManager->name,
+        'registration_status' => 'registered',
+    ]);
+    $managerToken = $projectManager->createToken('client-project-manager')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$managerToken)
+        ->putJson('/api/external-roles', [
+            'project' => $this->project->token,
+            'external_user' => [
+                'id' => 'client-owner-2',
+                'name' => 'Client Owner',
+                'email' => 'owner-2@example.com',
+            ],
+            'role' => ExternalUserRole::Owner->value,
+            'environment' => 'testing',
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://consumer.test',
+            ],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('user.id', 'client-owner-2')
+        ->assertJsonPath('user.role', ExternalUserRole::Owner->value);
+
+    $this->assertDatabaseHas('external_users', [
+        'project_id' => $this->project->id,
+        'external_id' => 'client-owner-2',
+        'role' => ExternalUserRole::Owner->value,
+    ]);
 });
 
 test('external role index returns collaborator candidates with stored roles', function () {
