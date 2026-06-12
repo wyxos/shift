@@ -4,25 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { axiosDeleteMock, axiosGetMock, axiosPatchMock, makeTasksPage, router, sonnerMocks } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
-    it('renders the requirements review surface with requirement language', () => {
-        axiosGetMock.mockReset();
-
-        const wrapper = mount(Index, {
-            props: {
-                surface: 'requirements',
-                tasks: makeTasksPage([{ id: 1, title: 'Export renewal data', status: 'pending', priority: 'medium', phase: 'requirement' }]),
-                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
-            },
-        });
-
-        expect(wrapper.text()).toContain('Requirements');
-        expect(wrapper.text()).toContain('Review submitted requirement items before they become active tasks.');
-        expect(wrapper.text()).toContain('Showing 1 to 1 of 1 requirements');
-        expect(wrapper.find('[data-testid="task-create-trigger"]').exists()).toBe(false);
-
-        wrapper.unmount();
-    });
-
     it('groups requirement rows by submitted requirements and keeps row state lifecycle-based', () => {
         const wrapper = mount(Index, {
             props: {

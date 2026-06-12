@@ -13,7 +13,21 @@ import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Pencil } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import LinkedAccountsManager from './LinkedAccountsManager.vue';
 
+type LinkedAccount = {
+    id: number | string;
+    label?: string | null;
+    name?: string | null;
+    email?: string | null;
+    provider?: string | null;
+    environment?: string | null;
+    unlink_url?: string | null;
+    unlinkUrl?: string | null;
+    can_unlink?: boolean | null;
+    canUnlink?: boolean | null;
+    links?: { unlink?: string | null };
+};
 type ExternalUserRow = {
     id: number;
     name: string;
@@ -21,12 +35,15 @@ type ExternalUserRow = {
     environment?: string | null;
     role?: string | null;
     role_label?: string | null;
-    project?: {
-        id: number;
-        name: string;
-    } | null;
+    can_manage_role?: boolean | null;
+    canManageRole?: boolean | null;
+    linked_accounts?: LinkedAccount[];
+    linkedAccounts?: LinkedAccount[];
+    linkable_accounts?: LinkedAccount[];
+    linkableAccounts?: LinkedAccount[];
+    links?: { link_accounts?: string | null; linkAccounts?: string | null };
+    project?: { id: number; name: string } | null;
 };
-
 type ExternalUsersPage = {
     data: ExternalUserRow[];
     current_page: number;
@@ -35,52 +52,40 @@ type ExternalUsersPage = {
     from: number | null;
     to: number | null;
 };
-
 type Filters = {
     search?: string | null;
     sort_by?: string | null;
     project_id?: number | string | null;
     organisation_id?: number | string | null;
 };
-
-type ProjectOption = {
-    id: number;
-    name: string;
-};
-
 type SortBy = 'newest' | 'oldest' | 'name';
-type EditErrors = Partial<Record<'name' | 'email' | 'project_id', string>>;
-
+type EditErrors = Partial<Record<'name' | 'email' | 'role', string>>;
 const props = defineProps<{
     externalUsers: ExternalUsersPage;
     filters: Filters;
-    projects?: ProjectOption[];
+    projects?: { id: number; name: string }[];
+    roles?: SelectOption[];
+    roleOptions?: SelectOption[];
+    role_options?: SelectOption[];
+    canManageExternalRoles?: boolean | null;
+    can_manage_external_roles?: boolean | null;
+    canManageLinkedAccounts?: boolean | null;
+    can_manage_linked_accounts?: boolean | null;
 }>();
-
 const defaultSortBy: SortBy = 'newest';
 const filtersOpen = ref(false);
+const jsonHeaders = { headers: { Accept: 'application/json' } };
 const sortOptions = [
     { value: 'newest', label: 'Newest' },
     { value: 'oldest', label: 'Oldest' },
     { value: 'name', label: 'Name' },
 ] satisfies { value: SortBy; label: string }[];
-
 function normalizeSortBy(value: string | null | undefined): SortBy {
-    if (value === 'oldest' || value === 'name') {
-        return value;
-    }
-
-    return defaultSortBy;
+    return value === 'oldest' || value === 'name' ? value : defaultSortBy;
 }
-
 function normalizeProjectId(value: number | string | null | undefined) {
-    if (value === null || value === undefined || value === '') {
-        return '';
-    }
-
-    return String(value);
+    return value === null || value === undefined || value === '' ? '' : String(value);
 }
-
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedProjectId = ref(normalizeProjectId(props.filters.project_id));
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
@@ -94,28 +99,28 @@ const editErrors = ref<EditErrors>({});
 const editForm = ref({
     name: '',
     email: '',
-    project_id: '',
+    role: '',
 });
 const indexPath = computed(() =>
     props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/external-users` : '/external-users',
 );
-const breadcrumbs = computed<BreadcrumbItem[]>(() => [
-    {
-        title: 'External Users',
-        href: indexPath.value,
-    },
-]);
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'External Users', href: indexPath.value }]);
 const projectFilterOptions = computed<SelectOption[]>(() => [
     { value: '', label: 'All projects' },
     ...(props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })),
 ]);
-const editProjectOptions = computed<SelectOption[]>(() => [
-    { value: '', label: 'No project' },
-    ...(props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })),
-]);
+const roleOptions = computed<SelectOption[]>(() => props.roleOptions ?? props.role_options ?? props.roles ?? []);
 const editSheetOpen = computed(() => Boolean(editingExternalUser.value));
 const editDisabled = computed(() => editSaving.value || !editForm.value.name.trim());
+const canManageExternalRoles = computed(() => props.canManageExternalRoles === true || props.can_manage_external_roles === true);
+const canManageLinkedAccounts = computed(() => props.canManageLinkedAccounts === true || props.can_manage_linked_accounts === true);
+const canEditExternalUserRole = computed(() => {
+    if (!editingExternalUser.value || !canManageExternalRoles.value || roleOptions.value.length === 0) {
+        return false;
+    }
 
+    return editingExternalUser.value.canManageRole !== false && editingExternalUser.value.can_manage_role !== false;
+});
 watch(
     () => props.filters,
     (next) => {
@@ -128,17 +133,13 @@ watch(
     },
     { deep: true },
 );
-
 const activeFilterCount = computed(() => {
     let count = 0;
-
     if (appliedSearchTerm.value.trim()) count += 1;
     if (appliedProjectId.value) count += 1;
     if (appliedSortBy.value !== defaultSortBy) count += 1;
-
     return count;
 });
-
 function queryParams(page = 1) {
     return {
         search: appliedSearchTerm.value.trim() || undefined,
@@ -147,20 +148,16 @@ function queryParams(page = 1) {
         page,
     };
 }
-
+function visitIndex(page = 1) {
+    router.get(indexPath.value, queryParams(page), { preserveState: true, preserveScroll: true, replace: true });
+}
 function applyFilters() {
     appliedSearchTerm.value = draftSearchTerm.value;
     appliedProjectId.value = draftProjectId.value;
     appliedSortBy.value = draftSortBy.value;
     filtersOpen.value = false;
-
-    router.get(indexPath.value, queryParams(), {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
+    visitIndex();
 }
-
 function resetFilters() {
     draftSearchTerm.value = '';
     draftProjectId.value = '';
@@ -169,81 +166,54 @@ function resetFilters() {
     appliedProjectId.value = '';
     appliedSortBy.value = defaultSortBy;
     filtersOpen.value = false;
-
-    router.get(indexPath.value, queryParams(), {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
+    visitIndex();
 }
-
-function goToPage(page: number) {
-    router.get(indexPath.value, queryParams(page), {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
-}
-
 function openEditSheet(externalUser: ExternalUserRow) {
     editingExternalUser.value = externalUser;
     editForm.value = {
         name: externalUser.name,
         email: externalUser.email ?? '',
-        project_id: normalizeProjectId(externalUser.project?.id),
+        role: externalUser.role ?? '',
     };
     editErrors.value = {};
     editError.value = null;
 }
-
 function closeEditSheet() {
     editingExternalUser.value = null;
     editForm.value = {
         name: '',
         email: '',
-        project_id: '',
+        role: '',
     };
     editErrors.value = {};
     editError.value = null;
 }
-
 function normalizeValidationErrors(errors: Record<string, string[] | string> | undefined) {
     if (!errors) return {};
-
     return Object.fromEntries(Object.entries(errors).map(([key, value]) => [key, Array.isArray(value) ? (value[0] ?? '') : value])) as EditErrors;
 }
-
+function reloadExternalUsers() {
+    router.reload({ only: ['externalUsers'], preserveScroll: true });
+}
 async function saveExternalUser() {
     if (!editingExternalUser.value || editDisabled.value) return;
-
     editSaving.value = true;
     editErrors.value = {};
     editError.value = null;
-
     try {
-        await axios.put(
-            `/external-users/${editingExternalUser.value.id}`,
-            {
-                name: editForm.value.name.trim(),
-                email: editForm.value.email.trim() || null,
-                project_id: editForm.value.project_id ? Number(editForm.value.project_id) : null,
-            },
-            {
-                headers: {
-                    Accept: 'application/json',
-                },
-            },
-        );
-
+        const payload: { name: string; email: string | null; role?: string | null } = {
+            name: editForm.value.name.trim(),
+            email: editForm.value.email.trim() || null,
+        };
+        if (canEditExternalUserRole.value) {
+            payload.role = editForm.value.role || null;
+        }
+        await axios.put(`/external-users/${editingExternalUser.value.id}`, payload, jsonHeaders);
         closeEditSheet();
-        router.reload({
-            only: ['externalUsers'],
-            preserveScroll: true,
-        });
+        reloadExternalUsers();
     } catch (error) {
         const response = (error as { response?: { status?: number; data?: { errors?: Record<string, string[] | string>; message?: string } } })
             .response;
-
         if (response?.status === 422) {
             editErrors.value = normalizeValidationErrors(response.data?.errors);
             editError.value = response.data?.message ?? null;
@@ -254,13 +224,22 @@ async function saveExternalUser() {
         editSaving.value = false;
     }
 }
-
 function environmentLabel(environment?: string | null) {
     return environment?.trim() || 'Unknown';
 }
-
 function roleLabel(externalUser: ExternalUserRow) {
-    return externalUser.role_label?.trim() || 'User';
+    const label = externalUser.role_label?.trim();
+    if (label && !(externalUser.role === 'owner' && label.toLowerCase() === 'owner')) {
+        return label;
+    }
+    const optionLabel = roleOptions.value.find((option) => option.value === externalUser.role)?.label;
+    if (optionLabel && !(externalUser.role === 'owner' && optionLabel.toLowerCase() === 'owner')) {
+        return optionLabel;
+    }
+    if (externalUser.role === 'owner') {
+        return 'Client Owner';
+    }
+    return label || optionLabel || 'User';
 }
 </script>
 
@@ -277,7 +256,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                 items-label="external users"
                 :page="props.externalUsers"
                 title="External Users"
-                @page-change="goToPage"
+                @page-change="visitIndex"
             >
                 <template #filters>
                     <div class="space-y-2">
@@ -319,10 +298,8 @@ function roleLabel(externalUser: ExternalUserRow) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Environment</TableHead>
-                            <TableHead>Role</TableHead>
                             <TableHead>Project</TableHead>
+                            <TableHead>Role</TableHead>
                             <TableHead class="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -333,23 +310,30 @@ function roleLabel(externalUser: ExternalUserRow) {
                                 :key="externalUser.id"
                                 :data-testid="`external-user-row-${externalUser.id}`"
                             >
-                                <TableCell class="font-medium">{{ externalUser.name }}</TableCell>
-                                <TableCell>{{ externalUser.email || 'No email' }}</TableCell>
+                                <TableCell class="min-w-[14rem] whitespace-normal" :data-testid="`external-user-identity-${externalUser.id}`">
+                                    <div class="min-w-0">
+                                        <div class="truncate font-medium">{{ externalUser.name }}</div>
+                                        <div class="text-muted-foreground truncate text-sm">{{ externalUser.email || 'No email' }}</div>
+                                    </div>
+                                </TableCell>
                                 <TableCell>
-                                    <Badge variant="secondary" :data-testid="`external-user-environment-${externalUser.id}`">
-                                        {{ environmentLabel(externalUser.environment) }}
-                                    </Badge>
+                                    <div
+                                        class="flex flex-col items-start gap-1"
+                                        :data-testid="`external-user-project-environment-${externalUser.id}`"
+                                    >
+                                        <Badge v-if="externalUser.project" class="bg-sky-100 text-sky-900 hover:bg-sky-100" variant="secondary">
+                                            {{ externalUser.project.name }}
+                                        </Badge>
+                                        <span v-else class="text-muted-foreground text-sm">No project assigned</span>
+                                        <Badge variant="secondary">
+                                            {{ environmentLabel(externalUser.environment) }}
+                                        </Badge>
+                                    </div>
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" :data-testid="`external-user-role-${externalUser.id}`">
                                         {{ roleLabel(externalUser) }}
                                     </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge v-if="externalUser.project" class="bg-sky-100 text-sky-900 hover:bg-sky-100" variant="secondary">
-                                        {{ externalUser.project.name }}
-                                    </Badge>
-                                    <span v-else class="text-muted-foreground text-sm">No project assigned</span>
                                 </TableCell>
                                 <TableCell>
                                     <div class="flex justify-end">
@@ -367,7 +351,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                                 </TableCell>
                             </TableRow>
                         </template>
-                        <TableEmpty v-else :colspan="6">No external users found.</TableEmpty>
+                        <TableEmpty v-else :colspan="4">No external users found.</TableEmpty>
                     </TableBody>
                 </Table>
             </AdminListShell>
@@ -411,18 +395,35 @@ function roleLabel(externalUser: ExternalUserRow) {
 
                         <div class="space-y-2">
                             <label class="text-muted-foreground text-sm leading-none font-medium">Project</label>
-                            <Select
-                                v-model="editForm.project_id"
-                                :disabled="editSaving"
-                                empty-label="No projects found."
-                                :options="editProjectOptions"
-                                placeholder="No project"
-                                searchable
-                                search-placeholder="Search projects..."
-                                test-id="external-user-edit-project"
-                            />
-                            <p v-if="editErrors.project_id" class="text-destructive text-sm">{{ editErrors.project_id }}</p>
+                            <div class="rounded-lg border p-3 text-sm" data-testid="external-user-project-context">
+                                <div class="font-medium">{{ editingExternalUser?.project?.name ?? 'No project assigned' }}</div>
+                                <div class="text-muted-foreground mt-1">{{ environmentLabel(editingExternalUser?.environment) }}</div>
+                            </div>
                         </div>
+
+                        <div class="space-y-2">
+                            <label class="text-muted-foreground text-sm leading-none font-medium">Role</label>
+                            <Select
+                                v-if="canEditExternalUserRole"
+                                v-model="editForm.role"
+                                :disabled="editSaving"
+                                empty-label="No roles found."
+                                :options="roleOptions"
+                                placeholder="Select a role"
+                                test-id="external-user-edit-role"
+                            />
+                            <div v-else class="rounded-lg border p-3 text-sm" data-testid="external-user-role-readonly">
+                                <span class="font-medium">{{ editingExternalUser ? roleLabel(editingExternalUser) : 'User' }}</span>
+                            </div>
+                            <p v-if="editErrors.role" class="text-destructive text-sm">{{ editErrors.role }}</p>
+                        </div>
+
+                        <LinkedAccountsManager
+                            v-if="editingExternalUser"
+                            :can-manage-linked-accounts="canManageLinkedAccounts"
+                            :external-user="editingExternalUser"
+                            @changed="reloadExternalUsers"
+                        />
 
                         <p v-if="editError" class="text-destructive text-sm">{{ editError }}</p>
                     </div>

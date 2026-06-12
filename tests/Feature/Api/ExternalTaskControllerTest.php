@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attachment;
+use App\Models\ExternalContact;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
@@ -130,6 +131,98 @@ test('external task visibility follows the role matrix', function () {
 
     expect($idsFor($user))->toBe([$userTask->id]);
     expect($idsFor($guest))->toBe([$guestTask->id, $assignedTask->id]);
+});
+
+test('linked external contacts can view tasks submitted by or assigned to linked accounts', function () {
+    $this->project->environments()->updateOrCreate(
+        ['environment' => 'production'],
+        ['url' => 'https://example.com/production'],
+    );
+
+    $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
+    $productionEnvironment = $this->project->environments()->where('environment', 'production')->firstOrFail();
+
+    $contact = ExternalContact::create([
+        'project_id' => $this->project->id,
+    ]);
+
+    $primaryAccount = ($this->createRoleExternalUser)('linked-primary', 'user', [
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'email' => 'shared-contact@example.com',
+    ]);
+    $secondaryAccount = ($this->createRoleExternalUser)('linked-secondary', 'user', [
+        'environment' => 'production',
+        'url' => 'https://example.com/production',
+        'email' => 'shared-contact@example.com',
+    ]);
+    $unlinkedAccount = ($this->createRoleExternalUser)('unlinked-user', 'user');
+
+    $primaryAccount->forceFill([
+        'external_contact_id' => $contact->id,
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+    $secondaryAccount->forceFill([
+        'external_contact_id' => $contact->id,
+        'project_environment_id' => $productionEnvironment->id,
+    ])->save();
+    $unlinkedAccount->forceFill([
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+
+    $submittedBySecondary = ($this->createSubmittedTask)($secondaryAccount, [
+        'title' => 'Submitted by linked production account',
+    ]);
+    $assignedToSecondary = ($this->createSubmittedTask)($unlinkedAccount, [
+        'title' => 'Assigned to linked production account',
+    ]);
+    $assignedToSecondary->externalUsers()->attach($secondaryAccount->id);
+    $unlinkedTask = ($this->createSubmittedTask)($unlinkedAccount, [
+        'title' => 'Unlinked account task',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($primaryAccount),
+        ]));
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($submittedBySecondary->id);
+    expect($ids)->toContain($assignedToSecondary->id);
+    expect($ids)->not->toContain($unlinkedTask->id);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$submittedBySecondary->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($primaryAccount),
+        ]))
+        ->assertOk()
+        ->assertJsonPath('id', $submittedBySecondary->id);
+});
+
+test('project environment identity resolves an external account when the request url changes', function () {
+    $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
+    $this->externalUser->forceFill([
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+
+    $task = ($this->createSubmittedTask)($this->externalUser, [
+        'title' => 'Task visible after client URL changes',
+    ]);
+
+    $payload = $this->externalUserData;
+    $payload['url'] = 'https://renamed-client.example.com';
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => $payload,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('id', $task->id);
 });
 
 test('index returns tasks for external user', function () {

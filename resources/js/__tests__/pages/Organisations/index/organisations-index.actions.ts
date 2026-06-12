@@ -280,6 +280,63 @@ describe('Organisations/Index.vue', () => {
         );
     });
 
+    it('edits organisation team member role only when role management is allowed', async () => {
+        const wrapper = mount(Index, {
+            props: makeProps({
+                panel: {
+                    team: 1,
+                    manage: null,
+                    settings: null,
+                    create: false,
+                },
+                panelOrganisation: {
+                    id: 1,
+                    name: 'Acme Labs',
+                    canManageTeamRoles: true,
+                    roleOptions: [
+                        { value: 'developer', label: 'Developer' },
+                        { value: 'lead_developer', label: 'Lead Developer' },
+                    ],
+                    projects: [
+                        { id: 30, name: 'Portal Refresh' },
+                        { id: 31, name: 'Billing Console' },
+                    ],
+                    teamUsers: [
+                        {
+                            id: 'access-20',
+                            organisationUserId: 20,
+                            name: 'Jane Admin',
+                            email: 'jane@example.com',
+                            status: 'registered',
+                            statusLabel: 'Registered',
+                            role: 'developer',
+                            roleLabel: 'Developer',
+                            projectIds: [30],
+                            canManageRole: true,
+                        },
+                    ],
+                },
+            }),
+        });
+
+        await wrapper.get('[data-testid="organisation-team-edit-20"]').trigger('click');
+
+        expect(wrapper.get('[data-testid="organisation-team-role"]').exists()).toBe(true);
+        await wrapper.get('[data-testid="organisation-team-role"]').setValue('lead_developer');
+        await wrapper.get('[data-testid="organisation-team-project-checkbox-31"]').setValue(true);
+        await wrapper.get('[data-testid="organisation-team-save-projects"]').trigger('click');
+        await flushPromises();
+
+        expect(axiosPatchMock).toHaveBeenCalledWith(
+            '/organisations/1/users/20/projects',
+            {
+                project_ids: [30, 31],
+                role: 'lead_developer',
+            },
+            expect.objectContaining({ headers: { Accept: 'application/json' } }),
+        );
+    });
+
     it('renders the settings screen and saves or deletes the selected organisation', async () => {
         const wrapper = mount(Index, {
             props: makeProps({

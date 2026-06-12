@@ -14,7 +14,7 @@ enum ExternalUserRole: string
     public function label(): string
     {
         return match ($this) {
-            self::Owner => 'Owner',
+            self::Owner => 'Client Owner',
             self::ClientDeveloper => 'Client Developer',
             self::ShiftLeadDeveloper => 'SHIFT Lead Developer',
             self::ShiftDeveloper => 'SHIFT Developer',
@@ -35,10 +35,7 @@ enum ExternalUserRole: string
 
     public function canManageExternalRoles(): bool
     {
-        return in_array($this, [
-            self::ShiftLeadDeveloper,
-            self::ShiftDeveloper,
-        ], true);
+        return false;
     }
 
     /**

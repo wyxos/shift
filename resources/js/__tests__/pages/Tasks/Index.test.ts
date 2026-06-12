@@ -12,4 +12,5 @@ import './index/task-index.comment-cancel-copy';
 import './index/task-index.comment-copy-selection';
 import './index/task-index.comment-reply';
 import './index/task-index.comment-highlight';
+import './index/task-index.requirement-create';
 import './index/task-index.requirements';

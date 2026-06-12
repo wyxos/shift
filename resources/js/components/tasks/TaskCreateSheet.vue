@@ -26,9 +26,11 @@ type TaskCreateDraft = {
 const props = withDefaults(
     defineProps<{
         projects?: TaskProjectOption[];
+        surface?: 'tasks' | 'requirements';
     }>(),
     {
         projects: () => [],
+        surface: 'tasks',
     },
 );
 
@@ -43,6 +45,7 @@ const createLoading = ref(false);
 const createUploading = ref(false);
 const createError = ref<string | null>(null);
 const createTempIdentifier = ref(Date.now().toString());
+const isRequirementSurface = computed(() => props.surface === 'requirements');
 
 const defaultProjectId = computed(() => (props.projects.length === 1 ? props.projects[0].id : null));
 const hasProjects = computed(() => props.projects.length > 0);
@@ -51,6 +54,21 @@ const canSubmit = computed(() => createForm.value.projectId !== null && createFo
 const selectedProject = computed(() => props.projects.find((project) => project.id === createForm.value.projectId) ?? null);
 const projectUsersLabel = computed(() => (selectedProject.value ? `${selectedProject.value.name} users` : 'Project users'));
 const projectOptions = computed<SelectOption[]>(() => props.projects.map((project) => ({ value: project.id, label: project.name })));
+const createButtonLabel = computed(() => (isRequirementSurface.value ? 'Create Requirement' : 'Create'));
+const createSheetTitle = computed(() => (isRequirementSurface.value ? 'Create Requirement' : 'Create Task'));
+const createSheetDescription = computed(() =>
+    isRequirementSurface.value ? 'Add a new requirement to your review queue.' : 'Add a new task to your project queue.',
+);
+const createTitleLabel = computed(() => (isRequirementSurface.value ? 'Requirement' : 'Task'));
+const createDescriptionLabel = computed(() => (isRequirementSurface.value ? 'Details' : 'Description'));
+const createTitlePlaceholder = computed(() => (isRequirementSurface.value ? 'Short, descriptive requirement' : 'Short, descriptive title'));
+const createDescriptionPlaceholder = computed(() =>
+    isRequirementSurface.value ? 'Write the requirement details, then drag files into the editor.' : undefined,
+);
+const createSuccessTitle = computed(() => (isRequirementSurface.value ? 'Requirement created' : 'Task created'));
+const createSuccessDescription = computed(() =>
+    isRequirementSurface.value ? 'Your requirement has been added to the review queue.' : 'Your task has been added to the queue.',
+);
 
 const createForm = ref<TaskCreateDraft>({
     title: '',
@@ -114,6 +132,7 @@ async function createTask() {
             description: createForm.value.description,
             priority: createForm.value.priority,
             project_id: createForm.value.projectId,
+            phase: isRequirementSurface.value ? 'requirement' : undefined,
             environment: createForm.value.environment,
             temp_identifier: createTempIdentifier.value,
             internal_collaborator_ids: createForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
@@ -129,7 +148,7 @@ async function createTask() {
 
         closeCreate();
         emit('created', createdId);
-        toast.success('Task created', { description: 'Your task has been added to the queue.' });
+        toast.success(createSuccessTitle.value, { description: createSuccessDescription.value });
     } catch (error: any) {
         createError.value = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
     } finally {
@@ -143,15 +162,15 @@ async function createTask() {
         <SheetTrigger as-child>
             <Button data-testid="open-create-task" size="sm" variant="default" :disabled="!hasProjects" @click="openCreate">
                 <Plus class="mr-2 h-4 w-4" />
-                Create
+                {{ createButtonLabel }}
             </Button>
         </SheetTrigger>
 
         <SheetContent class="flex h-full flex-col p-0" side="right" width-preset="task">
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
-                    <SheetTitle>Create Task</SheetTitle>
-                    <SheetDescription class="text-muted-foreground mt-1 text-sm">Add a new task to your project queue.</SheetDescription>
+                    <SheetTitle>{{ createSheetTitle }}</SheetTitle>
+                    <SheetDescription class="text-muted-foreground mt-1 text-sm">{{ createSheetDescription }}</SheetDescription>
                 </div>
             </SheetHeader>
 
@@ -163,6 +182,10 @@ async function createTask() {
                     description: createForm.description,
                 }"
                 :temp-identifier="createTempIdentifier"
+                :title-label="createTitleLabel"
+                :description-label="createDescriptionLabel"
+                :title-placeholder="createTitlePlaceholder"
+                :description-placeholder="createDescriptionPlaceholder"
                 :enable-ai-improve="aiImproveEnabled"
                 :error="createError"
                 @submit="createTask"
@@ -214,7 +237,7 @@ async function createTask() {
                             variant="default"
                         >
                             <Plus class="mr-2 h-4 w-4" />
-                            {{ createLoading ? 'Creating...' : 'Create' }}
+                            {{ createLoading ? 'Creating...' : createButtonLabel }}
                         </Button>
                     </SheetFooter>
                 </template>

@@ -6,7 +6,7 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 import { Label } from '@/components/ui/label';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getPriorityOptions, getRequirementStatusOptions, getStatusOptions } from '@/shared/tasks/presentation';
 import { renderRichContent } from '@/shared/tasks/rich-content';
@@ -50,7 +50,7 @@ const taskStatusOptions = getStatusOptions({ includeClosed: false });
 const requirementStatusOptions = getRequirementStatusOptions();
 const taskPriorityOptions = getPriorityOptions();
 const sheetTitle = computed(() => state.editTask?.title || (state.isRequirementPhase ? 'Requirement details' : 'Task details'));
-const sheetDescription = computed(() => (state.isRequirementPhase ? 'Requirement details' : 'Task details'));
+const titleInputLabel = computed(() => (state.isRequirementPhase ? 'Requirement title' : 'Task title'));
 const canShowFinalizeRequirement = computed(
     () => state.isRequirementPhase && state.canFinalizeRequirement && state.editForm.requirement_status === 'ready-to-finalize',
 );
@@ -66,10 +66,19 @@ function formatTaskTime(value?: string | null) {
         <SheetContent class="flex h-full min-h-0 flex-col p-0" side="right" width-preset="task">
             <SheetHeader class="shrink-0 p-0">
                 <div class="px-6 pt-6 pb-3">
-                    <SheetTitle class="truncate">{{ sheetTitle }}</SheetTitle>
-                    <SheetDescription class="text-muted-foreground mt-1 text-sm">
-                        {{ sheetDescription }}
-                    </SheetDescription>
+                    <SheetTitle class="min-w-0">
+                        <input
+                            v-if="state.editTask"
+                            v-model="editTitleModel"
+                            :aria-label="titleInputLabel"
+                            class="border-input bg-background text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground focus:border-ring focus-visible:border-ring block h-9 w-full min-w-0 rounded-md border px-3 py-1 text-lg font-semibold shadow-none transition-colors outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-100"
+                            data-shift-field-control
+                            data-testid="task-edit-title"
+                            :disabled="!state.canEditTaskScope || state.taskSaving"
+                            type="text"
+                        />
+                        <span v-else class="block truncate">{{ sheetTitle }}</span>
+                    </SheetTitle>
                 </div>
             </SheetHeader>
 
@@ -93,36 +102,31 @@ function formatTaskTime(value?: string | null) {
                         data-testid="task-edit-details-pane"
                     >
                         <div class="flex flex-col gap-4">
-                            <div class="grid gap-4 sm:grid-cols-3">
+                            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="edit-task-meta">
                                 <div class="space-y-1">
-                                    <div class="text-muted-foreground text-xs tracking-wide uppercase">Created by</div>
+                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created by</div>
                                     <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">
                                         {{ state.editTaskCreatorLabel }}
                                     </div>
                                 </div>
                                 <div class="space-y-1">
-                                    <div class="text-muted-foreground text-xs tracking-wide uppercase">Created</div>
+                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created</div>
                                     <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">
                                         {{ formatTaskTime(state.editTask.created_at) }}
                                     </div>
                                 </div>
                                 <div class="space-y-1">
-                                    <div class="text-muted-foreground text-xs tracking-wide uppercase">Updated</div>
+                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Updated</div>
                                     <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">
-                                        Updated {{ formatTaskTime(state.editTask.updated_at) }}
+                                        {{ formatTaskTime(state.editTask.updated_at) }}
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="space-y-2">
-                                <Label class="text-muted-foreground">Title</Label>
-                                <input
-                                    v-model="editTitleModel"
-                                    class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                                    data-testid="task-edit-title"
-                                    :disabled="!state.canEditTaskScope || state.taskSaving"
-                                    type="text"
-                                />
+                                <div class="space-y-1">
+                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Environment</div>
+                                    <div data-testid="edit-task-environment" class="text-foreground text-sm font-medium">
+                                        {{ state.editTaskEnvironmentLabel }}
+                                    </div>
+                                </div>
                             </div>
 
                             <div v-if="!state.isRequirementPhase" class="space-y-2">
@@ -215,19 +219,9 @@ function formatTaskTime(value?: string | null) {
                                 </p>
                             </div>
 
-                            <div class="space-y-2">
-                                <Label class="text-muted-foreground">Environment</Label>
-                                <div
-                                    data-testid="edit-task-environment"
-                                    class="text-foreground border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed px-3 py-2 text-sm"
-                                >
-                                    {{ state.editTaskEnvironmentLabel }}
-                                </div>
-                            </div>
-
-                            <div class="space-y-2">
+                            <div v-if="state.taskAttachments.length" class="space-y-2" data-testid="task-edit-attachments">
                                 <Label class="text-muted-foreground">Attachments</Label>
-                                <div v-if="state.taskAttachments.length" class="space-y-2">
+                                <div class="space-y-2">
                                     <div
                                         v-for="attachment in state.taskAttachments"
                                         :key="attachment.id"
@@ -252,12 +246,6 @@ function formatTaskTime(value?: string | null) {
                                         </Button>
                                     </div>
                                 </div>
-                                <div
-                                    v-else
-                                    class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-md border border-dashed p-3 text-sm"
-                                >
-                                    No attachments available
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -266,41 +254,32 @@ function formatTaskTime(value?: string | null) {
                 </div>
             </div>
 
-            <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                <div class="text-destructive text-sm">{{ state.taskSaveError || state.requirementFinalizeError }}</div>
-                <div class="flex items-center gap-2">
-                    <Button type="button" variant="outline" @click="state.attemptCloseEdit">Close</Button>
-                    <TooltipProvider v-if="canShowFinalizeRequirement" :delay-duration="0">
-                        <Tooltip>
-                            <TooltipTrigger as-child>
-                                <span class="inline-flex">
-                                    <Button
-                                        :disabled="state.taskSaving || state.requirementFinalizing"
-                                        type="button"
-                                        variant="outline"
-                                        data-testid="finalize-requirement"
-                                        @click="state.finalizeRequirement"
-                                    >
-                                        {{ state.requirementFinalizing ? 'Finalizing...' : 'Finalize Requirement' }}
-                                    </Button>
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Promotes this requirement into an active task while keeping the same ID, collaborators, and clarifications.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <Button
-                        v-if="state.canEditTaskScope || state.canManageCollaborators"
-                        :disabled="state.taskSaving"
-                        type="button"
-                        variant="default"
-                        data-testid="save-task-changes"
-                        @click="state.saveTaskChanges"
-                    >
-                        {{ state.taskSaving ? 'Saving...' : 'Save' }}
-                    </Button>
-                </div>
+            <SheetFooter
+                v-if="canShowFinalizeRequirement || state.requirementFinalizeError"
+                class="flex flex-row items-center justify-between border-t px-6 py-4"
+                data-testid="task-edit-footer"
+            >
+                <div class="text-destructive text-sm">{{ state.requirementFinalizeError }}</div>
+                <TooltipProvider v-if="canShowFinalizeRequirement" :delay-duration="0">
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <span class="inline-flex">
+                                <Button
+                                    :disabled="state.taskSaving || state.requirementFinalizing"
+                                    type="button"
+                                    variant="outline"
+                                    data-testid="finalize-requirement"
+                                    @click="state.finalizeRequirement"
+                                >
+                                    {{ state.requirementFinalizing ? 'Finalizing...' : 'Finalize Requirement' }}
+                                </Button>
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Promotes this requirement into an active task while keeping the same ID, collaborators, and clarifications.</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </SheetFooter>
         </SheetContent>
     </Sheet>

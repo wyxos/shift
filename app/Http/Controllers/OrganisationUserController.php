@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\Rule;
 
 class OrganisationUserController extends Controller
 {
@@ -30,7 +31,7 @@ class OrganisationUserController extends Controller
         $validated = $request->validate([
             'email' => 'required|email',
             'name' => 'required|string|max:255',
-            'role' => ['nullable', \Illuminate\Validation\Rule::enum(OrganisationRole::class)],
+            'role' => ['nullable', Rule::enum(OrganisationRole::class)],
         ]);
 
         if (! $this->permissions->canManageOrganisationAccess($organisation, Auth::id())) {
@@ -38,8 +39,8 @@ class OrganisationUserController extends Controller
         }
 
         $role = OrganisationRole::tryFrom($validated['role'] ?? '') ?? OrganisationRole::Developer;
-        if ($role !== OrganisationRole::Developer && ! $this->permissions->canManageOrganisation($organisation, Auth::id())) {
-            return response()->json(['message' => 'Only organisation administrators can assign elevated roles.'], 403);
+        if (! $this->permissions->canAssignOrganisationRole($organisation, Auth::id(), $role)) {
+            return response()->json(['message' => 'You cannot assign that organisation role.'], 403);
         }
 
         // Find the user by email if they exist
@@ -109,7 +110,19 @@ class OrganisationUserController extends Controller
         $validated = $request->validate([
             'project_ids' => 'array',
             'project_ids.*' => 'integer',
+            'role' => ['nullable', Rule::enum(OrganisationRole::class)],
         ]);
+
+        $role = OrganisationRole::tryFrom($validated['role'] ?? '');
+        if ($role instanceof OrganisationRole) {
+            if (! $this->permissions->canSetOrganisationUserRole($organisation, $organisationUser, Auth::id(), $role)) {
+                abort(403);
+            }
+
+            $organisationUser->forceFill([
+                'role' => $role->value,
+            ])->save();
+        }
 
         $projectIds = $this->manageableOrganisationProjectIds($organisation);
         $selectedProjectIds = collect($validated['project_ids'] ?? [])
@@ -147,17 +160,29 @@ class OrganisationUserController extends Controller
 
         return response()->json([
             'project_ids' => $selectedProjectIds->all(),
+            'organisation_user' => [
+                'id' => $organisationUser->id,
+                'role' => $organisationUser->role?->value,
+                'role_label' => $organisationUser->role?->label(),
+            ],
         ]);
     }
 
     private function authorizeOrganisationUser(Organisation $organisation, OrganisationUser $organisationUser): void
     {
-        if (
-            $organisationUser->organisation_id !== $organisation->id
-            || ! $this->permissions->canManageOrganisationAccess($organisation, Auth::id())
-        ) {
+        if ($organisationUser->organisation_id !== $organisation->id) {
             abort(403);
         }
+
+        if ($this->permissions->canManageOrganisation($organisation, Auth::id())) {
+            return;
+        }
+
+        if ($this->permissions->canManageOrganisationUserRole($organisation, $organisationUser, Auth::id())) {
+            return;
+        }
+
+        abort(403);
     }
 
     /**
