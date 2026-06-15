@@ -84,5 +84,10 @@ const submit = () => {
                 </Button>
             </div>
         </form>
+
+        <div class="text-muted-foreground text-center text-sm">
+            New to SHIFT?
+            <TextLink :href="route('register')" class="underline underline-offset-4" :tabindex="6">Create account</TextLink>
+        </div>
     </AuthBase>
 </template>

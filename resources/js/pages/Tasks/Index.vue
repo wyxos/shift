@@ -6,28 +6,40 @@ import { useTaskIndexEditState } from '@/composables/useTaskIndexEditState';
 import { useTaskIndexFilters } from '@/composables/useTaskIndexFilters';
 import { useTaskIndexListState } from '@/composables/useTaskIndexListState';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { TaskIndexFilters, TaskPaginator, TaskProjectOption } from '@/shared/tasks/types';
+import type { TaskProjectOption } from '@/shared/tasks/projects';
+import type { TaskIndexFilters, TaskPaginator } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { reactive, toRef, toRefs } from 'vue';
+import { computed, reactive, toRef, toRefs } from 'vue';
 
 const props = withDefaults(
     defineProps<{
         tasks: TaskPaginator;
         projects?: TaskProjectOption[];
         filters: TaskIndexFilters;
+        surface?: 'tasks' | 'requirements';
     }>(),
     {
         projects: () => [],
+        surface: 'tasks',
     },
 );
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Tasks', href: '/tasks' },
-    { title: 'Tasks', href: '/tasks' },
-];
+const indexHref = computed(() => {
+    const organisationId = props.filters.organisation_id;
 
-const filtersState = useTaskIndexFilters({ filters: props.filters });
+    if (props.surface === 'requirements') {
+        return organisationId ? `/organisation/${organisationId}/requirements` : '/requirements';
+    }
+
+    return organisationId ? `/organisation/${organisationId}/tasks` : '/tasks';
+});
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
+    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
+]);
+
+const filtersState = useTaskIndexFilters({ filters: props.filters, surface: props.surface });
 const listState = useTaskIndexListState({
     tasks: toRef(props, 'tasks'),
     buildListQuery: filtersState.buildListQuery,
@@ -54,11 +66,14 @@ const setDraftPriorities = (value: string[]) => {
 const setDraftEnvironmentTerm = (value: string) => {
     filtersState.draftEnvironmentTerm.value = value;
 };
+const setDraftProjectId = (value: string) => {
+    filtersState.draftProjectId.value = value;
+};
 const setDraftSortBy = (value: string) => {
     filtersState.draftSortBy.value = value;
 };
 
-const setEditField = (field: 'title' | 'priority' | 'status' | 'description', value: string) => {
+const setEditField = (field: 'title' | 'priority' | 'status' | 'requirement_status' | 'description', value: string) => {
     editState.editForm.value = {
         ...editState.editForm.value,
         [field]: value,
@@ -85,6 +100,7 @@ const onGlobalKeyDownCapture = editState.onGlobalKeyDownCapture;
 const filtersModel = reactive({
     ...filtersState,
     setDraftEnvironmentTerm,
+    setDraftProjectId,
     setDraftPriorities,
     setDraftSearchTerm,
     setDraftSortBy,
@@ -112,6 +128,7 @@ const {
     buildListQuery,
     defaultSortBy,
     draftEnvironmentTerm,
+    draftProjectId,
     draftPriorities,
     draftSearchTerm,
     draftSortBy,
@@ -157,7 +174,6 @@ const {
     hasUnsavedChanges,
     hasUnsavedCommentDraft,
     hasUnsavedTaskChanges,
-    isOwner,
     lastTouchTapAt,
     lastTouchTapId,
     lightboxAlt,
@@ -202,7 +218,7 @@ const {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <TaskIndexListCard :filters="filtersModel" :projects="props.projects" :state="combined" />
+            <TaskIndexListCard :filters="filtersModel" :projects="props.projects" :state="combined" :surface="props.surface" />
             <TaskEditSheet :state="combined" />
         </div>
     </AppLayout>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AxiosInstance } from 'axios';
 import { ButtonGroup } from '../../components/ui/button-group';
+import { Input } from '../../components/ui/input';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
 import { getPriorityOptions } from '../tasks/presentation';
 import ShiftEditor from './ShiftEditor.vue';
@@ -52,8 +53,6 @@ const emit = defineEmits<{
 const priorityOptions = getPriorityOptions();
 
 const baseControlClass = 'text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium select-none';
-const inputClass =
-    'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent text-foreground px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]';
 
 function updateField(field: keyof TaskCreateDraft, value: string) {
     emit('update:modelValue', {
@@ -70,14 +69,13 @@ function updateField(field: keyof TaskCreateDraft, value: string) {
                 <label :class="baseControlClass">
                     {{ titleLabel }}
                 </label>
-                <input
-                    :value="modelValue.title"
+                <Input
+                    :model-value="modelValue.title"
                     :placeholder="titlePlaceholder"
-                    :class="inputClass"
                     :data-testid="titleTestId"
                     required
                     type="text"
-                    @input="updateField('title', ($event.target as HTMLInputElement).value)"
+                    @update:model-value="updateField('title', String($event))"
                 />
             </div>
 

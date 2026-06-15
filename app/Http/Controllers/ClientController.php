@@ -4,18 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Organisation;
+use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
-    private function ensureClientManageable(Client $client): void
-    {
-        abort_unless(
-            $client->organisation()->where('author_id', auth()->id())->exists(),
-            403,
-        );
-    }
+    public function __construct(private readonly ShiftPermissionService $permissions) {}
 
     public function index(?Organisation $organisation = null)
     {
@@ -29,7 +23,13 @@ class ClientController extends Controller
         $clients = Client::query()
             ->with('organisation:id,name')
             ->whereHas('organisation', function (Builder $query) {
-                $query->where('author_id', auth()->id());
+                $query
+                    ->where('author_id', auth()->id())
+                    ->orWhereHas('organisationUsers', function (Builder $memberQuery) {
+                        $memberQuery
+                            ->where('user_id', auth()->id())
+                            ->where('role', \App\Enums\OrganisationRole::Administrator->value);
+                    });
             })
             ->when(
                 filled($organisationId),
@@ -74,7 +74,7 @@ class ClientController extends Controller
 
     public function destroy(Client $client)
     {
-        $this->ensureClientManageable($client);
+        abort_unless($client->organisation && $this->permissions->canManageOrganisation($client->organisation, auth()->id()), 403);
 
         $client->delete();
 
@@ -83,7 +83,7 @@ class ClientController extends Controller
 
     public function update(Client $client)
     {
-        $this->ensureClientManageable($client);
+        abort_unless($client->organisation && $this->permissions->canManageOrganisation($client->organisation, auth()->id()), 403);
 
         $client->update(request()->validate([
             'name' => 'required|string|max:255',
@@ -94,14 +94,15 @@ class ClientController extends Controller
 
     public function store()
     {
-        Client::create(request()->validate([
+        $attributes = request()->validate([
             'name' => 'required|string|max:255',
-            'organisation_id' => [
-                'required',
-                Rule::exists('organisations', 'id')
-                    ->where(fn ($query) => $query->where('author_id', auth()->id())),
-            ],
-        ]));
+            'organisation_id' => 'required|exists:organisations,id',
+        ]);
+
+        $organisation = Organisation::query()->findOrFail($attributes['organisation_id']);
+        abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
+
+        Client::create($attributes);
 
         return redirect()->route('clients.index')->with('success', 'Client created successfully.');
     }

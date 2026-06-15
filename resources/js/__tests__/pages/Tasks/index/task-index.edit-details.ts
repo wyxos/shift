@@ -43,6 +43,50 @@ describe('Tasks/Index.vue', () => {
         vi.useRealTimers();
     });
 
+    it('keeps the editable task title in the sheet header without duplicating a lower title field', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    can_comment: true,
+                    can_edit_task: true,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('.sheet-header [data-testid="task-edit-title"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="task-edit-details-pane"] [data-testid="task-edit-title"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="save-task-changes"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="task-edit-footer"]').exists()).toBe(false);
+        expect(wrapper.findAll('label').map((label) => label.text())).not.toContain('Title');
+        expect(wrapper.text()).not.toContain('Task details');
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
     it('shows task creator and environment in the edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
@@ -76,14 +120,22 @@ describe('Tasks/Index.vue', () => {
         await wrapper.find('button[title="Open details"]').trigger('click');
         await flushPromises();
 
+        const metadataGrid = wrapper.get('[data-testid="edit-task-meta"]');
+        const metadataLabels = metadataGrid.findAll('[data-testid="edit-task-meta-label"]');
         const editStatusGroup = wrapper.get('[aria-label="Task status"]');
         const mobilePaneGroup = wrapper.get('[aria-label="Edit task section"]');
         const editLayout = wrapper.get('[data-testid="task-edit-layout"]');
 
-        expect(wrapper.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
+        expect(metadataGrid.get('[data-testid="edit-task-environment"]').text()).toContain('Staging');
+        expect(metadataLabels.map((label) => label.text())).toEqual(['Created by', 'Created', 'Updated', 'Environment']);
+        metadataLabels.forEach((label) => {
+            expect(label.classes()).not.toContain('uppercase');
+            expect(label.classes()).toContain('text-[11px]');
+        });
         expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
-        expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toContain('Updated');
+        expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toBe('17:55');
+        expect(wrapper.text()).not.toContain('No attachments available');
         expect(editLayout.classes()).toContain('lg:grid-cols-2');
         expect(editLayout.classes()).not.toContain('lg:grid-cols-[1.15fr_0.85fr]');
         expect(wrapper.get('[data-testid="task-edit-details-pane"]').classes()).toContain('min-w-0');
@@ -116,6 +168,7 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '<p>Saved from rich editor</p>',
                     is_owner: false,
+                    can_edit_task: true,
                     submitter: { email: 'someone@example.com' },
                     attachments: [],
                 },
@@ -142,7 +195,7 @@ describe('Tasks/Index.vue', () => {
         vi.useRealTimers();
     });
 
-    it('allows any user to change task status from the V2 edit sheet', async () => {
+    it('allows users with the task edit capability to change task status from the V2 edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
         axiosGetMock.mockReset();
@@ -158,6 +211,8 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '',
                     is_owner: false,
+                    can_comment: true,
+                    can_edit_task: true,
                     submitter: { email: 'someone@example.com' },
                     attachments: [],
                 },
@@ -192,6 +247,56 @@ describe('Tasks/Index.vue', () => {
         });
         expect(sonnerMocks.toastLoadingMock).toHaveBeenCalledWith('Saving task changes...');
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Task changes saved', expect.objectContaining({ id: 'autosave-toast' }));
+
+        wrapper.unmount();
+        vi.useRealTimers();
+    });
+
+    it('keeps developer users in view and comment mode without task edit controls', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-02-10T18:00:00'));
+        axiosGetMock.mockReset();
+        axiosPutMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Developer-visible task',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '<p>Visible details.</p>',
+                    is_owner: false,
+                    can_comment: true,
+                    can_delete: false,
+                    can_edit_task: false,
+                    can_manage_collaborators: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({ data: { external: [] } });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Developer-visible task', status: 'pending', priority: 'high', can_delete: false }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="task-edit-title"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-testid="task-status-in-progress"]').attributes('disabled')).toBeDefined();
+
+        await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
+        vi.advanceTimersByTime(800);
+        await flushPromises();
+
+        expect(axiosPutMock).not.toHaveBeenCalled();
 
         wrapper.unmount();
         vi.useRealTimers();

@@ -86,9 +86,14 @@ const deliveryItems = [
                     <Button v-if="auth?.user" as-child size="sm">
                         <Link :href="route('dashboard')">Go to Dashboard</Link>
                     </Button>
-                    <Button v-else as-child size="sm" variant="outline">
-                        <Link :href="route('login')">Log in</Link>
-                    </Button>
+                    <template v-else>
+                        <Button as-child size="sm" variant="ghost">
+                            <Link :href="route('login')">Log in</Link>
+                        </Button>
+                        <Button as-child size="sm">
+                            <Link :href="route('register')">Create account</Link>
+                        </Button>
+                    </template>
                 </div>
             </div>
         </div>
@@ -114,6 +119,9 @@ const deliveryItems = [
                     </div>
                     <div class="flex flex-wrap gap-3">
                         <Button v-if="!auth?.user" as-child class="bg-blue-600 text-white hover:bg-blue-700" size="lg">
+                            <Link :href="route('register')">Create account</Link>
+                        </Button>
+                        <Button v-if="!auth?.user" as-child size="lg" variant="outline">
                             <Link :href="route('login')">Log in</Link>
                         </Button>
                         <Button

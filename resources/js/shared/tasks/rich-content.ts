@@ -1,3 +1,12 @@
+import hljs from 'highlight.js/lib/core';
+import cssLang from 'highlight.js/lib/languages/css';
+import jsLang from 'highlight.js/lib/languages/javascript';
+import jsonLang from 'highlight.js/lib/languages/json';
+import phpLang from 'highlight.js/lib/languages/php';
+import pythonLang from 'highlight.js/lib/languages/python';
+import tsLang from 'highlight.js/lib/languages/typescript';
+import xmlLang from 'highlight.js/lib/languages/xml';
+import 'highlight.js/styles/github.css';
 import { marked } from 'marked';
 
 const ALLOWED_TAGS = new Set([
@@ -45,6 +54,45 @@ const DROP_WITH_CONTENT = new Set([
     'textarea',
 ]);
 const SAFE_IMAGE_DATA_URI_PATTERN = /^data:image\/(?:png|gif|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i;
+let highlightLanguagesRegistered = false;
+
+function registerHighlightLanguage(name: string, language: any): void {
+    if (hljs.getLanguage(name)) return;
+
+    hljs.registerLanguage(name, language);
+}
+
+function ensureHighlightLanguagesRegistered(): void {
+    if (highlightLanguagesRegistered) return;
+
+    registerHighlightLanguage('javascript', jsLang);
+    registerHighlightLanguage('js', jsLang);
+    registerHighlightLanguage('typescript', tsLang);
+    registerHighlightLanguage('ts', tsLang);
+    registerHighlightLanguage('json', jsonLang);
+    registerHighlightLanguage('css', cssLang);
+    registerHighlightLanguage('php', phpLang);
+    registerHighlightLanguage('xml', xmlLang);
+    registerHighlightLanguage('html', xmlLang);
+    registerHighlightLanguage('python', pythonLang);
+    registerHighlightLanguage('py', pythonLang);
+
+    highlightLanguagesRegistered = true;
+}
+
+export function highlightRichCodeBlocks(root: ParentNode | null | undefined): void {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+
+    ensureHighlightLanguagesRegistered();
+
+    root.querySelectorAll('pre code').forEach((element) => {
+        if (!(element instanceof HTMLElement)) return;
+
+        try {
+            hljs.highlightElement(element);
+        } catch {}
+    });
+}
 
 export function hasHtmlMarkup(content: string): boolean {
     return /<\/?[a-z][\s\S]*>/i.test(content);

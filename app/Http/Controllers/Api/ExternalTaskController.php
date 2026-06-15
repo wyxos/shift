@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
@@ -64,10 +65,7 @@ class ExternalTaskController extends Controller
 
     private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
     {
-        $isSubmitter = $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
-        $hasAccess = $task->externalCollaborators()->where('external_users.id', $externalUser->id)->exists();
-
-        return $isSubmitter || $hasAccess;
+        return $this->externalUserService->canViewProjectItem($task, $externalUser);
     }
 
     private function canManageCollaborators(Task $task, ?ExternalUser $externalUser): bool
@@ -153,6 +151,26 @@ class ExternalTaskController extends Controller
 
     private function serializeCollaborators(Task $task): array
     {
+        $externalCollaborators = $task->externalCollaborators
+            ->map(fn (ExternalUser $user) => [
+                'id' => $user->external_id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ]);
+
+        if ($task->submitter instanceof ExternalUser) {
+            $submitterAlreadyListed = $externalCollaborators
+                ->contains(fn (array $collaborator) => (string) $collaborator['id'] === (string) $task->submitter->external_id);
+
+            if (! $submitterAlreadyListed) {
+                $externalCollaborators->prepend([
+                    'id' => $task->submitter->external_id,
+                    'name' => $task->submitter->name,
+                    'email' => $task->submitter->email,
+                ]);
+            }
+        }
+
         return [
             'internal_collaborators' => $task->internalCollaborators
                 ->map(fn (\App\Models\User $user) => [
@@ -162,12 +180,7 @@ class ExternalTaskController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'external_collaborators' => $task->externalCollaborators
-                ->map(fn (ExternalUser $user) => [
-                    'id' => $user->external_id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ])
+            'external_collaborators' => $externalCollaborators
                 ->values()
                 ->all(),
         ];
@@ -187,8 +200,10 @@ class ExternalTaskController extends Controller
             ->all();
     }
 
-    private function serializeTaskPayload(Task $task, string $clientUrl, bool $canManageCollaborators): array
+    private function serializeTaskPayload(Task $task, string $clientUrl, ?ExternalUser $externalUser): array
     {
+        $capabilities = $this->externalUserService->capabilityFlags($task, $externalUser);
+
         return [
             'id' => $task->id,
             'project_id' => $task->project_id,
@@ -199,12 +214,20 @@ class ExternalTaskController extends Controller
             'created_at' => $task->created_at?->toIso8601String(),
             'updated_at' => $task->updated_at?->toIso8601String(),
             'environment' => $this->taskEnvironment($task),
+            'phase' => $task->phase(),
+            'finalized' => ! $task->isRequirementPhase(),
+            'requirement_status' => $task->requirementStatus(),
+            'submitted_title' => $task->metadata?->submitted_title,
+            'submitted_description' => $task->metadata?->submitted_description,
+            'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,
                 'email' => $task->submitter->email ?? null,
             ] : null,
             'attachments' => $this->serializeAttachments($task, $clientUrl),
-            'can_manage_collaborators' => $canManageCollaborators,
+            ...$capabilities,
+            'can_manage_collaborators' => $externalUser instanceof ExternalUser
+                && $this->canManageCollaborators($task, $externalUser),
             ...$this->serializeCollaborators($task),
         ];
     }
@@ -258,16 +281,11 @@ class ExternalTaskController extends Controller
         $tasksQuery = Task::query()
             ->with(['submitter', 'metadata', 'project'])
             ->where('project_id', $project->id)
-            ->where(function ($query) use ($externalUser) {
-                // Tasks where the external user is the submitter
-                $query->whereHasMorph('submitter', [ExternalUser::class], function ($query) use ($externalUser) {
-                    $query->where('external_users.id', $externalUser->id);
-                })
-                    // OR tasks where the external user has been granted access
-                    ->orWhereHas('externalCollaborators', function ($query) use ($externalUser) {
-                        $query->where('external_users.id', $externalUser->id);
-                    });
-            })
+            ->withoutRequirementPhase();
+
+        $this->externalUserService->constrainVisibleProjectItems($tasksQuery, $externalUser);
+
+        $tasksQuery
             ->when(
                 request('search'),
                 fn ($query) => $query->whereRaw('LOWER(title) LIKE LOWER(?)', ['%'.request('search').'%'])
@@ -334,8 +352,11 @@ class ExternalTaskController extends Controller
         $tasks = $tasksQuery
             ->paginate(10)
             ->withQueryString();
-        $tasks->through(function (Task $task) {
+        $tasks->through(function (Task $task) use ($externalUser) {
             $task->environment = $task->metadata?->environment ?? ($task->submitter->environment ?? null);
+            foreach ($this->externalUserService->capabilityFlags($task, $externalUser) as $key => $value) {
+                $task->setAttribute($key, $value);
+            }
 
             return $task;
         });
@@ -371,7 +392,7 @@ class ExternalTaskController extends Controller
         return response()->json($this->serializeTaskPayload(
             $task,
             $clientUrl,
-            $this->canManageCollaborators($task, $externalUser),
+            $externalUser,
         ));
     }
 
@@ -423,6 +444,8 @@ class ExternalTaskController extends Controller
             'status' => $attributes['status'] ?? 'pending',
             'priority' => $attributes['priority'] ?? 'medium',
         ]);
+
+        $externalUser = null;
 
         if (isset($attributes['user'])) {
             $externalUser = $this->externalUserService->upsert($project, [
@@ -508,7 +531,7 @@ class ExternalTaskController extends Controller
         $clientUrl = (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'));
 
         return response()->json(
-            $this->serializeTaskPayload($task, $clientUrl, true),
+            $this->serializeTaskPayload($task, $clientUrl, $externalUser),
             201,
         );
     }
@@ -604,7 +627,7 @@ class ExternalTaskController extends Controller
             $this->serializeTaskPayload(
                 $task,
                 (string) ($task->metadata?->url ?? $externalUser->url ?? config('app.url')),
-                $this->canManageCollaborators($task, $externalUser),
+                $externalUser,
             )
         );
     }
@@ -630,11 +653,16 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Unauthorized to update this task'], 403);
         }
 
+        if (! $this->externalUserService->canMutateProjectItem($task, $externalUser)) {
+            return response()->json(['error' => 'You can only update tasks you submitted'], 403);
+        }
+
         $attributes = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
             'temp_identifier' => 'nullable|string',
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
@@ -647,10 +675,17 @@ class ExternalTaskController extends Controller
         }
 
         $task->update([
-            ...$attributes,
+            ...collect($attributes)->except('requirement_status')->all(),
             'status' => $attributes['status'] ?? $task->status,
             'priority' => $attributes['priority'] ?? $task->priority,
         ]);
+
+        if ($task->isRequirementPhase() && array_key_exists('requirement_status', $attributes)) {
+            $task->metadata()->updateOrCreate(
+                ['task_id' => $task->id],
+                ['requirement_status' => $attributes['requirement_status'] ?? RequirementStatus::Submitted->value],
+            );
+        }
 
         // Handle deleted attachments
         if (isset($attributes['deleted_attachment_ids']) && count($attributes['deleted_attachment_ids']) > 0) {
@@ -747,7 +782,7 @@ class ExternalTaskController extends Controller
             $this->serializeTaskPayload(
                 $task,
                 $clientUrl,
-                $this->canManageCollaborators($task, $externalUser),
+                $externalUser,
             ),
             200,
         );
@@ -774,6 +809,10 @@ class ExternalTaskController extends Controller
             return response()->json(['error' => 'Unauthorized to delete this task'], 403);
         }
 
+        if (! $this->externalUserService->canMutateProjectItem($task, $externalUser)) {
+            return response()->json(['error' => 'You can only delete tasks you submitted'], 403);
+        }
+
         $task->delete();
 
         return response()->json(['message' => 'Task deleted successfully'], 200);
@@ -798,6 +837,10 @@ class ExternalTaskController extends Controller
 
         if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to update this task status'], 403);
+        }
+
+        if (! $this->externalUserService->canMutateProjectItem($task, $externalUser)) {
+            return response()->json(['error' => 'You can only update status for tasks you submitted'], 403);
         }
 
         $validatedData = $request->validate([
@@ -832,6 +875,10 @@ class ExternalTaskController extends Controller
 
         if (! $this->externalUserHasAccess($task, $externalUser)) {
             return response()->json(['error' => 'Unauthorized to update this task priority'], 403);
+        }
+
+        if (! $this->externalUserService->canMutateProjectItem($task, $externalUser)) {
+            return response()->json(['error' => 'You can only update priority for tasks you submitted'], 403);
         }
 
         $validatedData = $request->validate([

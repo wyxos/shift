@@ -17,6 +17,9 @@ export type ProjectRow = {
     client_name?: string | null;
     organisation_name?: string | null;
     isOwner?: boolean;
+    can_delete_project?: boolean;
+    can_manage_project_access?: boolean;
+    can_manage_technical_settings?: boolean;
     token?: string | null;
     external_widget_enabled?: boolean;
     external_widget_guest_submissions_enabled?: boolean;

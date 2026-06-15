@@ -100,9 +100,10 @@ function selectOption(option: SelectOption) {
                 :aria-label="ariaLabel ?? placeholder"
                 :disabled="disabled"
                 :data-testid="testId"
+                data-shift-field-control
                 :class="
                     cn(
-                        'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                        'border-input bg-background placeholder:text-muted-foreground focus:border-ring focus-visible:border-ring flex h-10 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
                         props.class,
                         triggerClass,
                     )
@@ -134,7 +135,8 @@ function selectOption(option: SelectOption) {
                             ref="searchInput"
                             v-model="searchTerm"
                             :placeholder="searchPlaceholder"
-                            class="border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-8 w-full rounded-md border px-3 py-1 pl-8 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                            data-shift-field-control
+                            class="border-input bg-background placeholder:text-muted-foreground focus:border-ring focus-visible:border-ring flex h-8 w-full rounded-md border px-3 py-1 pl-8 text-sm transition-colors outline-none"
                             :data-testid="testId ? `${testId}-search` : undefined"
                             @keydown.enter.prevent
                         />

@@ -46,6 +46,8 @@ const props = defineProps<{
         throughput?: ThroughputPoint[];
         projects?: ProjectPoint[];
     };
+    organisation_id?: number | string | null;
+    organisationId?: number | string | null;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -125,13 +127,17 @@ const statusChartConfig = {
         label: 'Awaiting Feedback',
         color: 'var(--chart-3)',
     },
+    'on-hold': {
+        label: 'On Hold',
+        color: 'var(--chart-5)',
+    },
     completed: {
         label: 'Completed',
         color: 'var(--chart-2)',
     },
     closed: {
         label: 'Closed',
-        color: 'var(--chart-5)',
+        color: 'var(--muted-foreground)',
     },
 } satisfies ChartConfig;
 
@@ -205,6 +211,9 @@ const openCount = computed(() => props.metrics.open ?? props.metrics.pending + p
 const completionRate = computed(
     () => props.metrics.completion_rate ?? (props.metrics.total > 0 ? Math.round((props.metrics.completed / props.metrics.total) * 1000) / 10 : 0),
 );
+const scopedOrganisationId = computed(() => props.organisation_id ?? props.organisationId ?? null);
+const tasksHref = computed(() => (scopedOrganisationId.value ? `/organisation/${scopedOrganisationId.value}/tasks` : '/tasks'));
+const requirementsHref = computed(() => (scopedOrganisationId.value ? `/organisation/${scopedOrganisationId.value}/requirements` : '/requirements'));
 
 const totalThroughputDelta = computed(() => {
     const created = throughputData.value.reduce((sum, point) => sum + point.created, 0);
@@ -226,7 +235,10 @@ const totalThroughputDelta = computed(() => {
                 </div>
                 <div class="flex items-center gap-2">
                     <Button as-child variant="outline">
-                        <Link href="/tasks">Open Tasks</Link>
+                        <Link :href="requirementsHref">Review Requirements</Link>
+                    </Button>
+                    <Button as-child variant="outline">
+                        <Link :href="tasksHref">Open Tasks</Link>
                     </Button>
                 </div>
             </div>

@@ -24,6 +24,8 @@ type OrganisationRow = {
     organisation_users_count?: number | null;
     projects_count?: number | null;
     isOwner: boolean;
+    can_delete?: boolean;
+    can_manage_org_access?: boolean;
 };
 
 type OrganisationPaginator = {
@@ -417,7 +419,7 @@ watch(
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="ghost" @click="resetFilters">Reset</Button>
+                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
                     <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
                 </template>
 
@@ -428,7 +430,7 @@ watch(
                     </Button>
                 </template>
 
-                <OrganisationListTable :organisations="organisationRows" @open-delete="openDeleteModal" @open-manage-users="openManageUsersModal" />
+                <OrganisationListTable :organisations="organisationRows" @open-manage-users="openManageUsersModal" />
             </AdminListShell>
 
             <OrganisationTeamPanel

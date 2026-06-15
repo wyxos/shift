@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
-import { computed } from 'vue';
+import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 
 const props = defineProps<{
     state: any;
@@ -13,23 +23,54 @@ const threadComposerHtmlModel = computed({
     get: () => state.threadComposerHtml,
     set: (value: string) => state.setThreadComposerHtml(value),
 });
+const deleteDialogOpen = ref(false);
+const pendingDeleteMessage = ref<any | null>(null);
+
+const requestDeleteThreadMessage = (message: any) => {
+    pendingDeleteMessage.value = message;
+    deleteDialogOpen.value = true;
+};
+
+const clearPendingDeleteMessage = () => {
+    pendingDeleteMessage.value = null;
+};
+
+const confirmDeleteThreadMessage = async () => {
+    const message = pendingDeleteMessage.value;
+
+    if (!message) return;
+
+    deleteDialogOpen.value = false;
+    pendingDeleteMessage.value = null;
+    await state.deleteThreadMessage(message);
+};
+
+const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null) => {
+    state.commentsScrollRef = value instanceof HTMLElement ? value : null;
+};
+
+watch(deleteDialogOpen, (open) => {
+    if (!open) {
+        clearPendingDeleteMessage();
+    }
+});
 </script>
 
 <template>
     <div
-        class="border-muted-foreground/10 via-background to-background max-h-[70vh] min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/5 lg:h-full lg:max-h-none lg:min-h-0"
+        class="border-muted-foreground/10 bg-background h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border"
         data-testid="task-comments-pane"
     >
         <div class="border-muted-foreground/10 flex items-center justify-between border-b px-4 py-3">
             <div>
-                <h3 class="text-foreground text-sm font-semibold">Comments</h3>
+                <h3 class="text-foreground text-sm font-semibold">{{ state.isRequirementPhase ? 'Clarifications' : 'Comments' }}</h3>
             </div>
             <div class="text-muted-foreground text-xs">
                 {{ state.threadMessages.length }} message{{ state.threadMessages.length === 1 ? '' : 's' }}
             </div>
         </div>
 
-        <div ref="state.commentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+        <div :ref="assignCommentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
             <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
             <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
@@ -51,8 +92,8 @@ const threadComposerHtmlModel = computed({
                                         : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
                                 "
                                 class="rounded-lg px-3 py-2 text-sm shadow-sm"
-                                @dblclick="state.onMessageDblClick(message, $event)"
-                                @touchend="state.onMessageTouchEnd(message, $event)"
+                                @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
+                                @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
                                 <div v-if="!message.isYou" class="text-foreground/80 mb-1 text-[11px] font-semibold">
                                     {{ message.author }}
@@ -101,25 +142,32 @@ const threadComposerHtmlModel = computed({
                                     Copy selection
                                 </ContextMenuItem>
                                 <ContextMenuItem
-                                    v-if="!message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
                                     class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
                                     @select="state.startReplyToMessage(message)"
                                 >
                                     Reply
                                 </ContextMenuItem>
-                                <ContextMenuSeparator v-if="!message.isYou && message.id && !message.pending" class="bg-border -mx-1 my-1 h-px" />
+                                <ContextMenuSeparator
+                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
+                                    class="bg-border -mx-1 my-1 h-px"
+                                />
                                 <ContextMenuItem
-                                    v-if="message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
                                     class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
                                     @select="state.startThreadEdit(message)"
                                 >
                                     Edit
                                 </ContextMenuItem>
-                                <ContextMenuSeparator v-if="message.isYou && message.id && !message.pending" class="bg-border -mx-1 my-1 h-px" />
+                                <ContextMenuSeparator
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
+                                    class="bg-border -mx-1 my-1 h-px"
+                                />
                                 <ContextMenuItem
-                                    v-if="message.isYou && message.id && !message.pending"
+                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
                                     class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.deleteThreadMessage(message)"
+                                    data-testid="delete-thread-message"
+                                    @select="requestDeleteThreadMessage(message)"
                                 >
                                     Delete
                                 </ContextMenuItem>
@@ -136,6 +184,7 @@ const threadComposerHtmlModel = computed({
         <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
             <div v-if="state.threadEditError" class="text-destructive mb-2 text-xs">{{ state.threadEditError }}</div>
             <ShiftEditor
+                v-if="state.canComment"
                 ref="state.threadComposerRef"
                 v-model="threadComposerHtmlModel"
                 :enable-ai-improve="state.aiImproveEnabled"
@@ -149,6 +198,26 @@ const threadComposerHtmlModel = computed({
                 @uploading="state.setThreadComposerUploading($event)"
                 @send="state.handleThreadSend"
             />
+            <div v-else class="text-muted-foreground py-2 text-sm">Commenting is unavailable for this task.</div>
         </div>
+
+        <AlertDialog v-model:open="deleteDialogOpen">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete comment</AlertDialogTitle>
+                    <AlertDialogDescription>Delete this comment from the thread? This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        data-testid="confirm-thread-message-delete"
+                        @click="confirmDeleteThreadMessage"
+                    >
+                        Delete comment
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
 </template>

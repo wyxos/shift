@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RequirementStatus;
 use App\Enums\TaskCollaboratorKind;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -47,6 +48,43 @@ class Task extends Model
     public function scopeWithStatus(\Illuminate\Database\Eloquent\Builder $query, string $status): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', $status);
+    }
+
+    public function scopeWithoutRequirementPhase(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('metadata', function (Builder $metadataQuery) {
+            $metadataQuery->where('phase', 'requirement');
+        });
+    }
+
+    public function scopeRequirementIntake(Builder $query): Builder
+    {
+        return $query->whereHas('metadata', function (Builder $metadataQuery) {
+            $metadataQuery
+                ->where('intake_type', 'requirement')
+                ->where('source', 'embedded_requirement_pack');
+        });
+    }
+
+    public function phase(): string
+    {
+        return $this->metadata?->phase ?: 'task';
+    }
+
+    public function isRequirementPhase(): bool
+    {
+        return $this->phase() === 'requirement';
+    }
+
+    public function requirementStatus(): string
+    {
+        return $this->metadata?->requirement_status ?: RequirementStatus::Submitted->value;
+    }
+
+    public function isReadyToFinalizeRequirement(): bool
+    {
+        return $this->isRequirementPhase()
+            && $this->requirementStatus() === RequirementStatus::ReadyToFinalize->value;
     }
 
     public function scopeVisibleTo(Builder $query, ?int $userId): Builder
