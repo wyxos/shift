@@ -13,6 +13,7 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 - For MCP route, auth, tool, or project-visibility work, read `shared:projects/notes/shift-mcp.md` through Knowledge MCP before changing behavior.
 - Shared task UI or helpers that may be consumed by the SDK must not rely on a global Ziggy `route()` helper at SDK runtime. Pass explicit `/shift/api/**` URLs from the consuming SDK layer when needed.
 - After SDK UI changes in the sibling repo, rebuild there with `npm run build:shift`, then publish here with `php artisan shift:publish --group=public`.
+- For public SHIFT changes that need production, commit and push this repo first, then bring that commit into `../shift-hosted` by merge/cherry-pick/fetch-based application. Do not manually recreate the same edit in `shift-hosted` unless the user explicitly approves that exceptional fallback.
 - Production deploys for `shift.wyxos.com` must run from `../shift-hosted` with `npm run release` and the `SHIFT production` preset. Do not deploy production from this public clone.
 - Do not edit generated build output in `public/build/**`.
 

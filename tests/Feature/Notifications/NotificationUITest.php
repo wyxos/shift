@@ -3,8 +3,7 @@
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
-
-;
+use Illuminate\Notifications\DatabaseNotification;
 
 test('notification endpoints return correct data', function () {
     // Create a user and authenticate
@@ -22,10 +21,10 @@ test('notification endpoints return correct data', function () {
     $response->assertStatus(200);
     $response->assertJsonStructure([
         'notifications',
-        'count'
+        'count',
     ]);
     $response->assertJson([
-        'count' => 1
+        'count' => 1,
     ]);
 
     // Get the notification ID from the response
@@ -35,7 +34,7 @@ test('notification endpoints return correct data', function () {
     $markAsReadResponse = $this->post(route('notifications.mark-as-read', ['id' => $notificationId]));
     $markAsReadResponse->assertStatus(200);
     $markAsReadResponse->assertJson([
-        'success' => true
+        'success' => true,
     ]);
 
     // Verify the notification is now marked as read
@@ -51,7 +50,7 @@ test('notification endpoints return correct data', function () {
     $markAllAsReadResponse = $this->post(route('notifications.mark-all-as-read'));
     $markAllAsReadResponse->assertStatus(200);
     $markAllAsReadResponse->assertJson([
-        'success' => true
+        'success' => true,
     ]);
 
     // Verify all notifications are marked as read
@@ -106,7 +105,7 @@ test('marking notification as unread', function () {
     $markAsUnreadResponse = $this->post(route('notifications.mark-as-unread', ['id' => $notificationId]));
     $markAsUnreadResponse->assertStatus(200);
     $markAsUnreadResponse->assertJson([
-        'success' => true
+        'success' => true,
     ]);
 
     // Verify the notification is now marked as unread
@@ -117,4 +116,42 @@ test('marking notification as unread', function () {
 
     // Verify it appears in the unread notifications count
     expect($user->unreadNotifications()->count())->toEqual(1);
+});
+
+test('opening a task detail marks matching task notifications as read', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $task = Task::factory()->create();
+    $task->submitter()->associate($user)->save();
+
+    $otherTask = Task::factory()->create();
+    $otherTask->submitter()->associate($user)->save();
+
+    $user->notify(new TaskCreationNotification($task));
+    $user->notify(new TaskCreationNotification($otherTask));
+
+    $matchingNotification = $user->unreadNotifications()
+        ->get()
+        ->first(fn (DatabaseNotification $notification) => (int) $notification->data['task_id'] === $task->id);
+    $otherNotification = $user->unreadNotifications()
+        ->get()
+        ->first(fn (DatabaseNotification $notification) => (int) $notification->data['task_id'] === $otherTask->id);
+
+    $this->getJson(route('tasks.v2.show', ['task' => $task->id]))
+        ->assertOk();
+
+    expect($matchingNotification->refresh()->read_at)->not->toBeNull()
+        ->and($otherNotification->refresh()->read_at)->toBeNull();
+});
+
+test('missing task detail route returns a friendly not found message', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->getJson(route('tasks.v2.show', ['task' => 999999]))
+        ->assertNotFound()
+        ->assertJson([
+            'message' => 'This task is no longer available or you do not have access to it.',
+        ]);
 });
