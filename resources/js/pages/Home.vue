@@ -62,28 +62,32 @@ const installSteps = [
     },
 ];
 
-type InstallFlowLevel = 'INFO' | 'ACTION' | 'CODE' | 'WAIT' | 'SUCCESS';
+type InstallTerminalTone = 'default' | 'muted' | 'url' | 'success' | 'spacer';
 
-const installFlowLines: Array<{ level: InstallFlowLevel; text: string }> = [
-    { level: 'INFO', text: 'Detected application environment: local' },
-    { level: 'INFO', text: 'Detected application URL: https://app.northwind.com' },
-    { level: 'ACTION', text: 'Verify this installation in your browser to continue.' },
-    { level: 'ACTION', text: 'Verification URL: https://shift.wyxos.com/sdk/install' },
-    { level: 'CODE', text: 'Short code: A1B2-C3' },
-    { level: 'WAIT', text: 'Waiting for SHIFT approval...' },
-    { level: 'ACTION', text: 'Select which SHIFT project to link to this application' },
-    { level: 'SUCCESS', text: 'SHIFT authorization approved.' },
-    { level: 'SUCCESS', text: 'Registered local => https://app.northwind.com with SHIFT.' },
-    { level: 'SUCCESS', text: 'SHIFT installation complete.' },
+const installFlowLines: Array<{ text: string; tone?: InstallTerminalTone }> = [
+    { text: 'Detected application environment: local' },
+    { text: 'Detected application URL: https://app.northwind.com' },
+    { text: '', tone: 'spacer' },
+    { text: 'Open this URL in your browser to approve the installation:' },
+    { text: 'https://shift.wyxos.com/sdk/install', tone: 'url' },
+    { text: 'Short code: A1B2-C3' },
+    { text: '', tone: 'spacer' },
+    { text: 'Waiting for SHIFT approval...', tone: 'muted' },
+    { text: 'Select which SHIFT project to link to this application' },
+    { text: 'SHIFT authorization approved.', tone: 'success' },
+    { text: 'Registered local => https://app.northwind.com with SHIFT.', tone: 'success' },
+    { text: 'SHIFT installation complete.', tone: 'success' },
 ];
 
-const installFlowLevelClasses: Record<InstallFlowLevel, string> = {
-    INFO: 'border-sky-400/30 bg-sky-400/10 text-sky-200',
-    ACTION: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
-    CODE: 'border-violet-400/30 bg-violet-400/10 text-violet-200',
-    WAIT: 'border-slate-600 bg-slate-800/70 text-slate-300',
-    SUCCESS: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
+const installFlowToneClasses: Record<InstallTerminalTone, string> = {
+    default: 'text-zinc-100',
+    muted: 'text-zinc-400',
+    url: 'text-sky-300',
+    success: 'text-emerald-300',
+    spacer: 'h-2',
 };
+
+const installPrompt = 'runcloud@my-server:~/webapps/app-northwind$';
 
 const faqItems = [
     {
@@ -333,30 +337,46 @@ const faqItems = [
                     </div>
 
                     <div
-                        class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 font-mono text-sm text-slate-100 shadow-2xl shadow-blue-950/20"
+                        class="self-start overflow-hidden rounded-lg border border-zinc-800 bg-slate-950 font-mono text-sm shadow-2xl shadow-blue-950/20"
                         data-testid="install-terminal"
                     >
-                        <div class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-3">
-                            <span class="size-3 rounded-full bg-rose-400/80"></span>
-                            <span class="size-3 rounded-full bg-amber-400/80"></span>
-                            <span class="size-3 rounded-full bg-emerald-400/80"></span>
-                            <span class="ml-2 text-xs text-slate-500">app.northwind.com</span>
+                        <div class="flex items-center border-b border-zinc-700 bg-zinc-800 text-zinc-100">
+                            <div class="flex items-center gap-2 px-4 py-3">
+                                <span class="size-3 rounded-full bg-rose-500"></span>
+                                <span class="size-3 rounded-full bg-amber-400"></span>
+                                <span class="size-3 rounded-full bg-emerald-500"></span>
+                            </div>
+                            <div class="min-w-0 flex-1 px-2 text-center text-xs font-semibold text-zinc-100">
+                                runcloud@my-server: ~/webapps/app-northwind
+                            </div>
+                            <div class="w-20 shrink-0"></div>
                         </div>
-                        <div class="space-y-3 p-5">
-                            <pre
-                                class="overflow-x-auto rounded-md border border-slate-800 bg-slate-900 px-4 py-3"
-                            ><code><span class="text-emerald-300">$</span> php artisan install:shift</code></pre>
-                            <ol class="space-y-2">
-                                <li
-                                    v-for="line in installFlowLines"
-                                    :key="line.text"
-                                    class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3 rounded-md border px-4 py-3"
-                                    :class="installFlowLevelClasses[line.level]"
+                        <div
+                            class="overflow-x-auto bg-[#2e2e2e] px-5 py-4 text-[13px] leading-6 text-zinc-100 sm:text-sm"
+                            :aria-label="installPrompt"
+                            data-testid="install-terminal-screen"
+                        >
+                            <div class="min-w-max space-y-1">
+                                <div class="whitespace-pre">
+                                    <span class="text-lime-500">runcloud@my-server</span><span class="text-zinc-100">:</span
+                                    ><span class="font-semibold text-blue-500">~/webapps/app-northwind</span
+                                    ><span class="text-zinc-100">$ php artisan install:shift</span>
+                                </div>
+                                <div
+                                    v-for="(line, index) in installFlowLines"
+                                    :key="`${line.text}-${index}`"
+                                    class="whitespace-pre"
+                                    :class="installFlowToneClasses[line.tone ?? 'default']"
+                                    data-testid="install-terminal-line"
                                 >
-                                    <span class="text-xs leading-6 font-semibold tracking-wide">{{ line.level }}</span>
-                                    <span class="leading-6 text-slate-100">{{ line.text }}</span>
-                                </li>
-                            </ol>
+                                    {{ line.text }}
+                                </div>
+                                <div class="whitespace-pre">
+                                    <span class="text-lime-500">runcloud@my-server</span><span class="text-zinc-100">:</span
+                                    ><span class="font-semibold text-blue-500">~/webapps/app-northwind</span><span class="text-zinc-100">$ </span
+                                    ><span class="inline-block h-5 w-2 translate-y-0.5 bg-zinc-100"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
