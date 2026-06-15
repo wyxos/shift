@@ -62,18 +62,28 @@ const installSteps = [
     },
 ];
 
-const installFlowLines = [
-    'Detected application environment: local',
-    'Detected application URL: https://app.northwind.com',
-    'Verify this installation in your browser to continue.',
-    'Verification URL: https://shift.wyxos.com/sdk/install',
-    'Short code: A1B2-C3',
-    'Waiting for SHIFT approval...',
-    'Select which SHIFT project to link to this application',
-    'SHIFT authorization approved.',
-    'Registered local => https://app.northwind.com with SHIFT.',
-    'SHIFT installation complete.',
+type InstallFlowLevel = 'INFO' | 'ACTION' | 'CODE' | 'WAIT' | 'SUCCESS';
+
+const installFlowLines: Array<{ level: InstallFlowLevel; text: string }> = [
+    { level: 'INFO', text: 'Detected application environment: local' },
+    { level: 'INFO', text: 'Detected application URL: https://app.northwind.com' },
+    { level: 'ACTION', text: 'Verify this installation in your browser to continue.' },
+    { level: 'ACTION', text: 'Verification URL: https://shift.wyxos.com/sdk/install' },
+    { level: 'CODE', text: 'Short code: A1B2-C3' },
+    { level: 'WAIT', text: 'Waiting for SHIFT approval...' },
+    { level: 'ACTION', text: 'Select which SHIFT project to link to this application' },
+    { level: 'SUCCESS', text: 'SHIFT authorization approved.' },
+    { level: 'SUCCESS', text: 'Registered local => https://app.northwind.com with SHIFT.' },
+    { level: 'SUCCESS', text: 'SHIFT installation complete.' },
 ];
+
+const installFlowLevelClasses: Record<InstallFlowLevel, string> = {
+    INFO: 'border-sky-400/30 bg-sky-400/10 text-sky-200',
+    ACTION: 'border-amber-400/30 bg-amber-400/10 text-amber-200',
+    CODE: 'border-violet-400/30 bg-violet-400/10 text-violet-200',
+    WAIT: 'border-slate-600 bg-slate-800/70 text-slate-300',
+    SUCCESS: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
+};
 
 const faqItems = [
     {
@@ -322,23 +332,29 @@ const faqItems = [
                         </div>
                     </div>
 
-                    <div class="bg-card overflow-hidden rounded-lg border">
-                        <div class="border-b px-5 py-4">
-                            <h3 class="font-semibold">Installer sequence</h3>
-                            <p class="text-muted-foreground mt-1 text-sm">Based on the current package command.</p>
+                    <div
+                        class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 font-mono text-sm text-slate-100 shadow-2xl shadow-blue-950/20"
+                        data-testid="install-terminal"
+                    >
+                        <div class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-3">
+                            <span class="size-3 rounded-full bg-rose-400/80"></span>
+                            <span class="size-3 rounded-full bg-amber-400/80"></span>
+                            <span class="size-3 rounded-full bg-emerald-400/80"></span>
+                            <span class="ml-2 text-xs text-slate-500">app.northwind.com</span>
                         </div>
-                        <div class="space-y-4 p-5">
+                        <div class="space-y-3 p-5">
                             <pre
-                                class="bg-foreground text-background overflow-x-auto rounded-md px-4 py-3 text-sm"
-                            ><code>$ php artisan install:shift</code></pre>
+                                class="overflow-x-auto rounded-md border border-slate-800 bg-slate-900 px-4 py-3"
+                            ><code><span class="text-emerald-300">$</span> php artisan install:shift</code></pre>
                             <ol class="space-y-2">
                                 <li
-                                    v-for="(line, i) in installFlowLines"
-                                    :key="line"
-                                    class="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-3 rounded-md border px-4 py-3"
+                                    v-for="line in installFlowLines"
+                                    :key="line.text"
+                                    class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3 rounded-md border px-4 py-3"
+                                    :class="installFlowLevelClasses[line.level]"
                                 >
-                                    <span class="text-muted-foreground font-mono text-xs leading-6">{{ String(i + 1).padStart(2, '0') }}</span>
-                                    <span class="font-mono text-sm leading-6">{{ line }}</span>
+                                    <span class="text-xs leading-6 font-semibold tracking-wide">{{ line.level }}</span>
+                                    <span class="leading-6 text-slate-100">{{ line.text }}</span>
                                 </li>
                             </ol>
                         </div>
@@ -349,8 +365,8 @@ const faqItems = [
             <section class="border-b">
                 <div class="mx-auto w-full max-w-[1536px] px-6 py-24 lg:px-12 lg:py-32">
                     <div class="max-w-2xl">
-                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Questions teams ask</span>
-                        <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">No new client portal to explain.</h2>
+                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">FAQ</span>
+                        <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Answers before you install.</h2>
                     </div>
                     <div class="mt-12 grid gap-4 lg:grid-cols-2">
                         <article v-for="item in faqItems" :key="item.question" class="bg-card rounded-lg border p-6">
