@@ -1,6 +1,6 @@
 # SHIFT (Portal)
 
-Read `CLAUDE.md` for the Laravel Boost baseline and `PROFILE.md` for the repo's quality bar before changing anything here.
+Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `PROFILE.md` for the repo's quality bar before changing anything here.
 
 ## Scope
 - This file applies repo-wide unless a deeper `AGENTS.md` overrides it.
@@ -23,7 +23,6 @@ Read `CLAUDE.md` for the Laravel Boost baseline and `PROFILE.md` for the repo's 
 - Portal UI: `resources/js/` -> `resources/js/AGENTS.md`
 - Route contracts: `routes/api.php`, `routes/web.php`
 
-===
 # Laravel Boost Guidelines
 
 Laravel Boost guidelines are split to avoid loading every generated rule into the root context. Read the relevant files in `.codex/agents/laravel-boost/` before Laravel, PHP, frontend, or testing work.
