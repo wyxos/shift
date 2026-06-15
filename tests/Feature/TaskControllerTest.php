@@ -1073,6 +1073,52 @@ test('update v2 updates an owned task', function () {
     ]);
 });
 
+test('update v2 preserves requirement metadata when no environment is selected', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Original requirement',
+        'description' => '<p>Original requirement details.</p>',
+        'status' => 'pending',
+        'priority' => 'medium',
+    ]);
+    $requirement->submitter()->associate($this->user)->save();
+    $requirement->metadata()->create([
+        'url' => 'https://shift.test',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'requirement_status' => RequirementStatus::Submitted->value,
+        'submitted_title' => 'Original requirement',
+        'submitted_description' => '<p>Original requirement details.</p>',
+    ]);
+
+    $this->actingAs($this->user)
+        ->putJson(route('tasks.v2.update', $requirement), [
+            'title' => 'Updated requirement',
+            'description' => '<p>Updated requirement details.</p>',
+            'status' => 'pending',
+            'priority' => 'high',
+            'requirement_status' => RequirementStatus::InReview->value,
+        ])
+        ->assertOk()
+        ->assertJsonPath('task.phase', 'requirement')
+        ->assertJsonPath('task.requirement_status', RequirementStatus::InReview->value);
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $requirement->id,
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'requirement_status' => RequirementStatus::InReview->value,
+        'submitted_title' => 'Original requirement',
+        'submitted_description' => '<p>Original requirement details.</p>',
+    ]);
+});
+
 test('destroy v2 deletes task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,

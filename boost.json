@@ -1,5 +1,9 @@
 {
-    "agents": ["codex", "phpstorm"],
-    "editors": ["codex", "phpstorm"],
+    "agents": [
+        "codex"
+    ],
+    "editors": [
+        "codex"
+    ],
     "guidelines": []
 }

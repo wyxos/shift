@@ -411,8 +411,8 @@ defineExpose({ editor, reset });
     @apply bg-gray-200;
     /*  background: #0b1021; !* dark background to contrast token colors; override with theme if desired *!
   color: #e6e6e6;*/
-    border-radius: 0.5rem;
-    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.625rem;
     margin: 1rem 0;
     overflow-x: auto;
 }
@@ -422,6 +422,9 @@ defineExpose({ editor, reset });
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-size: 0.875rem;
     line-height: 1.5;
+    padding: 0;
+}
+.tiptap pre code.hljs {
     padding: 0;
 }
 </style>
