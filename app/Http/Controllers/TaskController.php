@@ -158,9 +158,13 @@ class TaskController extends Controller
         return $normalizedEnvironment;
     }
 
-    private function syncTaskEnvironment(Task $task, ?string $environment, ?string $url = null): void
+    private function syncTaskEnvironment(Task $task, ?string $environment, ?string $url = null, bool $preserveMetadata = false): void
     {
         if ($environment === null) {
+            if ($preserveMetadata) {
+                return;
+            }
+
             $task->metadata()->delete();
 
             return;
@@ -941,8 +945,10 @@ class TaskController extends Controller
         $task->status = $attributes['status'];
         $task->description = $attributes['description'] ?? null;
         $task->save();
-        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
-        if ($task->isRequirementPhase() && array_key_exists('requirement_status', $attributes)) {
+        $wasRequirementPhase = $task->isRequirementPhase();
+
+        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl, $wasRequirementPhase);
+        if ($wasRequirementPhase && array_key_exists('requirement_status', $attributes)) {
             $task->metadata()->updateOrCreate(
                 ['task_id' => $task->id],
                 ['requirement_status' => $attributes['requirement_status'] ?? RequirementStatus::Submitted->value],

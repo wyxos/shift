@@ -110,4 +110,29 @@ describe('field focus styles', () => {
         expect(focusedRule).not.toMatch(/\bring-/);
         expect(focusedRule).not.toMatch(/\bshadow-/);
     });
+
+    it('keeps editor and rendered rich content paragraph spacing aligned', () => {
+        const source = readFileSync(join(process.cwd(), 'resources/css/app.css'), 'utf8');
+
+        expect(source).toMatch(/\.ProseMirror > p \+ p,\s*\.shift-rich > p \+ p\s*\{[\s\S]*?margin-top:\s*0\.75rem;/);
+    });
+
+    it('keeps editor and rendered rich content code blocks aligned', () => {
+        const source = readFileSync(join(process.cwd(), 'resources/css/app.css'), 'utf8');
+
+        expect(source).toMatch(/\.ProseMirror pre,\s*\.shift-rich pre\s*\{[\s\S]*?padding:\s*0\.5rem 0\.625rem;/);
+        expect(source).toMatch(/\.ProseMirror pre,\s*\.shift-rich pre\s*\{[\s\S]*?border-radius:\s*0\.25rem;/);
+        expect(source).toMatch(/\.ProseMirror pre,\s*\.shift-rich pre\s*\{[\s\S]*?overflow-x:\s*auto;/);
+        expect(source).toMatch(/\.ProseMirror pre,\s*\.shift-rich pre\s*\{[\s\S]*?background:\s*#e5e7eb;/);
+        expect(source).toMatch(/\.ProseMirror pre code,\s*\.shift-rich pre code\s*\{[\s\S]*?white-space:\s*pre;/);
+        expect(source).toMatch(/\.ProseMirror pre code\.hljs,\s*\.shift-rich pre code\.hljs\s*\{[\s\S]*?padding:\s*0;/);
+    });
+
+    it('keeps shared rich editor code blocks compact', () => {
+        const source = readFileSync(join(process.cwd(), 'resources/js/shared/components/ShiftEditor.vue'), 'utf8');
+        const preRule = styleRule(source, '.tiptap pre');
+
+        expect(preRule).toContain('border-radius: 0.25rem;');
+        expect(preRule).toContain('padding: 0.5rem 0.625rem;');
+    });
 });
