@@ -219,7 +219,32 @@ describe('Home.vue', () => {
         expect(wrapper.text()).toContain('Do clients need a SHIFT login?');
         expect(wrapper.text()).toContain('Can we self-host it?');
         expect(wrapper.text()).toContain('What data leaves the client app?');
+        expect(wrapper.text()).toContain('FAQ');
+        expect(wrapper.text()).toContain('Answers before you install.');
+        expect(wrapper.text()).not.toContain('Questions teams ask');
+        expect(wrapper.text()).not.toContain('No new client portal to explain.');
         expect(wrapper.text()).toContain('Start hosted');
         expect(wrapper.text()).toContain('Install package');
+    });
+
+    it('renders the installer preview as a terminal transcript', () => {
+        const wrapper = mount(Home, {
+            global: {
+                mocks: {
+                    route: (name) => `/${name}`,
+                },
+            },
+        });
+
+        const terminal = wrapper.get('[data-testid="install-terminal"]');
+
+        expect(wrapper.text()).not.toContain('Installer sequence');
+        expect(wrapper.text()).not.toContain('Based on the current package command.');
+        expect(terminal.classes()).toEqual(expect.arrayContaining(['bg-slate-950', 'font-mono']));
+        expect(terminal.text()).toContain('$ php artisan install:shift');
+        expect(terminal.text()).toContain('INFO');
+        expect(terminal.text()).toContain('ACTION');
+        expect(terminal.text()).toContain('SUCCESS');
+        expect(terminal.text()).toContain('Short code: A1B2-C3');
     });
 });
