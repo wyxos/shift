@@ -17,6 +17,7 @@ use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
+use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
@@ -33,6 +34,8 @@ use Illuminate\Validation\ValidationException;
 
 class TaskController extends Controller
 {
+    public const TASK_NOT_FOUND_MESSAGE = 'This task is no longer available or you do not have access to it.';
+
     public function __construct(
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly ExternalUserService $externalUserService,
@@ -110,8 +113,21 @@ class TaskController extends Controller
     private function ensureTaskVisible(Task $task): void
     {
         if (! $this->visibleTasksQuery()->whereKey($task->id)->exists()) {
-            abort(404);
+            abort(404, self::TASK_NOT_FOUND_MESSAGE);
         }
+    }
+
+    private function markTaskNotificationsAsRead(Task $task): void
+    {
+        auth()->user()?->unreadNotifications()
+            ->whereIn('type', [
+                TaskCreationNotification::class,
+                TaskCollaboratorAddedNotification::class,
+                TaskThreadUpdated::class,
+            ])
+            ->where('data->task_id', $task->id)
+            ->get()
+            ->markAsRead();
     }
 
     private function visibleProjectsQuery(): Builder
@@ -902,6 +918,7 @@ class TaskController extends Controller
     public function showV2(Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
+        $this->markTaskNotificationsAsRead($task);
 
         $task->load(['submitter', 'attachments', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 

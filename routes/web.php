@@ -74,7 +74,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks.index');
     Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements.index');
     Route::get('tasks-v2', fn () => redirect()->route('tasks.index', request()->query()))->name('tasks.v2');
-    Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])->name('tasks.v2.show');
+    Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])
+        ->missing(fn () => response()->json(['message' => TaskController::TASK_NOT_FOUND_MESSAGE], 404))
+        ->name('tasks.v2.show');
     Route::get('tasks-v2/projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.v2.collaborators');
     Route::post('tasks-v2/tasks', [TaskController::class, 'storeV2'])->name('tasks.v2.store');
     Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
