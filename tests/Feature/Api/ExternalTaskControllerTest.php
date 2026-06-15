@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attachment;
+use App\Models\ExternalContact;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
@@ -39,6 +40,189 @@ beforeEach(function () {
         'url' => $this->externalUserData['url'],
         'project_id' => $this->project->id,
     ]);
+
+    $this->createRoleExternalUser = function (string $externalId, string $role, array $overrides = []): ExternalUser {
+        return ExternalUser::create([
+            'external_id' => $externalId,
+            'name' => $overrides['name'] ?? 'External '.$externalId,
+            'email' => $overrides['email'] ?? $externalId.'@example.com',
+            'environment' => $overrides['environment'] ?? 'testing',
+            'url' => $overrides['url'] ?? 'https://example.com',
+            'project_id' => $overrides['project_id'] ?? $this->project->id,
+            'role' => $role,
+        ]);
+    };
+
+    $this->externalPayload = fn (ExternalUser $externalUser): array => [
+        'id' => $externalUser->external_id,
+        'name' => $externalUser->name,
+        'email' => $externalUser->email,
+        'environment' => $externalUser->environment,
+        'url' => $externalUser->url,
+    ];
+
+    $this->createSubmittedTask = function (ExternalUser $submitter, array $attributes = []): Task {
+        $task = Task::factory()->create([
+            'project_id' => $this->project->id,
+            ...$attributes,
+        ]);
+        $task->submitter()->associate($submitter)->save();
+
+        return $task;
+    };
+});
+
+test('external task visibility follows the role matrix', function () {
+    $owner = ($this->createRoleExternalUser)('owner-1', 'owner');
+    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-1', 'client_developer');
+    $shiftLeadDeveloper = ($this->createRoleExternalUser)('shift-lead-1', 'shift_lead_developer');
+    $shiftDeveloper = ($this->createRoleExternalUser)('shift-developer-1', 'shift_developer');
+    $user = ($this->createRoleExternalUser)('user-1', 'user');
+    $guest = ($this->createRoleExternalUser)('guest-1', 'guest');
+
+    $ownerTask = ($this->createSubmittedTask)($owner, ['title' => 'Owner task']);
+    $clientDeveloperTask = ($this->createSubmittedTask)($clientDeveloper, ['title' => 'Client developer task']);
+    $shiftDeveloperTask = ($this->createSubmittedTask)($shiftDeveloper, ['title' => 'Shift developer task']);
+    $userTask = ($this->createSubmittedTask)($user, ['title' => 'User task']);
+    $guestTask = ($this->createSubmittedTask)($guest, ['title' => 'Guest task']);
+    $assignedTask = ($this->createSubmittedTask)($guest, ['title' => 'Assigned guest task']);
+    $assignedTask->externalUsers()->attach($clientDeveloper->id);
+
+    $idsFor = function (ExternalUser $externalUser): array {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+            ->getJson('/api/tasks?'.http_build_query([
+                'project' => $this->project->token,
+                'user' => ($this->externalPayload)($externalUser),
+            ]));
+
+        $response->assertOk();
+
+        return collect($response->json('data'))->pluck('id')->sort()->values()->all();
+    };
+
+    expect($idsFor($owner))->toBe(collect([
+        $ownerTask->id,
+        $clientDeveloperTask->id,
+        $shiftDeveloperTask->id,
+        $userTask->id,
+        $guestTask->id,
+        $assignedTask->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($shiftLeadDeveloper))->toBe(collect([
+        $ownerTask->id,
+        $clientDeveloperTask->id,
+        $shiftDeveloperTask->id,
+        $userTask->id,
+        $guestTask->id,
+        $assignedTask->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($clientDeveloper))->toBe(collect([
+        $ownerTask->id,
+        $clientDeveloperTask->id,
+        $assignedTask->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($shiftDeveloper))->toBe(collect([
+        $ownerTask->id,
+        $shiftDeveloperTask->id,
+    ])->sort()->values()->all());
+
+    expect($idsFor($user))->toBe([$userTask->id]);
+    expect($idsFor($guest))->toBe([$guestTask->id, $assignedTask->id]);
+});
+
+test('linked external contacts can view tasks submitted by or assigned to linked accounts', function () {
+    $this->project->environments()->updateOrCreate(
+        ['environment' => 'production'],
+        ['url' => 'https://example.com/production'],
+    );
+
+    $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
+    $productionEnvironment = $this->project->environments()->where('environment', 'production')->firstOrFail();
+
+    $contact = ExternalContact::create([
+        'project_id' => $this->project->id,
+    ]);
+
+    $primaryAccount = ($this->createRoleExternalUser)('linked-primary', 'user', [
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'email' => 'shared-contact@example.com',
+    ]);
+    $secondaryAccount = ($this->createRoleExternalUser)('linked-secondary', 'user', [
+        'environment' => 'production',
+        'url' => 'https://example.com/production',
+        'email' => 'shared-contact@example.com',
+    ]);
+    $unlinkedAccount = ($this->createRoleExternalUser)('unlinked-user', 'user');
+
+    $primaryAccount->forceFill([
+        'external_contact_id' => $contact->id,
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+    $secondaryAccount->forceFill([
+        'external_contact_id' => $contact->id,
+        'project_environment_id' => $productionEnvironment->id,
+    ])->save();
+    $unlinkedAccount->forceFill([
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+
+    $submittedBySecondary = ($this->createSubmittedTask)($secondaryAccount, [
+        'title' => 'Submitted by linked production account',
+    ]);
+    $assignedToSecondary = ($this->createSubmittedTask)($unlinkedAccount, [
+        'title' => 'Assigned to linked production account',
+    ]);
+    $assignedToSecondary->externalUsers()->attach($secondaryAccount->id);
+    $unlinkedTask = ($this->createSubmittedTask)($unlinkedAccount, [
+        'title' => 'Unlinked account task',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($primaryAccount),
+        ]));
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($submittedBySecondary->id);
+    expect($ids)->toContain($assignedToSecondary->id);
+    expect($ids)->not->toContain($unlinkedTask->id);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$submittedBySecondary->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($primaryAccount),
+        ]))
+        ->assertOk()
+        ->assertJsonPath('id', $submittedBySecondary->id);
+});
+
+test('project environment identity resolves an external account when the request url changes', function () {
+    $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
+    $this->externalUser->forceFill([
+        'project_environment_id' => $testingEnvironment->id,
+    ])->save();
+
+    $task = ($this->createSubmittedTask)($this->externalUser, [
+        'title' => 'Task visible after client URL changes',
+    ]);
+
+    $payload = $this->externalUserData;
+    $payload['url'] = 'https://renamed-client.example.com';
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$task->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => $payload,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('id', $task->id);
 });
 
 test('index returns tasks for external user', function () {
@@ -184,6 +368,11 @@ test('show returns task details', function () {
         'id' => $task->id,
         'title' => 'Test Task',
         'project_id' => $this->project->id,
+        'can_edit' => true,
+        'can_update_status' => true,
+        'can_update_priority' => true,
+        'can_delete' => true,
+        'can_comment' => true,
     ]);
 });
 
@@ -523,6 +712,89 @@ test('destroy returns 403 for unauthorized user', function () {
     $response->assertStatus(403);
 });
 
+test('destroy is forbidden for non submitter with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
+    $owner = ($this->createRoleExternalUser)('owner-delete-1', 'owner');
+    $task = ($this->createSubmittedTask)($owner, [
+        'title' => 'Owner task visible to assigned developer',
+    ]);
+    $task->externalUsers()->attach($this->externalUser->id);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($this->externalUser->fresh()),
+        ]));
+
+    $response->assertStatus(403);
+
+    $this->assertDatabaseHas('tasks', [
+        'id' => $task->id,
+        'title' => 'Owner task visible to assigned developer',
+    ]);
+});
+
+test('requirement item mutation is submitter only for visible non submitters', function () {
+    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-requirement-edit', 'client_developer');
+    $owner = ($this->createRoleExternalUser)('owner-requirement-edit', 'owner');
+    $requirement = ($this->createSubmittedTask)($owner, [
+        'title' => 'Owner submitted requirement',
+        'description' => 'Original requirement details.',
+        'status' => 'pending',
+        'priority' => 'medium',
+    ]);
+    $requirement->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Owner submitted requirement',
+        'submitted_description' => 'Original requirement details.',
+    ]);
+
+    $payload = [
+        'project' => $this->project->token,
+        'user' => ($this->externalPayload)($clientDeveloper),
+    ];
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->putJson("/api/tasks/{$requirement->id}", [
+            ...$payload,
+            'title' => 'Changed requirement',
+            'description' => 'Changed requirement details.',
+            'status' => 'completed',
+            'priority' => 'high',
+        ])
+        ->assertStatus(403);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$requirement->id}/toggle-status", [
+            ...$payload,
+            'status' => 'completed',
+        ])
+        ->assertStatus(403);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$requirement->id}/toggle-priority", [
+            ...$payload,
+            'priority' => 'high',
+        ])
+        ->assertStatus(403);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/tasks/{$requirement->id}?".http_build_query($payload))
+        ->assertStatus(403);
+
+    $requirement->refresh();
+
+    expect($requirement->title)->toBe('Owner submitted requirement');
+    expect($requirement->description)->toBe('Original requirement details.');
+    expect($requirement->status)->toBe('pending');
+    expect($requirement->priority)->toBe('medium');
+});
+
 test('store rejects tagged external collaborators when the environment is not registered', function () {
     \Illuminate\Support\Facades\Http::fake();
 
@@ -607,6 +879,8 @@ test('external task creation only notifies explicitly tagged internal collaborat
     );
 });
 test('index returns tasks with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     // Create another external user
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',
@@ -638,6 +912,8 @@ test('index returns tasks with granted access', function () {
 });
 
 test('show returns task with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     // Create another external user
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',
@@ -668,10 +944,17 @@ test('show returns task with granted access', function () {
     $response->assertJson([
         'id' => $task->id,
         'title' => 'Task by other user',
+        'can_edit' => false,
+        'can_update_status' => false,
+        'can_update_priority' => false,
+        'can_delete' => false,
+        'can_comment' => true,
     ]);
 });
 
-test('update succeeds with granted access', function () {
+test('update is forbidden for non submitter with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     // Create another external user
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',
@@ -710,14 +993,20 @@ test('update succeeds with granted access', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->putJson("/api/tasks/{$task->id}", $updateData);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'title' => 'Updated By Access',
-        'description' => 'Updated by user with granted access',
+    $response->assertStatus(403);
+
+    $this->assertDatabaseHas('tasks', [
+        'id' => $task->id,
+        'title' => 'Original Title',
+        'description' => $task->description,
+        'status' => 'pending',
+        'priority' => 'low',
     ]);
 });
 
-test('toggle status succeeds with granted access', function () {
+test('toggle status is forbidden for non submitter with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     // Create another external user
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',
@@ -749,14 +1038,14 @@ test('toggle status succeeds with granted access', function () {
             ],
         ]);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'status' => 'completed',
-        'message' => 'Task status updated successfully',
-    ]);
+    $response->assertStatus(403);
+
+    expect($task->fresh()->status)->toBe('pending');
 });
 
-test('toggle status allows awaiting feedback for external users with access', function () {
+test('toggle status rejects awaiting feedback for non submitter with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-456',
         'name' => 'Other User',
@@ -785,14 +1074,14 @@ test('toggle status allows awaiting feedback for external users with access', fu
             ],
         ]);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'status' => 'awaiting-feedback',
-        'message' => 'Task status updated successfully',
-    ]);
+    $response->assertStatus(403);
+
+    expect($task->fresh()->status)->toBe('pending');
 });
 
-test('toggle priority succeeds with granted access', function () {
+test('toggle priority is forbidden for non submitter with granted access', function () {
+    $this->externalUser->update(['role' => 'client_developer']);
+
     // Create another external user
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',
@@ -824,11 +1113,9 @@ test('toggle priority succeeds with granted access', function () {
             ],
         ]);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'priority' => 'high',
-        'message' => 'Task priority updated successfully',
-    ]);
+    $response->assertStatus(403);
+
+    expect($task->fresh()->priority)->toBe('low');
 });
 
 test('internal collaborator lookup endpoint returns registered shift users for the project', function () {

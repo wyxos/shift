@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Link } from '@inertiajs/vue3';
-import { Building2, FolderKanban, Pencil, Trash2, Users } from 'lucide-vue-next';
+import { Building2, Eye, FolderKanban, Users } from 'lucide-vue-next';
 
 type OrganisationRow = {
     id: number;
@@ -12,6 +12,8 @@ type OrganisationRow = {
     organisation_users_count?: number | null;
     projects_count?: number | null;
     isOwner: boolean;
+    can_delete?: boolean;
+    can_manage_org_access?: boolean;
 };
 
 const { organisations } = defineProps<{
@@ -19,7 +21,6 @@ const { organisations } = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    'open-delete': [organisation: OrganisationRow];
     'open-manage-users': [organisation: OrganisationRow];
 }>();
 
@@ -38,8 +39,12 @@ function projectsLabel(count?: number | null) {
     return `${total} project${total === 1 ? '' : 's'}`;
 }
 
-function settingsHref(organisation: OrganisationRow) {
-    return `/organisation/${organisation.id}/settings`;
+function dashboardHref(organisation: OrganisationRow) {
+    return `/organisation/${organisation.id}/dashboard`;
+}
+
+function canManageOrgAccess(organisation: OrganisationRow) {
+    return organisation.can_manage_org_access ?? organisation.isOwner;
 }
 </script>
 
@@ -80,7 +85,7 @@ function settingsHref(organisation: OrganisationRow) {
                 <TableCell>
                     <div class="flex flex-wrap justify-end gap-2">
                         <Button
-                            v-if="organisation.isOwner"
+                            v-if="canManageOrgAccess(organisation)"
                             size="sm"
                             variant="outline"
                             :data-testid="`organisation-manage-${organisation.id}`"
@@ -90,29 +95,11 @@ function settingsHref(organisation: OrganisationRow) {
                             <Users class="h-4 w-4" />
                             <span class="sr-only">Manage users</span>
                         </Button>
-                        <Button
-                            v-if="organisation.isOwner"
-                            as-child
-                            size="sm"
-                            variant="outline"
-                            :data-testid="`organisation-edit-${organisation.id}`"
-                            title="Edit organisation"
-                        >
-                            <Link :href="settingsHref(organisation)">
-                                <Pencil class="h-4 w-4" />
-                                <span class="sr-only">Edit organisation</span>
+                        <Button as-child size="sm" variant="outline" :data-testid="`organisation-view-${organisation.id}`" title="View organisation">
+                            <Link :href="dashboardHref(organisation)">
+                                <Eye class="h-4 w-4" />
+                                <span class="sr-only">View organisation</span>
                             </Link>
-                        </Button>
-                        <Button
-                            v-if="organisation.isOwner"
-                            size="sm"
-                            variant="destructive"
-                            :data-testid="`organisation-delete-${organisation.id}`"
-                            title="Delete organisation"
-                            @click="emit('open-delete', organisation)"
-                        >
-                            <Trash2 class="h-4 w-4" />
-                            <span class="sr-only">Delete organisation</span>
                         </Button>
                     </div>
                 </TableCell>

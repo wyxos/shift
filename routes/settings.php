@@ -16,10 +16,12 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');
     Route::put('settings/password', [PasswordController::class, 'update'])->name('password.update');
 
-    Route::get('settings/api', [ApiController::class, 'edit'])->name('api.edit');
-    Route::put('settings/api', [ApiController::class, 'update'])->name('api.update');
-    Route::post('settings/api/tokens/mcp/reset', [ApiController::class, 'resetMcpToken'])->name('api.tokens.mcp.reset');
-    Route::post('settings/api/tokens/sdk/{token}/reset', [ApiController::class, 'resetSdkToken'])->name('api.tokens.sdk.reset');
+    Route::middleware('verified')->group(function () {
+        Route::get('settings/api', [ApiController::class, 'edit'])->name('api.edit');
+        Route::put('settings/api', [ApiController::class, 'update'])->name('api.update');
+        Route::post('settings/api/tokens/mcp/reset', [ApiController::class, 'resetMcpToken'])->name('api.tokens.mcp.reset');
+        Route::post('settings/api/tokens/sdk/{token}/reset', [ApiController::class, 'resetSdkToken'])->name('api.tokens.sdk.reset');
+    });
 
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/Appearance');

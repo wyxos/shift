@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\OrganisationRole;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
@@ -150,6 +151,88 @@ test('organisation owner can sync a member project access', function () {
     $this->assertDatabaseMissing('project_users', [
         'project_id' => $disabledProject->id,
         'user_id' => $member->id,
+    ]);
+});
+
+test('organisation owner can update a member internal role', function () {
+    $member = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $organisationUser = OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $member->id,
+        'user_email' => $member->email,
+        'user_name' => $member->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('organisation-users.projects.sync', [$organisation, $organisationUser]), [
+            'project_ids' => [],
+            'role' => OrganisationRole::LeadDeveloper->value,
+        ])
+        ->assertOk()
+        ->assertJsonPath('organisation_user.role', OrganisationRole::LeadDeveloper->value)
+        ->assertJsonPath('organisation_user.role_label', OrganisationRole::LeadDeveloper->label());
+
+    $this->assertDatabaseHas('organisation_users', [
+        'id' => $organisationUser->id,
+        'role' => OrganisationRole::LeadDeveloper->value,
+    ]);
+});
+
+test('lead roles cannot promote lower roles or edit peer roles', function () {
+    $lead = User::factory()->create();
+    $peerLead = User::factory()->create();
+    $developer = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $lead->id,
+        'user_email' => $lead->email,
+        'user_name' => $lead->name,
+        'role' => OrganisationRole::LeadDeveloper->value,
+    ]);
+    $peerLeadMembership = OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $peerLead->id,
+        'user_email' => $peerLead->email,
+        'user_name' => $peerLead->name,
+        'role' => OrganisationRole::ClientProjectManager->value,
+    ]);
+    $developerMembership = OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $developer->id,
+        'user_email' => $developer->email,
+        'user_name' => $developer->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    $this->actingAs($lead)
+        ->patchJson(route('organisation-users.projects.sync', [$organisation, $developerMembership]), [
+            'project_ids' => [],
+            'role' => OrganisationRole::ClientProjectManager->value,
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($lead)
+        ->patchJson(route('organisation-users.projects.sync', [$organisation, $peerLeadMembership]), [
+            'project_ids' => [],
+            'role' => OrganisationRole::Developer->value,
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('organisation_users', [
+        'id' => $developerMembership->id,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+    $this->assertDatabaseHas('organisation_users', [
+        'id' => $peerLeadMembership->id,
+        'role' => OrganisationRole::ClientProjectManager->value,
     ]);
 });
 

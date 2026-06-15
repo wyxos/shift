@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrganisationRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,10 @@ class OrganisationUser extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected $casts = [
+        'role' => OrganisationRole::class,
+    ];
 
     public function organisation(): BelongsTo
     {
@@ -47,6 +52,7 @@ class OrganisationUser extends Model
                 'user_id' => $user?->id,
                 'user_email' => $email,
                 'user_name' => $name,
+                'role' => OrganisationRole::Developer->value,
             ]);
         }
 

@@ -5,14 +5,55 @@ namespace App\Services;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
+use App\Models\Task;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ExternalUserService
 {
+    public const ROLE_OWNER = 'owner';
+
+    public const ROLE_CLIENT_DEVELOPER = 'client_developer';
+
+    public const ROLE_SHIFT_LEAD_DEVELOPER = 'shift_lead_developer';
+
+    public const ROLE_SHIFT_DEVELOPER = 'shift_developer';
+
+    public const ROLE_USER = 'user';
+
+    public const ROLE_GUEST = 'guest';
+
+    private const VIEW_ALL_PROJECT_ITEM_ROLES = [
+        self::ROLE_OWNER,
+        self::ROLE_SHIFT_LEAD_DEVELOPER,
+    ];
+
+    private const VIEW_OWNER_AND_ASSIGNED_PROJECT_ITEM_ROLES = [
+        self::ROLE_CLIENT_DEVELOPER,
+        self::ROLE_SHIFT_DEVELOPER,
+    ];
+
+    private const REQUIREMENT_SUBMITTER_ROLES = [
+        self::ROLE_OWNER,
+        self::ROLE_CLIENT_DEVELOPER,
+        self::ROLE_SHIFT_LEAD_DEVELOPER,
+        self::ROLE_SHIFT_DEVELOPER,
+    ];
+
+    private const ROLES = [
+        self::ROLE_OWNER,
+        self::ROLE_CLIENT_DEVELOPER,
+        self::ROLE_SHIFT_LEAD_DEVELOPER,
+        self::ROLE_SHIFT_DEVELOPER,
+        self::ROLE_USER,
+        self::ROLE_GUEST,
+    ];
+
     public function __construct(
         private readonly ProjectEnvironmentService $projectEnvironmentService,
     ) {}
@@ -23,16 +64,49 @@ class ExternalUserService
         $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($environment);
         $normalizedUrl = $this->projectEnvironmentService->normalizeUrl($url);
 
-        if ($normalizedId === null || $normalizedEnvironment === null || $normalizedUrl === null) {
+        if ($normalizedId === null || $normalizedEnvironment === null) {
             return null;
         }
 
-        return ExternalUser::query()
+        $projectEnvironment = $this->projectEnvironmentService->find($project, $normalizedEnvironment);
+
+        if ($projectEnvironment instanceof ProjectEnvironment) {
+            $externalUser = $this->findByProjectEnvironment($project, $projectEnvironment, $normalizedId, $normalizedUrl);
+
+            if ($externalUser instanceof ExternalUser) {
+                return $externalUser;
+            }
+        }
+
+        if ($normalizedUrl === null) {
+            return null;
+        }
+
+        return $this->legacyIdentityQuery($project, $normalizedId, $normalizedEnvironment, $normalizedUrl)->first();
+    }
+
+    private function findByProjectEnvironment(
+        Project $project,
+        ProjectEnvironment $projectEnvironment,
+        string $externalId,
+        ?string $url = null,
+    ): ?ExternalUser {
+        $matches = ExternalUser::query()
             ->where('project_id', $project->id)
-            ->where('external_id', $normalizedId)
-            ->where('environment', $normalizedEnvironment)
-            ->where('url', $normalizedUrl)
-            ->first();
+            ->where('project_environment_id', $projectEnvironment->id)
+            ->where('external_id', $externalId)
+            ->orderBy('id')
+            ->get();
+
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+
+        if ($matches->count() > 1 && $url !== null) {
+            return $matches->first(fn (ExternalUser $externalUser) => $externalUser->url === $url);
+        }
+
+        return null;
     }
 
     public function upsert(Project $project, array $attributes): ExternalUser
@@ -47,18 +121,138 @@ class ExternalUserService
             ]);
         }
 
-        return ExternalUser::query()->updateOrCreate(
-            [
+        $values = [
+            'name' => $this->normalizeString($attributes['name'] ?? null) ?? 'External User',
+            'email' => $this->normalizeString($attributes['email'] ?? null),
+        ];
+
+        if (array_key_exists('role', $attributes)) {
+            $values['role'] = $this->normalizeRole($attributes['role']) ?? self::ROLE_USER;
+        }
+
+        return DB::transaction(function () use ($project, $externalId, $environment, $url, $values) {
+            $projectEnvironment = $this->projectEnvironmentService->register($project, $environment, $url);
+            $externalUser = $this->findByProjectEnvironment($project, $projectEnvironment, $externalId, $url)
+                ?? $this->legacyIdentityQuery($project, $externalId, $environment, $url)->first();
+
+            if (! $externalUser instanceof ExternalUser) {
+                return ExternalUser::query()->create([
+                    ...$values,
+                    'project_id' => $project->id,
+                    'external_contact_id' => $this->createContactId($project),
+                    'project_environment_id' => $projectEnvironment->id,
+                    'external_id' => $externalId,
+                    'environment' => $environment,
+                    'url' => $url,
+                ]);
+            }
+
+            $externalUser->fill([
+                ...$values,
                 'project_id' => $project->id,
-                'external_id' => $externalId,
+                'external_contact_id' => $externalUser->external_contact_id ?? $this->createContactId($project),
+                'project_environment_id' => $projectEnvironment->id,
                 'environment' => $environment,
                 'url' => $url,
-            ],
-            [
-                'name' => $this->normalizeString($attributes['name'] ?? null) ?? 'External User',
-                'email' => $this->normalizeString($attributes['email'] ?? null),
-            ],
-        );
+            ])->save();
+
+            return $externalUser;
+        });
+    }
+
+    public function role(ExternalUser $externalUser): string
+    {
+        return $this->normalizeRole($externalUser->getAttribute('role')) ?? self::ROLE_USER;
+    }
+
+    public function canViewAllProjectItems(ExternalUser $externalUser): bool
+    {
+        return in_array($this->role($externalUser), self::VIEW_ALL_PROJECT_ITEM_ROLES, true);
+    }
+
+    public function canViewOwnerAndAssignedProjectItems(ExternalUser $externalUser): bool
+    {
+        return in_array($this->role($externalUser), self::VIEW_OWNER_AND_ASSIGNED_PROJECT_ITEM_ROLES, true);
+    }
+
+    public function canSubmitRequirements(ExternalUser $externalUser): bool
+    {
+        return in_array($this->role($externalUser), self::REQUIREMENT_SUBMITTER_ROLES, true);
+    }
+
+    public function constrainVisibleProjectItems(Builder $query, ExternalUser $externalUser): Builder
+    {
+        if ($this->canViewAllProjectItems($externalUser)) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $visibilityQuery) use ($externalUser) {
+            $linkedExternalUserIds = $this->linkedExternalUserIds($externalUser);
+
+            $visibilityQuery->whereHasMorph('submitter', [ExternalUser::class], function (Builder $submitterQuery) use ($linkedExternalUserIds) {
+                $submitterQuery->whereIn('external_users.id', $linkedExternalUserIds);
+            })->orWhereHas('externalCollaborators', function (Builder $collaboratorQuery) use ($linkedExternalUserIds) {
+                $collaboratorQuery->whereIn('external_users.id', $linkedExternalUserIds);
+            });
+
+            if (! $this->canViewOwnerAndAssignedProjectItems($externalUser)) {
+                return;
+            }
+
+            $visibilityQuery->orWhereHasMorph('submitter', [ExternalUser::class], function (Builder $submitterQuery) {
+                $submitterQuery->where('external_users.role', self::ROLE_OWNER);
+            });
+        });
+    }
+
+    public function canViewProjectItem(Task $task, ExternalUser $externalUser): bool
+    {
+        if ($this->canViewAllProjectItems($externalUser)) {
+            return true;
+        }
+
+        if ($this->isLinkedSubmitter($task, $externalUser)) {
+            return true;
+        }
+
+        if ($task->externalCollaborators()
+            ->whereIn('external_users.id', $this->linkedExternalUserIds($externalUser))
+            ->exists()) {
+            return true;
+        }
+
+        if (! $this->canViewOwnerAndAssignedProjectItems($externalUser)) {
+            return false;
+        }
+
+        $submitter = $task->submitter;
+
+        return $submitter instanceof ExternalUser && $this->role($submitter) === self::ROLE_OWNER;
+    }
+
+    public function canMutateProjectItem(Task $task, ExternalUser $externalUser): bool
+    {
+        return $this->isSubmitter($task, $externalUser);
+    }
+
+    public function canCommentOnProjectItem(Task $task, ExternalUser $externalUser): bool
+    {
+        return $this->canViewProjectItem($task, $externalUser);
+    }
+
+    public function capabilityFlags(Task $task, ?ExternalUser $externalUser): array
+    {
+        $canMutate = $externalUser instanceof ExternalUser
+            && $this->canMutateProjectItem($task, $externalUser);
+
+        return [
+            'can_edit' => $canMutate,
+            'can_update_status' => $canMutate,
+            'can_update_priority' => $canMutate,
+            'can_delete' => $canMutate,
+            'can_comment' => $externalUser instanceof ExternalUser
+                && $this->canCommentOnProjectItem($task, $externalUser),
+        ];
     }
 
     public function searchCollaborators(Project $project, ?string $environment, ?string $search = null): array
@@ -184,5 +378,70 @@ class ExternalUserService
     public function normalizeUrl(?string $value): ?string
     {
         return $this->projectEnvironmentService->normalizeUrl($value);
+    }
+
+    private function normalizeRole(mixed $value): ?string
+    {
+        if ($value instanceof \BackedEnum) {
+            $value = $value->value;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        $role = trim(strtolower((string) $value));
+
+        return in_array($role, self::ROLES, true) ? $role : null;
+    }
+
+    private function legacyIdentityQuery(Project $project, string $externalId, string $environment, string $url): Builder
+    {
+        return ExternalUser::query()
+            ->where('project_id', $project->id)
+            ->where('external_id', $externalId)
+            ->where('environment', $environment)
+            ->where('url', $url);
+    }
+
+    private function createContactId(Project $project): int
+    {
+        return (int) DB::table('external_contacts')->insertGetId([
+            'project_id' => $project->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function linkedExternalUserIds(ExternalUser $externalUser): array
+    {
+        $externalContactId = $externalUser->external_contact_id;
+
+        if ($externalContactId === null) {
+            return [(int) $externalUser->id];
+        }
+
+        return ExternalUser::query()
+            ->where('project_id', $externalUser->project_id)
+            ->where('external_contact_id', $externalContactId)
+            ->pluck('id')
+            ->push($externalUser->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function isLinkedSubmitter(Task $task, ExternalUser $externalUser): bool
+    {
+        return $task->submitter_type === ExternalUser::class
+            && $task->submitter_id !== null
+            && in_array((int) $task->submitter_id, $this->linkedExternalUserIds($externalUser), true);
+    }
+
+    private function isSubmitter(Task $task, ExternalUser $externalUser): bool
+    {
+        return $task->submitter_type === ExternalUser::class
+            && (int) $task->submitter_id === (int) $externalUser->id;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ExternalUserRole;
 use App\Enums\TaskCollaboratorKind;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,12 @@ class ExternalUser extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected $casts = [
+        'external_contact_id' => 'integer',
+        'project_environment_id' => 'integer',
+        'role' => ExternalUserRole::class,
+    ];
 
     /**
      * Get the tasks that this external user is associated with.
@@ -29,6 +36,16 @@ class ExternalUser extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(ExternalContact::class, 'external_contact_id');
+    }
+
+    public function projectEnvironment(): BelongsTo
+    {
+        return $this->belongsTo(ProjectEnvironment::class);
     }
 
     /**

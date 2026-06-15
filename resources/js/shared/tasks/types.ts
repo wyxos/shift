@@ -2,12 +2,39 @@ import type { CollaboratorOption, TaskCollaboratorSelection } from './collaborat
 
 export type Task = {
     id: number;
+    project_id?: number | null;
+    project?: TaskProjectSummary | null;
     title: string;
     status: string;
+    requirement_status?: string | null;
     priority: string;
+    phase?: 'task' | 'requirement' | string;
+    finalized?: boolean;
+    batch?: RequirementBatchSummary | null;
     environment?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
+    can_comment?: boolean;
+    can_delete?: boolean;
+    can_edit_task?: boolean;
+    can_edit_requirement?: boolean;
+    can_finalize_requirement?: boolean;
+};
+
+export type TaskProjectSummary = {
+    id: number;
+    name: string;
+};
+
+export type RequirementBatchSummary = {
+    id: number;
+    title?: string | null;
+    created_at?: string | null;
+    total_items: number;
+    requirement_items: number;
+    ready_items?: number;
+    finalized_items: number;
+    can_finalize_requirement?: boolean;
 };
 
 export type TaskPaginator = {
@@ -32,8 +59,16 @@ export type TaskDetail = Task & {
     created_at?: string;
     submitter?: { name?: string; email?: string } | null;
     environment?: string | null;
+    submitted_title?: string | null;
+    submitted_description?: string | null;
+    finalized_at?: string | null;
     attachments?: TaskAttachment[];
     is_owner?: boolean;
+    can_comment?: boolean;
+    can_delete?: boolean;
+    can_edit_task?: boolean;
+    can_edit_requirement?: boolean;
+    can_finalize_requirement?: boolean;
     can_manage_collaborators?: boolean;
     internal_collaborators?: CollaboratorOption[];
     external_collaborators?: CollaboratorOption[];
@@ -57,6 +92,7 @@ export type TaskIndexFilters = {
     search?: string | null;
     environment?: string | null;
     organisation_id?: number | string | null;
+    project_id?: number | string | null;
     sort_by?: string | null;
 };
 
@@ -64,6 +100,7 @@ export type TaskIndexEditSnapshot = {
     title: string;
     priority: string;
     status: string;
+    requirement_status: string;
     description: string;
     environment: string | null;
     collaborators: TaskCollaboratorSelection;

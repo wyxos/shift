@@ -56,4 +56,14 @@ class Organisation extends Model
     {
         return $this->hasMany(Project::class);
     }
+
+    public function scopeVisibleToUser(Builder $query, int $userId): Builder
+    {
+        return $query->where(function (Builder $query) use ($userId) {
+            $query->where('author_id', $userId)
+                ->orWhereHas('organisationUsers', function (Builder $query) use ($userId) {
+                    $query->where('user_id', $userId);
+                });
+        });
+    }
 }

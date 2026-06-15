@@ -106,6 +106,9 @@ describe('TaskCollaboratorField', () => {
         await flushPromises();
 
         expect(wrapper.get('[data-testid="internal-collaborator-selected-1"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="internal-collaborator-option-1"]').classes()).toEqual(
+            expect.arrayContaining(['bg-primary/10', 'border-primary/40']),
+        );
         expect(wrapper.get('[data-testid="task-collaborators-dropdown"]').text()).not.toContain('Selected');
     });
 

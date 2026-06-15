@@ -22,6 +22,7 @@ export interface SidebarOrganisation {
     id: number;
     name: string;
     isOwner: boolean;
+    can_manage_org_access?: boolean;
 }
 
 export interface SharedData extends PageProps {
