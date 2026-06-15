@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Organisation;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
 {
@@ -100,7 +101,12 @@ class ClientController extends Controller
         ]);
 
         $organisation = Organisation::query()->findOrFail($attributes['organisation_id']);
-        abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
+
+        if (! $this->permissions->canManageOrganisation($organisation, auth()->id())) {
+            throw ValidationException::withMessages([
+                'organisation_id' => 'The selected organisation is invalid.',
+            ]);
+        }
 
         Client::create($attributes);
 

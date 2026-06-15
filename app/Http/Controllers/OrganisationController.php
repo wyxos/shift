@@ -17,6 +17,11 @@ class OrganisationController extends Controller
     public function index(?Organisation $organisation = null, ?string $activePanel = null)
     {
         $userId = auth()->id();
+
+        if ($organisation && ! $organisation->isVisibleToUser($userId)) {
+            abort(404);
+        }
+
         $sortBy = request('sort_by');
         $routeOrganisationId = $organisation?->id;
         $panel = [

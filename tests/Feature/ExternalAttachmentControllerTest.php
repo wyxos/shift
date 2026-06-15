@@ -302,6 +302,7 @@ test('download returns image inline for image files', function () {
 test('external role-visible users can download task attachments', function () {
     $project = Project::factory()->create([
         'token' => 'attachment-role-project',
+        'author_id' => $this->user->id,
     ]);
     $owner = ExternalUser::factory()->create([
         'project_id' => $project->id,
