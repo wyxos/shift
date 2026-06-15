@@ -13,7 +13,7 @@ import {
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 
 const props = defineProps<{
     state: any;
@@ -45,6 +45,10 @@ const confirmDeleteThreadMessage = async () => {
     await state.deleteThreadMessage(message);
 };
 
+const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null) => {
+    state.commentsScrollRef = value instanceof HTMLElement ? value : null;
+};
+
 watch(deleteDialogOpen, (open) => {
     if (!open) {
         clearPendingDeleteMessage();
@@ -66,7 +70,7 @@ watch(deleteDialogOpen, (open) => {
             </div>
         </div>
 
-        <div ref="state.commentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+        <div :ref="assignCommentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
             <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
             <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>

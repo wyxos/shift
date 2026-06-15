@@ -1,6 +1,7 @@
 import Index from '@/pages/Tasks/Index.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
+import { nextTick } from 'vue';
 import { axiosGetMock, makeTasksPage } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
@@ -149,6 +150,57 @@ describe('Tasks/Index.vue', () => {
         const commentHtml = wrapper.get('[data-testid="comment-bubble-11"]').html();
         expect(commentHtml).toContain('<code>');
         expect(commentHtml).toContain('this quote');
+
+        wrapper.unmount();
+    });
+
+    it('syntax-highlights fenced code comments after rendering markdown', async () => {
+        axiosGetMock.mockReset();
+
+        axiosGetMock
+            .mockResolvedValueOnce({
+                data: {
+                    id: 1,
+                    title: 'Auth issue',
+                    priority: 'high',
+                    status: 'pending',
+                    created_at: '2026-02-10T17:40:00',
+                    description: '',
+                    is_owner: false,
+                    submitter: { email: 'someone@example.com' },
+                    attachments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    external: [
+                        {
+                            id: 11,
+                            sender_name: 'You',
+                            is_current_user: true,
+                            content: "```js\nfunction demo(){\n  console.log('test')\n}\n```",
+                            created_at: '2026-02-09T12:01:00Z',
+                            attachments: [],
+                        },
+                    ],
+                },
+            });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
+                filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
+            },
+        });
+
+        await wrapper.find('button[title="Open details"]').trigger('click');
+        await flushPromises();
+        await nextTick();
+
+        const code = wrapper.get('[data-testid="comment-bubble-11"] pre code');
+        expect(code.classes()).toContain('hljs');
+        expect(code.html()).toContain('hljs-keyword');
+        expect(code.text()).toContain("console.log('test')");
 
         wrapper.unmount();
     });

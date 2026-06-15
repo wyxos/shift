@@ -66,6 +66,7 @@ class ExternalRequirementController extends Controller
 
         $environment = trim((string) ($attributes['environment'] ?? ''));
         $statuses = $this->normalizeRequirementStatusFilter($attributes['lifecycle'] ?? $attributes['status'] ?? null);
+        $clientUrl = $this->sourceUrl($attributes);
 
         $requirements = $this->visibleRequirementsQuery($project, $externalUser)
             ->with(['metadata.requirementBatch', 'submitter'])
@@ -87,7 +88,7 @@ class ExternalRequirementController extends Controller
             ->withQueryString();
         $batchSummaries = $this->requirementBatchSummaries($project, $externalUser, $requirements->getCollection());
 
-        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser));
+        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser, $clientUrl));
 
         return response()->json($requirements);
     }
@@ -200,7 +201,7 @@ class ExternalRequirementController extends Controller
                 'title' => $batch->title,
                 'created_at' => $batch->created_at?->toIso8601String(),
             ],
-            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser))->values()->all(),
+            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser, $sourceUrl))->values()->all(),
         ], 201);
     }
 
@@ -443,12 +444,37 @@ class ExternalRequirementController extends Controller
         ) ?? (string) config('app.url');
     }
 
-    private function serializeRequirement(Task $task, array $batchSummaries = [], ?ExternalUser $externalUser = null): array
+    private function rewriteContentUrlsToClientProxyUrls(?string $content, string $clientUrl): ?string
+    {
+        if ($content === null || $content === '' || $clientUrl === '') {
+            return $content;
+        }
+
+        $clientBase = rtrim($clientUrl, '/');
+        $patterns = [
+            '#https?://[^\"\'<>]+/attachments/(\\d+)/download#',
+            '#(?<![A-Za-z0-9])/attachments/(\\d+)/download#',
+            '#https?://[^\"\'<>]+/shift/api/attachments/(\\d+)/download#',
+            '#(?<![A-Za-z0-9])/shift/api/attachments/(\\d+)/download#',
+        ];
+
+        $out = $content;
+        foreach ($patterns as $pattern) {
+            $out = preg_replace_callback($pattern, function ($matches) use ($clientBase) {
+                return $clientBase.'/shift/api/attachments/'.((int) $matches[1]).'/download';
+            }, $out) ?? $out;
+        }
+
+        return $out;
+    }
+
+    private function serializeRequirement(Task $task, array $batchSummaries = [], ?ExternalUser $externalUser = null, ?string $clientUrl = null): array
     {
         $metadata = $task->metadata;
         $phase = $metadata?->phase ?: 'task';
         $batchId = $metadata?->requirement_batch_id;
         $capabilities = $this->externalUserService->capabilityFlags($task, $externalUser);
+        $clientUrl ??= $metadata?->url ?? $externalUser?->url ?? (string) config('app.url');
 
         return [
             'id' => $task->id,
@@ -457,14 +483,14 @@ class ExternalRequirementController extends Controller
             'batch_title' => $metadata?->requirementBatch?->title,
             'batch' => $batchId ? ($batchSummaries[$batchId] ?? null) : null,
             'title' => $task->title,
-            'description' => $task->description,
+            'description' => $this->rewriteContentUrlsToClientProxyUrls($task->description, $clientUrl),
             'status' => $task->status,
             'requirement_status' => $task->requirementStatus(),
             'priority' => $task->priority,
             'phase' => $phase,
             'finalized' => $phase !== 'requirement',
             'submitted_title' => $metadata?->submitted_title,
-            'submitted_description' => $metadata?->submitted_description,
+            'submitted_description' => $this->rewriteContentUrlsToClientProxyUrls($metadata?->submitted_description, $clientUrl),
             'environment' => $metadata?->environment,
             ...$capabilities,
             'created_at' => $task->created_at?->toIso8601String(),

@@ -261,6 +261,27 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
 
     expect($globalRequirement->refresh()->description)->toContain("/attachments/{$attachment->id}/download");
     expect($globalRequirement->metadata?->submitted_description)->toContain("/attachments/{$attachment->id}/download");
+
+    $proxiedUrl = "https://example.com/portal/shift/api/attachments/{$attachment->id}/download";
+    expect($response->json('items.0.description'))->toContain($proxiedUrl);
+    expect($response->json('items.0.submitted_description'))->toContain($proxiedUrl);
+
+    $listResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/requirements?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($externalUser),
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://example.com/portal',
+            ],
+        ]))
+        ->assertOk();
+
+    $listedRequirement = collect($listResponse->json('data'))
+        ->firstWhere('id', $globalRequirement->id);
+
+    expect($listedRequirement['description'] ?? null)->toBe('<p><img src="'.$proxiedUrl.'"></p>');
+    expect($listedRequirement['submitted_description'] ?? null)->toBe('<p><img src="'.$proxiedUrl.'"></p>');
 });
 
 test('requirement visibility follows the external role matrix', function () {
