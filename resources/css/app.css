@@ -82,6 +82,10 @@
         --font-sans:
             'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     }
+
+    [data-shift-field-control]:focus {
+        border-color: var(--ring) !important;
+    }
 }
 
 :root {
@@ -180,8 +184,13 @@
     }
 }
 
-/* Rich text lists (TipTap + rendered task/comments content):
-   Tailwind preflight removes list markers/padding by default. */
+/* Rich text blocks (TipTap + rendered task/comments content):
+   Tailwind preflight removes paragraph spacing and list markers/padding by default. */
+.ProseMirror > p + p,
+.shift-rich > p + p {
+    margin-top: 0.75rem;
+}
+
 .ProseMirror ul,
 .shift-rich ul {
     list-style: disc;
@@ -199,6 +208,44 @@
 .ProseMirror li,
 .shift-rich li {
     margin: 0.125rem 0;
+}
+
+.ProseMirror pre,
+.shift-rich pre {
+    display: block;
+    margin: 0.75rem 0;
+    padding: 0.5rem 0.625rem;
+    overflow-x: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: #e5e7eb;
+    color: #24292e;
+}
+
+.ProseMirror pre code,
+.shift-rich pre code {
+    display: block;
+    min-width: max-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.ProseMirror pre code.hljs,
+.shift-rich pre code.hljs {
+    padding: 0;
+    background: transparent;
+    color: #24292e;
+}
+
+.ProseMirror .hljs,
+.shift-rich .hljs {
+    background: transparent;
+    color: #24292e;
 }
 
 .ProseMirror ul ul,

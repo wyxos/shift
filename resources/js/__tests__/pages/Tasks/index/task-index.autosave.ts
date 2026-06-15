@@ -21,6 +21,7 @@ describe('Tasks/Index.vue', () => {
                     created_at: '2026-02-10T17:40:00',
                     description: '',
                     is_owner: true,
+                    can_edit_task: true,
                     can_manage_collaborators: true,
                     submitter: { email: 'owner@example.com' },
                     attachments: [],

@@ -60,6 +60,21 @@ test('guests are redirected to login and return to the verification page after a
     ])->assertRedirect(route('sdk-install.verify', ['user_code' => $session['user_code']], absolute: false));
 });
 
+test('unverified users must verify their email before approving install requests', function () {
+    $session = $this->service->create('staging', 'https://client-app.test');
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user)
+        ->get(route('sdk-install.verify', ['user_code' => $session['user_code']], absolute: false))
+        ->assertRedirect(route('verification.notice', absolute: false));
+
+    $this->actingAs($user)
+        ->post(route('sdk-install.approve', absolute: false), [
+            'user_code' => $session['user_code'],
+        ])
+        ->assertRedirect(route('verification.notice', absolute: false));
+});
+
 test('authenticated users can inspect and approve an install request', function () {
     $session = $this->service->create('staging', 'https://client-app.test');
     $user = User::factory()->create();

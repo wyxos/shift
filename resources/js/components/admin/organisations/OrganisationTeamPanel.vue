@@ -3,6 +3,7 @@ import DeleteDialog from '@/components/DeleteDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, type SelectOption } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
@@ -18,6 +19,10 @@ type OrganisationTeamUser = {
     email: string;
     status: 'owner' | 'registered' | 'pending';
     statusLabel: string;
+    role?: string | null;
+    roleLabel?: string | null;
+    canManageRole?: boolean | null;
+    can_manage_role?: boolean | null;
     projectIds?: number[];
     projectAccessCount?: number;
     createdAt?: string | null;
@@ -30,12 +35,26 @@ type OrganisationProject = {
     name: string;
 };
 
+type OrganisationRoleOption = SelectOption;
+
 const props = defineProps<{
     organisation: {
         id: number;
         name: string;
         projects: OrganisationProject[];
         teamUsers: OrganisationTeamUser[];
+        roleOptions?: OrganisationRoleOption[];
+        role_options?: OrganisationRoleOption[];
+        canManageRoles?: boolean | null;
+        can_manage_roles?: boolean | null;
+        canManageTeamRoles?: boolean | null;
+        can_manage_team_roles?: boolean | null;
+        capabilities?: {
+            canManageRoles?: boolean | null;
+            can_manage_roles?: boolean | null;
+            canManageTeamRoles?: boolean | null;
+            can_manage_team_roles?: boolean | null;
+        };
     };
 }>();
 
@@ -45,6 +64,7 @@ const emit = defineEmits<{
 
 const editingUser = ref<OrganisationTeamUser | null>(null);
 const selectedProjectIds = ref<number[]>([]);
+const selectedRole = ref<string>('');
 const saving = ref(false);
 const error = ref<string | null>(null);
 const projectIdsByTeamUser = ref<Record<string, number[]>>({});
@@ -56,6 +76,29 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+});
+const roleOptions = computed(() => props.organisation.roleOptions ?? props.organisation.role_options ?? []);
+const canManageTeamRoles = computed(
+    () =>
+        props.organisation.canManageTeamRoles === true ||
+        props.organisation.can_manage_team_roles === true ||
+        props.organisation.canManageRoles === true ||
+        props.organisation.can_manage_roles === true ||
+        props.organisation.capabilities?.canManageTeamRoles === true ||
+        props.organisation.capabilities?.can_manage_team_roles === true ||
+        props.organisation.capabilities?.canManageRoles === true ||
+        props.organisation.capabilities?.can_manage_roles === true,
+);
+const canEditSelectedUserRole = computed(() => {
+    if (!editingUser.value?.organisationUserId || editingUser.value.status === 'owner') {
+        return false;
+    }
+
+    if (!canManageTeamRoles.value || roleOptions.value.length === 0) {
+        return false;
+    }
+
+    return editingUser.value.canManageRole !== false && editingUser.value.can_manage_role !== false;
 });
 
 watch(
@@ -98,15 +141,36 @@ function formatProjectCount(teamUser: OrganisationTeamUser) {
     return `${count} ${count === 1 ? 'project' : 'projects'}`;
 }
 
+function roleLabelForValue(value: string | null | undefined) {
+    if (!value) {
+        return 'Role not assigned';
+    }
+
+    return (
+        roleOptions.value.find((option) => option.value === value)?.label ??
+        value
+            .split('_')
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ')
+    );
+}
+
+function roleLabel(teamUser: OrganisationTeamUser) {
+    return teamUser.roleLabel?.trim() || roleLabelForValue(teamUser.role);
+}
+
 function openAccessSheet(teamUser: OrganisationTeamUser) {
     editingUser.value = teamUser;
     selectedProjectIds.value = [...(projectIdsByTeamUser.value[teamUser.id] ?? teamUser.projectIds ?? [])];
+    selectedRole.value = teamUser.role ?? '';
     error.value = null;
 }
 
 function closeAccessSheet() {
     editingUser.value = null;
     selectedProjectIds.value = [];
+    selectedRole.value = '';
     saving.value = false;
     error.value = null;
 }
@@ -143,11 +207,17 @@ async function saveProjectAccess() {
     error.value = null;
 
     try {
+        const payload: { project_ids: number[]; role?: string | null } = {
+            project_ids: selectedProjectIds.value,
+        };
+
+        if (canEditSelectedUserRole.value) {
+            payload.role = selectedRole.value || null;
+        }
+
         const response = await axios.patch(
             `/organisations/${props.organisation.id}/users/${editingUser.value.organisationUserId}/projects`,
-            {
-                project_ids: selectedProjectIds.value,
-            },
+            payload,
             {
                 headers: {
                     Accept: 'application/json',
@@ -207,12 +277,13 @@ function confirmRemoveOrganisationAccess() {
                     <TableHead>Created on</TableHead>
                     <TableHead>Verified on</TableHead>
                     <TableHead>Project access</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead class="text-right">Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                <TableEmpty v-if="organisation.teamUsers.length === 0" :colspan="7">No users have access to this organisation.</TableEmpty>
+                <TableEmpty v-if="organisation.teamUsers.length === 0" :colspan="8">No users have access to this organisation.</TableEmpty>
 
                 <TableRow v-for="teamUser in organisation.teamUsers" v-else :key="teamUser.id" :data-testid="`organisation-team-user-${teamUser.id}`">
                     <TableCell class="min-w-[15rem] whitespace-normal">
@@ -234,6 +305,9 @@ function confirmRemoveOrganisationAccess() {
                     </TableCell>
                     <TableCell class="text-muted-foreground" :data-testid="`organisation-team-project-count-${teamUser.id}`">
                         {{ formatProjectCount(teamUser) }}
+                    </TableCell>
+                    <TableCell>
+                        <Badge variant="outline" :data-testid="`organisation-team-role-${teamUser.id}`">{{ roleLabel(teamUser) }}</Badge>
                     </TableCell>
                     <TableCell>
                         <Badge :class="statusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
@@ -298,6 +372,26 @@ function confirmRemoveOrganisationAccess() {
                             />
                             <span class="min-w-0 truncate">{{ project.name }}</span>
                         </label>
+                    </div>
+                </div>
+
+                <div v-if="editingUser" class="flex flex-col gap-3">
+                    <div>
+                        <h2 class="text-sm font-medium">Role</h2>
+                        <p class="text-muted-foreground text-sm">Set this member's organisation role when your access allows it.</p>
+                    </div>
+
+                    <Select
+                        v-if="canEditSelectedUserRole"
+                        v-model="selectedRole"
+                        :disabled="saving"
+                        empty-label="No roles found."
+                        :options="roleOptions"
+                        placeholder="Select a role"
+                        test-id="organisation-team-role"
+                    />
+                    <div v-else class="rounded-lg border p-3 text-sm" data-testid="organisation-team-role-readonly">
+                        <span class="font-medium">{{ roleLabel(editingUser) }}</span>
                     </div>
                 </div>
 

@@ -102,11 +102,7 @@ function updateEnvironmentWidgetEnabled(environment: WidgetEnvironmentSettings, 
                         <p class="text-muted-foreground text-xs">Tune widget availability for registered consuming app environments.</p>
                     </div>
 
-                    <div
-                        v-for="environment in form.environments"
-                        :key="environment.id"
-                        class="space-y-2 rounded-lg border p-3"
-                    >
+                    <div v-for="environment in form.environments" :key="environment.id" class="space-y-2 rounded-lg border p-3">
                         <div class="min-w-0">
                             <p class="truncate text-sm font-medium">{{ environment.label }}</p>
                             <p class="text-muted-foreground truncate text-xs">{{ environment.url }}</p>

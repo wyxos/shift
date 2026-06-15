@@ -68,6 +68,7 @@ const props = withDefaults(
 const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
 const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
+const editorFocused = ref(false);
 const axiosClient = computed(() => props.axiosInstance ?? axios);
 const {
     attachments,
@@ -305,7 +306,15 @@ defineExpose({ editor, reset });
 
 <template>
     <div>
-        <EditorContent class="tiptap" data-testid="tiptap-editor" :editor="editor" :style="editorStyle" />
+        <div
+            :class="['tiptap', { 'is-focused': editorFocused }]"
+            data-testid="tiptap-editor"
+            :style="editorStyle"
+            @focusin="editorFocused = true"
+            @focusout="editorFocused = false"
+        >
+            <EditorContent :editor="editor" />
+        </div>
 
         <div class="flex flex-col gap-2">
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
@@ -378,10 +387,16 @@ defineExpose({ editor, reset });
     --editor-min-height: 140px;
 }
 .ProseMirror {
-    @apply rounded-lg border-2 border-blue-500 p-4 text-sm leading-6;
+    @apply rounded-lg border p-4 text-sm leading-6 transition-colors outline-none;
+    border-color: var(--input);
     min-height: var(--editor-min-height, 140px);
     max-height: 600px;
     overflow-y: auto;
+}
+.ProseMirror:focus,
+.ProseMirror-focused,
+.tiptap.is-focused .ProseMirror {
+    border-color: var(--ring);
 }
 /* Placeholder styling */
 .ProseMirror p.is-editor-empty:first-child::before {
@@ -396,8 +411,8 @@ defineExpose({ editor, reset });
     @apply bg-gray-200;
     /*  background: #0b1021; !* dark background to contrast token colors; override with theme if desired *!
   color: #e6e6e6;*/
-    border-radius: 0.5rem;
-    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.625rem;
     margin: 1rem 0;
     overflow-x: auto;
 }
@@ -407,6 +422,9 @@ defineExpose({ editor, reset });
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-size: 0.875rem;
     line-height: 1.5;
+    padding: 0;
+}
+.tiptap pre code.hljs {
     padding: 0;
 }
 </style>

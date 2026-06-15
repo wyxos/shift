@@ -21,6 +21,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // embedded widget intake
         Route::get('/widget/config', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'config'])->name('widget.config');
         Route::post('/widget/tasks', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'store'])->name('widget.tasks.store');
+        Route::get('/requirements', [\App\Http\Controllers\Api\ExternalRequirementController::class, 'index'])->name('requirements.index');
+        Route::post('/requirements/batches', [\App\Http\Controllers\Api\ExternalRequirementController::class, 'storeBatch'])->name('requirements.batches.store');
+        Route::get('/external-roles/capabilities', [\App\Http\Controllers\Api\ExternalRoleController::class, 'capabilities'])->name('external-roles.capabilities');
+        Route::get('/external-roles', [\App\Http\Controllers\Api\ExternalRoleController::class, 'index'])->name('external-roles.index');
+        Route::put('/external-roles', [\App\Http\Controllers\Api\ExternalRoleController::class, 'update'])->name('external-roles.update');
 
         // tasks
         Route::get('/collaborators/internal', [\App\Http\Controllers\Api\ExternalTaskController::class, 'internalCollaborators'])->name('collaborators.internal');

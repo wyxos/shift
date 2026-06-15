@@ -127,7 +127,7 @@ async function resetSdkToken(token: SdkTokenRecord) {
 
                 <div v-if="issuedToken" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
                     <p class="font-semibold">New token</p>
-                    <p class="mt-2 break-all font-mono text-sm">{{ issuedToken }}</p>
+                    <p class="mt-2 font-mono text-sm break-all">{{ issuedToken }}</p>
                 </div>
 
                 <div v-if="resetError" class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ resetError }}</div>
@@ -145,7 +145,11 @@ async function resetSdkToken(token: SdkTokenRecord) {
                     </div>
 
                     <div class="space-y-2">
-                        <div v-for="tokenRecord in mcpTokens" :key="tokenRecord.id" class="flex items-center justify-between gap-4 rounded border p-3 text-sm">
+                        <div
+                            v-for="tokenRecord in mcpTokens"
+                            :key="tokenRecord.id"
+                            class="flex items-center justify-between gap-4 rounded border p-3 text-sm"
+                        >
                             <span class="font-medium">{{ tokenRecord.name }}</span>
                             <span class="text-muted-foreground">ID {{ tokenRecord.id }}</span>
                         </div>

@@ -8,7 +8,7 @@ import {
     shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent,
     shouldShowCopySelection as shouldShowCopySelectionForContext,
 } from './interaction';
-import { buildReplyQuoteHtml, extractPlainTextFromContent } from './rich-content';
+import { buildReplyQuoteHtml, extractPlainTextFromContent, highlightRichCodeBlocks } from './rich-content';
 import { getReplyTargetFromEventTarget, mapThreadToMessage, shouldHandleImage } from './thread';
 import type { TaskAttachment, ThreadMessage } from './types';
 
@@ -63,6 +63,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     watch(options.editOpen, (open) => {
         if (!open) return;
         scrollCommentsToBottomSoon();
+        highlightCommentsSoon();
     });
 
     watch(
@@ -70,6 +71,14 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         () => {
             if (!options.editOpen.value) return;
             scrollCommentsToBottomSoon();
+        },
+    );
+
+    watch(
+        () => threadMessages.value.map((message) => `${message.id ?? message.clientId}:${message.content}`).join('\n'),
+        () => {
+            if (!options.editOpen.value) return;
+            highlightCommentsSoon();
         },
     );
 
@@ -238,6 +247,10 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         raf(scrollCommentsToBottom);
         window.setTimeout(scrollCommentsToBottom, 50);
         window.setTimeout(scrollCommentsToBottom, 250);
+    }
+
+    function highlightCommentsSoon() {
+        void nextTick().then(() => highlightRichCodeBlocks(commentsScrollRef.value));
     }
 
     function onCommentsMediaLoadCapture(event: Event) {
@@ -417,7 +430,6 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     async function deleteThreadMessage(message: ThreadMessage) {
         if (!options.editTask.value) return;
         if (!message.id || !message.isYou || message.pending) return;
-        if (!confirm('Delete this message?')) return;
 
         try {
             await options.deleteThread(options.getTaskId(options.editTask.value), message.id);

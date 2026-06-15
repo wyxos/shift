@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskStatus;
 use App\Models\Organisation;
 use App\Models\Task;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ class DashboardController extends Controller
 
         $baseQuery = Task::query()
             ->visibleTo($userId)
+            ->withoutRequirementPhase()
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $this->applyProjectOrganisationFilter($query, $organisationId);
             });
@@ -44,6 +46,7 @@ class DashboardController extends Controller
             'pending' => 'Pending',
             'in-progress' => 'In Progress',
             'awaiting-feedback' => 'Awaiting Feedback',
+            'on-hold' => 'On Hold',
             'completed' => 'Completed',
             'closed' => 'Closed',
         ];
@@ -52,7 +55,7 @@ class DashboardController extends Controller
             'medium' => 'Medium',
             'low' => 'Low',
         ];
-        $openStatuses = ['pending', 'in-progress', 'awaiting-feedback'];
+        $openStatuses = TaskStatus::defaultOpenValues();
 
         $total = $tasks->count();
         $pending = $tasks->where('status', 'pending')->count();
@@ -156,6 +159,7 @@ class DashboardController extends Controller
         ];
 
         return Inertia::render('Dashboard', [
+            'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
             'metrics' => $metrics,
             'charts' => [
                 'status' => $statusBreakdown,

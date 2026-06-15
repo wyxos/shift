@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrganisationRole;
 use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
+use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
 
 class OrganisationController extends Controller
 {
-    private function ensureOrganisationVisible(Organisation $organisation): void
-    {
-        abort_unless($organisation->isVisibleToUser(auth()->id()), 404);
-    }
+    public function __construct(private readonly ShiftPermissionService $permissions) {}
 
     public function index(?Organisation $organisation = null, ?string $activePanel = null)
     {
@@ -30,12 +29,7 @@ class OrganisationController extends Controller
 
         $organisations = Organisation::query()
             ->withCount(['organisationUsers', 'projects'])
-            ->where(function (Builder $query) use ($userId) {
-                $query->where('author_id', $userId)
-                    ->orWhereHas('organisationUsers', function (Builder $query) use ($userId) {
-                        $query->where('user_id', $userId);
-                    });
-            })
+            ->visibleToUser($userId)
             ->when(
                 request('search'),
                 fn (Builder $query, string $search) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%'])
@@ -59,12 +53,15 @@ class OrganisationController extends Controller
 
         if ($panelOrganisationId) {
             $panelOrganisation = Organisation::query()
-                ->where('author_id', $userId)
                 ->with([
                     'author:id,name,email,created_at,email_verified_at,last_login_at',
                     'organisationUsers.user:id,name,email,created_at,email_verified_at,last_login_at',
                 ])
                 ->find($panelOrganisationId);
+
+            if ($panelOrganisation && ! $this->permissions->canManageOrganisationAccess($panelOrganisation, $userId)) {
+                $panelOrganisation = null;
+            }
 
             if ($panelOrganisation) {
                 $panelOrganisationProjects = Project::query()
@@ -92,6 +89,7 @@ class OrganisationController extends Controller
                 ->through(fn (Organisation $organisation) => [
                     ...$organisation->toArray(),
                     'isOwner' => $organisation->author_id === $userId,
+                    ...$this->permissions->organisationCapabilities($organisation, $userId),
                 ]),
             'accessUsers' => User::query()
                 ->orderBy('name')
@@ -107,6 +105,8 @@ class OrganisationController extends Controller
                     ])
                     ->values()
                     ->all(),
+                'roleOptions' => $this->permissions->organisationRoleOptions($panelOrganisation, $userId),
+                'canManageTeamRoles' => $this->permissions->canManageOrganisationAccess($panelOrganisation, $userId),
                 'teamUsers' => collect([
                     $panelOrganisation->author ? [
                         'id' => 'owner-'.$panelOrganisation->author->id,
@@ -114,6 +114,10 @@ class OrganisationController extends Controller
                         'email' => $panelOrganisation->author->email,
                         'status' => 'owner',
                         'statusLabel' => 'Owner',
+                        'role' => OrganisationRole::Administrator->value,
+                        'roleLabel' => OrganisationRole::Administrator->label(),
+                        'canManageRole' => false,
+                        'roleOptions' => [],
                         'projectIds' => $panelOrganisationProjects->pluck('id')->values()->all(),
                         'projectAccessCount' => $panelOrganisationProjects->count(),
                         'createdAt' => $panelOrganisation->author->created_at?->toISOString(),
@@ -126,7 +130,7 @@ class OrganisationController extends Controller
                         $panelOrganisation->organisationUsers
                             ->reject(fn ($organisationUser) => $organisationUser->user_id === $panelOrganisation->author_id
                                 || strcasecmp($organisationUser->user_email, $panelOrganisation->author?->email ?: '') === 0)
-                            ->map(function ($organisationUser) use ($panelProjectUsers) {
+                            ->map(function ($organisationUser) use ($panelOrganisation, $panelProjectUsers, $userId) {
                                 $projectIds = $panelProjectUsers
                                     ->filter(function (ProjectUser $projectUser) use ($organisationUser) {
                                         if ($organisationUser->user_id) {
@@ -148,6 +152,10 @@ class OrganisationController extends Controller
                                     'email' => $organisationUser->user?->email ?: $organisationUser->user_email,
                                     'status' => $organisationUser->user_id ? 'registered' : 'pending',
                                     'statusLabel' => $organisationUser->user_id ? 'Registered' : 'Pending invitation',
+                                    'role' => $organisationUser->role?->value,
+                                    'roleLabel' => $organisationUser->role?->label(),
+                                    'canManageRole' => $this->permissions->canManageOrganisationUserRole($panelOrganisation, $organisationUser, $userId),
+                                    'roleOptions' => $this->permissions->organisationRoleOptions($panelOrganisation, $userId, $organisationUser),
                                     'projectIds' => $projectIds,
                                     'projectAccessCount' => count($projectIds),
                                     'createdAt' => ($organisationUser->user?->created_at ?: $organisationUser->created_at)?->toISOString(),
@@ -162,23 +170,50 @@ class OrganisationController extends Controller
         ]);
     }
 
+    public function sidebar()
+    {
+        $userId = auth()->id();
+        abort_unless($userId, 401);
+
+        $limit = min(max(request()->integer('limit', 5), 1), 10);
+        $offset = max(request()->integer('offset', 0), 0);
+        $search = trim((string) request('search', ''));
+
+        $organisations = Organisation::query()
+            ->visibleToUser($userId)
+            ->when($search !== '', fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$search.'%']))
+            ->orderBy('name')
+            ->skip($offset)
+            ->limit($limit + 1)
+            ->get(['id', 'name', 'author_id']);
+
+        return response()->json([
+            'items' => $organisations
+                ->take($limit)
+                ->map(fn (Organisation $organisation) => [
+                    'id' => $organisation->id,
+                    'name' => $organisation->name,
+                    'isOwner' => $organisation->author_id === $userId,
+                    ...$this->permissions->organisationCapabilities($organisation, $userId),
+                ])
+                ->values(),
+            'hasMore' => $organisations->count() > $limit,
+        ]);
+    }
+
     public function team(Organisation $organisation)
     {
-        $this->ensureOrganisationVisible($organisation);
-
         return $this->index($organisation, 'team');
     }
 
     public function settings(Organisation $organisation)
     {
-        $this->ensureOrganisationVisible($organisation);
-
         return $this->index($organisation, 'settings');
     }
 
     public function destroy(Organisation $organisation)
     {
-        abort_if($organisation->author_id !== auth()->id(), 403);
+        abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
 
         $organisation->delete();
 
@@ -187,7 +222,7 @@ class OrganisationController extends Controller
 
     public function update(Organisation $organisation)
     {
-        abort_if($organisation->author_id !== auth()->id(), 403);
+        abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
 
         $organisation->update(request()->validate([
             'name' => 'required|string|max:255',
@@ -202,17 +237,27 @@ class OrganisationController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        Organisation::create([
+        $organisation = Organisation::create([
             ...$validated,
             'author_id' => auth()->id(),
         ]);
+
+        $user = auth()->user();
+        if ($user) {
+            $organisation->organisationUsers()->create([
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'user_name' => $user->name,
+                'role' => OrganisationRole::Administrator->value,
+            ]);
+        }
 
         return redirect()->route('organisations.index')->with('success', 'Organisation created successfully.');
     }
 
     public function users(Organisation $organisation)
     {
-        if ($organisation->author_id !== auth()->id()) {
+        if (! $this->permissions->canManageOrganisationAccess($organisation, auth()->id())) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

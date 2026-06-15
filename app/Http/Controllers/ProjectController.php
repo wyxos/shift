@@ -7,22 +7,16 @@ use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectEnvironmentService;
+use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
     public function __construct(
+        private readonly ShiftPermissionService $permissions,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
     ) {}
-
-    private function ensureProjectManageable(Project $project): void
-    {
-        abort_unless(
-            $project->isManagedByUser(auth()->id()),
-            403,
-        );
-    }
 
     public function index(?Organisation $organisation = null)
     {
@@ -85,6 +79,7 @@ class ProjectController extends Controller
                             ->map(fn ($environment) => $this->environmentPayload($environment))
                             ->values(),
                         'isOwner' => $project->isManagedByUser(auth()->id()),
+                        ...$this->permissions->projectCapabilities($project, auth()->id()),
                     ]),
                 'clients' => Client::query()
                     ->whereHas('organisation', function (Builder $query) {
@@ -104,7 +99,7 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
-        $this->ensureProjectManageable($project);
+        abort_unless($this->permissions->canManageProject($project, auth()->id()), 403);
 
         $project->delete();
 
@@ -113,7 +108,7 @@ class ProjectController extends Controller
 
     public function update(Project $project)
     {
-        $this->ensureProjectManageable($project);
+        abort_unless($this->permissions->canManageProject($project, auth()->id()), 403);
 
         $project->update(request()->validate([
             'name' => 'required|string|max:255',
@@ -124,7 +119,10 @@ class ProjectController extends Controller
 
     public function updateWidgetSettings(Project $project)
     {
-        $this->ensureProjectManageable($project);
+        abort_unless(
+            $this->permissions->canManageTechnicalSettings($project, auth()->id()),
+            403,
+        );
 
         $attributes = request()->validate([
             'external_widget_enabled' => 'required|boolean',
@@ -162,7 +160,10 @@ class ProjectController extends Controller
 
     public function updateMcpSettings(Project $project)
     {
-        $this->ensureProjectManageable($project);
+        abort_unless(
+            $this->permissions->canManageTechnicalSettings($project, auth()->id()),
+            403,
+        );
 
         $attributes = request()->validate([
             'mcp_enabled' => 'required|boolean',
@@ -198,6 +199,17 @@ class ProjectController extends Controller
             ],
         ]);
 
+        $organisation = null;
+        if (! empty($validated['organisation_id'])) {
+            $organisation = Organisation::query()->findOrFail($validated['organisation_id']);
+        } elseif (! empty($validated['client_id'])) {
+            $organisation = Client::query()->findOrFail($validated['client_id'])->organisation;
+        }
+
+        if ($organisation) {
+            abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
+        }
+
         Project::create([
             ...$validated,
             'author_id' => auth()->id(),
@@ -208,7 +220,7 @@ class ProjectController extends Controller
 
     public function users(Project $project)
     {
-        if (! $project->isVisibleToUser(auth()->id())) {
+        if (! $this->permissions->canManageProjectAccess($project, auth()->id())) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -222,7 +234,7 @@ class ProjectController extends Controller
     public function generateApiToken(Project $project)
     {
         abort_unless(
-            $project->isManagedByUser(auth()->id()),
+            $this->permissions->canManageTechnicalSettings($project, auth()->id()),
             403,
         );
 
