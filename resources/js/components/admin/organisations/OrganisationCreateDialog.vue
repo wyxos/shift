@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 
 type CreateForm = {
     name: string;
@@ -23,6 +24,8 @@ const emit = defineEmits<{
 }>();
 
 function updateOpen(value: boolean) {
+    if (!value && form.processing) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -49,8 +52,15 @@ function updateOpen(value: boolean) {
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Cancel</Button>
-                <Button data-testid="submit-create-organisation" :disabled="form.processing" @click="emit('submit')">Create</Button>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="updateOpen(false)">Cancel</Button>
+                <RequestButton
+                    data-testid="submit-create-organisation"
+                    :loading="form.processing"
+                    loading-label="Creating..."
+                    @click="emit('submit')"
+                >
+                    Create
+                </RequestButton>
             </DialogFooter>
         </DialogContent>
     </Dialog>

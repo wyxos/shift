@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, type SelectOption } from '@/components/ui/select';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { computed } from 'vue';
 
 type Option = {
@@ -45,6 +46,8 @@ const organisationOptions = computed<SelectOption[]>(() => [
 ]);
 
 function updateOpen(value: boolean) {
+    if (!value && form.processing) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -103,8 +106,17 @@ function updateOpen(value: boolean) {
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Cancel</Button>
-                <Button type="button" :disabled="disabled" data-testid="create-project-submit" @click="emit('submit')">Create</Button>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="updateOpen(false)">Cancel</Button>
+                <RequestButton
+                    type="button"
+                    :disabled="disabled"
+                    :loading="form.processing"
+                    loading-label="Creating..."
+                    data-testid="create-project-submit"
+                    @click="emit('submit')"
+                >
+                    Create
+                </RequestButton>
             </DialogFooter>
         </DialogContent>
     </Dialog>

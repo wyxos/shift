@@ -46,7 +46,9 @@ const {
     confirmDelete,
     createDisabled,
     createForm,
+    deleteError,
     deleteForm,
+    deleteProcessing,
     draftSearchTerm,
     draftSortBy,
     editDialogOpen,
@@ -78,6 +80,7 @@ const {
     otherEditErrors,
     projectRows,
     removeAccess,
+    removingAccessId,
     resetFilters,
     saveEdit,
     saveMcpSettings,
@@ -137,7 +140,13 @@ const {
             </AdminListShell>
         </div>
 
-        <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
+        <DeleteDialog
+            :error="deleteError"
+            :is-open="deleteForm.isActive"
+            :loading="deleteProcessing"
+            @cancel="deleteForm.isActive = false"
+            @confirm="confirmDelete"
+        >
             <template #title>Delete Project</template>
             <template #description>Are you sure you want to delete this project? This action cannot be undone.</template>
             <template #cancel>Cancel</template>
@@ -171,6 +180,7 @@ const {
             :form="manageUsersForm"
             :loading="manageUsersLoading"
             :open="manageUsersForm.isOpen"
+            :removing-access-id="removingAccessId"
             @cancel="manageUsersForm.isOpen = false"
             @remove-access="removeAccess"
             @submit-access="grantAccess"

@@ -5,6 +5,7 @@ import { accessStatusBadgeClass, accessStatusLabel, accessUserDisplayName, type 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { Trash2 } from 'lucide-vue-next';
 import { type ProjectAccessUser } from './project-shared';
 
@@ -28,6 +29,7 @@ const { open, form, loading, error, accessForm, accessUsers, accessDisabled } = 
     form: ManageUsersForm;
     loading: boolean;
     error: string | null;
+    removingAccessId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +40,8 @@ const emit = defineEmits<{
 }>();
 
 function updateOpen(value: boolean) {
+    if (!value && (accessForm.processing || loading || removingAccessId)) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -82,22 +86,30 @@ function updateOpen(value: boolean) {
                         <div class="font-medium">{{ accessUserDisplayName(projectUser) }}</div>
                         <Badge :class="accessStatusBadgeClass(projectUser)" variant="secondary">{{ accessStatusLabel(projectUser) }}</Badge>
                     </div>
-                    <Button
+                    <RequestButton
                         type="button"
                         variant="destructive"
                         size="icon"
+                        :loading="removingAccessId === projectUser.id"
                         title="Remove access"
                         :data-testid="`project-remove-access-${projectUser.id}`"
                         @click="emit('remove-access', projectUser)"
                     >
                         <Trash2 class="h-4 w-4" />
                         <span class="sr-only">Remove access</span>
-                    </Button>
+                    </RequestButton>
                 </div>
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="ghost" @click="updateOpen(false)">Close</Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    :disabled="accessForm.processing || loading || Boolean(removingAccessId)"
+                    @click="updateOpen(false)"
+                >
+                    Close
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

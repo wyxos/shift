@@ -9,7 +9,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import { Select, type SelectOption } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { Building2, Pencil, Plus, Search, Trash2, Users } from 'lucide-vue-next';
@@ -149,21 +149,10 @@ const createForm = useForm<{
     isActive: false,
 });
 
-const editForm = useForm<{
-    id: number | null;
-    name: string;
-}>({
-    id: null,
-    name: '',
-});
-
-const deleteForm = useForm<{
-    id: number | null;
-    isActive: boolean;
-}>({
-    id: null,
-    isActive: false,
-});
+const editForm = useForm<{ id: number | null; name: string }>({ id: null, name: '' });
+const deleteForm = useForm<{ id: number | null; isActive: boolean }>({ id: null, isActive: false });
+const deleteProcessing = ref(false);
+const deleteError = ref<string | null>(null);
 
 const otherCreateErrors = computed<Record<string, string>>(() => {
     return Object.entries(createForm.errors)
@@ -241,6 +230,8 @@ function openEditModal(client: ClientRow) {
 }
 
 function openDeleteModal(client: ClientRow) {
+    deleteProcessing.value = false;
+    deleteError.value = null;
     deleteForm.id = client.id;
     deleteForm.isActive = true;
 }
@@ -254,6 +245,16 @@ function closeEditModal() {
     editDialogOpen.value = false;
     editForm.reset();
     editForm.id = null;
+}
+
+function updateCreateDialogOpen(open: boolean) {
+    if (!open && createForm.processing) return;
+    void (open ? (createForm.isActive = true) : closeCreateModal());
+}
+
+function updateEditDialogOpen(open: boolean) {
+    if (!open && editForm.processing) return;
+    void (open ? (editDialogOpen.value = true) : closeEditModal());
 }
 
 function submitCreateForm() {
@@ -280,12 +281,20 @@ function saveEdit() {
 }
 
 function confirmDelete() {
-    if (!deleteForm.id) return;
+    if (!deleteForm.id || deleteProcessing.value) return;
 
+    deleteProcessing.value = true;
+    deleteError.value = null;
     router.delete(`/clients/${deleteForm.id}`, {
         preserveScroll: true,
         onSuccess: () => {
             deleteForm.isActive = false;
+        },
+        onError: (errors) => {
+            deleteError.value = String(Object.values(errors)[0] ?? 'Unable to delete this client right now.');
+        },
+        onFinish: () => {
+            if (deleteForm.isActive) deleteProcessing.value = false;
         },
     });
 }
@@ -399,17 +408,18 @@ function confirmDelete() {
             </AdminListShell>
         </div>
 
-        <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
+        <DeleteDialog
+            :error="deleteError"
+            :is-open="deleteForm.isActive"
+            :loading="deleteProcessing"
+            @cancel="deleteForm.isActive = false"
+            @confirm="confirmDelete"
+        >
             <template #title>Delete Client</template>
             <template #description>Are you sure you want to delete this client? This action cannot be undone.</template>
-            <template #cancel>Cancel</template>
-            <template #confirm>Confirm</template>
         </DeleteDialog>
 
-        <AlertDialog v-model:open="createForm.isActive">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
+        <AlertDialog :open="createForm.isActive" @update:open="updateCreateDialogOpen">
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Create Client</AlertDialogTitle>
@@ -441,16 +451,21 @@ function confirmDelete() {
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="closeCreateModal">Cancel</AlertDialogCancel>
-                    <Button type="button" :disabled="createDisabled" data-testid="create-client-submit" @click="submitCreateForm">Create</Button>
+                    <AlertDialogCancel :disabled="createForm.processing" @click="closeCreateModal">Cancel</AlertDialogCancel>
+                    <RequestButton
+                        :disabled="createDisabled"
+                        :loading="createForm.processing"
+                        loading-label="Creating..."
+                        data-testid="create-client-submit"
+                        @click="submitCreateForm"
+                    >
+                        Create
+                    </RequestButton>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog v-model:open="editDialogOpen">
-            <AlertDialogTrigger as-child>
-                <div />
-            </AlertDialogTrigger>
+        <AlertDialog :open="editDialogOpen" @update:open="updateEditDialogOpen">
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Client</AlertDialogTitle>
@@ -468,8 +483,16 @@ function confirmDelete() {
                 </div>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel type="button" @click="closeEditModal">Cancel</AlertDialogCancel>
-                    <Button type="button" :disabled="editDisabled" data-testid="edit-client-submit" @click="saveEdit">Save</Button>
+                    <AlertDialogCancel :disabled="editForm.processing" @click="closeEditModal">Cancel</AlertDialogCancel>
+                    <RequestButton
+                        :disabled="editDisabled"
+                        :loading="editForm.processing"
+                        loading-label="Saving..."
+                        data-testid="edit-client-submit"
+                        @click="saveEdit"
+                    >
+                        Save
+                    </RequestButton>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

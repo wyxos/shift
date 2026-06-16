@@ -215,7 +215,7 @@ vi.mock('axios', () => ({
     },
 }));
 // prettier-ignore
-vi.mock('lucide-vue-next', () => Object.fromEntries(['Bot', 'KeyRound', 'ListTodo', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
+vi.mock('lucide-vue-next', () => Object.fromEntries(['Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
 
 describe('Projects.vue', () => {
     const mockProjects = {

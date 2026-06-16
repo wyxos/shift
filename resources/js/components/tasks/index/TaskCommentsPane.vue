@@ -1,19 +1,10 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
-import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
+import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
 
 const props = defineProps<{
     state: any;
@@ -24,9 +15,20 @@ const threadComposerHtmlModel = computed({
     set: (value: string) => state.setThreadComposerHtml(value),
 });
 const deleteDialogOpen = ref(false);
+const deleteConfirmLoading = ref(false);
+const deleteConfirmError = ref<string | null>(null);
 const pendingDeleteMessage = ref<any | null>(null);
+const deleteDialogOpenModel = computed({
+    get: () => deleteDialogOpen.value,
+    set: (value: boolean) => {
+        if (!value && deleteConfirmLoading.value) return;
+        deleteDialogOpen.value = value;
+    },
+});
 
 const requestDeleteThreadMessage = (message: any) => {
+    deleteConfirmLoading.value = false;
+    deleteConfirmError.value = null;
     pendingDeleteMessage.value = message;
     deleteDialogOpen.value = true;
 };
@@ -35,14 +37,35 @@ const clearPendingDeleteMessage = () => {
     pendingDeleteMessage.value = null;
 };
 
+const requestErrorMessage = (error: unknown, fallback: string) => {
+    return error instanceof Error && error.message ? error.message : fallback;
+};
+
 const confirmDeleteThreadMessage = async () => {
     const message = pendingDeleteMessage.value;
 
-    if (!message) return;
+    if (!message || deleteConfirmLoading.value) return;
+
+    deleteConfirmLoading.value = true;
+    deleteConfirmError.value = null;
+
+    let deleted;
+    try {
+        deleted = await state.deleteThreadMessage(message);
+    } catch (error) {
+        deleteConfirmError.value = unref(state.threadError) || requestErrorMessage(error, 'Unable to delete this comment right now.');
+        deleteConfirmLoading.value = false;
+        return;
+    }
+
+    if (deleted === false) {
+        deleteConfirmError.value = unref(state.threadError) || 'Unable to delete this comment right now.';
+        deleteConfirmLoading.value = false;
+        return;
+    }
 
     deleteDialogOpen.value = false;
     pendingDeleteMessage.value = null;
-    await state.deleteThreadMessage(message);
 };
 
 const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null) => {
@@ -50,7 +73,7 @@ const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null
 };
 
 watch(deleteDialogOpen, (open) => {
-    if (!open) {
+    if (!open && !deleteConfirmLoading.value) {
         clearPendingDeleteMessage();
     }
 });
@@ -201,23 +224,19 @@ watch(deleteDialogOpen, (open) => {
             <div v-else class="text-muted-foreground py-2 text-sm">Commenting is unavailable for this task.</div>
         </div>
 
-        <AlertDialog v-model:open="deleteDialogOpen">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete comment</AlertDialogTitle>
-                    <AlertDialogDescription>Delete this comment from the thread? This cannot be undone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        data-testid="confirm-thread-message-delete"
-                        @click="confirmDeleteThreadMessage"
-                    >
-                        Delete comment
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmRequestDialog
+            v-model:open="deleteDialogOpenModel"
+            title="Delete comment"
+            confirm-label="Delete comment"
+            confirm-test-id="confirm-thread-message-delete"
+            confirm-variant="destructive"
+            :error="deleteConfirmError"
+            :loading="deleteConfirmLoading"
+            loading-label="Deleting..."
+            @cancel="deleteDialogOpen = false"
+            @confirm="confirmDeleteThreadMessage"
+        >
+            <template #description>Delete this comment from the thread? This cannot be undone.</template>
+        </ConfirmRequestDialog>
     </div>
 </template>

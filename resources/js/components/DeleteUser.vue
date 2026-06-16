@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 
 const passwordInput = ref<HTMLInputElement | null>(null);
 
@@ -72,12 +73,12 @@ const closeModal = () => {
 
                         <DialogFooter class="gap-2">
                             <DialogClose as-child>
-                                <Button variant="secondary" @click="closeModal"> Cancel </Button>
+                                <Button variant="secondary" :disabled="form.processing" @click="closeModal"> Cancel </Button>
                             </DialogClose>
 
-                            <Button variant="destructive" :disabled="form.processing">
-                                <button type="submit">Delete account</button>
-                            </Button>
+                            <RequestButton type="submit" variant="destructive" :loading="form.processing" loading-label="Deleting...">
+                                Delete account
+                            </RequestButton>
                         </DialogFooter>
                     </form>
                 </DialogContent>

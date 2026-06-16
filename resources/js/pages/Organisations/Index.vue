@@ -105,6 +105,8 @@ const filtersOpen = ref(false);
 const manageUsersLoading = ref(false);
 const manageUsersError = ref<string | null>(null);
 const manageUsersListVisible = ref(true);
+const removingAccessId = ref<number | null>(null);
+const deleteError = ref<string | null>(null);
 
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
 const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
@@ -194,33 +196,18 @@ function onPageChange(page: number) {
 }
 
 function openDeleteModal(organisation: OrganisationIdentity) {
+    deleteProcessing.value = false;
+    deleteError.value = null;
     deleteForm.id = organisation.id;
     deleteForm.isActive = true;
 }
 
-const editForm = useForm<{
-    id: number | null;
-    name: string;
-}>({
-    id: null,
-    name: '',
-});
+const editForm = useForm<{ id: number | null; name: string }>({ id: null, name: '' });
 
-const createForm = useForm<{
-    name: string;
-    isActive: boolean;
-}>({
-    name: '',
-    isActive: false,
-});
+const createForm = useForm<{ name: string; isActive: boolean }>({ name: '', isActive: false });
 
-const deleteForm = useForm<{
-    id: number | null;
-    isActive: boolean;
-}>({
-    id: null,
-    isActive: false,
-});
+const deleteForm = useForm<{ id: number | null; isActive: boolean }>({ id: null, isActive: false });
+const deleteProcessing = ref(false);
 
 const accessForm = useForm<{
     organisation_id: number | null;
@@ -270,12 +257,20 @@ function saveEdit() {
 }
 
 function confirmDelete() {
-    if (!deleteForm.id) return;
+    if (!deleteForm.id || deleteProcessing.value) return;
 
+    deleteProcessing.value = true;
+    deleteError.value = null;
     router.delete(`/organisations/${deleteForm.id}`, {
         preserveScroll: true,
         onSuccess: () => {
             deleteForm.isActive = false;
+        },
+        onError: (errors) => {
+            deleteError.value = String(Object.values(errors)[0] ?? 'Unable to delete this organisation right now.');
+        },
+        onFinish: () => {
+            if (deleteForm.isActive) deleteProcessing.value = false;
         },
     });
 }
@@ -348,8 +343,9 @@ function openTeamInviteModal(organisation: OrganisationIdentity) {
 }
 
 function removeAccess(organisationUser: { id: number }) {
-    if (!manageUsersForm.organisation_id) return;
+    if (!manageUsersForm.organisation_id || removingAccessId.value !== null) return;
 
+    removingAccessId.value = organisationUser.id;
     router.delete(`/organisations/${manageUsersForm.organisation_id}/users/${organisationUser.id}`, {
         preserveScroll: true,
         onSuccess: () => {
@@ -357,6 +353,9 @@ function removeAccess(organisationUser: { id: number }) {
                 id: manageUsersForm.organisation_id as number,
                 name: manageUsersForm.organisation_name,
             });
+        },
+        onFinish: () => {
+            removingAccessId.value = null;
         },
     });
 }
@@ -450,11 +449,15 @@ watch(
             />
         </div>
 
-        <DeleteDialog :is-open="deleteForm.isActive" @cancel="deleteForm.isActive = false" @confirm="confirmDelete">
+        <DeleteDialog
+            :error="deleteError"
+            :is-open="deleteForm.isActive"
+            :loading="deleteProcessing"
+            @cancel="deleteForm.isActive = false"
+            @confirm="confirmDelete"
+        >
             <template #title>Delete Organisation</template>
             <template #description>Are you sure you want to delete this organisation? This action cannot be undone.</template>
-            <template #cancel>Cancel</template>
-            <template #confirm>Confirm</template>
         </DeleteDialog>
 
         <OrganisationCreateDialog
@@ -473,6 +476,7 @@ watch(
             :form="manageUsersForm"
             :loading="manageUsersLoading"
             :open="manageUsersForm.isOpen"
+            :removing-access-id="removingAccessId"
             :show-users="manageUsersListVisible"
             @cancel="manageUsersForm.isOpen = false"
             @remove-access="removeAccess"
