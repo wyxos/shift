@@ -649,7 +649,14 @@ class TaskController extends Controller
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
-            ->with(['project:id,name', 'metadata:id,task_id,environment,phase,requirement_status,submitted_title,submitted_description,finalized_at', 'submitter'])
+            ->with([
+                'project:id,name,author_id,organisation_id,client_id',
+                'project.organisation:id,author_id',
+                'project.client:id,organisation_id',
+                'project.client.organisation:id,author_id',
+                'metadata:id,task_id,environment,phase,requirement_status,submitted_title,submitted_description,finalized_at',
+                'submitter',
+            ])
             ->withoutRequirementPhase();
 
         $query->whereIn('status', $selectedStatuses);
@@ -766,7 +773,10 @@ class TaskController extends Controller
 
         $query = $this->visibleTasksQuery()
             ->with([
-                'project:id,name',
+                'project:id,name,author_id,organisation_id,client_id',
+                'project.organisation:id,author_id',
+                'project.client:id,organisation_id',
+                'project.client.organisation:id,author_id',
                 'metadata:id,task_id,environment,phase,requirement_status,submitted_title,submitted_description,finalized_at,requirement_batch_id',
                 'metadata.requirementBatch:id,title,created_at',
                 'submitter',
