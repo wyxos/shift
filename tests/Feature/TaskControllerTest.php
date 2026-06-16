@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\OrganisationRole;
 use App\Enums\RequirementStatus;
 use App\Models\ExternalUser;
 use App\Models\Organisation;
@@ -91,6 +92,91 @@ test('tasks organisation route is hidden from users without organisation access'
     $this->actingAs($this->user)
         ->get(route('organisation.tasks', $otherOrganisation))
         ->assertNotFound();
+});
+
+test('tasks organisation route exposes delete capability for organisation administrators', function () {
+    $projectOwner = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    OrganisationUser::query()->create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'role' => OrganisationRole::Administrator->value,
+    ]);
+
+    $project = Project::factory()->create([
+        'author_id' => $projectOwner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+    ]);
+    $task->submitter()->associate($projectOwner)->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.tasks', $organisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $task->id)
+        ->where('tasks.data.0.can_delete', true)
+    );
+});
+
+test('requirements organisation route exposes delete capability for organisation administrators', function () {
+    $projectOwner = User::factory()->create();
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    OrganisationUser::query()->create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'role' => OrganisationRole::Administrator->value,
+    ]);
+
+    $project = Project::factory()->create([
+        'author_id' => $projectOwner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $requirement = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+    ]);
+    $requirement->submitter()->associate($projectOwner)->save();
+    $requirement->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Requirement item',
+        'submitted_description' => 'Requirement details.',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('organisation.requirements', $organisation));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.data.0.id', $requirement->id)
+        ->where('tasks.data.0.can_delete', true)
+    );
 });
 
 test('organisation members only see tasks for projects with explicit project access', function () {
