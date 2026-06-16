@@ -2,7 +2,6 @@
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -10,6 +9,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import type { TaskProjectOption } from '@/shared/tasks/projects';
 import type { RequirementBatchSummary } from '@/shared/tasks/types';
 import TaskListOverviewPanel from '@shared/components/tasks/TaskListOverviewPanel.vue';
@@ -172,9 +172,7 @@ async function confirmRequirementBatchFinalize() {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction data-testid="confirm-requirement-pack-finalize" @click="confirmRequirementBatchFinalize"
-                    >Finalize</AlertDialogAction
-                >
+                <Button data-testid="confirm-requirement-pack-finalize" type="button" @click="confirmRequirementBatchFinalize">Finalize</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
@@ -189,9 +187,7 @@ async function confirmRequirementBatchFinalize() {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction class="bg-destructive text-destructive-foreground hover:bg-destructive/90" @click="confirmDeleteTask">
-                    Delete
-                </AlertDialogAction>
+                <Button data-testid="confirm-task-delete" type="button" variant="destructive" @click="confirmDeleteTask">Delete</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
