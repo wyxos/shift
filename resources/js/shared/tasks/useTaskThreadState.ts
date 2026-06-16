@@ -427,9 +427,9 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         }
     }
 
-    async function deleteThreadMessage(message: ThreadMessage) {
-        if (!options.editTask.value) return;
-        if (!message.id || !message.isYou || message.pending) return;
+    async function deleteThreadMessage(message: ThreadMessage): Promise<boolean> {
+        if (!options.editTask.value) return false;
+        if (!message.id || !message.isYou || message.pending) return false;
 
         try {
             await options.deleteThread(options.getTaskId(options.editTask.value), message.id);
@@ -437,6 +437,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             if (threadEditingId.value === message.id) {
                 cancelThreadEdit();
             }
+
+            return true;
         } catch (error: any) {
             const messageText = getErrorMessage(error, 'Failed to delete comment');
             if (options.onDeleteError) {
@@ -444,6 +446,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             } else {
                 threadError.value = messageText;
             }
+
+            return false;
         }
     }
 

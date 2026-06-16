@@ -7,6 +7,7 @@ import { Select, type SelectOption } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Pencil, Trash2, UserPlus } from 'lucide-vue-next';
@@ -69,6 +70,8 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const projectIdsByTeamUser = ref<Record<string, number[]>>({});
 const removingUser = ref<OrganisationTeamUser | null>(null);
+const removingUserProcessing = ref(false);
+const removingUserError = ref<string | null>(null);
 
 const sheetOpen = computed(() => Boolean(editingUser.value));
 const removeDialogOpen = computed(() => Boolean(removingUser.value));
@@ -168,6 +171,8 @@ function openAccessSheet(teamUser: OrganisationTeamUser) {
 }
 
 function closeAccessSheet() {
+    if (saving.value) return;
+
     editingUser.value = null;
     selectedProjectIds.value = [];
     selectedRole.value = '';
@@ -176,12 +181,17 @@ function closeAccessSheet() {
 }
 
 function openRemoveConfirmation(teamUser: OrganisationTeamUser) {
+    if (removingUserProcessing.value) return;
     if (!teamUser.organisationUserId) return;
 
+    removingUserProcessing.value = false;
+    removingUserError.value = null;
     removingUser.value = teamUser;
 }
 
 function closeRemoveConfirmation() {
+    if (removingUserProcessing.value) return;
+
     removingUser.value = null;
 }
 
@@ -239,9 +249,11 @@ async function saveProjectAccess() {
 }
 
 function confirmRemoveOrganisationAccess() {
-    if (!removingUser.value?.organisationUserId) return;
+    if (!removingUser.value?.organisationUserId || removingUserProcessing.value) return;
 
     const organisationUserId = removingUser.value.organisationUserId;
+    removingUserProcessing.value = true;
+    removingUserError.value = null;
 
     router.delete(`/organisations/${props.organisation.id}/users/${organisationUserId}`, {
         preserveScroll: true,
@@ -250,7 +262,13 @@ function confirmRemoveOrganisationAccess() {
                 closeAccessSheet();
             }
 
-            closeRemoveConfirmation();
+            removingUser.value = null;
+        },
+        onError: (errors) => {
+            removingUserError.value = String(Object.values(errors)[0] ?? 'Unable to remove this organisation access right now.');
+        },
+        onFinish: () => {
+            if (removingUser.value) removingUserProcessing.value = false;
         },
     });
 }
@@ -400,14 +418,27 @@ function confirmRemoveOrganisationAccess() {
 
             <SheetFooter class="border-t sm:flex-row sm:justify-end">
                 <Button type="button" variant="outline" :disabled="saving" @click="closeAccessSheet">Cancel</Button>
-                <Button type="button" :disabled="saving" data-testid="organisation-team-save-projects" @click="saveProjectAccess">
-                    {{ saving ? 'Saving...' : 'Save changes' }}
-                </Button>
+                <RequestButton
+                    type="button"
+                    :loading="saving"
+                    loading-label="Saving..."
+                    data-testid="organisation-team-save-projects"
+                    @click="saveProjectAccess"
+                >
+                    Save changes
+                </RequestButton>
             </SheetFooter>
         </SheetContent>
     </Sheet>
 
-    <DeleteDialog :is-open="removeDialogOpen" @cancel="closeRemoveConfirmation" @confirm="confirmRemoveOrganisationAccess">
+    <DeleteDialog
+        :error="removingUserError"
+        :is-open="removeDialogOpen"
+        :loading="removingUserProcessing"
+        loading-label="Removing..."
+        @cancel="closeRemoveConfirmation"
+        @confirm="confirmRemoveOrganisationAccess"
+    >
         <template #title>Remove organisation access</template>
         <template #description>
             Remove {{ removingUser?.name }} from {{ organisation.name }}? They will also lose access to projects inside this organisation.

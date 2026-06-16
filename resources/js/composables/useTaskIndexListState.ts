@@ -63,8 +63,10 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         try {
             await axios.delete(route('tasks.v2.destroy', { task: taskId }));
             router.reload({ preserveScroll: true, preserveState: true });
+            return true;
         } catch (e: any) {
             error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete task';
+            return false;
         } finally {
             deleteLoading.value = null;
         }
@@ -82,11 +84,13 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
             toast.success('Requirements finalized', {
                 description: `${count} ${count === 1 ? 'item' : 'items'} now ${count === 1 ? 'appears' : 'appear'} in the active task list.`,
             });
+            return true;
         } catch (e: any) {
             error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirements';
             toast.error('Failed to finalize requirements', {
                 description: error.value,
             });
+            return false;
         } finally {
             requirementBatchFinalizeLoading.value = null;
         }

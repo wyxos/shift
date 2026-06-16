@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import RequestButton from '@shared/components/RequestButton.vue';
 import { ref, watch } from 'vue';
 
 const props = defineProps({
     isOpen: {
         type: Boolean,
         required: true,
+    },
+    loading: {
+        type: Boolean,
+        default: false,
+    },
+    loadingLabel: {
+        type: String,
+        default: 'Deleting...',
+    },
+    error: {
+        type: String,
+        default: null,
     },
 });
 
@@ -24,6 +37,8 @@ watch(
 );
 
 function updateOpen(value: boolean) {
+    if (props.loading && !value) return;
+
     open.value = value;
 
     if (!value) {
@@ -43,14 +58,15 @@ function updateOpen(value: boolean) {
                 <DialogDescription>
                     <slot name="description"> Are you sure you want to delete this record? This action cannot be undone. </slot>
                 </DialogDescription>
+                <p v-if="error" class="text-destructive text-sm" data-testid="delete-dialog-error">{{ error }}</p>
             </DialogHeader>
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">
+                <Button type="button" variant="outline" :disabled="loading" @click="updateOpen(false)">
                     <slot name="cancel"> Cancel </slot>
                 </Button>
-                <Button type="button" variant="destructive" class="bg-red-500" @click="emits('confirm')">
+                <RequestButton type="button" variant="destructive" :loading="loading" :loading-label="loadingLabel" @click="emits('confirm')">
                     <slot name="confirm"> Delete </slot>
-                </Button>
+                </RequestButton>
             </DialogFooter>
         </DialogContent>
     </Dialog>

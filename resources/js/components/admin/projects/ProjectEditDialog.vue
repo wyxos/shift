@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 
 type EditForm = {
     id: number | null;
@@ -26,6 +27,8 @@ const emit = defineEmits<{
 }>();
 
 function updateOpen(value: boolean) {
+    if (!value && form.processing) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -53,8 +56,17 @@ function updateOpen(value: boolean) {
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Cancel</Button>
-                <Button type="button" :disabled="disabled" data-testid="edit-project-submit" @click="emit('submit')">Save</Button>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="updateOpen(false)">Cancel</Button>
+                <RequestButton
+                    type="button"
+                    :disabled="disabled"
+                    :loading="form.processing"
+                    loading-label="Saving..."
+                    data-testid="edit-project-submit"
+                    @click="emit('submit')"
+                >
+                    Save
+                </RequestButton>
             </DialogFooter>
         </DialogContent>
     </Dialog>

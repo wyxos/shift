@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { MessageSquare } from 'lucide-vue-next';
 
 type WidgetEnvironmentSettings = {
@@ -35,6 +36,8 @@ const emit = defineEmits<{
 }>();
 
 function updateOpen(value: boolean) {
+    if (!value && loading) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -143,10 +146,10 @@ function updateEnvironmentWidgetEnabled(environment: WidgetEnvironmentSettings, 
 
             <DialogFooter>
                 <Button type="button" variant="outline" :disabled="loading" @click="updateOpen(false)">Cancel</Button>
-                <Button type="button" :disabled="loading" data-testid="save-widget-settings" @click="emit('save')">
+                <RequestButton type="button" :loading="loading" loading-label="Saving..." data-testid="save-widget-settings" @click="emit('save')">
                     <MessageSquare class="mr-2 h-4 w-4" />
                     Save
-                </Button>
+                </RequestButton>
             </DialogFooter>
         </DialogContent>
     </Dialog>

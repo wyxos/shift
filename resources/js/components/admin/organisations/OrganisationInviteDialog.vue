@@ -2,7 +2,6 @@
 /* eslint-disable vue/no-mutating-props */
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 
 type InviteForm = {
     organisation_name: string;
@@ -31,10 +31,16 @@ const emit = defineEmits<{
     cancel: [];
     submit: [];
 }>();
+
+function updateOpen(value: boolean) {
+    if (!value && form.processing) return;
+
+    emit('update:open', value);
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
+    <AlertDialog :open="open" @update:open="updateOpen">
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Invite User to Organisation</AlertDialogTitle>
@@ -59,15 +65,21 @@ const emit = defineEmits<{
 
             <AlertDialogFooter>
                 <AlertDialogCancel
+                    :disabled="form.processing"
                     @click="
                         emit('update:open', false);
                         emit('cancel');
                     "
                     >Cancel</AlertDialogCancel
                 >
-                <AlertDialogAction data-testid="submit-invite-organisation" :disabled="form.processing" @click="emit('submit')"
-                    >Invite</AlertDialogAction
+                <RequestButton
+                    data-testid="submit-invite-organisation"
+                    :loading="form.processing"
+                    loading-label="Inviting..."
+                    @click="emit('submit')"
                 >
+                    Invite
+                </RequestButton>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

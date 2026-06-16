@@ -38,8 +38,11 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     const breadcrumbs: BreadcrumbItem[] = [{ title: 'Projects', href: '/projects' }];
     const filtersOpen = ref(false);
     const editDialogOpen = ref(false);
+    const deleteProcessing = ref(false);
+    const deleteError = ref<string | null>(null);
     const manageUsersLoading = ref(false);
     const manageUsersError = ref<string | null>(null);
+    const removingAccessId = ref<number | null>(null);
     const apiTokenLoading = ref(false);
     const apiTokenError = ref<string | null>(null);
     const widgetSettingsOpen = ref(false);
@@ -195,6 +198,8 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     }
 
     function openDeleteModal(project: ProjectRow) {
+        deleteProcessing.value = false;
+        deleteError.value = null;
         deleteForm.id = project.id;
         deleteForm.isActive = true;
     }
@@ -308,11 +313,19 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     }
 
     function confirmDelete() {
-        if (!deleteForm.id) return;
+        if (!deleteForm.id || deleteProcessing.value) return;
+        deleteProcessing.value = true;
+        deleteError.value = null;
         router.delete(`/projects/${deleteForm.id}`, {
             preserveScroll: true,
             onSuccess: () => {
                 deleteForm.isActive = false;
+            },
+            onError: (errors) => {
+                deleteError.value = String(Object.values(errors)[0] ?? 'Unable to delete this project right now.');
+            },
+            onFinish: () => {
+                if (deleteForm.isActive) deleteProcessing.value = false;
             },
         });
     }
@@ -335,10 +348,15 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     }
 
     function removeAccess(projectUser: ProjectAccessUser) {
-        if (!manageUsersForm.project_id) return;
+        if (!manageUsersForm.project_id || removingAccessId.value !== null) return;
+
+        removingAccessId.value = projectUser.id;
         router.delete(`/projects/${manageUsersForm.project_id}/users/${projectUser.id}`, {
             preserveScroll: true,
             onSuccess: () => openManageUsersModal({ id: manageUsersForm.project_id as number, name: manageUsersForm.project_name }),
+            onFinish: () => {
+                removingAccessId.value = null;
+            },
         });
     }
 
@@ -424,7 +442,9 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         confirmDelete,
         createDisabled,
         createForm,
+        deleteError,
         deleteForm,
+        deleteProcessing,
         draftSearchTerm,
         draftSortBy,
         editDialogOpen,
@@ -439,6 +459,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         manageUsersError,
         manageUsersForm,
         manageUsersLoading,
+        removingAccessId,
         mcpSettingsError,
         mcpSettingsForm,
         mcpSettingsLoading,

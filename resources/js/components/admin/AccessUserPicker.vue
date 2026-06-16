@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { Check, Search, UserPlus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { type AccessUserCandidate, deriveNameFromEmail } from './access-users';
@@ -133,10 +133,17 @@ function selectCandidate(candidate: AccessUserCandidate) {
                         </button>
                     </div>
                 </div>
-                <Button type="button" :disabled="disabled || processing" :data-testid="`${testIdPrefix}-submit`" @click="emit('submit')">
+                <RequestButton
+                    type="button"
+                    :disabled="disabled || processing"
+                    :loading="processing"
+                    loading-label="Adding..."
+                    :data-testid="`${testIdPrefix}-submit`"
+                    @click="emit('submit')"
+                >
                     <UserPlus class="h-4 w-4" />
-                    {{ processing ? 'Adding...' : submitLabel }}
-                </Button>
+                    {{ submitLabel }}
+                </RequestButton>
             </div>
         </div>
 
