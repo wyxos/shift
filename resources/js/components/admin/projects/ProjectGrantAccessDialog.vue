@@ -9,9 +9,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import RequestButton from '@/shared/components/RequestButton.vue';
 
 type GrantAccessForm = {
     project_id: number | null;
@@ -33,10 +33,16 @@ const emit = defineEmits<{
     cancel: [];
     submit: [];
 }>();
+
+function updateOpen(value: boolean) {
+    if (!value && form.processing) return;
+
+    emit('update:open', value);
+}
 </script>
 
 <template>
-    <AlertDialog :open="open" @update:open="emit('update:open', $event)">
+    <AlertDialog :open="open" @update:open="updateOpen">
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Grant Project Access</AlertDialogTitle>
@@ -59,13 +65,23 @@ const emit = defineEmits<{
             <AlertDialogFooter>
                 <AlertDialogCancel
                     type="button"
+                    :disabled="form.processing"
                     @click="
                         emit('update:open', false);
                         emit('cancel');
                     "
                     >Cancel</AlertDialogCancel
                 >
-                <Button type="button" :disabled="disabled" data-testid="grant-project-submit" @click="emit('submit')">Grant Access</Button>
+                <RequestButton
+                    type="button"
+                    :disabled="disabled"
+                    :loading="form.processing"
+                    loading-label="Granting..."
+                    data-testid="grant-project-submit"
+                    @click="emit('submit')"
+                >
+                    Grant Access
+                </RequestButton>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import { KeyRound } from 'lucide-vue-next';
 
 type ApiTokenForm = {
@@ -22,6 +23,8 @@ const emit = defineEmits<{
 }>();
 
 function updateOpen(value: boolean) {
+    if (!value && loading) return;
+
     emit('update:open', value);
 
     if (!value) {
@@ -47,16 +50,22 @@ function updateOpen(value: boolean) {
 
                 <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
 
-                <Button type="button" :disabled="loading" data-testid="generate-project-token" @click="emit('generate')">
+                <RequestButton
+                    type="button"
+                    :loading="loading"
+                    loading-label="Generating..."
+                    data-testid="generate-project-token"
+                    @click="emit('generate')"
+                >
                     <KeyRound class="mr-2 h-4 w-4" />
                     {{ form.token ? 'Regenerate Token' : 'Generate Token' }}
-                </Button>
+                </RequestButton>
 
                 <p class="text-muted-foreground text-sm">Regenerating a token invalidates any existing integrations using the previous token.</p>
             </div>
 
             <DialogFooter>
-                <Button type="button" variant="outline" @click="updateOpen(false)">Close</Button>
+                <Button type="button" variant="outline" :disabled="loading" @click="updateOpen(false)">Close</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
