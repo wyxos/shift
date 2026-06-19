@@ -62,24 +62,44 @@ vi.mock('@inertiajs/vue3', () => ({
             return h('a', { href: this.href }, this.$slots.default?.());
         },
     },
+    usePage: () => ({
+        props: {
+            auth: {
+                user: {
+                    id: 1,
+                },
+            },
+        },
+    }),
 }));
 
 describe('NotificationBadge', () => {
     let originalRoute: unknown;
+    let originalEcho: unknown;
+    let setIntervalSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
         originalRoute = (globalThis as any).route;
+        originalEcho = (globalThis as any).Echo;
+        setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 1 as any);
         axiosGetMock.mockReset();
         axiosPostMock.mockReset();
     });
 
     afterEach(() => {
+        setIntervalSpy.mockRestore();
+
         if (originalRoute === undefined) {
             delete (globalThis as any).route;
-            return;
+        } else {
+            (globalThis as any).route = originalRoute;
         }
 
-        (globalThis as any).route = originalRoute;
+        if (originalEcho === undefined) {
+            delete (globalThis as any).Echo;
+        } else {
+            (globalThis as any).Echo = originalEcho;
+        }
     });
 
     it('does not render or fetch when the Ziggy route helper is unavailable', async () => {
@@ -89,6 +109,7 @@ describe('NotificationBadge', () => {
         await flushPromises();
 
         expect(axiosGetMock).not.toHaveBeenCalled();
+        expect(setIntervalSpy).not.toHaveBeenCalled();
         expect(wrapper.find('button').exists()).toBe(false);
         expect(wrapper.text()).toBe('');
     });
@@ -136,7 +157,77 @@ describe('NotificationBadge', () => {
         await flushPromises();
 
         expect(axiosGetMock).toHaveBeenCalledWith('/notifications/unread');
+        expect(setIntervalSpy).not.toHaveBeenCalled();
         expect(wrapper.get('a[href="/tasks?task=42"]').text()).toContain('New Task: Broken footer');
         expect(wrapper.get('a[href="/notifications"]').text()).toContain('View all notifications');
+    });
+
+    it('prepends realtime notifications from Echo and leaves the channel on unmount', async () => {
+        (globalThis as any).route = vi.fn((name: string, params?: Record<string, unknown>) => {
+            switch (name) {
+                case 'notifications.unread':
+                    return '/notifications/unread';
+                case 'notifications.index':
+                    return '/notifications';
+                case 'notifications.mark-all-as-read':
+                    return '/notifications/mark-all-as-read';
+                case 'notifications.mark-as-read':
+                    return `/notifications/${params?.id}/mark-as-read`;
+                case 'tasks.index':
+                    return `/tasks?task=${params?.task}`;
+                case 'projects.index':
+                    return '/projects';
+                case 'organisations.index':
+                    return '/organisations';
+                default:
+                    return `/${name}`;
+            }
+        });
+
+        axiosGetMock.mockResolvedValue({
+            data: {
+                notifications: [],
+                count: 0,
+            },
+        });
+
+        let callback: ((notification: Record<string, unknown>) => void) | null = null;
+        const notificationMock = vi.fn((handler: typeof callback) => {
+            callback = handler;
+
+            return channel;
+        });
+        const channel = {
+            notification: notificationMock,
+        };
+        const privateMock = vi.fn(() => channel);
+        const leaveMock = vi.fn();
+        (globalThis as any).Echo = {
+            private: privateMock,
+            leave: leaveMock,
+        };
+
+        const wrapper = mount(NotificationBadge);
+        await flushPromises();
+
+        expect(privateMock).toHaveBeenCalledWith('App.Models.User.1');
+        expect(notificationMock).toHaveBeenCalledOnce();
+        expect(callback).not.toBeNull();
+
+        callback?.({
+            id: 'realtime-1',
+            type: 'TaskCreationNotification',
+            task_title: 'Realtime failure',
+            task_id: 99,
+            created_at: 'just now',
+        });
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('1');
+        expect(wrapper.get('a[href="/tasks?task=99"]').text()).toContain('New Task: Realtime failure');
+
+        wrapper.unmount();
+
+        expect(leaveMock).toHaveBeenCalledWith('App.Models.User.1');
     });
 });

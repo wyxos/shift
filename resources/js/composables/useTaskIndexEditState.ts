@@ -8,7 +8,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } fr
 import { toast } from 'vue-sonner';
 import { defaultTaskEditForm, editMobilePaneOptions } from './taskIndexEditDefaults';
 import { taskIndexThreadBindings } from './taskIndexThreadBindings';
+import { useTaskErrorOccurrences } from './useTaskErrorOccurrences';
 import { useTaskIndexThreadState } from './useTaskIndexThreadState';
+import { useTaskSaveToast } from './useTaskSaveToast';
 type UseTaskIndexEditStateOptions = {
     projects: TaskProjectOption[];
     aiImproveEnabled: ComputedRef<boolean>;
@@ -33,13 +35,15 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const requirementFinalizeError = ref<string | null>(null);
     const autosaveArmed = ref(false);
     let taskAutosaveTimer: number | null = null;
-    const taskSaveToastId = ref<string | number | null>(null);
+    const errorOccurrenceState = useTaskErrorOccurrences();
+    const taskSaveToast = useTaskSaveToast();
     const thread = useTaskIndexThreadState({
         aiImproveEnabled: options.aiImproveEnabled,
         editOpen,
         editTask,
     });
     const isRequirementPhase = computed(() => editTask.value?.phase === 'requirement');
+    const isErrorIntakeTask = computed(() => Boolean(editTask.value?.error_signature));
     const canComment = computed(() => editTask.value?.can_comment !== false);
     const canEditTaskScope = computed(() => {
         if (!editTask.value) return false;
@@ -191,19 +195,6 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             void saveTaskChanges();
         }, 650);
     }
-    function showTaskSavingToast() {
-        if (taskSaveToastId.value !== null) return;
-        taskSaveToastId.value = toast.loading('Saving task changes...');
-    }
-    function showTaskSaveResultToast(success: boolean, message?: string) {
-        const id = taskSaveToastId.value ?? undefined;
-        taskSaveToastId.value = null;
-        if (success) {
-            toast.success('Task changes saved', { id, duration: 1400 });
-            return;
-        }
-        toast.error('Failed to save task changes', { id, description: message ?? 'Unknown error', duration: 4000 });
-    }
     async function saveTaskChanges() {
         if (!editTask.value) return;
         if (!hasPendingTaskChanges()) return;
@@ -236,7 +227,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
         taskSaving.value = true;
         taskSaveError.value = null;
-        showTaskSavingToast();
+        taskSaveToast.showTaskSavingToast();
 
         try {
             if (needsCoreUpdate) {
@@ -272,7 +263,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 scheduleTaskAutosave(true);
                 return;
             }
-            showTaskSaveResultToast(!taskSaveError.value, taskSaveError.value ?? undefined);
+            taskSaveToast.showTaskSaveResultToast(!taskSaveError.value, taskSaveError.value ?? undefined);
         }
     }
 
@@ -302,7 +293,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         } catch (e: any) {
             requirementFinalizeError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirement';
             toast.error('Failed to finalize requirement', {
-                description: requirementFinalizeError.value,
+                description: requirementFinalizeError.value ?? undefined,
             });
         } finally {
             requirementFinalizing.value = false;
@@ -332,6 +323,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         initialEditSnapshot.value = null;
         editMobilePane.value = 'details';
         thread.resetThreadState();
+        errorOccurrenceState.resetErrorOccurrences();
 
         if (updateHistory) {
             syncTaskQuery(taskId, 'push');
@@ -365,6 +357,9 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             };
             autosaveArmed.value = true;
             void thread.fetchThreads(taskId);
+            if (data?.error_signature) {
+                void errorOccurrenceState.fetchErrorOccurrences(taskId);
+            }
         } catch (e: any) {
             editError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch task';
         } finally {
@@ -385,6 +380,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editForm.value = defaultTaskEditForm();
         initialEditSnapshot.value = null;
         editMobilePane.value = 'details';
+        errorOccurrenceState.resetErrorOccurrences();
         taskSaving.value = false;
         taskSaveError.value = null;
         requirementFinalizing.value = false;
@@ -392,10 +388,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         pendingTaskSave.value = false;
         autosaveArmed.value = false;
         thread.resetThreadState();
-        if (taskSaveToastId.value !== null) {
-            toast.dismiss(taskSaveToastId.value);
-            taskSaveToastId.value = null;
-        }
+        taskSaveToast.dismissTaskSaveToast();
         if (updateHistory) {
             syncTaskQuery(null, 'push');
         }
@@ -452,15 +445,13 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
             window.clearTimeout(taskAutosaveTimer);
             taskAutosaveTimer = null;
         }
-        if (taskSaveToastId.value !== null) {
-            toast.dismiss(taskSaveToastId.value);
-            taskSaveToastId.value = null;
-        }
+        taskSaveToast.dismissTaskSaveToast();
     });
 
     return {
         aiImproveEnabled: options.aiImproveEnabled,
         attemptCloseEdit,
+        activeErrorThreadTab: errorOccurrenceState.activeErrorThreadTab,
         canComment,
         canEditTaskScope,
         canFinalizeRequirement,
@@ -481,7 +472,13 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editTaskProjectUsersLabel,
         editTempIdentifier,
         editUploading,
+        errorOccurrences: errorOccurrenceState.errorOccurrences,
+        errorOccurrencesError: errorOccurrenceState.errorOccurrencesError,
+        errorOccurrencesLoading: errorOccurrenceState.errorOccurrencesLoading,
+        errorOccurrencesPagination: errorOccurrenceState.errorOccurrencesPagination,
+        fetchErrorOccurrences: errorOccurrenceState.fetchErrorOccurrences,
         hasUnsavedChanges,
+        isErrorIntakeTask,
         isRequirementPhase,
         onEditOpenChange,
         openEdit,
@@ -490,6 +487,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         requirementFinalizeError,
         requirementFinalizing,
         saveTaskChanges,
+        setActiveErrorThreadTab: errorOccurrenceState.setActiveErrorThreadTab,
         taskAttachments,
         taskSaveError,
         taskSaving,

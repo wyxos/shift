@@ -1,9 +1,19 @@
 import { computed, ref, watch } from 'vue';
 import type { TaskFilterOption } from './presentation';
-import { DEFAULT_SORT_BY, getDefaultStatuses, getPriorityOptions, getSortByOptions, getStatusOptions, normalizeStringList } from './presentation';
+import {
+    DEFAULT_SORT_BY,
+    DEFAULT_TASK_TYPE_FILTER,
+    getDefaultStatuses,
+    getPriorityOptions,
+    getSortByOptions,
+    getStatusOptions,
+    getTaskTypeOptions,
+    normalizeStringList,
+} from './presentation';
 import type { TaskIndexFilters } from './types';
 
 type UseTaskFilterStateOptions = {
+    includeTypeFilter?: boolean;
     includeClosed?: boolean;
     completedStatuses?: string[];
     filters?: TaskIndexFilters;
@@ -14,8 +24,11 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
     const statusOptions = options.statusOptions ?? getStatusOptions({ includeClosed: options.includeClosed ?? false });
     const priorityOptions = getPriorityOptions();
     const sortByOptions = getSortByOptions();
+    const typeOptions = getTaskTypeOptions();
     const defaultSortBy = DEFAULT_SORT_BY;
+    const includeTypeFilter = options.includeTypeFilter ?? false;
     const allowedSortBy = new Set(sortByOptions.map((option) => option.value));
+    const allowedTypes = new Set(typeOptions.map((option) => option.value));
     const defaultStatuses = getDefaultStatuses(statusOptions, options.completedStatuses ?? ['completed']);
     const allPriorities = priorityOptions.map((option) => option.value);
     const providedFilters = options.filters ?? {};
@@ -30,6 +43,10 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             : '';
     const providedProjectId =
         typeof providedFilters.project_id === 'number' || typeof providedFilters.project_id === 'string' ? String(providedFilters.project_id) : '';
+    const providedType =
+        includeTypeFilter && typeof providedFilters.type === 'string' && allowedTypes.has(providedFilters.type)
+            ? providedFilters.type
+            : DEFAULT_TASK_TYPE_FILTER;
     const providedSortBy =
         typeof providedFilters.sort_by === 'string' && allowedSortBy.has(providedFilters.sort_by) ? providedFilters.sort_by : defaultSortBy;
 
@@ -39,6 +56,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
     const appliedSearchTerm = ref(providedSearchTerm);
     const appliedEnvironmentTerm = ref(providedEnvironmentTerm);
     const appliedProjectId = ref(providedProjectId);
+    const appliedType = ref(providedType);
     const appliedSortBy = ref(providedSortBy);
 
     const draftStatuses = ref<string[]>([...appliedStatuses.value]);
@@ -46,6 +64,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
     const draftSearchTerm = ref(appliedSearchTerm.value);
     const draftEnvironmentTerm = ref(appliedEnvironmentTerm.value);
     const draftProjectId = ref(appliedProjectId.value);
+    const draftType = ref(appliedType.value);
     const draftSortBy = ref(appliedSortBy.value);
 
     watch(filtersOpen, (open) => {
@@ -60,6 +79,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         if (appliedSearchTerm.value.trim()) count += 1;
         if (appliedEnvironmentTerm.value.trim()) count += 1;
         if (appliedProjectId.value) count += 1;
+        if (includeTypeFilter && appliedType.value !== DEFAULT_TASK_TYPE_FILTER) count += 1;
         if (appliedSortBy.value !== defaultSortBy) count += 1;
         return count;
     });
@@ -70,6 +90,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         draftSearchTerm.value = appliedSearchTerm.value;
         draftEnvironmentTerm.value = appliedEnvironmentTerm.value;
         draftProjectId.value = appliedProjectId.value;
+        draftType.value = appliedType.value;
         draftSortBy.value = appliedSortBy.value;
     }
 
@@ -79,6 +100,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedSearchTerm.value = draftSearchTerm.value;
         appliedEnvironmentTerm.value = draftEnvironmentTerm.value;
         appliedProjectId.value = draftProjectId.value;
+        appliedType.value = allowedTypes.has(draftType.value) ? draftType.value : DEFAULT_TASK_TYPE_FILTER;
         appliedSortBy.value = draftSortBy.value;
     }
 
@@ -88,6 +110,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         draftSearchTerm.value = '';
         draftEnvironmentTerm.value = '';
         draftProjectId.value = '';
+        draftType.value = DEFAULT_TASK_TYPE_FILTER;
         draftSortBy.value = defaultSortBy;
     }
 
@@ -97,6 +120,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedSearchTerm.value = '';
         appliedEnvironmentTerm.value = '';
         appliedProjectId.value = '';
+        appliedType.value = DEFAULT_TASK_TYPE_FILTER;
         appliedSortBy.value = defaultSortBy;
     }
 
@@ -113,6 +137,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             environment: appliedEnvironmentTerm.value || undefined,
             organisation_id: providedOrganisationId || undefined,
             project_id: appliedProjectId.value || undefined,
+            type: includeTypeFilter && appliedType.value !== DEFAULT_TASK_TYPE_FILTER ? appliedType.value : undefined,
             sort_by: appliedSortBy.value,
             page,
         };
@@ -135,6 +160,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedSearchTerm,
         appliedSortBy,
         appliedStatuses,
+        appliedType,
         applyDraftToApplied,
         buildListQuery,
         defaultSortBy,
@@ -145,7 +171,9 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         draftSearchTerm,
         draftSortBy,
         draftStatuses,
+        draftType,
         filtersOpen,
+        includeTypeFilter,
         priorityOptions,
         resetAppliedToDefaults,
         resetDraftToDefaults,
@@ -155,5 +183,6 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         sortByOptions,
         statusOptions,
         syncAppliedToDraft,
+        typeOptions,
     };
 }

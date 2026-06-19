@@ -200,6 +200,21 @@ class ExternalTaskController extends Controller
             ->all();
     }
 
+    private function serializeTaskType(Task $task): array
+    {
+        if (filled($task->error_signature)) {
+            return [
+                'type' => 'app_error',
+                'type_label' => 'App error',
+            ];
+        }
+
+        return [
+            'type' => 'task',
+            'type_label' => 'Task',
+        ];
+    }
+
     private function serializeTaskPayload(Task $task, string $clientUrl, ?ExternalUser $externalUser): array
     {
         $capabilities = $this->externalUserService->capabilityFlags($task, $externalUser);
@@ -208,6 +223,7 @@ class ExternalTaskController extends Controller
             'id' => $task->id,
             'project_id' => $task->project_id,
             'title' => $task->title,
+            ...$this->serializeTaskType($task),
             'description' => $this->rewriteContentUrlsToClientProxyUrls((string) ($task->description ?? ''), $clientUrl),
             'status' => $task->status,
             'priority' => $task->priority,
@@ -355,6 +371,9 @@ class ExternalTaskController extends Controller
         $tasks->through(function (Task $task) use ($externalUser) {
             $task->environment = $task->metadata?->environment ?? ($task->submitter->environment ?? null);
             foreach ($this->externalUserService->capabilityFlags($task, $externalUser) as $key => $value) {
+                $task->setAttribute($key, $value);
+            }
+            foreach ($this->serializeTaskType($task) as $key => $value) {
                 $task->setAttribute($key, $value);
             }
 

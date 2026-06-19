@@ -10,6 +10,8 @@ import {
     getRequirementStatusLabel,
     getStatusBadgeClass,
     getStatusLabel,
+    getTaskTypeBadgeClass,
+    getTaskTypeLabel,
 } from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -28,6 +30,8 @@ type TaskListRow = {
         name: string;
     } | null;
     title: string;
+    type?: string | null;
+    type_label?: string | null;
     status: string;
     requirement_status?: string | null;
     priority: string;
@@ -69,10 +73,13 @@ interface Props {
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
     draftProjectId?: string;
+    draftType?: string;
     draftSortBy: string;
+    includeTypeFilter?: boolean;
     projectOptions?: Option[];
     statusOptions: Option[];
     priorityOptions: Option[];
+    typeOptions?: Option[];
     sortByOptions: Option[];
     title?: string;
     description?: string;
@@ -85,6 +92,7 @@ interface Props {
     setDraftSearchTerm: (value: string) => void;
     setDraftEnvironmentTerm: (value: string) => void;
     setDraftProjectId?: (value: string) => void;
+    setDraftType?: (value: string) => void;
     setDraftSortBy: (value: string) => void;
     resetFilters: () => void;
     applyFilters: () => void;
@@ -108,8 +116,12 @@ const props = withDefaults(defineProps<Props>(), {
     finalizeRequirementBatch: undefined,
     requirementBatchFinalizeLoading: null,
     draftProjectId: '',
+    draftType: 'all',
+    includeTypeFilter: false,
     projectOptions: () => [],
+    typeOptions: () => [],
     setDraftProjectId: () => {},
+    setDraftType: () => {},
 });
 
 const groupedRequirements = computed(() => {
@@ -155,7 +167,10 @@ function taskBatch(task: TaskListRow) {
 }
 
 function taskProjectLabel(task: TaskListRow) {
-    return task.project?.name?.trim() || null;
+    const name = task.project?.name?.trim() || '';
+    if (!name) return null;
+
+    return name.replace(/^Requirement\s+/i, '').trim() || name;
 }
 
 function requirementPackTitle(batch: TaskListRow['batch']) {
@@ -244,11 +259,14 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                     :draft-search-term="draftSearchTerm"
                     :draft-environment-term="draftEnvironmentTerm"
                     :draft-project-id="draftProjectId"
+                    :draft-type="draftType"
                     :draft-sort-by="draftSortBy"
+                    :include-type-filter="includeTypeFilter"
                     :project-options="projectOptions"
                     :status-options="statusOptions"
                     :status-label="itemLabel === 'requirements' ? 'State' : 'Status'"
                     :priority-options="priorityOptions"
+                    :type-options="typeOptions"
                     :sort-by-options="sortByOptions"
                     :set-open="setFiltersOpen"
                     :set-draft-statuses="setDraftStatuses"
@@ -256,6 +274,7 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                     :set-draft-search-term="setDraftSearchTerm"
                     :set-draft-environment-term="setDraftEnvironmentTerm"
                     :set-draft-project-id="setDraftProjectId"
+                    :set-draft-type="setDraftType"
                     :set-draft-sort-by="setDraftSortBy"
                     :reset-filters="resetFilters"
                     :apply-filters="applyFilters"
@@ -326,34 +345,23 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                                 data-testid="task-row"
                             >
                                 <TableCell class="min-w-[18rem] whitespace-normal">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <button
-                                            type="button"
-                                            class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                                            :aria-label="`Open task details for ${task.title}`"
-                                            :data-testid="`task-title-${task.id}`"
-                                            @click="openEdit(task.id)"
-                                        >
-                                            {{ task.title }}
-                                        </button>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                        :aria-label="`Open task details for ${task.title}`"
+                                        :data-testid="`task-title-${task.id}`"
+                                        @click="openEdit(task.id)"
+                                    >
+                                        {{ task.title }}
+                                    </button>
                                 </TableCell>
                                 <TableCell>
                                     <Badge
-                                        :class="
-                                            itemLabel === 'requirements'
-                                                ? getRequirementStatusBadgeClass(requirementState(task))
-                                                : getStatusBadgeClass(task.status)
-                                        "
+                                        :class="getRequirementStatusBadgeClass(requirementState(task))"
                                         :data-testid="`task-status-badge-${task.id}`"
                                         variant="outline"
                                     >
-                                        <template v-if="itemLabel === 'requirements'">
-                                            {{ getRequirementStatusLabel(requirementState(task)) }}
-                                        </template>
-                                        <template v-else>
-                                            {{ getStatusLabel(task.status) }}
-                                        </template>
+                                        {{ getRequirementStatusLabel(requirementState(task)) }}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -404,7 +412,7 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                             data-testid="task-row"
                         >
                             <TableCell class="min-w-[18rem] whitespace-normal">
-                                <div class="flex flex-wrap items-center gap-2">
+                                <div class="flex min-w-0 flex-col gap-1.5" :data-testid="`task-title-cell-${task.id}`">
                                     <button
                                         type="button"
                                         class="text-card-foreground hover:text-primary focus-visible:ring-ring rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -414,9 +422,18 @@ async function finalizeRequirementPack(group: { batch: TaskListRow['batch'] }) {
                                     >
                                         {{ task.title }}
                                     </button>
-                                    <Badge v-if="taskProjectLabel(task)" :data-testid="`task-project-badge-${task.id}`" variant="secondary">
-                                        {{ taskProjectLabel(task) }}
-                                    </Badge>
+                                    <div class="flex flex-wrap items-center gap-2" :data-testid="`task-title-badges-${task.id}`">
+                                        <Badge v-if="taskProjectLabel(task)" :data-testid="`task-project-badge-${task.id}`" variant="secondary">
+                                            {{ taskProjectLabel(task) }}
+                                        </Badge>
+                                        <Badge
+                                            :class="getTaskTypeBadgeClass(task.type)"
+                                            :data-testid="`task-type-badge-${task.id}`"
+                                            variant="outline"
+                                        >
+                                            {{ getTaskTypeLabel(task.type, task.type_label) }}
+                                        </Badge>
+                                    </div>
                                 </div>
                             </TableCell>
                             <TableCell>

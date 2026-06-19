@@ -5,6 +5,7 @@ import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
+import TaskErrorOccurrencesPane from './TaskErrorOccurrencesPane.vue';
 
 const props = defineProps<{
     state: any;
@@ -72,6 +73,31 @@ const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null
     state.commentsScrollRef = value instanceof HTMLElement ? value : null;
 };
 
+const showOccurrences = computed(() => state.isErrorIntakeTask && state.activeErrorThreadTab === 'occurrences');
+const occurrenceCount = computed(() => {
+    const total = state.errorOccurrencesPagination?.total;
+
+    if (typeof total === 'number') {
+        return total;
+    }
+
+    const occurrences = Array.isArray(state.errorOccurrences) ? state.errorOccurrences : [];
+
+    return occurrences.length || state.editTask?.error_occurrences_count || 0;
+});
+const messageCountLabel = computed(() => {
+    if (showOccurrences.value) {
+        return `${occurrenceCount.value} occurrence${occurrenceCount.value === 1 ? '' : 's'}`;
+    }
+
+    return `${state.threadMessages.length} message${state.threadMessages.length === 1 ? '' : 's'}`;
+});
+
+const tabClass = (tab: 'comments' | 'occurrences') => [
+    'rounded-md px-2.5 py-1.5 text-xs font-medium transition',
+    state.activeErrorThreadTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+];
+
 watch(deleteDialogOpen, (open) => {
     if (!open && !deleteConfirmLoading.value) {
         clearPendingDeleteMessage();
@@ -84,16 +110,41 @@ watch(deleteDialogOpen, (open) => {
         class="border-muted-foreground/10 bg-background h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border"
         data-testid="task-comments-pane"
     >
-        <div class="border-muted-foreground/10 flex items-center justify-between border-b px-4 py-3">
-            <div>
-                <h3 class="text-foreground text-sm font-semibold">{{ state.isRequirementPhase ? 'Clarifications' : 'Comments' }}</h3>
+        <div class="border-muted-foreground/10 flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div v-if="state.isErrorIntakeTask" class="bg-muted/40 flex rounded-lg p-1" role="tablist" aria-label="Error task discussion">
+                <button
+                    :aria-selected="state.activeErrorThreadTab === 'comments'"
+                    :class="tabClass('comments')"
+                    data-testid="error-comments-tab"
+                    role="tab"
+                    type="button"
+                    @click="state.setActiveErrorThreadTab('comments')"
+                >
+                    Comments
+                </button>
+                <button
+                    :aria-selected="state.activeErrorThreadTab === 'occurrences'"
+                    :class="tabClass('occurrences')"
+                    data-testid="error-occurrences-tab"
+                    dusk="error-occurrences-tab"
+                    role="tab"
+                    type="button"
+                    @click="state.setActiveErrorThreadTab('occurrences')"
+                >
+                    Occurrences
+                </button>
             </div>
-            <div class="text-muted-foreground text-xs">
-                {{ state.threadMessages.length }} message{{ state.threadMessages.length === 1 ? '' : 's' }}
+            <div v-else>
+                <h3 class="text-foreground text-sm font-semibold">
+                    {{ state.isRequirementPhase ? 'Clarifications' : 'Comments' }}
+                </h3>
             </div>
+            <div class="text-muted-foreground shrink-0 text-xs">{{ messageCountLabel }}</div>
         </div>
 
-        <div :ref="assignCommentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+        <TaskErrorOccurrencesPane v-if="showOccurrences" :state="state" />
+
+        <div v-else :ref="assignCommentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
             <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
             <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
@@ -204,7 +255,7 @@ watch(deleteDialogOpen, (open) => {
             </div>
         </div>
 
-        <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
+        <div v-if="!showOccurrences" class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
             <div v-if="state.threadEditError" class="text-destructive mb-2 text-xs">{{ state.threadEditError }}</div>
             <ShiftEditor
                 v-if="state.canComment"
