@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreAppErrorRequest extends FormRequest
 {
@@ -44,7 +45,7 @@ class StoreAppErrorRequest extends FormRequest
             'context' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
             'user' => ['nullable', 'array'],
-            'user.id' => ['nullable', 'string', 'max:255'],
+            'user.id' => ['nullable', Rule::anyOf(['string|max:255', 'integer'])],
             'user.name' => ['nullable', 'string', 'max:255'],
             'user.email' => ['nullable', 'email', 'max:255'],
             'user.environment' => ['nullable', 'string', 'max:255'],

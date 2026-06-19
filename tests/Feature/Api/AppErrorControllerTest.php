@@ -126,6 +126,29 @@ it('groups repeated errors with the same project environment revision and frame 
     expect($task->error_occurrences_count)->toBe(2);
 });
 
+it('accepts numeric host user ids from sdk error reports', function () {
+    $user = User::factory()->create();
+    Project::factory()->withAuthor($user->id)->create(['token' => 'project-token']);
+    $token = $user->createToken('sdk')->plainTextToken;
+
+    $response = $this->withToken($token)->postJson('/api/errors', appErrorPayload([
+        'user' => [
+            'id' => 123,
+            'name' => 'Consumer User',
+            'email' => 'consumer@example.com',
+            'environment' => 'local',
+            'url' => 'https://consumer.test',
+        ],
+    ]));
+
+    $response->assertCreated();
+
+    $occurrence = DB::table('task_error_occurrences')->first();
+    $occurrenceUser = json_decode($occurrence->user, true, 512, JSON_THROW_ON_ERROR);
+
+    expect($occurrenceUser['id'])->toBe(123);
+});
+
 it('recovers when a duplicate grouped task is inserted during first occurrence creation', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create(['token' => 'project-token']);
