@@ -2,10 +2,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Bell } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 type NotificationData = {
     task_title?: string;
@@ -24,10 +24,27 @@ type NotificationItem = {
     created_at?: string;
 };
 
+type RealtimeNotification = NotificationData & {
+    id?: number | string;
+    type?: string;
+    data?: NotificationData | string;
+    created_at?: string;
+};
+
+type PageProps = {
+    auth?: {
+        user?: {
+            id?: number | string;
+        } | null;
+    };
+};
+
+const page = usePage<PageProps>();
 const unreadCount = ref(0);
 const notifications = ref<NotificationItem[]>([]);
 const loading = ref(true);
 const hasRouteHelper = typeof route === 'function';
+let channelName: string | null = null;
 
 const unreadUrl = computed(() => (hasRouteHelper ? route('notifications.unread') : null));
 const notificationsIndexUrl = computed(() => (hasRouteHelper ? route('notifications.index') : null));
@@ -76,6 +93,46 @@ const fetchNotifications = async () => {
     }
 };
 
+function realtimeNotificationItem(notification: RealtimeNotification): NotificationItem | null {
+    const id = notification.id;
+
+    if (id === undefined || id === null) {
+        return null;
+    }
+
+    return {
+        id,
+        type: notification.type ?? 'Notification',
+        data: notification.data ?? notification,
+        created_at: notification.created_at ?? 'Just now',
+    };
+}
+
+function prependRealtimeNotification(notification: RealtimeNotification) {
+    const item = realtimeNotificationItem(notification);
+
+    if (!item || notifications.value.some((existing) => existing.id === item.id)) {
+        return;
+    }
+
+    notifications.value = [item, ...notifications.value].slice(0, 15);
+    unreadCount.value += 1;
+}
+
+function subscribeToRealtimeNotifications() {
+    const userId = page.props.auth?.user?.id;
+    const echo = window.Echo;
+
+    if (!userId || !echo?.private) {
+        return;
+    }
+
+    channelName = `App.Models.User.${userId}`;
+    echo.private(channelName).notification((notification: RealtimeNotification) => {
+        prependRealtimeNotification(notification);
+    });
+}
+
 const markAsRead = async (id: NotificationItem['id']) => {
     const url = getMarkAsReadUrl(id);
     if (!url) return;
@@ -108,10 +165,13 @@ onMounted(() => {
     }
 
     fetchNotifications();
+    subscribeToRealtimeNotifications();
+});
 
-    const interval = setInterval(fetchNotifications, 60000);
-
-    return () => clearInterval(interval);
+onUnmounted(() => {
+    if (channelName && window.Echo?.leave) {
+        window.Echo.leave(channelName);
+    }
 });
 
 const getNotificationTitle = (notification: NotificationItem) => {

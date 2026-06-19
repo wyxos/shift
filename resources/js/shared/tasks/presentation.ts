@@ -10,6 +10,13 @@ export type SortByOption = {
     label: string;
 };
 
+export type TaskTypeOption = {
+    value: string;
+    label: string;
+    selectedClass: string;
+    unselectedClass: string;
+};
+
 const STATUS_OPTIONS: TaskFilterOption[] = [
     {
         value: 'pending',
@@ -145,6 +152,30 @@ const SORT_BY_OPTIONS: SortByOption[] = [
     { value: 'priority', label: 'Priority' },
 ];
 
+const TYPE_FILTER_OPTIONS: TaskTypeOption[] = [
+    {
+        value: 'all',
+        label: 'All',
+        selectedClass: 'border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-400/60 dark:bg-slate-500/22 dark:text-slate-50',
+        unselectedClass:
+            'border-slate-300/60 text-slate-700 hover:bg-slate-50 dark:border-slate-500/25 dark:bg-slate-500/8 dark:text-slate-200 dark:hover:bg-slate-500/14',
+    },
+    {
+        value: 'tasks',
+        label: 'Tasks',
+        selectedClass: 'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-400/60 dark:bg-sky-500/22 dark:text-sky-50',
+        unselectedClass:
+            'border-sky-300/60 text-sky-900 hover:bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/8 dark:text-sky-200 dark:hover:bg-sky-500/14',
+    },
+    {
+        value: 'app_errors',
+        label: 'App errors',
+        selectedClass: 'border-rose-300 bg-rose-100 text-rose-900 dark:border-rose-400/60 dark:bg-rose-500/22 dark:text-rose-50',
+        unselectedClass:
+            'border-rose-300/60 text-rose-900 hover:bg-rose-50 dark:border-rose-500/25 dark:bg-rose-500/8 dark:text-rose-200 dark:hover:bg-rose-500/14',
+    },
+];
+
 const STATUS_BADGE_CLASS_MAP: Record<string, string> = {
     pending: 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-100',
     'in-progress': 'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-100',
@@ -171,6 +202,7 @@ const PRIORITY_BADGE_CLASS_MAP: Record<string, string> = {
 };
 
 export const DEFAULT_SORT_BY = 'updated_at';
+export const DEFAULT_TASK_TYPE_FILTER = 'all';
 
 export function getStatusOptions(options: { includeClosed?: boolean } = {}): TaskFilterOption[] {
     if (options.includeClosed === false) {
@@ -190,6 +222,10 @@ export function getRequirementStatusOptions(): TaskFilterOption[] {
 
 export function getSortByOptions(): SortByOption[] {
     return [...SORT_BY_OPTIONS];
+}
+
+export function getTaskTypeOptions(): TaskTypeOption[] {
+    return [...TYPE_FILTER_OPTIONS];
 }
 
 export function getDefaultStatuses(statusOptions: Pick<TaskFilterOption, 'value'>[], excluded: string[] = ['completed', 'closed']): string[] {
@@ -221,6 +257,22 @@ export function getPriorityBadgeClass(priority: string): string {
         PRIORITY_BADGE_CLASS_MAP[priority] ??
         'border-zinc-300 bg-zinc-100 text-zinc-800 dark:border-zinc-500/40 dark:bg-zinc-500/20 dark:text-zinc-100'
     );
+}
+
+export function getTaskTypeBadgeClass(type?: string | null): string {
+    if (type === 'app_error') {
+        return 'border-rose-300 bg-rose-100 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-100';
+    }
+
+    return 'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-100';
+}
+
+export function getTaskTypeLabel(type?: string | null, label?: string | null): string {
+    if (type === 'app_error') {
+        return 'error';
+    }
+
+    return label?.trim() || 'Task';
 }
 
 export function getStatusLabel(value: string, statusOptions: Pick<TaskFilterOption, 'value' | 'label'>[] = STATUS_OPTIONS): string {

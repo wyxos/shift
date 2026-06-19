@@ -24,6 +24,11 @@ class Task extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'error_first_seen_at' => 'datetime',
+        'error_last_seen_at' => 'datetime',
+    ];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -36,6 +41,9 @@ class Task extends Model
                 'project_id',
                 'submitter_type',
                 'submitter_id',
+                'error_signature',
+                'error_occurrences_count',
+                'error_last_seen_at',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
@@ -64,6 +72,11 @@ class Task extends Model
                 ->where('intake_type', 'requirement')
                 ->where('source', 'embedded_requirement_pack');
         });
+    }
+
+    public function scopeErrorIntake(Builder $query): Builder
+    {
+        return $query->whereNotNull('error_signature');
     }
 
     public function phase(): string
@@ -184,6 +197,11 @@ class Task extends Model
     public function threads(): HasMany
     {
         return $this->hasMany(TaskThread::class);
+    }
+
+    public function errorOccurrences(): HasMany
+    {
+        return $this->hasMany(TaskErrorOccurrence::class);
     }
 
     /**

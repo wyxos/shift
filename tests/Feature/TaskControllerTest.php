@@ -44,6 +44,63 @@ test('index displays tasks', function () {
     );
 });
 
+test('tasks index can distinguish and filter tasks from app errors', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Normal customer task',
+        'status' => 'pending',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $errorTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Backend error: Checkout failed',
+        'status' => 'pending',
+        'error_signature' => str_repeat('b', 64),
+        'error_source' => 'backend',
+        'error_environment' => 'local',
+        'error_occurrences_count' => 3,
+    ]);
+    $errorTask->submitter()->associate($this->user)->save();
+
+    $this->actingAs($this->user)
+        ->get(route('tasks.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tasks/Index')
+            ->has('tasks.data', 2)
+            ->where('filters.type', 'all')
+            ->where('tasks.data.0.type', 'app_error')
+            ->where('tasks.data.0.type_label', 'App error')
+        );
+
+    $this->actingAs($this->user)
+        ->get(route('tasks.index', ['type' => 'tasks']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tasks/Index')
+            ->has('tasks.data', 1)
+            ->where('filters.type', 'tasks')
+            ->where('tasks.data.0.id', $task->id)
+            ->where('tasks.data.0.type', 'task')
+        );
+
+    $this->actingAs($this->user)
+        ->get(route('tasks.index', ['type' => 'app_errors']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tasks/Index')
+            ->has('tasks.data', 1)
+            ->where('filters.type', 'app_errors')
+            ->where('tasks.data.0.id', $errorTask->id)
+            ->where('tasks.data.0.type', 'app_error')
+        );
+});
+
 test('tasks index can be scoped by organisation route', function () {
     $firstOrganisation = Organisation::factory()->create([
         'author_id' => $this->user->id,
@@ -633,6 +690,43 @@ test('tasks v2 show includes created and updated timestamps', function () {
     $response->assertJsonStructure(['created_at', 'updated_at']);
     expect($response->json('created_at'))->toBeString()->not->toBeEmpty();
     expect($response->json('updated_at'))->toBeString()->not->toBeEmpty();
+});
+
+test('tasks v2 show includes error intake metadata for error tasks', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'UI error: Widget crashed',
+        'status' => 'pending',
+        'priority' => 'high',
+        'error_signature' => str_repeat('a', 64),
+        'error_source' => 'ui',
+        'error_environment' => 'local',
+        'error_release' => 'v1.2.3',
+        'error_git_sha' => 'abc1234',
+        'error_exception_class' => null,
+        'error_name' => 'LocalWidgetError',
+        'error_culprit_file' => 'https://consumer.test/widget.js',
+        'error_culprit_line' => 88,
+        'error_culprit_function' => 'renderWidget',
+        'error_occurrences_count' => 2,
+        'error_first_seen_at' => now()->subMinute(),
+        'error_last_seen_at' => now(),
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('error_signature', str_repeat('a', 64))
+        ->assertJsonPath('error_source', 'ui')
+        ->assertJsonPath('error_occurrences_count', 2)
+        ->assertJsonPath('error_culprit_file', 'https://consumer.test/widget.js')
+        ->assertJsonPath('error_culprit_line', 88);
 });
 
 test('can finalize ready requirement items in a visible batch without promoting parked items', function () {

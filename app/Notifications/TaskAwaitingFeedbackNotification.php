@@ -36,7 +36,7 @@ class TaskAwaitingFeedbackNotification extends Notification implements ShouldQue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail', 'database', 'broadcast'];
     }
 
     /**
@@ -50,7 +50,7 @@ class TaskAwaitingFeedbackNotification extends Notification implements ShouldQue
 
         // Add each task to the email
         foreach ($this->tasks as $task) {
-            $mailMessage->line('- ' . $task->title . ' (Project: ' . $task->project->name . ')');
+            $mailMessage->line('- '.$task->title.' (Project: '.$task->project->name.')');
         }
 
         $mailMessage->action('View Tasks', $this->url)

@@ -69,6 +69,9 @@ const setDraftEnvironmentTerm = (value: string) => {
 const setDraftProjectId = (value: string) => {
     filtersState.draftProjectId.value = value;
 };
+const setDraftType = (value: string) => {
+    filtersState.draftType.value = value;
+};
 const setDraftSortBy = (value: string) => {
     filtersState.draftSortBy.value = value;
 };
@@ -105,6 +108,7 @@ const filtersModel = reactive({
     setDraftSearchTerm,
     setDraftSortBy,
     setDraftStatuses,
+    setDraftType,
     setFiltersOpen,
 });
 const combined = reactive({
@@ -133,7 +137,9 @@ const {
     draftSearchTerm,
     draftSortBy,
     draftStatuses,
+    draftType,
     filtersOpen,
+    includeTypeFilter,
     priorityOptions,
     resetFilters,
     selectAllPriorities,
@@ -141,6 +147,7 @@ const {
     sortByOptions,
     statusOptions,
     syncAppliedToDraft,
+    typeOptions,
 } = toRefs(filtersModel as any);
 
 const {

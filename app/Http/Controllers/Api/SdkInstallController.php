@@ -26,14 +26,22 @@ class SdkInstallController extends Controller
             $attributes['url'],
         );
 
-        return response()->json([
+        $payload = [
             'device_code' => $session['device_code'],
             'user_code' => $session['user_code'],
             'verification_uri' => route('sdk-install.verify', absolute: true),
             'verification_uri_complete' => route('sdk-install.verify', ['user_code' => $session['user_code']], absolute: true),
             'interval' => $this->sdkInstallSessionService->pollIntervalSeconds(),
             'expires_at' => $session['expires_at'],
-        ], 201);
+        ];
+
+        $realtime = $this->sdkInstallSessionService->realtimeMetadata($session['device_code']);
+
+        if ($realtime !== null) {
+            $payload['realtime'] = $realtime;
+        }
+
+        return response()->json($payload, 201);
     }
 
     public function poll(Request $request): JsonResponse

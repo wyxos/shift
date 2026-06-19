@@ -42,7 +42,7 @@
         // "typeRoots": [],                                  /* Specify multiple folders that act like './node_modules/@types'. */
         "types": [
             "vite/client",
-            "vue/tsx",
+            "vue/jsx",
             "./resources/js/types"
         ] /* Specify type package names to be included without being referenced in a source file. */,
         // "allowUmdGlobalAccess": true,                     /* Allow accessing UMD globals from modules. */
@@ -123,7 +123,7 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.tsx", 
+        "resources/js/**/*.tsx",
         "resources/js/**/*.vue",
         "./resources/js/shared/**/*.ts",
         "./resources/js/shared/**/*.d.ts",

@@ -12,6 +12,8 @@ import { computed } from 'vue';
 type Option = {
     value: string;
     label: string;
+    selectedClass?: string;
+    unselectedClass?: string;
 };
 
 interface Props {
@@ -22,11 +24,14 @@ interface Props {
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
     draftProjectId?: string;
+    draftType?: string;
     draftSortBy: string;
+    includeTypeFilter?: boolean;
     projectOptions?: Option[];
     statusOptions: Option[];
     statusLabel?: string;
     priorityOptions: Option[];
+    typeOptions?: Option[];
     sortByOptions: Option[];
     setOpen: (value: boolean) => void;
     setDraftStatuses: (value: string[]) => void;
@@ -34,6 +39,7 @@ interface Props {
     setDraftSearchTerm: (value: string) => void;
     setDraftEnvironmentTerm: (value: string) => void;
     setDraftProjectId?: (value: string) => void;
+    setDraftType?: (value: string) => void;
     setDraftSortBy: (value: string) => void;
     resetFilters: () => void;
     applyFilters: () => void;
@@ -43,9 +49,13 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
     draftProjectId: '',
+    draftType: 'all',
+    includeTypeFilter: false,
     projectOptions: () => [],
     statusLabel: 'Status',
+    typeOptions: () => [],
     setDraftProjectId: () => {},
+    setDraftType: () => {},
 });
 
 const openModel = computed({
@@ -69,6 +79,11 @@ const projectModel = computed({
 });
 
 const projectFilterOptions = computed(() => [{ value: '', label: 'All projects' }, ...props.projectOptions]);
+
+const typeModel = computed({
+    get: () => props.draftType ?? 'all',
+    set: (value: string) => props.setDraftType(value),
+});
 
 const statusesModel = computed({
     get: () => props.draftStatuses,
@@ -122,6 +137,17 @@ const sortByModel = computed({
                         empty-label="No projects found."
                         searchable
                         test-id="filter-project"
+                    />
+                </div>
+
+                <div v-if="includeTypeFilter" class="space-y-2">
+                    <Label class="text-muted-foreground">Type</Label>
+                    <ButtonGroup
+                        v-model="typeModel"
+                        test-id-prefix="filter-type"
+                        aria-label="Filter tasks by type"
+                        :options="typeOptions"
+                        :columns="3"
                     />
                 </div>
 

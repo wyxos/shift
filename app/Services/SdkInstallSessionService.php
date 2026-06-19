@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\SdkInstallSessionApproved;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -63,6 +64,40 @@ class SdkInstallSessionService
     public function pollIntervalSeconds(): int
     {
         return 5;
+    }
+
+    public function realtimeMetadata(string $deviceCode): ?array
+    {
+        $key = config('reverb.apps.apps.0.key') ?: config('broadcasting.connections.reverb.key');
+
+        if (! is_string($key) || $key === '') {
+            return null;
+        }
+
+        $reverbOptions = config('reverb.apps.apps.0.options', []);
+        $broadcastOptions = config('broadcasting.connections.reverb.options', []);
+        $appUrlHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        $host = data_get($reverbOptions, 'host')
+            ?: data_get($broadcastOptions, 'host')
+            ?: $appUrlHost
+            ?: 'localhost';
+        $port = data_get($reverbOptions, 'port')
+            ?: data_get($broadcastOptions, 'port')
+            ?: 443;
+        $scheme = data_get($reverbOptions, 'scheme')
+            ?: data_get($broadcastOptions, 'scheme')
+            ?: 'https';
+
+        return [
+            'broadcaster' => 'reverb',
+            'key' => $key,
+            'ws_host' => $host,
+            'ws_port' => (int) $port,
+            'scheme' => $scheme,
+            'channel' => SdkInstallSessionApproved::channelName($deviceCode),
+            'event' => 'sdk-install.approved',
+        ];
     }
 
     public function poll(string $deviceCode): array
@@ -139,6 +174,8 @@ class SdkInstallSessionService
             $session['approved_at'] = now()->toIso8601String();
 
             $this->persist($session);
+
+            event(new SdkInstallSessionApproved($deviceCode, $session));
 
             return $session;
         });

@@ -1,9 +1,11 @@
 <?php
 
+use App\Events\SdkInstallSessionApproved;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
 use App\Services\SdkInstallSessionService;
+use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -45,6 +47,25 @@ test('create install session returns device flow payload and starts pending', fu
     expect($session)->not->toBeNull();
     expect($session['environment'])->toBe('staging');
     expect($session['url'])->toBe('https://client-app.test');
+});
+
+test('create install session returns reverb metadata when realtime is configured', function () {
+    configureInstallReverb();
+
+    $response = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'local',
+        'url' => 'https://client-app.test',
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('realtime.broadcaster', 'reverb')
+        ->assertJsonPath('realtime.key', 'local-reverb-key')
+        ->assertJsonPath('realtime.ws_host', 'shift.test')
+        ->assertJsonPath('realtime.ws_port', 8080)
+        ->assertJsonPath('realtime.scheme', 'https')
+        ->assertJsonPath('realtime.event', 'sdk-install.approved');
+
+    expect($response->json('realtime.channel'))->toBe('sdk-install.'.hash('sha256', $response->json('device_code')));
 });
 
 test('guests are redirected to login and return to the verification page after authenticating', function () {
@@ -103,6 +124,34 @@ test('authenticated users can inspect and approve an install request', function 
     ])
         ->assertOk()
         ->assertJsonPath('state', 'approved');
+});
+
+test('approving an install session broadcasts the approved state without credentials', function () {
+    configureInstallReverb();
+    Event::fake([SdkInstallSessionApproved::class]);
+
+    $session = $this->service->create('staging', 'https://client-app.test');
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ])->assertRedirect();
+
+    Event::assertDispatched(SdkInstallSessionApproved::class, function ($event) use ($session) {
+        $channels = collect($event->broadcastOn())
+            ->map(fn ($channel) => $channel->name)
+            ->all();
+        $payload = $event->broadcastWith();
+
+        return in_array('sdk-install.'.hash('sha256', $session['device_code']), $channels, true)
+            && $event->broadcastAs() === 'sdk-install.approved'
+            && $payload['state'] === 'approved'
+            && array_key_exists('approved_at', $payload)
+            && array_key_exists('expires_at', $payload)
+            && ! array_key_exists('device_code', $payload)
+            && ! array_key_exists('user_token', $payload)
+            && ! array_key_exists('project_token', $payload);
+    });
 });
 
 test('approved install sessions cannot be rebound to another browser user', function () {
@@ -389,3 +438,13 @@ test('finalize rejects projects outside the approver visibility', function () {
         ->assertForbidden()
         ->assertJsonPath('message', 'You do not have permission to install against the selected project.');
 });
+
+function configureInstallReverb(): void
+{
+    config([
+        'reverb.apps.apps.0.key' => 'local-reverb-key',
+        'reverb.apps.apps.0.options.host' => 'shift.test',
+        'reverb.apps.apps.0.options.port' => 8080,
+        'reverb.apps.apps.0.options.scheme' => 'https',
+    ]);
+}
