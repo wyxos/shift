@@ -78,3 +78,41 @@ test('all notification classes use database channel', function () {
         $this->assertContains('database', $channels, "Notification class {$notificationClass} does not use the database channel");
     }
 });
+
+test('all notification classes use broadcast channel', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    $notificationClasses = collect(glob(app_path('Notifications/*.php')))
+        ->map(function ($file) {
+            $className = basename($file, '.php');
+
+            return 'App\\Notifications\\'.$className;
+        })
+        ->filter(function ($class) {
+            return class_exists($class);
+        });
+
+    foreach ($notificationClasses as $notificationClass) {
+        $reflection = new ReflectionClass($notificationClass);
+
+        if ($reflection->isAbstract()) {
+            continue;
+        }
+
+        $viaMethod = $reflection->getMethod('via');
+        $mockNotification = $this->getMockBuilder($notificationClass)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $mockNotification->method('via')
+            ->willReturnCallback(function ($notifiable) use ($viaMethod, $mockNotification) {
+                return $viaMethod->invoke($mockNotification, $notifiable);
+            });
+
+        $channels = $mockNotification->via($user);
+
+        $this->assertContains('broadcast', $channels, "Notification class {$notificationClass} does not use the broadcast channel");
+    }
+});

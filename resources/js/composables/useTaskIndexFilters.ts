@@ -13,6 +13,7 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     const page = usePage<SharedData>();
     const state = useTaskFilterState({
         filters: options.filters,
+        includeTypeFilter: options.surface !== 'requirements',
         includeClosed: false,
         completedStatuses: options.surface === 'requirements' ? [] : ['completed'],
         statusOptions: options.surface === 'requirements' ? getRequirementStatusOptions() : undefined,

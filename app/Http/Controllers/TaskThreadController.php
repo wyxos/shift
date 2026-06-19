@@ -51,7 +51,7 @@ class TaskThreadController extends Controller
             ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->get()
-            ->map(function ($thread) {
+            ->map(function (TaskThread $thread) use ($task) {
                 // Filter out attachments that are already embedded in the content
                 $content = (string) ($thread->content ?? '');
                 $attachments = $thread->attachments()->get()
@@ -76,12 +76,23 @@ class TaskThreadController extends Controller
                     'id' => $thread->id,
                     'content' => $thread->content,
                     'sender_name' => $thread->sender_name,
-                    'is_current_user' => $thread->sender_id === Auth::id() && $thread->sender_type === get_class(Auth::user()),
+                    'is_current_user' => $this->isCurrentUserThread($task, $thread),
                     'created_at' => $thread->created_at,
                     'attachments' => $attachments,
                 ];
             })
             ->toArray();
+    }
+
+    private function isCurrentUserThread(Task $task, TaskThread $thread): bool
+    {
+        if ($task->error_signature && $thread->sender_name === 'SHIFT error intake') {
+            return false;
+        }
+
+        $user = Auth::user();
+
+        return $user !== null && $thread->sender_id === $user->getKey() && $thread->sender_type === get_class($user);
     }
 
     /**

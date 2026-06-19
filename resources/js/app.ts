@@ -8,6 +8,7 @@ import { createApp, Fragment, h } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
+import './lib/echo';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {

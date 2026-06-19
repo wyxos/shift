@@ -10,6 +10,7 @@ use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -84,6 +85,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('tasks-v2/tasks/{task}/requirements/finalize', [TaskController::class, 'finalizeRequirementV2'])->name('requirements.v2.finalize');
     Route::patch('requirements/batches/{requirementBatch}/finalize', [TaskController::class, 'finalizeRequirementBatchV2'])->name('requirements.v2.batches.finalize');
     Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
+    Route::get('tasks/{task}/error-occurrences', [TaskErrorOccurrenceController::class, 'index'])->name('task-error-occurrences.index');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');
 

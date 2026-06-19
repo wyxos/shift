@@ -5,6 +5,8 @@ export type Task = {
     project_id?: number | null;
     project?: TaskProjectSummary | null;
     title: string;
+    type?: 'task' | 'app_error' | string;
+    type_label?: string;
     status: string;
     requirement_status?: string | null;
     priority: string;
@@ -72,6 +74,78 @@ export type TaskDetail = Task & {
     can_manage_collaborators?: boolean;
     internal_collaborators?: CollaboratorOption[];
     external_collaborators?: CollaboratorOption[];
+    error_signature?: string | null;
+    error_source?: string | null;
+    error_environment?: string | null;
+    error_release?: string | null;
+    error_git_sha?: string | null;
+    error_exception_class?: string | null;
+    error_name?: string | null;
+    error_culprit_file?: string | null;
+    error_culprit_line?: number | null;
+    error_culprit_function?: string | null;
+    error_occurrences_count?: number | null;
+    error_first_seen_at?: string | null;
+    error_last_seen_at?: string | null;
+};
+
+export type TaskErrorOccurrence = {
+    id: number;
+    number: number;
+    source: string;
+    environment?: string | null;
+    release?: string | null;
+    git_sha?: string | null;
+    exception_class?: string | null;
+    error_name?: string | null;
+    message?: string | null;
+    culprit?: {
+        file?: string | null;
+        line?: number | null;
+        function?: string | null;
+    };
+    request?: {
+        method?: string | null;
+        url?: string | null;
+        path?: string | null;
+        referrer?: string | null;
+        query?: Record<string, unknown> | null;
+        body?: Record<string, unknown> | null;
+    };
+    occurred_at?: string | null;
+    received_at?: string | null;
+    created_at?: string | null;
+    payload?: Record<string, unknown>;
+    stacktrace?: {
+        frames?: TaskErrorStackFrame[];
+    };
+    context?: Record<string, unknown>;
+    user?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+};
+
+export type TaskErrorStackFrame = {
+    file?: string | null;
+    line?: number | null;
+    function?: string | null;
+    in_app?: boolean | null;
+    context?: {
+        start_line?: number | null;
+        lines?: Array<{
+            number: number;
+            text: string;
+            active?: boolean | null;
+        }>;
+    } | null;
+};
+
+export type TaskErrorOccurrencePagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from?: number | null;
+    to?: number | null;
 };
 
 export type ThreadMessage = {
@@ -93,6 +167,7 @@ export type TaskIndexFilters = {
     environment?: string | null;
     organisation_id?: number | string | null;
     project_id?: number | string | null;
+    type?: string | null;
     sort_by?: string | null;
 };
 

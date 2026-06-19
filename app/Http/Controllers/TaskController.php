@@ -225,6 +225,21 @@ class TaskController extends Controller
         ];
     }
 
+    private function serializeTaskType(Task $task): array
+    {
+        if (filled($task->error_signature)) {
+            return [
+                'type' => 'app_error',
+                'type_label' => 'App error',
+            ];
+        }
+
+        return [
+            'type' => 'task',
+            'type_label' => 'Task',
+        ];
+    }
+
     private function validateStoreAttributes(Request $request): array
     {
         $rules = [
@@ -602,6 +617,20 @@ class TaskController extends Controller
             'submitted_title' => $task->metadata?->submitted_title,
             'submitted_description' => $task->metadata?->submitted_description,
             'finalized_at' => $task->metadata?->finalized_at?->toIso8601String(),
+            ...$this->serializeTaskType($task),
+            'error_signature' => $task->error_signature,
+            'error_source' => $task->error_source,
+            'error_environment' => $task->error_environment,
+            'error_release' => $task->error_release,
+            'error_git_sha' => $task->error_git_sha,
+            'error_exception_class' => $task->error_exception_class,
+            'error_name' => $task->error_name,
+            'error_culprit_file' => $task->error_culprit_file,
+            'error_culprit_line' => $task->error_culprit_line,
+            'error_culprit_function' => $task->error_culprit_function,
+            'error_occurrences_count' => $task->error_occurrences_count,
+            'error_first_seen_at' => $task->error_first_seen_at?->toIso8601String(),
+            'error_last_seen_at' => $task->error_last_seen_at?->toIso8601String(),
             'submitter' => $task->submitter ? [
                 'name' => $task->submitter->name ?? null,
                 'email' => $task->submitter->email ?? null,
@@ -646,6 +675,7 @@ class TaskController extends Controller
         $projectId = request('project_id');
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
+        $type = in_array((string) request('type'), ['all', 'tasks', 'app_errors'], true) ? (string) request('type') : 'all';
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
@@ -685,6 +715,12 @@ class TaskController extends Controller
             });
         }
 
+        if ($type === 'tasks') {
+            $query->whereNull('error_signature');
+        } elseif ($type === 'app_errors') {
+            $query->errorIntake();
+        }
+
         if ($sortBy === 'priority') {
             $query
                 ->orderByRaw("
@@ -717,6 +753,7 @@ class TaskController extends Controller
                 'environment' => $this->taskEnvironment($task),
                 'created_at' => $task->created_at?->toIso8601String(),
                 'updated_at' => $task->updated_at?->toIso8601String(),
+                ...$this->serializeTaskType($task),
                 ...$this->permissions->taskCapabilities($task, auth()->id()),
             ];
         });
@@ -730,6 +767,7 @@ class TaskController extends Controller
                     'environment' => $environment !== '' ? $environment : null,
                     'organisation_id' => filled($organisationId) ? (int) $organisationId : null,
                     'project_id' => filled($projectId) ? (int) $projectId : null,
+                    'type' => $type,
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,

@@ -262,6 +262,47 @@ test('index returns tasks for external user', function () {
     $response->assertJsonCount(2, 'data');
 });
 
+test('index and show expose task type metadata for app error tasks', function () {
+    $normalTask = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'Normal customer task',
+        'updated_at' => now()->subMinute(),
+    ]);
+    $normalTask->submitter()->associate($this->externalUser)->save();
+
+    $errorTask = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'Backend error: Checkout failed',
+        'error_signature' => str_repeat('c', 64),
+        'error_source' => 'backend',
+        'updated_at' => now(),
+    ]);
+    $errorTask->submitter()->associate($this->externalUser)->save();
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+        ]));
+
+    $response->assertOk()
+        ->assertJsonPath('data.0.id', $errorTask->id)
+        ->assertJsonPath('data.0.type', 'app_error')
+        ->assertJsonPath('data.0.type_label', 'App error')
+        ->assertJsonPath('data.1.id', $normalTask->id)
+        ->assertJsonPath('data.1.type', 'task')
+        ->assertJsonPath('data.1.type_label', 'Task');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson("/api/tasks/{$errorTask->id}?".http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('type', 'app_error')
+        ->assertJsonPath('type_label', 'App error');
+});
+
 test('project token API calls require authenticated user project access', function () {
     $otherUser = User::factory()->create();
     $otherToken = $otherUser->createToken('other-token')->plainTextToken;
