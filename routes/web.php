@@ -12,12 +12,26 @@ use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Http\Controllers\UserController;
+use App\Support\PublicDiscoveryDemo;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
+
+Route::get('docs/public-discovery-demo/{screen}', function (string $screen) {
+    abort_unless(app()->environment('local', 'testing'), 404);
+
+    $demo = PublicDiscoveryDemo::screen($screen);
+
+    abort_unless($demo !== null, 404);
+
+    return view('docs.public-discovery-demo', [
+        'demo' => $demo,
+        'screens' => PublicDiscoveryDemo::screens(),
+    ]);
+})->name('docs.public-discovery-demo');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sdk/install', [\App\Http\Controllers\SdkInstallController::class, 'show'])->name('sdk-install.verify');

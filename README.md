@@ -1,6 +1,6 @@
 # SHIFT
 
-**Open Source Task Management System**
+**Laravel app issue intake from inside the app**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel)](https://laravel.com)
@@ -8,27 +8,27 @@
 [![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php)](https://php.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://typescriptlang.org)
 
-SHIFT is an open-source task tracking portal built with Laravel 12 and Vue 3.
+SHIFT is an open-source Laravel portal for issue intake from inside a Laravel application.
 
-Its current focus is a common pain point in client work: letting clients post issues/bugs/requests against Laravel projects without having to learn (or be invited into) your internal tracking tool.
+Its current focus is practical: a user reports an issue from the app page where it happened, `wyxos/shift-php` carries app/user/request context into SHIFT, and the developer follows up in the task thread without reconstructing the report from email, screenshots, and logs.
 
-Longer-term, the goal is to add integrations and adapters for other frameworks while keeping the core workflow (orgs → clients → projects → tasks) consistent.
+The portal still has the normal structure needed to manage the work (organisations, clients, projects, tasks, attachments, and threads), but the public entry point is Laravel in-app issue intake rather than a broad project-management tool.
 
 ## Features
 
-- **Multi-tenant Structure**: Organizations → Clients → Projects → Tasks
-- **User Management**: Role-based access with project assignments
-- **Task Tracking**: Create, assign, and monitor task progress
-- **File Attachments**: Upload and manage task-related files
-- **Task Threads**: Discussion threads for task collaboration
-- **External Integration**: API endpoints for external user access
-- **Modern UI**: Built with Vue 3, TypeScript, and Tailwind CSS
+- **Laravel in-app intake**: Report issues from the app surface through `wyxos/shift-php`.
+- **App context**: Carry environment, app URL, route, user context, and request metadata with the report.
+- **Backend error intake**: Attach scrubbed Laravel exception occurrences to SHIFT tasks.
+- **Task threads**: Keep developer follow-up beside the original app report.
+- **Portal structure**: Organize work by organisations, clients, projects, tasks, attachments, and collaborators.
+- **Modern Laravel stack**: Laravel 12, Vue 3, TypeScript, Inertia, Tailwind CSS.
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
+
 - PHP 8.3+
 - Node.js 18+
 - Composer
@@ -67,6 +67,22 @@ Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded 
 
 ---
 
+## Public Discovery Docs
+
+The first public discovery package is here:
+
+- [SHIFT public discovery](docs/public-discovery.md)
+- [Repeatable local screenshots](docs/assets/public-discovery/)
+
+The screenshots are generated from local-only dummy fixture screens. They do not use production data, hosted SHIFT screenshots, Voidcare data, real clients, real users, or production tokens.
+
+Regenerate them from this repo with:
+
+```bash
+npm run docs:screenshots
+```
+
+The command expects the local Herd route `https://shift.test/docs/public-discovery-demo/{screen}` and verifies each generated PNG is 1920x1080.
 
 ## SDK Install Flow
 
@@ -114,6 +130,6 @@ SHIFT is open-source software licensed under the [MIT License](LICENSE). You're 
 
 **[Back to Top](#shift)**
 
-**Open Source Task Management System**
+**Laravel app issue intake from inside the app**
 
 </div>
