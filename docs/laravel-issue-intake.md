@@ -17,8 +17,6 @@ The report starts from the Laravel app page before it becomes a detached support
 
 ## Install Path
 
-For a Laravel app:
-
 ```bash
 composer require wyxos/shift-php
 php artisan install:shift
@@ -40,9 +38,7 @@ SHIFT_URL=https://shift.test
 
 Local and private URLs are supported by the installer and package client. The active portal still needs to reach the app URL for collaborator lookup.
 
-## Demo Screenshots
-
-The screenshots below are generated from local fixture screens in this repository. They use fake names, `example.test` addresses, and `.test` URLs; no hosted data, client records, user records, or tokens are included.
+## Demo
 
 ![Embedded issue form](assets/laravel-issue-intake/01-embedded-issue-form.png)
 
@@ -51,47 +47,3 @@ The screenshots below are generated from local fixture screens in this repositor
 ![Backend error intake](assets/laravel-issue-intake/03-backend-error-intake.png)
 
 ![Task thread and follow-up](assets/laravel-issue-intake/04-task-thread-follow-up.png)
-
-## Screenshot Scope
-
-- Embedded issue/task form in a Laravel app.
-- Created task with the originating app context attached.
-- Backend error occurrence intake with scrubbed request and stack context.
-- Task thread follow-up where the app user and developer discuss the same report.
-
-## Regenerate Screenshots
-
-Prerequisites:
-
-- Run from `/Users/joeyj/Developer/wyxos/php/shift`.
-- Composer and npm dependencies installed.
-- The local app available through Herd at `https://shift.test`.
-- `APP_ENV=local` or the test environment. The fixture route returns `404` elsewhere.
-
-Command:
-
-```bash
-npm run docs:screenshots
-```
-
-Optional arguments:
-
-```bash
-npm run docs:screenshots -- --base-url=https://shift.test/docs/laravel-issue-intake-demo
-npm run docs:screenshots -- --output-dir=docs/assets/laravel-issue-intake
-npm run docs:screenshots -- --headed
-```
-
-The script captures the four fixture URLs at a 1920x1080 viewport and checks each PNG's dimensions before reporting success.
-
-## Local Fixture Boundary
-
-The screenshot route is:
-
-```text
-/docs/laravel-issue-intake-demo/{screen}
-```
-
-It is available only in `local` and `testing`. It keeps the screenshot set repeatable without hosted services or customer data.
-
-The fixture data is deliberately human-readable but fake: example names, `example.test` email addresses, local `.test` URLs, and invented task IDs.
