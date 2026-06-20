@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $demo['title'] }} | SHIFT public discovery demo</title>
+    <title>{{ $demo['title'] }} | Laravel issue intake demo</title>
     <style>
         :root {
             color-scheme: light;
@@ -613,7 +613,7 @@
 </head>
 <body>
     <main class="stage accent-{{ $demo['accent'] }}" data-screenshot-ready="{{ $demo['slug'] }}">
-        <section class="browser" aria-label="SHIFT public discovery demo">
+        <section class="browser" aria-label="Laravel issue intake demo">
             <div class="browser-bar">
                 <div class="dots" aria-hidden="true">
                     <span class="dot red"></span>
@@ -627,7 +627,7 @@
             <div class="content">
                 <header class="hero">
                     <div>
-                        <p class="eyebrow">SHIFT public discovery demo</p>
+                        <p class="eyebrow">Laravel issue intake demo</p>
                         <h1>{{ $demo['title'] }}</h1>
                         <p class="subtitle">{{ $demo['subtitle'] }}</p>
                     </div>
@@ -718,7 +718,7 @@
                                         <span class="badge">User context included</span>
                                     </div>
 
-                                    <button class="primary-button" type="button">Create SHIFT task</button>
+                                    <button class="primary-button" type="button">Create task</button>
                                 </div>
                             </article>
                         </div>
@@ -752,7 +752,7 @@
                                             </div>
                                             <p class="description">
                                                 Maya Thompson created this from the invoice page in the Laravel app.
-                                                SHIFT keeps the app URL, route, environment, and reporter context with the task.
+                                                The portal keeps the app URL, route, environment, and reporter context with the task.
                                             </p>
                                             <div class="timeline">
                                                 @foreach ($demo['timeline'] as $item)
@@ -811,7 +811,7 @@
                                 <div class="panel-header">
                                     <div>
                                         <h2>{{ $demo['task']['id'] }} - {{ $demo['task']['title'] }}</h2>
-                                        <p>Error intake in SHIFT, with sensitive request fields scrubbed.</p>
+                                        <p>Error intake with sensitive request fields scrubbed.</p>
                                     </div>
                                 </div>
                                 <div class="panel-body">
