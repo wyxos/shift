@@ -11,11 +11,11 @@ defineProps<{
 
 const embeddedShowcase = {
     label: 'Client app',
-    title: 'The tracker lives where the client already works.',
+    title: 'Issue intake lives where the client already works.',
     url: 'app.northwind.com/shift/tasks',
     image: '/marketing/shift-embedded-tasks.png',
     alt: 'SHIFT task list embedded inside a client Laravel app with the client app menu visible',
-    copy: 'The package mounts a task workspace inside the Laravel app. Clients stay in their own app and file work against the right project context.',
+    copy: 'The package mounts the task surface inside the Laravel app. Clients stay in their own app and file work against the right project context.',
 };
 
 const platformShowcase = {
@@ -89,40 +89,40 @@ const installFlowToneClasses: Record<InstallTerminalTone, string> = {
 
 const installPrompt = 'runcloud@my-server:~/webapps/app-northwind$';
 
-const faqItems = [
+const fitItems = [
     {
-        question: 'Do clients need a SHIFT login?',
-        answer: 'No. They use the client app they already have. SHIFT sits inside it through the Laravel package.',
+        heading: 'Client app access',
+        copy: 'Clients use the app account they already have. The Laravel package provides the embedded task surface.',
     },
     {
-        question: 'Can we self-host it?',
-        answer: 'Yes. Run the open-source Laravel portal on your own server and point the package at that URL.',
+        heading: 'Hosted or self-hosted',
+        copy: 'Run the hosted portal, or install the open-source Laravel portal on your own server and point the package at that URL.',
     },
     {
-        question: 'What data leaves the client app?',
-        answer: 'Task details, project context, environment, page URL, comments, and attachments you choose to send. It is built around explicit task reporting, not background scraping.',
+        heading: 'Explicit report data',
+        copy: 'Task details, project context, environment, page URL, comments, and selected attachments are sent with the report.',
     },
     {
-        question: 'Can we use existing Laravel auth?',
-        answer: 'Yes. The embedded workspace runs inside the client Laravel app, so users keep their normal application session.',
+        heading: 'Existing Laravel auth',
+        copy: 'The embedded workspace runs inside the client Laravel app, so users keep their normal application session.',
     },
     {
-        question: 'Is this another project management tool?',
-        answer: 'No. It is the intake and triage layer for client app work. Your team can still deliver the work however you already plan and ship it.',
+        heading: 'Workflow fit',
+        copy: 'Use it for intake and triage from the app. Your team can keep planning and shipping work in the tools it already uses.',
     },
 ];
 </script>
 
 <template>
-    <Head title="Open Source Client Task Portal">
+    <Head title="Laravel In-App Issue Intake">
         <meta
-            content="SHIFT puts an issue and task tracker inside the Laravel apps you build for clients. Install one package, and every report lands in one portal, hosted or self-hosted."
+            content="SHIFT puts issue intake inside the Laravel apps you build for clients. Install one package, and every report lands in one portal, hosted or self-hosted."
             name="description"
         />
-        <meta content="client task portal, issue tracker, open source, Laravel, shift-php, hosted, self-hosted" name="keywords" />
-        <meta content="Open Source Client Task Portal" property="og:title" />
+        <meta content="client task portal, issue intake, open source, Laravel, shift-php, hosted, self-hosted" name="keywords" />
+        <meta content="Laravel In-App Issue Intake" property="og:title" />
         <meta
-            content="An issue and task tracker that lives inside your client's own Laravel app. Install wyxos/shift-php, and everything lands in one portal you run."
+            content="Issue intake that lives inside your client's own Laravel app. Install wyxos/shift-php, and reports land in one portal you run."
             property="og:description"
         />
         <meta content="website" property="og:type" />
@@ -170,8 +170,8 @@ const faqItems = [
                             <span class="text-blue-600 dark:text-blue-400">captured inside their app.</span>
                         </h1>
                         <p class="text-muted-foreground mt-6 max-w-xl text-lg leading-relaxed lg:text-xl">
-                            SHIFT adds an issue and task tracker to the Laravel apps you build for clients. They report bugs and requests in context.
-                            Your team triages every client from one portal.
+                            SHIFT adds issue intake to the Laravel apps you build for clients. They report bugs and requests in context. Your team
+                            triages every client from one portal.
                         </p>
                         <p class="text-muted-foreground mt-4 max-w-xl text-base leading-relaxed">
                             For Laravel teams maintaining client apps, support portals, and internal tools.
@@ -385,13 +385,13 @@ const faqItems = [
             <section class="border-b">
                 <div class="mx-auto w-full max-w-[1536px] px-6 py-24 lg:px-12 lg:py-32">
                     <div class="max-w-2xl">
-                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">FAQ</span>
-                        <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Answers before you install.</h2>
+                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Fit</span>
+                        <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Before you install.</h2>
                     </div>
                     <div class="mt-12 grid gap-4 lg:grid-cols-2">
-                        <article v-for="item in faqItems" :key="item.question" class="bg-card rounded-lg border p-6">
-                            <h3 class="font-semibold">{{ item.question }}</h3>
-                            <p class="text-muted-foreground mt-3 leading-relaxed">{{ item.answer }}</p>
+                        <article v-for="item in fitItems" :key="item.heading" class="bg-card rounded-lg border p-6">
+                            <h3 class="font-semibold">{{ item.heading }}</h3>
+                            <p class="text-muted-foreground mt-3 leading-relaxed">{{ item.copy }}</p>
                         </article>
                     </div>
                 </div>

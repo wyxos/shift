@@ -100,7 +100,7 @@ describe('Home.vue', () => {
         expect(wrapper.text()).toContain('MIT');
         expect(wrapper.text()).toContain('Laravel');
         expect(wrapper.text()).toContain('wyxos/shift-php');
-        expect(wrapper.text()).toContain('issue and task tracker');
+        expect(wrapper.text()).toContain('issue intake');
         expect(wrapper.text()).toContain('For Laravel teams maintaining client apps, support portals, and internal tools.');
         expect(wrapper.text()).not.toContain('Laravel package + SHIFT portal');
         expect(wrapper.text()).not.toContain('Open source · built for Laravel');
@@ -193,7 +193,7 @@ describe('Home.vue', () => {
         );
     });
 
-    it('shows the real installer flow, objections, and split buying paths', () => {
+    it('shows the real installer flow, install fit, and split buying paths', () => {
         const wrapper = mount(Home, {
             global: {
                 mocks: {
@@ -216,11 +216,16 @@ describe('Home.vue', () => {
         expect(wrapper.text()).not.toContain('ANSWER');
         expect(wrapper.text()).not.toContain('Which SHIFT URL should this project use?');
         expect(wrapper.text()).not.toContain('Choose the project to connect');
-        expect(wrapper.text()).toContain('Do clients need a SHIFT login?');
-        expect(wrapper.text()).toContain('Can we self-host it?');
-        expect(wrapper.text()).toContain('What data leaves the client app?');
-        expect(wrapper.text()).toContain('FAQ');
-        expect(wrapper.text()).toContain('Answers before you install.');
+        expect(wrapper.text()).toContain('Client app access');
+        expect(wrapper.text()).toContain('Hosted or self-hosted');
+        expect(wrapper.text()).toContain('Explicit report data');
+        expect(wrapper.text()).toContain('Fit');
+        expect(wrapper.text()).toContain('Before you install.');
+        expect(wrapper.text()).not.toContain('Do clients need a SHIFT login?');
+        expect(wrapper.text()).not.toContain('Can we self-host it?');
+        expect(wrapper.text()).not.toContain('What data leaves the client app?');
+        expect(wrapper.text()).not.toContain('FAQ');
+        expect(wrapper.text()).not.toContain('Answers before you install.');
         expect(wrapper.text()).not.toContain('Questions teams ask');
         expect(wrapper.text()).not.toContain('No new client portal to explain.');
         expect(wrapper.text()).toContain('Start hosted');
