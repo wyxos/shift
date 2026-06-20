@@ -5,6 +5,8 @@
         "build": "NODE_OPTIONS=--max-old-space-size=1536 vite build",
         "build:ssr": "NODE_OPTIONS=--max-old-space-size=1536 vite build && NODE_OPTIONS=--max-old-space-size=1536 vite build --ssr",
         "dev": "vite",
+        "docs:screenshots": "node scripts/capture-public-discovery-screenshots.mjs",
+        "docs:screenshots:test": "node --test tests/docs/public-discovery-screenshots.test.mjs",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",
