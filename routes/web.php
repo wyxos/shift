@@ -12,7 +12,7 @@ use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Http\Controllers\UserController;
-use App\Support\PublicDiscoveryDemo;
+use App\Support\LaravelIssueIntakeDemo;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -20,18 +20,18 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
-Route::get('docs/public-discovery-demo/{screen}', function (string $screen) {
+Route::get('docs/laravel-issue-intake-demo/{screen}', function (string $screen) {
     abort_unless(app()->environment('local', 'testing'), 404);
 
-    $demo = PublicDiscoveryDemo::screen($screen);
+    $demo = LaravelIssueIntakeDemo::screen($screen);
 
     abort_unless($demo !== null, 404);
 
-    return view('docs.public-discovery-demo', [
+    return view('docs.laravel-issue-intake-demo', [
         'demo' => $demo,
-        'screens' => PublicDiscoveryDemo::screens(),
+        'screens' => LaravelIssueIntakeDemo::screens(),
     ]);
-})->name('docs.public-discovery-demo');
+})->name('docs.laravel-issue-intake-demo');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sdk/install', [\App\Http\Controllers\SdkInstallController::class, 'show'])->name('sdk-install.verify');

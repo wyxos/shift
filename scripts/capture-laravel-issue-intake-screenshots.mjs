@@ -43,8 +43,8 @@ export function readPngSize(buffer) {
 
 function parseArgs(argv) {
     const options = {
-        baseUrl: process.env.SHIFT_PUBLIC_DISCOVERY_DEMO_URL ?? 'https://shift.test/docs/public-discovery-demo',
-        outputDir: path.resolve(__dirname, '../docs/assets/public-discovery'),
+        baseUrl: process.env.SHIFT_LARAVEL_ISSUE_INTAKE_DEMO_URL ?? 'https://shift.test/docs/laravel-issue-intake-demo',
+        outputDir: path.resolve(__dirname, '../docs/assets/laravel-issue-intake'),
         headed: false,
     };
 
@@ -94,7 +94,7 @@ export async function captureScreenshots(options) {
                 await page.goto(url, { waitUntil: 'domcontentloaded' });
             } catch (error) {
                 throw new Error(
-                    `Could not open ${url}. Ensure the local SHIFT app is available through Herd, or pass --base-url=. Original error: ${error.message}`,
+                    `Could not open ${url}. Ensure the local app is available through Herd, or pass --base-url=. Original error: ${error.message}`,
                 );
             }
 

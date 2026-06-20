@@ -1,13 +1,13 @@
 <?php
 
-it('renders local public discovery demo screens with deterministic dummy data', function (
+it('renders local Laravel issue intake demo screens with deterministic dummy data', function (
     string $screen,
     string $heading,
     string $demoUrl,
 ) {
-    $this->get("/docs/public-discovery-demo/{$screen}")
+    $this->get("/docs/laravel-issue-intake-demo/{$screen}")
         ->assertOk()
-        ->assertSee('SHIFT public discovery demo', false)
+        ->assertSee('Laravel issue intake demo', false)
         ->assertSee($heading, false)
         ->assertSee($demoUrl, false)
         ->assertSee('Maya Thompson', false)
@@ -35,14 +35,14 @@ it('renders local public discovery demo screens with deterministic dummy data', 
     ],
 ]);
 
-it('returns not found for unknown public discovery demo screens', function () {
-    $this->get('/docs/public-discovery-demo/not-real')
+it('returns not found for unknown Laravel issue intake demo screens', function () {
+    $this->get('/docs/laravel-issue-intake-demo/not-real')
         ->assertNotFound();
 });
 
-it('hides public discovery demo screens outside local and testing environments', function () {
+it('hides Laravel issue intake demo screens outside local and testing environments', function () {
     app()->detectEnvironment(fn (): string => 'production');
 
-    $this->get('/docs/public-discovery-demo/embedded-issue-form')
+    $this->get('/docs/laravel-issue-intake-demo/embedded-issue-form')
         ->assertNotFound();
 });
