@@ -34,10 +34,6 @@ The portal still has the normal structure needed to manage the work (organisatio
 - Composer
 - MySQL/PostgreSQL
 
-### Registration
-
-Registration routes are enabled. New accounts must verify their email address, and invited organisation or project users are linked during signup.
-
 ### Installation
 
 ```bash
@@ -67,22 +63,9 @@ Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded 
 
 ---
 
-## Laravel Issue Intake Docs
-
-The first public docs package is here:
+## Documentation
 
 - [Laravel app issue intake](docs/laravel-issue-intake.md)
-- [Repeatable local screenshots](docs/assets/laravel-issue-intake/)
-
-The screenshots use local fixture screens with fake names, `example.test` addresses, and `.test` URLs. They do not include hosted data, client records, user records, or tokens.
-
-Regenerate them from this repo with:
-
-```bash
-npm run docs:screenshots
-```
-
-The command expects the local Herd route `https://shift.test/docs/laravel-issue-intake-demo/{screen}` and verifies each generated PNG is 1920x1080.
 
 ## SDK Install Flow
 
@@ -93,20 +76,6 @@ The portal exposes a cache-backed browser/device install flow for SDK consumers.
 - `POST /api/sdk/install/sessions/poll`, `/projects`, `/projects/create`, and `/finalize` let the CLI wait for approval, list manageable projects, create a standalone project when needed, and finalize credentials.
 - Finalization reuses an existing project token when possible, otherwise creates one, then issues a user API token once and registers the selected environment URL.
 
----
-
-## Tech Stack
-
-- **Backend**: Laravel 12 with PHP 8.3+
-- **Frontend**: Vue 3 with TypeScript and Inertia.js
-- **Styling**: Tailwind CSS
-- **Database**: MySQL/PostgreSQL
-- **Authentication**: Laravel Sanctum
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## Support
 
 - **[Report Issues](https://github.com/wyxos/shift/issues)** - Bug reports and feature requests
@@ -116,20 +85,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-SHIFT is open-source software licensed under the [MIT License](LICENSE). You're free to use, modify, and distribute this software according to the license terms.
-
----
-
-## Acknowledgments
-
-- Created by [Wyxos](https://wyxos.com)
-
----
-
-<div align="center">
-
-**[Back to Top](#shift)**
-
-**Laravel app issue intake from inside the app**
-
-</div>
+Licensed under the [MIT License](LICENSE).

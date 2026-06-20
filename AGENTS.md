@@ -17,6 +17,12 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 - Production deploys for `shift.wyxos.com` must run from `../shift-hosted` with `npm run release` and the `SHIFT production` preset. Do not deploy production from this public clone.
 - Do not edit generated build output in `public/build/**`.
 
+## Docs Screenshot Automation
+- Keep public docs focused on user relevance, installability, workflow fit, and demo proof. Do not put local fixture routes, Herd assumptions, regeneration commands, or other agent/contributor notes in reader-facing docs.
+- The local screenshot route is `/docs/laravel-issue-intake-demo/{screen}` and is available only in `local` and `testing`.
+- Regenerate the committed docs screenshots from this repo with `npm run docs:screenshots`; the script captures `docs/assets/laravel-issue-intake/*.png` at 1920x1080.
+- Override the route with `SHIFT_LARAVEL_ISSUE_INTAKE_DEMO_URL` or `--base-url=` when the local app is not available at `https://shift.test`.
+
 ## Scope Map
 - Backend domain and policies: `app/` -> `app/AGENTS.md`
 - SDK-facing API: `app/Http/Controllers/Api/` -> `app/Http/Controllers/Api/AGENTS.md`
