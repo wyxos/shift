@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-final class PublicDiscoveryDemo
+final class LaravelIssueIntakeDemo
 {
     /**
      * @return array<string, array<string, mixed>>
@@ -49,9 +49,9 @@ final class PublicDiscoveryDemo
                 'kind' => 'task',
                 'accent' => 'indigo',
                 'title' => 'Created task with app context',
-                'subtitle' => 'The report lands in SHIFT with enough app context for a developer to start work.',
+                'subtitle' => 'The report lands with enough app context for a developer to start work.',
                 'demo_url' => 'https://shift.test/tasks?project=northstar-billing-local',
-                'surface' => 'SHIFT portal',
+                'surface' => 'Portal task',
                 'task' => [
                     'id' => 'SH-4187',
                     'title' => 'Invoice export fails for finance reviewer',
@@ -74,7 +74,7 @@ final class PublicDiscoveryDemo
                 ],
                 'timeline' => [
                     'Issue captured from host app',
-                    'Task created in SHIFT project',
+                    'Task created in project',
                     'Context attached for triage',
                     'Thread opened for follow-up',
                 ],
@@ -84,7 +84,7 @@ final class PublicDiscoveryDemo
                 'kind' => 'error',
                 'accent' => 'rose',
                 'title' => 'Backend error intake',
-                'subtitle' => 'Scrubbed Laravel exception context can create or update the matching SHIFT task.',
+                'subtitle' => 'Scrubbed Laravel exception context can create or update the matching task.',
                 'demo_url' => 'https://shift-sdk-package.test/admin/reports/month-end',
                 'surface' => 'Laravel exception reporter',
                 'task' => [
@@ -125,7 +125,7 @@ final class PublicDiscoveryDemo
                 'title' => 'Task thread and follow-up',
                 'subtitle' => 'Developers and app users keep the discussion attached to the original report.',
                 'demo_url' => 'https://shift.test/tasks/SH-4187',
-                'surface' => 'SHIFT task thread',
+                'surface' => 'Task thread',
                 'task' => [
                     'id' => 'SH-4187',
                     'title' => 'Invoice export fails for finance reviewer',

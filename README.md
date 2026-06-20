@@ -10,7 +10,7 @@
 
 SHIFT is an open-source Laravel portal for issue intake from inside a Laravel application.
 
-Its current focus is practical: a user reports an issue from the app page where it happened, `wyxos/shift-php` carries app/user/request context into SHIFT, and the developer follows up in the task thread without reconstructing the report from email, screenshots, and logs.
+The current focus is practical: a user reports an issue from the app page where it happened, `wyxos/shift-php` carries app/user/request context into the portal, and the developer follows up in the task thread without reconstructing the report from email, screenshots, and logs.
 
 The portal still has the normal structure needed to manage the work (organisations, clients, projects, tasks, attachments, and threads), but the public entry point is Laravel in-app issue intake rather than a broad project-management tool.
 
@@ -18,7 +18,7 @@ The portal still has the normal structure needed to manage the work (organisatio
 
 - **Laravel in-app intake**: Report issues from the app surface through `wyxos/shift-php`.
 - **App context**: Carry environment, app URL, route, user context, and request metadata with the report.
-- **Backend error intake**: Attach scrubbed Laravel exception occurrences to SHIFT tasks.
+- **Backend error intake**: Attach scrubbed Laravel exception occurrences to tasks.
 - **Task threads**: Keep developer follow-up beside the original app report.
 - **Portal structure**: Organize work by organisations, clients, projects, tasks, attachments, and collaborators.
 - **Modern Laravel stack**: Laravel 12, Vue 3, TypeScript, Inertia, Tailwind CSS.
@@ -36,7 +36,7 @@ The portal still has the normal structure needed to manage the work (organisatio
 
 ### Registration
 
-Registration is temporarily disabled. Create users via seeding or the database, or re-enable routes in `routes/auth.php` when you want public signups.
+Registration routes are enabled. New accounts must verify their email address, and invited organisation or project users are linked during signup.
 
 ### Installation
 
@@ -67,14 +67,14 @@ Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded 
 
 ---
 
-## Public Discovery Docs
+## Laravel Issue Intake Docs
 
-The first public discovery package is here:
+The first public docs package is here:
 
-- [SHIFT public discovery](docs/public-discovery.md)
-- [Repeatable local screenshots](docs/assets/public-discovery/)
+- [Laravel app issue intake](docs/laravel-issue-intake.md)
+- [Repeatable local screenshots](docs/assets/laravel-issue-intake/)
 
-The screenshots are generated from local-only dummy fixture screens. They do not use production data, hosted SHIFT screenshots, Voidcare data, real clients, real users, or production tokens.
+The screenshots use local fixture screens with fake names, `example.test` addresses, and `.test` URLs. They do not include hosted data, client records, user records, or tokens.
 
 Regenerate them from this repo with:
 
@@ -82,14 +82,14 @@ Regenerate them from this repo with:
 npm run docs:screenshots
 ```
 
-The command expects the local Herd route `https://shift.test/docs/public-discovery-demo/{screen}` and verifies each generated PNG is 1920x1080.
+The command expects the local Herd route `https://shift.test/docs/laravel-issue-intake-demo/{screen}` and verifies each generated PNG is 1920x1080.
 
 ## SDK Install Flow
 
-SHIFT exposes a cache-backed browser/device install flow for SDK consumers.
+The portal exposes a cache-backed browser/device install flow for SDK consumers.
 
 - `POST /api/sdk/install/sessions` creates an install session and returns the device/user codes plus verification URLs.
-- `/sdk/install` lets a SHIFT user enter or prefill a code, log in if needed, and approve the install session.
+- `/sdk/install` lets a signed-in user enter or prefill a code, log in if needed, and approve the install session.
 - `POST /api/sdk/install/sessions/poll`, `/projects`, `/projects/create`, and `/finalize` let the CLI wait for approval, list manageable projects, create a standalone project when needed, and finalize credentials.
 - Finalization reuses an existing project token when possible, otherwise creates one, then issues a user API token once and registers the selected environment URL.
 
