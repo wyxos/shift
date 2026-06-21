@@ -1,24 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildUrl, readPngSize, screenshotTargets } from '../../scripts/capture-laravel-issue-intake-screenshots.mjs';
+import { buildUrl, readPngSize, screenshotTargets } from '../../scripts/capture-laravel-issue-reporting-screenshots.mjs';
 
-test('defines the Laravel issue intake screenshot set', () => {
+test('defines the Laravel issue reporting screenshot set', () => {
     assert.deepEqual(
         screenshotTargets.map((target) => target.slug),
-        ['embedded-issue-form', 'created-task-context', 'backend-error-intake', 'task-thread-follow-up'],
+        ['report-form', 'created-task', 'error-report', 'task-thread'],
     );
 
     assert.deepEqual(
         screenshotTargets.map((target) => target.file),
-        ['01-embedded-issue-form.png', '02-created-task-context.png', '03-backend-error-intake.png', '04-task-thread-follow-up.png'],
+        ['01-report-form.png', '02-created-task.png', '03-error-report.png', '04-task-thread.png'],
     );
 });
 
 test('builds demo URLs without duplicate slashes', () => {
     assert.equal(
-        buildUrl('https://shift.test/docs/laravel-issue-intake-demo/', 'embedded-issue-form'),
-        'https://shift.test/docs/laravel-issue-intake-demo/embedded-issue-form',
+        buildUrl('https://shift.test/docs/laravel-issue-reporting-demo/', 'report-form'),
+        'https://shift.test/docs/laravel-issue-reporting-demo/report-form',
     );
 });
 

@@ -9,20 +9,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const screenshotTargets = [
     {
-        slug: 'embedded-issue-form',
-        file: '01-embedded-issue-form.png',
+        slug: 'report-form',
+        file: '01-report-form.png',
     },
     {
-        slug: 'created-task-context',
-        file: '02-created-task-context.png',
+        slug: 'created-task',
+        file: '02-created-task.png',
     },
     {
-        slug: 'backend-error-intake',
-        file: '03-backend-error-intake.png',
+        slug: 'error-report',
+        file: '03-error-report.png',
     },
     {
-        slug: 'task-thread-follow-up',
-        file: '04-task-thread-follow-up.png',
+        slug: 'task-thread',
+        file: '04-task-thread.png',
     },
 ];
 
@@ -43,8 +43,8 @@ export function readPngSize(buffer) {
 
 function parseArgs(argv) {
     const options = {
-        baseUrl: process.env.SHIFT_LARAVEL_ISSUE_INTAKE_DEMO_URL ?? 'https://shift.test/docs/laravel-issue-intake-demo',
-        outputDir: path.resolve(__dirname, '../docs/assets/laravel-issue-intake'),
+        baseUrl: process.env.SHIFT_LARAVEL_ISSUE_REPORTING_DEMO_URL ?? 'https://shift.test/docs/laravel-issue-reporting-demo',
+        outputDir: path.resolve(__dirname, '../docs/assets/laravel-issue-reporting'),
         headed: false,
     };
 
@@ -78,12 +78,12 @@ export async function captureScreenshots(options) {
     });
 
     try {
-        const context = await browser.newContext({
+        const browserContext = await browser.newContext({
             viewport: { width: 1920, height: 1080 },
             deviceScaleFactor: 1,
             ignoreHTTPSErrors: true,
         });
-        const page = await context.newPage();
+        const page = await browserContext.newPage();
         const results = [];
 
         for (const target of screenshotTargets) {
