@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $demo['title'] }} | Laravel issue intake demo</title>
+    <title>{{ $demo['title'] }} | Laravel issue reporting demo</title>
     <style>
         :root {
             color-scheme: light;
@@ -377,12 +377,12 @@
             padding: 12px;
         }
 
-        .context-list {
+        .detail-list {
             display: grid;
             gap: 10px;
         }
 
-        .context-item {
+        .detail-item {
             display: grid;
             grid-template-columns: 150px 1fr;
             gap: 12px;
@@ -392,19 +392,19 @@
             font-size: 14px;
         }
 
-        .context-item dt {
+        .detail-item dt {
             color: var(--muted);
             font-weight: 800;
         }
 
-        .context-item dd {
+        .detail-item dd {
             margin: 0;
             color: #273449;
             overflow-wrap: anywhere;
         }
 
-        .task-layout .context-item,
-        .thread-layout .context-item {
+        .task-layout .detail-item,
+        .thread-layout .detail-item {
             grid-template-columns: 1fr;
             gap: 6px;
         }
@@ -613,7 +613,7 @@
 </head>
 <body>
     <main class="stage accent-{{ $demo['accent'] }}" data-screenshot-ready="{{ $demo['slug'] }}">
-        <section class="browser" aria-label="Laravel issue intake demo">
+        <section class="browser" aria-label="Laravel issue reporting demo">
             <div class="browser-bar">
                 <div class="dots" aria-hidden="true">
                     <span class="dot red"></span>
@@ -627,13 +627,13 @@
             <div class="content">
                 <header class="hero">
                     <div>
-                        <p class="eyebrow">Laravel issue intake demo</p>
+                        <p class="eyebrow">Laravel issue reporting demo</p>
                         <h1>{{ $demo['title'] }}</h1>
                         <p class="subtitle">{{ $demo['subtitle'] }}</p>
                     </div>
 
                     <aside class="task-chip">
-                        <strong>{{ $demo['surface'] }}</strong>
+                        <strong>{{ $demo['location'] }}</strong>
                         <span>{{ $demo['task']['id'] }} - {{ $demo['task']['project'] }}</span>
                     </aside>
                 </header>
@@ -714,8 +714,8 @@
 
                                     <div class="badge-row">
                                         <span class="badge">Screenshot attached</span>
-                                        <span class="badge">Route captured</span>
-                                        <span class="badge">User context included</span>
+                                        <span class="badge">Route included</span>
+                                        <span class="badge">User included</span>
                                     </div>
 
                                     <button class="primary-button" type="button">Create task</button>
@@ -752,7 +752,7 @@
                                             </div>
                                             <p class="description">
                                                 Maya Thompson created this from the invoice page in the Laravel app.
-                                                The portal keeps the app URL, route, environment, and reporter context with the task.
+                                                The portal keeps the app URL, route, environment, and reporter with the task.
                                             </p>
                                             <div class="timeline">
                                                 @foreach ($demo['timeline'] as $item)
@@ -768,14 +768,14 @@
                                     <aside class="panel">
                                         <div class="panel-header">
                                             <div>
-                                                <h2>App context</h2>
-                                                <p>Dummy local data for documentation screenshots.</p>
+                                                <h2>App details</h2>
+                                                <p>Page, route, environment, and reporter details.</p>
                                             </div>
                                         </div>
                                         <div class="panel-body">
-                                            <dl class="context-list">
-                                                @foreach ($demo['context'] as $label => $value)
-                                                    <div class="context-item">
+                                            <dl class="detail-list">
+                                                @foreach ($demo['details'] as $label => $value)
+                                                    <div class="detail-item">
                                                         <dt>{{ $label }}</dt>
                                                         <dd>{{ $value }}</dd>
                                                     </div>
@@ -792,7 +792,7 @@
                                 <div class="panel-header">
                                     <div>
                                         <h2>Laravel backend exception</h2>
-                                        <p>{{ $demo['error']['occurrences'] }} from {{ $demo['person']['name'] }}'s local session.</p>
+                                        <p>{{ $demo['error']['seen'] }} from {{ $demo['person']['name'] }}'s local session.</p>
                                     </div>
                                     <span class="badge accent">{{ $demo['task']['priority'] }}</span>
                                 </div>
@@ -811,7 +811,7 @@
                                 <div class="panel-header">
                                     <div>
                                         <h2>{{ $demo['task']['id'] }} - {{ $demo['task']['title'] }}</h2>
-                                        <p>Error intake with sensitive request fields scrubbed.</p>
+                                        <p>Error report with sensitive request fields removed.</p>
                                     </div>
                                 </div>
                                 <div class="panel-body">
@@ -819,16 +819,16 @@
                                         <span class="badge accent">{{ $demo['task']['status'] }}</span>
                                         <span class="badge">{{ $demo['error']['release'] }}</span>
                                     </div>
-                                    <dl class="context-list" style="margin-top: 18px;">
-                                        @foreach ($demo['context'] as $label => $value)
-                                            <div class="context-item">
+                                    <dl class="detail-list" style="margin-top: 18px;">
+                                        @foreach ($demo['details'] as $label => $value)
+                                            <div class="detail-item">
                                                 <dt>{{ $label }}</dt>
                                                 <dd>{{ $value }}</dd>
                                             </div>
                                         @endforeach
                                     </dl>
                                     <div class="mini-card" style="margin-top: 18px;">
-                                        <h3>Reporter context</h3>
+                                        <h3>Reporter</h3>
                                         <p>{{ $demo['person']['name'] }} ({{ $demo['person']['email'] }}) was signed in when the backend error occurred.</p>
                                     </div>
                                 </div>
@@ -869,10 +869,10 @@
 
                             <aside class="side-stack">
                                 <div class="mini-card">
-                                    <h3>Original context</h3>
-                                    <dl class="context-list">
-                                        @foreach ($demo['context'] as $label => $value)
-                                            <div class="context-item">
+                                    <h3>Original details</h3>
+                                    <dl class="detail-list">
+                                        @foreach ($demo['details'] as $label => $value)
+                                            <div class="detail-item">
                                                 <dt>{{ $label }}</dt>
                                                 <dd>{{ $value }}</dd>
                                             </div>
@@ -880,7 +880,7 @@
                                     </dl>
                                 </div>
                                 <div class="mini-card">
-                                    <h3>Workflow fit</h3>
+                                    <h3>Thread stays with the task</h3>
                                     <p>The discussion stays tied to the app page, reporter, and task history instead of being split between email, a ticket, and an error log.</p>
                                 </div>
                             </aside>
