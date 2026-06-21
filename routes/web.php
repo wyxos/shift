@@ -12,7 +12,7 @@ use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Http\Controllers\UserController;
-use App\Support\LaravelIssueIntakeDemo;
+use App\Support\LaravelIssueReportingDemo;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -20,18 +20,18 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
-Route::get('docs/laravel-issue-intake-demo/{screen}', function (string $screen) {
+Route::get('docs/laravel-issue-reporting-demo/{screen}', function (string $screen) {
     abort_unless(app()->environment('local', 'testing'), 404);
 
-    $demo = LaravelIssueIntakeDemo::screen($screen);
+    $demo = LaravelIssueReportingDemo::screen($screen);
 
     abort_unless($demo !== null, 404);
 
-    return view('docs.laravel-issue-intake-demo', [
+    return view('docs.laravel-issue-reporting-demo', [
         'demo' => $demo,
-        'screens' => LaravelIssueIntakeDemo::screens(),
+        'screens' => LaravelIssueReportingDemo::screens(),
     ]);
-})->name('docs.laravel-issue-intake-demo');
+})->name('docs.laravel-issue-reporting-demo');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sdk/install', [\App\Http\Controllers\SdkInstallController::class, 'show'])->name('sdk-install.verify');

@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-final class LaravelIssueIntakeDemo
+final class LaravelIssueReportingDemo
 {
     /**
      * @return array<string, array<string, mixed>>
@@ -10,19 +10,19 @@ final class LaravelIssueIntakeDemo
     public static function screens(): array
     {
         return [
-            'embedded-issue-form' => [
-                'slug' => 'embedded-issue-form',
+            'report-form' => [
+                'slug' => 'report-form',
                 'kind' => 'form',
                 'accent' => 'teal',
-                'title' => 'Embedded issue form',
+                'title' => 'Issue report form',
                 'subtitle' => 'A Laravel user reports an issue from the page where it happened.',
                 'demo_url' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
-                'surface' => 'Host Laravel app',
+                'location' => 'Laravel app',
                 'task' => [
                     'id' => 'SH-4187',
                     'title' => 'Invoice export fails for finance reviewer',
                     'project' => 'Northstar Billing Portal',
-                    'status' => 'Ready for triage',
+                    'status' => 'Ready for review',
                     'priority' => 'High',
                 ],
                 'person' => [
@@ -34,9 +34,9 @@ final class LaravelIssueIntakeDemo
                     ['label' => 'Title', 'value' => 'Invoice export fails for finance reviewer'],
                     ['label' => 'What happened?', 'value' => 'The export button shows a success toast, but the CSV never downloads. I tried it twice on invoice INV-1047.'],
                     ['label' => 'Expected result', 'value' => 'Download a CSV with invoice lines, totals, and payment status.'],
-                    ['label' => 'Page context', 'value' => '/billing/invoices/INV-1047'],
+                    ['label' => 'Page', 'value' => '/billing/invoices/INV-1047'],
                 ],
-                'context' => [
+                'details' => [
                     'Environment' => 'local',
                     'App URL' => 'https://shift-sdk-package.test',
                     'Route' => 'billing.invoices.show',
@@ -44,28 +44,28 @@ final class LaravelIssueIntakeDemo
                     'Browser' => 'Chrome 126 on macOS',
                 ],
             ],
-            'created-task-context' => [
-                'slug' => 'created-task-context',
+            'created-task' => [
+                'slug' => 'created-task',
                 'kind' => 'task',
                 'accent' => 'indigo',
-                'title' => 'Created task with app context',
-                'subtitle' => 'The report lands with enough app context for a developer to start work.',
+                'title' => 'Created task with app details',
+                'subtitle' => 'The task includes the page, route, environment, and reporter.',
                 'demo_url' => 'https://shift.test/tasks?project=northstar-billing-local',
-                'surface' => 'Portal task',
+                'location' => 'Portal task',
                 'task' => [
                     'id' => 'SH-4187',
                     'title' => 'Invoice export fails for finance reviewer',
                     'project' => 'Northstar Billing Portal',
                     'status' => 'Open',
                     'priority' => 'High',
-                    'source' => 'Embedded app intake',
+                    'source' => 'Created from Laravel app',
                 ],
                 'person' => [
                     'name' => 'Maya Thompson',
                     'email' => 'maya.thompson@example.test',
                     'role' => 'Finance reviewer',
                 ],
-                'context' => [
+                'details' => [
                     'Submitted from' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
                     'Environment' => 'local',
                     'Route' => 'billing.invoices.show',
@@ -73,20 +73,20 @@ final class LaravelIssueIntakeDemo
                     'Request ID' => 'demo-req-9f72a8',
                 ],
                 'timeline' => [
-                    'Issue captured from host app',
+                    'Issue reported from the app',
                     'Task created in project',
-                    'Context attached for triage',
-                    'Thread opened for follow-up',
+                    'Page and user details attached',
+                    'Thread opened for replies',
                 ],
             ],
-            'backend-error-intake' => [
-                'slug' => 'backend-error-intake',
+            'error-report' => [
+                'slug' => 'error-report',
                 'kind' => 'error',
                 'accent' => 'rose',
-                'title' => 'Backend error intake',
-                'subtitle' => 'Scrubbed Laravel exception context can create or update the matching task.',
+                'title' => 'Laravel error report',
+                'subtitle' => 'Cleaned Laravel exception details can create or update the matching task.',
                 'demo_url' => 'https://shift-sdk-package.test/admin/reports/month-end',
-                'surface' => 'Laravel exception reporter',
+                'location' => 'Laravel exception reporter',
                 'task' => [
                     'id' => 'SH-4192',
                     'title' => 'Month-end report export throws storage disk exception',
@@ -102,15 +102,15 @@ final class LaravelIssueIntakeDemo
                 'error' => [
                     'class' => 'RuntimeException',
                     'message' => 'Configured export disk [reports-local] is not available.',
-                    'occurrences' => '3 occurrences in 11 minutes',
+                    'seen' => 'Seen 3 times in 11 minutes',
                     'release' => 'local-demo-2026.06.20',
                 ],
-                'context' => [
+                'details' => [
                     'Method' => 'POST',
                     'Path' => '/admin/reports/month-end/export',
                     'Controller' => 'ReportExportController@store',
                     'Environment' => 'local',
-                    'Scrubbed fields' => 'password, token, authorization, cookie',
+                    'Removed fields' => 'password, token, authorization, cookie',
                 ],
                 'frames' => [
                     'app/Services/Reports/MonthEndExport.php:84',
@@ -118,14 +118,14 @@ final class LaravelIssueIntakeDemo
                     'vendor/laravel/framework/src/Illuminate/Routing/Controller.php:54',
                 ],
             ],
-            'task-thread-follow-up' => [
-                'slug' => 'task-thread-follow-up',
+            'task-thread' => [
+                'slug' => 'task-thread',
                 'kind' => 'thread',
                 'accent' => 'amber',
-                'title' => 'Task thread and follow-up',
-                'subtitle' => 'Developers and app users keep the discussion attached to the original report.',
+                'title' => 'Task thread',
+                'subtitle' => 'Developers and app users discuss the issue on the original task.',
                 'demo_url' => 'https://shift.test/tasks/SH-4187',
-                'surface' => 'Task thread',
+                'location' => 'Task thread',
                 'task' => [
                     'id' => 'SH-4187',
                     'title' => 'Invoice export fails for finance reviewer',
@@ -158,7 +158,7 @@ final class LaravelIssueIntakeDemo
                         'time' => '10:43',
                     ],
                 ],
-                'context' => [
+                'details' => [
                     'Original page' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
                     'Environment' => 'local',
                     'Reporter' => 'Maya Thompson',

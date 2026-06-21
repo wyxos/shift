@@ -100,7 +100,7 @@ describe('Home.vue', () => {
         expect(wrapper.text()).toContain('MIT');
         expect(wrapper.text()).toContain('Laravel');
         expect(wrapper.text()).toContain('wyxos/shift-php');
-        expect(wrapper.text()).toContain('issue intake');
+        expect(wrapper.text()).toContain('issue reporting');
         expect(wrapper.text()).toContain('For Laravel teams maintaining client apps, support portals, and internal tools.');
         expect(wrapper.text()).not.toContain('Laravel package + SHIFT portal');
         expect(wrapper.text()).not.toContain('Open source · built for Laravel');
@@ -161,10 +161,10 @@ describe('Home.vue', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Hosted SHIFT');
-        expect(wrapper.text()).toContain('Self-hosted SHIFT');
+        expect(wrapper.text()).toContain('Hosted portal');
+        expect(wrapper.text()).toContain('Self-hosted portal');
         expect(wrapper.text()).toContain('shift.wyxos.com');
-        expect(wrapper.text()).toContain('without a hosted billing layer');
+        expect(wrapper.text()).toContain('without using the hosted service');
         expect(wrapper.text()).toContain('composer require wyxos/shift-php');
         expect(wrapper.text()).toContain('SHIFT_URL=https://shift.wyxos.com');
         expect(wrapper.text()).toContain('php artisan install:shift');
@@ -181,11 +181,11 @@ describe('Home.vue', () => {
         });
 
         const images = wrapper.findAll('img');
-        expect(images.some((image) => image.attributes('src') === '/marketing/shift-embedded-tasks.png')).toBe(true);
+        expect(images.some((image) => image.attributes('src') === '/marketing/shift-app-tasks.png')).toBe(true);
         expect(images.some((image) => image.attributes('src') === '/marketing/shift-portal-queue.png')).toBe(true);
         expect(wrapper.text()).toContain('1Install package');
-        expect(wrapper.text()).toContain('2Client files request');
-        expect(wrapper.text()).toContain('3Team triages in SHIFT');
+        expect(wrapper.text()).toContain('2Client reports issue');
+        expect(wrapper.text()).toContain('3Team reviews report');
         expect(wrapper.text()).toContain('app.northwind.com/shift/tasks');
         expect(wrapper.text()).toContain('shift.wyxos.com/tasks');
         expect(wrapper.text()).not.toContain(
@@ -208,18 +208,18 @@ describe('Home.vue', () => {
         expect(wrapper.text()).toContain('Open this URL in your browser to approve the installation:');
         expect(wrapper.text()).toContain('https://shift.wyxos.com/sdk/install');
         expect(wrapper.text()).toContain('Short code: A1B2-C3');
-        expect(wrapper.text()).toContain('Waiting for SHIFT approval...');
-        expect(wrapper.text()).toContain('Select which SHIFT project to link to this application');
-        expect(wrapper.text()).toContain('SHIFT authorization approved.');
-        expect(wrapper.text()).toContain('SHIFT installation complete.');
+        expect(wrapper.text()).toContain('Waiting for approval...');
+        expect(wrapper.text()).toContain('Select which project to link to this application');
+        expect(wrapper.text()).toContain('Authorization approved.');
+        expect(wrapper.text()).toContain('Installation complete.');
         expect(wrapper.text()).not.toContain('PROMPT');
         expect(wrapper.text()).not.toContain('ANSWER');
         expect(wrapper.text()).not.toContain('Which SHIFT URL should this project use?');
         expect(wrapper.text()).not.toContain('Choose the project to connect');
         expect(wrapper.text()).toContain('Client app access');
         expect(wrapper.text()).toContain('Hosted or self-hosted');
-        expect(wrapper.text()).toContain('Explicit report data');
-        expect(wrapper.text()).toContain('Fit');
+        expect(wrapper.text()).toContain('Report details');
+        expect(wrapper.text()).toContain('Where it helps');
         expect(wrapper.text()).toContain('Before you install.');
         expect(wrapper.text()).not.toContain('Do clients need a SHIFT login?');
         expect(wrapper.text()).not.toContain('Can we self-host it?');
@@ -251,8 +251,8 @@ describe('Home.vue', () => {
         expect(terminal.text()).toContain('runcloud@my-server:~/webapps/app-northwind$');
         expect(terminal.text()).toContain('Open this URL in your browser to approve the installation:');
         expect(terminal.text()).toContain('https://shift.wyxos.com/sdk/install');
-        expect(terminal.text()).toContain('SHIFT authorization approved.');
-        expect(terminal.text()).toContain('SHIFT installation complete.');
+        expect(terminal.text()).toContain('Authorization approved.');
+        expect(terminal.text()).toContain('Installation complete.');
         expect(terminal.text()).not.toMatch(/\b(INFO|ACTION|CODE|WAIT|SUCCESS)\b/);
         expect(terminal.text()).toContain('Short code: A1B2-C3');
         expect(terminal.find('ol').exists()).toBe(false);

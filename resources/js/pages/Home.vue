@@ -9,17 +9,17 @@ defineProps<{
     };
 }>();
 
-const embeddedShowcase = {
+const appShowcase = {
     label: 'Client app',
-    title: 'Issue intake lives where the client already works.',
+    title: 'Issue reports start where the client already works.',
     url: 'app.northwind.com/shift/tasks',
-    image: '/marketing/shift-embedded-tasks.png',
-    alt: 'SHIFT task list embedded inside a client Laravel app with the client app menu visible',
-    copy: 'The package mounts the task surface inside the Laravel app. Clients stay in their own app and file work against the right project context.',
+    image: '/marketing/shift-app-tasks.png',
+    alt: 'SHIFT task list inside a client Laravel app with the client app menu visible',
+    copy: 'The package adds task tools to the Laravel app. Clients stay in their app and report work against the right project.',
 };
 
 const platformShowcase = {
-    label: 'Central platform',
+    label: 'Central portal',
     title: 'Your team handles every client from one queue.',
     url: 'shift.wyxos.com/tasks',
     image: '/marketing/shift-portal-queue.png',
@@ -27,7 +27,7 @@ const platformShowcase = {
     copy: 'The central portal keeps the agency side organised by organisation, client, project, task, status, priority, and environment.',
 };
 
-const showcases = [embeddedShowcase, platformShowcase];
+const showcases = [appShowcase, platformShowcase];
 
 const workflowSteps = [
     {
@@ -35,11 +35,11 @@ const workflowSteps = [
         copy: 'Add wyxos/shift-php to the client Laravel app.',
     },
     {
-        label: 'Client files request',
-        copy: 'They create tasks from /shift/tasks without a separate SHIFT login.',
+        label: 'Client reports issue',
+        copy: 'They create tasks from /shift/tasks without a separate portal login.',
     },
     {
-        label: 'Team triages in SHIFT',
+        label: 'Team reviews report',
         copy: 'Your team works from one portal across clients and projects.',
     },
 ];
@@ -53,12 +53,12 @@ const installSteps = [
     {
         label: 'Point it',
         command: 'SHIFT_URL=https://shift.wyxos.com',
-        note: 'Use hosted SHIFT, or replace it with your self-hosted URL.',
+        note: 'Use the hosted portal, or replace it with your self-hosted URL.',
     },
     {
         label: 'Connect',
         command: 'php artisan install:shift',
-        note: 'Approve in the browser and choose the SHIFT project.',
+        note: 'Approve in the browser and choose the project.',
     },
 ];
 
@@ -72,11 +72,11 @@ const installFlowLines: Array<{ text: string; tone?: InstallTerminalTone }> = [
     { text: 'https://shift.wyxos.com/sdk/install', tone: 'url' },
     { text: 'Short code: A1B2-C3' },
     { text: '', tone: 'spacer' },
-    { text: 'Waiting for SHIFT approval...', tone: 'muted' },
-    { text: 'Select which SHIFT project to link to this application' },
-    { text: 'SHIFT authorization approved.', tone: 'success' },
-    { text: 'Registered local => https://app.northwind.com with SHIFT.', tone: 'success' },
-    { text: 'SHIFT installation complete.', tone: 'success' },
+    { text: 'Waiting for approval...', tone: 'muted' },
+    { text: 'Select which project to link to this application' },
+    { text: 'Authorization approved.', tone: 'success' },
+    { text: 'Registered local => https://app.northwind.com.', tone: 'success' },
+    { text: 'Installation complete.', tone: 'success' },
 ];
 
 const installFlowToneClasses: Record<InstallTerminalTone, string> = {
@@ -89,40 +89,40 @@ const installFlowToneClasses: Record<InstallTerminalTone, string> = {
 
 const installPrompt = 'runcloud@my-server:~/webapps/app-northwind$';
 
-const fitItems = [
+const useCaseItems = [
     {
         heading: 'Client app access',
-        copy: 'Clients use the app account they already have. The Laravel package provides the embedded task surface.',
+        copy: 'Clients use the app account they already have. The Laravel package adds the task tools.',
     },
     {
         heading: 'Hosted or self-hosted',
         copy: 'Run the hosted portal, or install the open-source Laravel portal on your own server and point the package at that URL.',
     },
     {
-        heading: 'Explicit report data',
-        copy: 'Task details, project context, environment, page URL, comments, and selected attachments are sent with the report.',
+        heading: 'Report details',
+        copy: 'Task details, project, environment, page URL, comments, and selected attachments are sent with the report.',
     },
     {
         heading: 'Existing Laravel auth',
-        copy: 'The embedded workspace runs inside the client Laravel app, so users keep their normal application session.',
+        copy: 'The workspace runs inside the client Laravel app, so users keep their normal signed-in session.',
     },
     {
-        heading: 'Workflow fit',
-        copy: 'Use it for intake and triage from the app. Your team can keep planning and shipping work in the tools it already uses.',
+        heading: 'Where it helps',
+        copy: 'Use it when issues should start inside the app. Your team can keep planning and shipping work in the tools it already uses.',
     },
 ];
 </script>
 
 <template>
-    <Head title="Laravel In-App Issue Intake">
+    <Head title="Laravel In-App Issue Reporting">
         <meta
-            content="SHIFT puts issue intake inside the Laravel apps you build for clients. Install one package, and every report lands in one portal, hosted or self-hosted."
+            content="SHIFT puts issue reporting inside the Laravel apps you build for clients. Install one package, and every report lands in one portal, hosted or self-hosted."
             name="description"
         />
-        <meta content="client task portal, issue intake, open source, Laravel, shift-php, hosted, self-hosted" name="keywords" />
-        <meta content="Laravel In-App Issue Intake" property="og:title" />
+        <meta content="client task portal, issue reporting, open source, Laravel, shift-php, hosted, self-hosted" name="keywords" />
+        <meta content="Laravel In-App Issue Reporting" property="og:title" />
         <meta
-            content="Issue intake that lives inside your client's own Laravel app. Install wyxos/shift-php, and reports land in one portal you run."
+            content="Issue reporting inside your client's own Laravel app. Install wyxos/shift-php, and reports land in one portal you run."
             property="og:description"
         />
         <meta content="website" property="og:type" />
@@ -167,11 +167,11 @@ const fitItems = [
                     <div class="max-w-2xl">
                         <h1 class="text-4xl leading-[1.04] font-semibold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl">
                             Tasks from your clients,
-                            <span class="text-blue-600 dark:text-blue-400">captured inside their app.</span>
+                            <span class="text-blue-600 dark:text-blue-400">reported inside their app.</span>
                         </h1>
                         <p class="text-muted-foreground mt-6 max-w-xl text-lg leading-relaxed lg:text-xl">
-                            SHIFT adds issue intake to the Laravel apps you build for clients. They report bugs and requests in context. Your team
-                            triages every client from one portal.
+                            SHIFT adds issue reporting to the Laravel apps you build for clients. They report bugs and requests with the page details
+                            included. Your team reviews every client from one portal.
                         </p>
                         <p class="text-muted-foreground mt-4 max-w-xl text-base leading-relaxed">
                             For Laravel teams maintaining client apps, support portals, and internal tools.
@@ -208,10 +208,10 @@ const fitItems = [
                                 <span class="size-3 rounded-full bg-amber-400/70"></span>
                                 <span class="size-3 rounded-full bg-emerald-400/70"></span>
                                 <span class="bg-background/80 text-muted-foreground mx-auto rounded-md px-3 py-1 text-xs">
-                                    {{ embeddedShowcase.url }}
+                                    {{ appShowcase.url }}
                                 </span>
                             </div>
-                            <img :alt="embeddedShowcase.alt" class="aspect-[2/1] w-full object-cover object-top" :src="embeddedShowcase.image" />
+                            <img :alt="appShowcase.alt" class="aspect-[2/1] w-full object-cover object-top" :src="appShowcase.image" />
                         </div>
                     </figure>
                 </div>
@@ -236,9 +236,9 @@ const fitItems = [
             <section class="bg-muted/30 border-b">
                 <div class="mx-auto w-full max-w-[1536px] px-6 py-24 lg:px-12 lg:py-32">
                     <div class="max-w-3xl">
-                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Two surfaces</span>
+                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Two places</span>
                         <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
-                            Inside the client app, and inside your central platform.
+                            Inside the client app, and inside your central portal.
                         </h2>
                     </div>
 
@@ -274,32 +274,32 @@ const fitItems = [
                         <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Hosted, or on your own server.</h2>
                         <p class="text-muted-foreground mt-6 text-lg leading-relaxed">
                             Start on the hosted portal in minutes, or run the open-source app yourself. Same package either way. The installer just
-                            points at whichever SHIFT URL you choose.
+                            points at the portal URL you choose.
                         </p>
                     </div>
                     <div class="mt-12 grid gap-6 lg:grid-cols-2">
-                        <div class="bg-card rounded-lg border p-8" data-testid="setup-path-Hosted SHIFT">
+                        <div class="bg-card rounded-lg border p-8" data-testid="setup-path-Hosted portal">
                             <div class="flex items-center gap-3">
                                 <span class="flex size-11 items-center justify-center rounded-lg bg-blue-600 text-white"
                                     ><Cloud class="size-5"
                                 /></span>
-                                <h3 class="text-xl font-semibold">Hosted SHIFT</h3>
+                                <h3 class="text-xl font-semibold">Hosted portal</h3>
                             </div>
                             <p class="text-muted-foreground mt-5 text-lg leading-relaxed">
                                 Use the managed portal at <span class="text-foreground/80 font-medium">shift.wyxos.com</span>. We run it; you connect
                                 projects with the installer. There's a starter plan to get going.
                             </p>
                         </div>
-                        <div class="bg-card rounded-lg border p-8" data-testid="setup-path-Self-hosted SHIFT">
+                        <div class="bg-card rounded-lg border p-8" data-testid="setup-path-Self-hosted portal">
                             <div class="flex items-center gap-3">
                                 <span class="bg-foreground text-background flex size-11 items-center justify-center rounded-lg"
                                     ><Server class="size-5"
                                 /></span>
-                                <h3 class="text-xl font-semibold">Self-hosted SHIFT</h3>
+                                <h3 class="text-xl font-semibold">Self-hosted portal</h3>
                             </div>
                             <p class="text-muted-foreground mt-5 text-lg leading-relaxed">
-                                Run the open-source Laravel app on your own server. Your data and your controls, without a hosted billing layer. Point
-                                the package at your URL.
+                                Run the open-source Laravel app on your own server. Your data and your controls, without using the hosted service.
+                                Point the package at your URL.
                             </p>
                         </div>
                     </div>
@@ -312,7 +312,7 @@ const fitItems = [
                         <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Setup</span>
                         <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Run php artisan install:shift.</h2>
                         <p class="text-muted-foreground mt-6 text-lg leading-relaxed">
-                            The installer detects the current app, opens browser approval, lets you choose a project, and writes the scoped connection
+                            The installer detects the current app, opens browser approval, lets you choose a project, and writes the connection
                             details.
                         </p>
                         <div class="mt-8 grid gap-4">
@@ -385,11 +385,11 @@ const fitItems = [
             <section class="border-b">
                 <div class="mx-auto w-full max-w-[1536px] px-6 py-24 lg:px-12 lg:py-32">
                     <div class="max-w-2xl">
-                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Fit</span>
+                        <span class="text-sm font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400">Use cases</span>
                         <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Before you install.</h2>
                     </div>
                     <div class="mt-12 grid gap-4 lg:grid-cols-2">
-                        <article v-for="item in fitItems" :key="item.heading" class="bg-card rounded-lg border p-6">
+                        <article v-for="item in useCaseItems" :key="item.heading" class="bg-card rounded-lg border p-6">
                             <h3 class="font-semibold">{{ item.heading }}</h3>
                             <p class="text-muted-foreground mt-3 leading-relaxed">{{ item.copy }}</p>
                         </article>
@@ -403,7 +403,7 @@ const fitItems = [
                         <div class="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-end">
                             <div class="max-w-2xl">
                                 <h2 class="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">Give clients a better way to report.</h2>
-                                <p class="mt-5 text-lg text-blue-100">Start hosted, or install the package and point it at your own SHIFT portal.</p>
+                                <p class="mt-5 text-lg text-blue-100">Start hosted, or install the package and point it at your own portal.</p>
                             </div>
                             <div class="flex shrink-0 flex-wrap gap-3">
                                 <Button v-if="!auth?.user" as-child class="bg-white text-blue-700 hover:bg-blue-50" size="lg">
