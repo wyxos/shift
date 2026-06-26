@@ -88,7 +88,7 @@ describe('Tasks/Index.vue', () => {
                     { id: 1, title: 'Investigate checkout', status: 'pending', priority: 'medium', type: 'task', type_label: 'Task' },
                     {
                         id: 2,
-                        title: 'Backend error: Checkout failed',
+                        title: 'Checkout failed',
                         project: { id: 5, name: 'Requirement Pack QA' },
                         status: 'pending',
                         priority: 'high',

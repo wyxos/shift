@@ -129,12 +129,16 @@ class AppErrorTaskIngestor
 
     private function title(array $signature): string
     {
-        $source = $signature['source'] === 'ui' ? 'UI error' : 'Backend error';
         $name = $signature['exception_class'] ?? $signature['error_name'] ?? 'Error';
         $name = class_basename($name);
         $culprit = $this->culpritLabel($signature);
+        $title = "{$name}".($culprit ? " at {$culprit}" : '');
 
-        return Str::limit("{$source}: {$name}".($culprit ? " at {$culprit}" : ''), 255, '');
+        if ($signature['source'] === 'ui') {
+            $title = "UI error: {$title}";
+        }
+
+        return Str::limit($title, 255, '');
     }
 
     private function culpritLabel(array $signature): ?string

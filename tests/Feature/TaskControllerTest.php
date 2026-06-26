@@ -58,7 +58,7 @@ test('tasks index can distinguish and filter tasks from app errors', function ()
 
     $errorTask = Task::factory()->create([
         'project_id' => $project->id,
-        'title' => 'Backend error: Checkout failed',
+        'title' => 'Checkout failed',
         'status' => 'pending',
         'error_signature' => str_repeat('b', 64),
         'error_source' => 'backend',

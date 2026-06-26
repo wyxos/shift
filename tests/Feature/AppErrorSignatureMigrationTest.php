@@ -79,6 +79,37 @@ it('normalizes existing revision split app error tasks', function () {
         ]);
 });
 
+it('removes the redundant backend error prefix from existing app error task titles', function () {
+    $project = Project::factory()->create();
+    $backendTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Backend error: Checkout failed',
+        'error_signature' => str_repeat('c', 64),
+        'error_source' => 'backend',
+    ]);
+    $uiTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'UI error: Widget crashed',
+        'error_signature' => str_repeat('d', 64),
+        'error_source' => 'ui',
+    ]);
+    $normalTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Backend error: customer typed this title',
+        'error_signature' => null,
+    ]);
+
+    $migration = database_path('migrations/2026_06_26_162500_remove_backend_error_prefix_from_task_titles.php');
+
+    if (file_exists($migration)) {
+        (require $migration)->up();
+    }
+
+    expect($backendTask->fresh()->title)->toBe('Checkout failed')
+        ->and($uiTask->fresh()->title)->toBe('UI error: Widget crashed')
+        ->and($normalTask->fresh()->title)->toBe('Backend error: customer typed this title');
+});
+
 function createLegacyErrorOccurrence(Task $task, int $number, string $gitSha, CarbonInterface $receivedAt): void
 {
     DB::table('task_error_occurrences')->insert([
