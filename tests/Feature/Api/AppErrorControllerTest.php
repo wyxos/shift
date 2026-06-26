@@ -99,7 +99,7 @@ it('files a backend error as a task with a raw occurrence record', function () {
         ->assertJsonPath('occurrences.0.payload.project', '[Filtered]');
 });
 
-it('groups repeated errors with the same project environment revision and frame as task occurrences', function () {
+it('groups repeated errors with the same project environment and frame as task occurrences', function () {
     $user = User::factory()->create();
     Project::factory()->withAuthor($user->id)->create(['token' => 'project-token']);
     $token = $user->createToken('sdk')->plainTextToken;
@@ -298,21 +298,33 @@ it('reopens a completed error task when the same signature occurs again', functi
     expect($task->fresh()->status)->toBe(TaskStatus::Pending->value);
 });
 
-it('creates a separate task when the git revision changes', function () {
+it('groups repeated errors across deployment revisions while retaining occurrence revisions', function () {
     $user = User::factory()->create();
     Project::factory()->withAuthor($user->id)->create(['token' => 'project-token']);
     $token = $user->createToken('sdk')->plainTextToken;
 
     $first = $this->withToken($token)->postJson('/api/errors', appErrorPayload(['git_sha' => 'abc1234']));
     $second = $this->withToken($token)->postJson('/api/errors', appErrorPayload(['git_sha' => 'def5678']));
+    $third = $this->withToken($token)->postJson('/api/errors', appErrorPayload([
+        'release' => 'v2.0.0',
+        'git_sha' => null,
+    ]));
 
     $first->assertCreated();
-    $second->assertCreated();
+    $second->assertCreated()
+        ->assertJsonPath('task.signature', $first->json('task.signature'))
+        ->assertJsonPath('task.occurrences_count', 2);
+    $third->assertCreated()
+        ->assertJsonPath('task.signature', $first->json('task.signature'))
+        ->assertJsonPath('task.occurrences_count', 3);
 
-    expect($second->json('task.signature'))->not->toBe($first->json('task.signature'));
-    expect(Task::query()->count())->toBe(2);
+    expect(Task::query()->count())->toBe(1);
     expect(TaskThread::query()->count())->toBe(0);
-    expect(DB::table('task_error_occurrences')->count())->toBe(2);
+    expect(DB::table('task_error_occurrences')->count())->toBe(3);
+    expect(DB::table('task_error_occurrences')->orderBy('number')->pluck('git_sha')->all())
+        ->toBe(['abc1234', 'def5678', null]);
+    expect(DB::table('task_error_occurrences')->orderBy('number')->pluck('release')->all())
+        ->toBe(['v1.2.3', 'v1.2.3', 'v2.0.0']);
 });
 
 it('returns not found when the authenticated user cannot access the project token', function () {
