@@ -34,7 +34,6 @@ class AppErrorSignature
         $components = [
             'project_id' => $project->id,
             'environment' => $this->nullableString($payload['environment'] ?? null),
-            'revision' => $this->nullableString($payload['git_sha'] ?? null) ?? $this->nullableString($payload['release'] ?? null),
             'source' => (string) $payload['source'],
             'name' => $exceptionClass ?? $errorName ?? 'Error',
             'file' => $culpritFile,
