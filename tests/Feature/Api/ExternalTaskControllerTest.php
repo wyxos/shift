@@ -272,7 +272,7 @@ test('index and show expose task type metadata for app error tasks', function ()
 
     $errorTask = Task::factory()->create([
         'project_id' => $this->project->id,
-        'title' => 'Backend error: Checkout failed',
+        'title' => 'Checkout failed',
         'error_signature' => str_repeat('c', 64),
         'error_source' => 'backend',
         'updated_at' => now(),
