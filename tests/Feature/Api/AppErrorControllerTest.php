@@ -31,8 +31,7 @@ it('files a backend error as a task with a raw occurrence record', function () {
 
     $task = Task::query()->with('metadata')->firstOrFail();
     expect($task->error_signature)->toHaveLength(64)
-        ->and($task->title)->toContain('RuntimeException')
-        ->and($task->title)->toContain('InvoiceSync.php:88')
+        ->and($task->title)->toBe('RuntimeException at app/Services/Billing/InvoiceSync.php:88')
         ->and($task->status)->toBe(TaskStatus::Pending->value)
         ->and($task->priority)->toBe('high')
         ->and($task->error_culprit_file)->toBe('app/Services/Billing/InvoiceSync.php')
