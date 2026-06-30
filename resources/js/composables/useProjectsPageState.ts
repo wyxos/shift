@@ -257,8 +257,11 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     }
 
     function openProjectExternalUsers(project: ProjectRow) {
-        const path = isScopedOrganisationRoute.value ? `/organisation/${appliedOrganisationId.value}/external-users` : '/external-users';
-        router.get(path, { project_id: project.id });
+        const organisationId = isScopedOrganisationRoute.value ? appliedOrganisationId.value : project.organisation_id;
+
+        if (!organisationId) return;
+
+        router.get(`/organisation/${organisationId}/external-users`, { project_id: project.id });
     }
 
     function closeEditModal() {

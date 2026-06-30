@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Organisation;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
@@ -73,16 +74,18 @@ class ClientController extends Controller
             ]);
     }
 
-    public function destroy(Client $client)
+    public function destroy(Client $client): RedirectResponse
     {
         abort_unless($client->organisation && $this->permissions->canManageOrganisation($client->organisation, auth()->id()), 403);
 
+        $redirect = $this->redirectToClientList($client);
+
         $client->delete();
 
-        return redirect()->route('clients.index')->with('success', 'Client deleted successfully.');
+        return $redirect->with('success', 'Client deleted successfully.');
     }
 
-    public function update(Client $client)
+    public function update(Client $client): RedirectResponse
     {
         abort_unless($client->organisation && $this->permissions->canManageOrganisation($client->organisation, auth()->id()), 403);
 
@@ -90,10 +93,10 @@ class ClientController extends Controller
             'name' => 'required|string|max:255',
         ]));
 
-        return redirect()->route('clients.index')->with('success', 'Client updated successfully.');
+        return $this->redirectToClientList($client)->with('success', 'Client updated successfully.');
     }
 
-    public function store()
+    public function store(): RedirectResponse
     {
         $attributes = request()->validate([
             'name' => 'required|string|max:255',
@@ -108,8 +111,15 @@ class ClientController extends Controller
             ]);
         }
 
-        Client::create($attributes);
+        $client = Client::create($attributes);
 
-        return redirect()->route('clients.index')->with('success', 'Client created successfully.');
+        return $this->redirectToClientList($client)->with('success', 'Client created successfully.');
+    }
+
+    private function redirectToClientList(Client $client): RedirectResponse
+    {
+        $client->loadMissing('organisation');
+
+        return redirect()->route('organisation.clients', $client->organisation);
     }
 }

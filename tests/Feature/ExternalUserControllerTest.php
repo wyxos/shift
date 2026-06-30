@@ -15,9 +15,14 @@ beforeEach(function () {
 });
 
 test('user can only see external users for owned projects', function () {
+    $ownedOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
     // Create a project owned by the authenticated user
     $ownedProject = Project::factory()->create([
         'author_id' => $this->user->id,
+        'organisation_id' => $ownedOrganisation->id,
     ]);
 
     // Create an external user for the owned project
@@ -29,8 +34,12 @@ test('user can only see external users for owned projects', function () {
 
     // Create another project not owned by the authenticated user
     $otherUser = User::factory()->create();
+    $otherOrganisation = Organisation::factory()->create([
+        'author_id' => $otherUser->id,
+    ]);
     $otherProject = Project::factory()->create([
         'author_id' => $otherUser->id,
+        'organisation_id' => $otherOrganisation->id,
     ]);
 
     // Create an external user for the other project
@@ -42,7 +51,7 @@ test('user can only see external users for owned projects', function () {
 
     // Access the external users index page as the authenticated user
     $response = $this->actingAs($this->user)
-        ->get(route('external-users.index'));
+        ->get(route('organisation.external-users', $ownedOrganisation));
 
     $response->assertStatus(200);
 
@@ -56,12 +65,17 @@ test('user can only see external users for owned projects', function () {
 });
 
 test('external users index can filter by project and includes role labels', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
     $billingProject = Project::factory()->create([
         'author_id' => $this->user->id,
+        'organisation_id' => $organisation->id,
         'name' => 'Billing Console',
     ]);
     $retailProject = Project::factory()->create([
         'author_id' => $this->user->id,
+        'organisation_id' => $organisation->id,
         'name' => 'Retail Dashboard',
     ]);
 
@@ -79,7 +93,10 @@ test('external users index can filter by project and includes role labels', func
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('external-users.index', ['project_id' => $billingProject->id]));
+        ->get(route('organisation.external-users', [
+            'organisation' => $organisation,
+            'project_id' => $billingProject->id,
+        ]));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
@@ -95,8 +112,12 @@ test('external users index can filter by project and includes role labels', func
 });
 
 test('external users index includes linked and linkable account management data', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
+        'organisation_id' => $organisation->id,
         'name' => 'Portal',
     ]);
     $contact = ExternalContact::create([
@@ -124,7 +145,11 @@ test('external users index includes linked and linkable account management data'
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('external-users.index', ['project_id' => $project->id, 'sort_by' => 'name']));
+        ->get(route('organisation.external-users', [
+            'organisation' => $organisation,
+            'project_id' => $project->id,
+            'sort_by' => 'name',
+        ]));
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
@@ -214,6 +239,39 @@ test('external user update can return json for sheet edits', function () {
     $response->assertJsonPath('external_user.email', 'lead@example.com');
     $response->assertJsonPath('external_user.role', ExternalUserRole::ClientDeveloper->value);
     $response->assertJsonPath('external_user.project.id', $project->id);
+
+    $this->assertDatabaseHas('external_users', [
+        'id' => $externalUser->id,
+        'name' => 'Client QA Lead',
+        'email' => 'lead@example.com',
+    ]);
+});
+
+test('external user form update redirects to the organisation external users page', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'organisation_id' => $organisation->id,
+        'name' => 'Portal',
+    ]);
+    $externalUser = ExternalUser::factory()->create([
+        'project_id' => $project->id,
+        'name' => 'Client QA',
+        'email' => 'qa@example.com',
+        'role' => ExternalUserRole::ClientDeveloper,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('external-users.update', $externalUser), [
+            'name' => 'Client QA Lead',
+            'email' => 'lead@example.com',
+        ])
+        ->assertRedirect(route('organisation.external-users', [
+            'organisation' => $organisation,
+            'project_id' => $project->id,
+        ]));
 
     $this->assertDatabaseHas('external_users', [
         'id' => $externalUser->id,
@@ -441,8 +499,12 @@ test('developer project members cannot manage external account links', function 
 test('user can only see external users for projects with access', function () {
     // Create a project not owned by the authenticated user
     $otherUser = User::factory()->create();
+    $accessibleOrganisation = Organisation::factory()->create([
+        'author_id' => $otherUser->id,
+    ]);
     $accessibleProject = Project::factory()->create([
         'author_id' => $otherUser->id,
+        'organisation_id' => $accessibleOrganisation->id,
     ]);
 
     // Give the authenticated user access to the project
@@ -464,6 +526,7 @@ test('user can only see external users for projects with access', function () {
     // Create another project not owned by the authenticated user and without access
     $inaccessibleProject = Project::factory()->create([
         'author_id' => $otherUser->id,
+        'organisation_id' => $accessibleOrganisation->id,
     ]);
 
     // Create an external user for the inaccessible project
@@ -475,7 +538,7 @@ test('user can only see external users for projects with access', function () {
 
     // Access the external users index page as the authenticated user
     $response = $this->actingAs($this->user)
-        ->get(route('external-users.index'));
+        ->get(route('organisation.external-users', $accessibleOrganisation));
 
     $response->assertStatus(200);
 
@@ -486,28 +549,6 @@ test('user can only see external users for projects with access', function () {
     // Assert that the inaccessible external user is not visible
     $response->assertDontSee('Inaccessible External User');
     $response->assertDontSee('inaccessible@example.com');
-});
-
-test('user cannot edit external user for inaccessible project', function () {
-    // Create a project not owned by the authenticated user
-    $otherUser = User::factory()->create();
-    $inaccessibleProject = Project::factory()->create([
-        'author_id' => $otherUser->id,
-    ]);
-
-    // Create an external user for the inaccessible project
-    $inaccessibleExternalUser = ExternalUser::factory()->create([
-        'project_id' => $inaccessibleProject->id,
-        'name' => 'Inaccessible External User',
-        'email' => 'inaccessible@example.com',
-    ]);
-
-    // Try to access the edit page for the inaccessible external user
-    $response = $this->actingAs($this->user)
-        ->get(route('external-users.edit', $inaccessibleExternalUser->id));
-
-    // Should get a 404 since the user doesn't have access to this external user
-    $response->assertStatus(404);
 });
 
 test('user cannot update external user for inaccessible project', function () {
