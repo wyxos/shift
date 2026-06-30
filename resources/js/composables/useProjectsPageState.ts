@@ -1,8 +1,8 @@
 import { type AccessUserCandidate } from '@/components/admin/access-users';
 import {
     defaultSortBy,
-    normalizeNullableId,
     normalizeSortBy,
+    type NullableOption,
     type Option,
     type ProjectAccessUser,
     type ProjectEnvironmentRow,
@@ -15,11 +15,15 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
+import { useProjectAppErrorNotificationsState } from './useProjectAppErrorNotificationsState';
+import { omitErrors, useProjectCreateState } from './useProjectCreateState';
 
 type ProjectsPageStateProps = {
     projects: ProjectPaginator;
     accessUsers: AccessUserCandidate[];
+    canCreateProject?: boolean;
     clients: Option[];
+    currentOrganisation?: NullableOption;
     organisations: Option[];
     filters: ProjectFilters;
 };
@@ -29,13 +33,8 @@ type WidgetEnvironmentSettings = Pick<
     'id' | 'key' | 'label' | 'url' | 'external_widget_enabled' | 'external_widget_guest_submissions_enabled'
 >;
 
-function omitErrors(errors: Record<string, string>, keys: string[]) {
-    return Object.fromEntries(Object.entries(errors).filter(([key]) => !keys.includes(key))) as Record<string, string>;
-}
-
 export function useProjectsPageState(props: ProjectsPageStateProps) {
     const page = usePage<SharedData>();
-    const breadcrumbs: BreadcrumbItem[] = [{ title: 'Projects', href: '/projects' }];
     const filtersOpen = ref(false);
     const editDialogOpen = ref(false);
     const deleteProcessing = ref(false);
@@ -51,6 +50,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     const mcpSettingsOpen = ref(false);
     const mcpSettingsLoading = ref(false);
     const mcpSettingsError = ref<string | null>(null);
+    const appErrorNotifications = useProjectAppErrorNotificationsState();
     const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
     const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
     const appliedOrganisationId = computed(() => props.filters.organisation_id ?? null);
@@ -87,6 +87,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         return current.pathname === `/organisation/${appliedOrganisationId.value}/projects`;
     });
     const indexPath = computed(() => (isScopedOrganisationRoute.value ? `/organisation/${appliedOrganisationId.value}/projects` : '/projects'));
+    const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'Projects', href: indexPath.value }]);
     const activeFilterCount = computed(() => {
         let count = 0;
 
@@ -136,26 +137,10 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         mcp_enabled: false,
     });
 
-    watch(
-        () => createForm.client_id,
-        (value) => {
-            const normalized = normalizeNullableId(value);
-            if (normalized !== value) createForm.client_id = normalized;
-        },
-    );
-    watch(
-        () => createForm.organisation_id,
-        (value) => {
-            const normalized = normalizeNullableId(value);
-            if (normalized !== value) createForm.organisation_id = normalized;
-        },
-    );
-
-    const otherCreateErrors = computed(() => omitErrors(createForm.errors, ['name', 'client_id', 'organisation_id']));
     const otherEditErrors = computed(() => omitErrors(editForm.errors, ['name']));
-    const createDisabled = computed(() => createForm.processing || !createForm.name.trim());
     const editDisabled = computed(() => editForm.processing || !editForm.name.trim());
     const grantAccessDisabled = computed(() => grantAccessForm.processing || !grantAccessForm.email.trim() || !grantAccessForm.name.trim());
+    const projectCreate = useProjectCreateState(props, createForm);
 
     function buildIndexParams(page = 1) {
         const params: Record<string, unknown> = {
@@ -276,11 +261,6 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         router.get(path, { project_id: project.id });
     }
 
-    function closeCreateModal() {
-        createForm.isActive = false;
-        createForm.reset();
-    }
-
     function closeEditModal() {
         editDialogOpen.value = false;
         editForm.reset();
@@ -295,16 +275,6 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     function closeMcpSettingsModal() {
         mcpSettingsOpen.value = false;
         mcpSettingsError.value = null;
-    }
-
-    function submitCreateForm() {
-        createForm.post('/projects', {
-            preserveScroll: true,
-            onSuccess: () => closeCreateModal(),
-            onError: () => {
-                createForm.isActive = true;
-            },
-        });
     }
 
     function saveEdit() {
@@ -430,17 +400,17 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
 
     return {
         activeFilterCount,
+        ...appErrorNotifications,
+        ...projectCreate,
         apiTokenError,
         apiTokenForm,
         apiTokenLoading,
         applyFilters,
         breadcrumbs,
-        closeCreateModal,
         closeEditModal,
         closeMcpSettingsModal,
         closeWidgetSettingsModal,
         confirmDelete,
-        createDisabled,
         createForm,
         deleteError,
         deleteForm,
@@ -473,7 +443,6 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         openProjectExternalUsers,
         openProjectTasks,
         openWidgetSettingsModal,
-        otherCreateErrors,
         otherEditErrors,
         projectRows,
         removeAccess,
@@ -481,7 +450,6 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         saveEdit,
         saveMcpSettings,
         saveWidgetSettings,
-        submitCreateForm,
         widgetSettingsError,
         widgetSettingsForm,
         widgetSettingsLoading,

@@ -2,8 +2,10 @@
 
 use App\Models\Organisation;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\ProjectInvitationNotification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
@@ -170,5 +172,40 @@ test('project invite reuses existing organisation membership', function () {
         'project_id' => $project->id,
         'user_id' => $existingUser->id,
         'registration_status' => 'registered',
+    ]);
+});
+
+test('revoking explicit project access removes saved app error notification recipients', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+    $recipient = User::factory()->create();
+    $projectUser = ProjectUser::query()->create([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'user_email' => $recipient->email,
+        'user_name' => $recipient->name,
+        'registration_status' => 'registered',
+    ]);
+
+    DB::table('project_app_error_notification_users')->insert([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($this->user)
+        ->deleteJson(route('project-users.destroy', [$project, $projectUser]))
+        ->assertOk();
+
+    $this->assertDatabaseMissing('project_app_error_notification_users', [
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
     ]);
 });

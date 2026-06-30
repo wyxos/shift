@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
-import { Bot, KeyRound, ListTodo, MessageSquare, Pencil, Trash2, Users, UserSearch } from 'lucide-vue-next';
+import { BellRing, Bot, KeyRound, ListTodo, MessageSquare, Pencil, Trash2, Users, UserSearch } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
 const { projects, showOrganisationColumn = true } = defineProps<{
@@ -19,6 +19,7 @@ const emit = defineEmits<{
     'open-tasks': [project: ProjectRow];
     'open-widget-settings': [project: ProjectRow];
     'open-mcp-settings': [project: ProjectRow];
+    'open-app-error-notifications': [project: ProjectRow];
 }>();
 
 function canManageProjectAccess(project: ProjectRow) {
@@ -65,10 +66,10 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                     <TableCell>
                         <div class="flex flex-col gap-1">
                             <span class="font-medium">{{ project.name }}</span>
-                            <span v-if="projectClientLabel(project)" class="text-muted-foreground text-xs">
-                                {{ projectClientLabel(project) }}
-                            </span>
-                            <div v-if="hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
+                            <div v-if="projectClientLabel(project) || hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
+                                <Badge v-if="projectClientLabel(project)" :data-testid="`project-client-${project.id}`" variant="secondary">
+                                    {{ projectClientLabel(project) }}
+                                </Badge>
                                 <Badge v-if="hasWidgetEnabled(project)" :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">
                                     Widget
                                 </Badge>
@@ -153,6 +154,15 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                                 @click="emit('open-mcp-settings', project)"
                             >
                                 <Bot class="h-4 w-4" />
+                            </ActionIconButton>
+                            <ActionIconButton
+                                v-if="canManageTechnicalSettings(project)"
+                                label="Manage app error notifications"
+                                title="App errors"
+                                :data-testid="`project-app-error-notifications-${project.id}`"
+                                @click="emit('open-app-error-notifications', project)"
+                            >
+                                <BellRing class="h-4 w-4" />
                             </ActionIconButton>
                             <ActionIconButton
                                 v-if="canEditProject(project)"
