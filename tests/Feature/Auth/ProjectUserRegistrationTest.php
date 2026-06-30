@@ -47,7 +47,10 @@ test('invited project users can register and must verify their email', function 
 
     $registeredUser = User::where('email', 'invited@example.com')->firstOrFail();
 
-    $response->assertRedirect(route('projects.index', ['highlight' => $project->id], absolute: false));
+    $response->assertRedirect(route('organisation.projects', [
+        'organisation' => $organisation,
+        'highlight' => $project->id,
+    ], absolute: false));
     $this->assertAuthenticatedAs($registeredUser);
     expect($registeredUser->email_verified_at)->toBeNull();
 
@@ -63,8 +66,12 @@ test('invited project users can register and must verify their email', function 
     ]);
 
     Notification::assertSentTo($registeredUser, VerifyEmail::class);
-    Notification::assertSentTo($projectOwner, ProjectUserRegisteredNotification::class);
+    Notification::assertSentTo(
+        $projectOwner,
+        ProjectUserRegisteredNotification::class,
+        fn (ProjectUserRegisteredNotification $notification) => $notification->toArray($projectOwner)['organisation_id'] === $organisation->id,
+    );
 
-    $this->get('/projects')
+    $this->get(route('organisation.projects', $organisation, absolute: false))
         ->assertRedirect(route('verification.notice', absolute: false));
 });

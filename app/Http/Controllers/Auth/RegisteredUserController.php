@@ -81,7 +81,14 @@ class RegisteredUserController extends Controller
                 $project->author->notify(new ProjectUserRegisteredNotification($user, $project));
             }
 
-            return to_route('projects.index', ['highlight' => $request->project_id]);
+            if ($project && $organisation = $project->accessOrganisation()) {
+                return to_route('organisation.projects', [
+                    'organisation' => $organisation,
+                    'highlight' => $project->id,
+                ]);
+            }
+
+            return to_route('dashboard');
         }
 
         // If the user was invited to an organisation, update the organisation_user record and redirect to the organisation

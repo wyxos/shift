@@ -3,6 +3,7 @@ import DeleteDialog from '@/components/DeleteDialog.vue';
 import AdminListShell from '@/components/admin/AdminListShell.vue';
 import { type AccessUserCandidate } from '@/components/admin/access-users';
 import ProjectApiTokenDialog from '@/components/admin/projects/ProjectApiTokenDialog.vue';
+import ProjectAppErrorNotificationsDialog from '@/components/admin/projects/ProjectAppErrorNotificationsDialog.vue';
 import ProjectCreateDialog from '@/components/admin/projects/ProjectCreateDialog.vue';
 import ProjectEditDialog from '@/components/admin/projects/ProjectEditDialog.vue';
 import ProjectFilterControls from '@/components/admin/projects/ProjectFilterControls.vue';
@@ -10,7 +11,7 @@ import ProjectListTable from '@/components/admin/projects/ProjectListTable.vue';
 import ProjectManageUsersDialog from '@/components/admin/projects/ProjectManageUsersDialog.vue';
 import ProjectMcpSettingsDialog from '@/components/admin/projects/ProjectMcpSettingsDialog.vue';
 import ProjectWidgetSettingsDialog from '@/components/admin/projects/ProjectWidgetSettingsDialog.vue';
-import { type Option, type ProjectFilters, type ProjectPaginator } from '@/components/admin/projects/project-shared';
+import { type NullableOption, type Option, type ProjectFilters, type ProjectPaginator } from '@/components/admin/projects/project-shared';
 import { Button } from '@/components/ui/button';
 import { useProjectsPageState } from '@/composables/useProjectsPageState';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -21,19 +22,28 @@ const props = withDefaults(
     defineProps<{
         projects: ProjectPaginator;
         accessUsers?: AccessUserCandidate[];
+        canCreateProject?: boolean;
         clients?: Option[];
+        currentOrganisation?: NullableOption;
         organisations?: Option[];
         filters?: ProjectFilters;
     }>(),
     {
         accessUsers: () => [],
+        canCreateProject: false,
         clients: () => [],
+        currentOrganisation: null,
         organisations: () => [],
         filters: () => ({}),
     },
 );
 const {
     activeFilterCount,
+    appErrorNotificationsError,
+    appErrorNotificationsForm,
+    appErrorNotificationsLoaded,
+    appErrorNotificationsLoading,
+    appErrorNotificationsOpen,
     apiTokenError,
     apiTokenForm,
     apiTokenLoading,
@@ -41,6 +51,7 @@ const {
     breadcrumbs,
     closeCreateModal,
     closeEditModal,
+    closeAppErrorNotificationsModal,
     closeMcpSettingsModal,
     closeWidgetSettingsModal,
     confirmDelete,
@@ -68,6 +79,8 @@ const {
     mcpSettingsLoading,
     mcpSettingsOpen,
     onPageChange,
+    openCreateModal,
+    openAppErrorNotificationsModal,
     openApiTokenModal,
     openDeleteModal,
     openEditModal,
@@ -82,6 +95,7 @@ const {
     removeAccess,
     removingAccessId,
     resetFilters,
+    saveAppErrorNotifications,
     saveEdit,
     saveMcpSettings,
     saveWidgetSettings,
@@ -119,7 +133,7 @@ const {
                 </template>
 
                 <template #actions>
-                    <Button data-testid="open-create-project" size="sm" @click="createForm.isActive = true">
+                    <Button v-if="props.canCreateProject" data-testid="open-create-project" size="sm" @click="openCreateModal">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Project
                     </Button>
@@ -133,6 +147,7 @@ const {
                     @open-edit="openEditModal"
                     @open-external-users="openProjectExternalUsers"
                     @open-manage-users="openManageUsersModal"
+                    @open-app-error-notifications="openAppErrorNotificationsModal"
                     @open-mcp-settings="openMcpSettingsModal"
                     @open-tasks="openProjectTasks"
                     @open-widget-settings="openWidgetSettingsModal"
@@ -159,6 +174,7 @@ const {
             :disabled="createDisabled"
             :organisations="organisations"
             :other-errors="otherCreateErrors"
+            :scoped-organisation="currentOrganisation"
             @cancel="closeCreateModal"
             @submit="submitCreateForm"
             @update:open="createForm.isActive = $event"
@@ -203,6 +219,16 @@ const {
             @cancel="closeWidgetSettingsModal"
             @save="saveWidgetSettings"
             @update:open="widgetSettingsOpen = $event"
+        />
+        <ProjectAppErrorNotificationsDialog
+            :error="appErrorNotificationsError"
+            :form="appErrorNotificationsForm"
+            :loaded="appErrorNotificationsLoaded"
+            :loading="appErrorNotificationsLoading"
+            :open="appErrorNotificationsOpen"
+            @cancel="closeAppErrorNotificationsModal"
+            @save="saveAppErrorNotifications"
+            @update:open="appErrorNotificationsOpen = $event"
         />
         <ProjectMcpSettingsDialog
             :error="mcpSettingsError"

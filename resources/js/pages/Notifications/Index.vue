@@ -78,6 +78,8 @@ const getNotificationTitle = (notification) => {
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
             return `New Task: ${data.task_title}`;
+        case 'App\\Notifications\\AppErrorReportedNotification':
+            return `App Error: ${data.task_title}`;
         case 'App\\Notifications\\TaskThreadUpdated':
             return `New reply in ${data.type} thread for ${data.task_title}`;
         case 'App\\Notifications\\ProjectInvitationNotification':
@@ -106,12 +108,13 @@ const getNotificationUrl = (notification) => {
 
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
+        case 'App\\Notifications\\AppErrorReportedNotification':
             return route('tasks.index', { task: data.task_id });
         case 'App\\Notifications\\TaskThreadUpdated':
             return data.url;
         case 'App\\Notifications\\ProjectInvitationNotification':
         case 'App\\Notifications\\ProjectUserRegisteredNotification':
-            return route('projects.index');
+            return data.organisation_id ? route('organisation.projects', { organisation: data.organisation_id }) : route('dashboard');
         case 'App\\Notifications\\OrganisationInvitationNotification':
         case 'App\\Notifications\\OrganisationAccessNotification':
             return route('organisations.index');
@@ -135,6 +138,8 @@ const getNotificationDescription = (notification) => {
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
             return `Task created in project: ${data.project_name}`;
+        case 'App\\Notifications\\AppErrorReportedNotification':
+            return `App error reported in project: ${data.project_name}`;
         case 'App\\Notifications\\TaskThreadUpdated':
             return data.content ? `${data.content.substring(0, 100)}${data.content.length > 100 ? '...' : ''}` : '';
         case 'App\\Notifications\\ProjectInvitationNotification':

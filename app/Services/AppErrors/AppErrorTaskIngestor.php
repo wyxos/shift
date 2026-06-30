@@ -7,17 +7,23 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskErrorOccurrence;
 use App\Models\User;
+use App\Notifications\AppErrorReportedNotification;
+use App\Services\ProjectAppErrorNotificationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AppErrorTaskIngestor
 {
     public function __construct(
         private readonly AppErrorSignature $signature,
         private readonly AppErrorScrubber $scrubber,
+        private readonly ProjectAppErrorNotificationService $notifications,
     ) {}
 
     /**
@@ -47,12 +53,14 @@ class AppErrorTaskIngestor
         array $scrubbedPayload,
         ?string $message,
     ): array {
-        return DB::transaction(function () use ($project, $sender, $signature, $receivedAt, $occurredAt, $scrubbedPayload, $message) {
+        [$task, $occurrence, $notificationReason] = DB::transaction(function () use ($project, $sender, $signature, $receivedAt, $occurredAt, $scrubbedPayload, $message) {
             $task = Task::query()
                 ->where('project_id', $project->id)
                 ->where('error_signature', $signature['signature'])
                 ->lockForUpdate()
                 ->first();
+
+            $notificationReason = null;
 
             if (! $task instanceof Task) {
                 $task = new Task([
@@ -65,8 +73,10 @@ class AppErrorTaskIngestor
                     'error_occurrences_count' => 0,
                 ]);
                 $task->submitter()->associate($sender);
+                $notificationReason = 'created';
             } elseif ($task->status === TaskStatus::Completed->value) {
                 $task->status = TaskStatus::Pending->value;
+                $notificationReason = 'reopened';
             }
 
             $occurrenceNumber = ((int) $task->error_occurrences_count) + 1;
@@ -123,8 +133,41 @@ class AppErrorTaskIngestor
                 'metadata' => $this->arrayValue(Arr::get($scrubbedPayload, 'metadata')),
             ]);
 
-            return [$task->refresh(), $occurrence->refresh()];
+            return [$task->refresh(), $occurrence->refresh(), $notificationReason];
         });
+
+        if ($notificationReason !== null) {
+            $this->notifyConfiguredRecipients($task, $notificationReason);
+        }
+
+        return [$task, $occurrence];
+    }
+
+    private function notifyConfiguredRecipients(Task $task, string $reason): void
+    {
+        $task->loadMissing('project');
+
+        if (! $task->project instanceof Project) {
+            return;
+        }
+
+        $recipients = $this->notifications->recipients($task->project);
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        try {
+            Notification::send($recipients, new AppErrorReportedNotification($task, $reason));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Log::warning('Failed to dispatch app error notification.', [
+                'task_id' => $task->id,
+                'project_id' => $task->project_id,
+                'reason' => $reason,
+            ]);
+        }
     }
 
     private function title(array $signature): string

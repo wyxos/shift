@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\ProjectInvitationNotification;
+use App\Services\ProjectAppErrorNotificationService;
 use App\Services\ShiftPermissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +16,10 @@ use Illuminate\Support\Facades\Notification;
 
 class ProjectUserController extends Controller
 {
-    public function __construct(private readonly ShiftPermissionService $permissions) {}
+    public function __construct(
+        private readonly ShiftPermissionService $permissions,
+        private readonly ProjectAppErrorNotificationService $appErrorNotifications,
+    ) {}
 
     /**
      * Store a newly created resource in storage.
@@ -100,6 +104,7 @@ class ProjectUserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $this->appErrorNotifications->removeProjectUserRecipients([$projectUser]);
         $projectUser->delete();
 
         if (request()->expectsJson()) {
