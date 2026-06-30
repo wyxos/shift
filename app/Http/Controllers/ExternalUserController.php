@@ -9,6 +9,8 @@ use App\Models\Organisation;
 use App\Models\Project;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -268,31 +270,9 @@ class ExternalUserController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        $projectIds = $this->visibleProjectsQuery()->pluck('id');
-
-        $externalUser = ExternalUser::with('project')
-            ->whereIn('project_id', $projectIds)
-            ->findOrFail($id);
-
-        $projects = $this->visibleProjectsQuery()
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return Inertia::render('ExternalUsers/Edit', [
-            'externalUser' => $externalUser,
-            'projects' => $projects,
-            'roles' => $this->roles(),
-        ]);
-    }
-
-    /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id): JsonResponse|RedirectResponse
     {
         $projectIds = $this->visibleProjectsQuery()->pluck('id');
 
@@ -329,8 +309,24 @@ class ExternalUserController extends Controller
             ]);
         }
 
-        return redirect()->route('external-users.index')
+        return $this->redirectToExternalUsersList($externalUser)
             ->with('success', 'External user updated successfully.');
+    }
+
+    private function redirectToExternalUsersList(ExternalUser $externalUser): RedirectResponse
+    {
+        $externalUser->loadMissing('project.organisation', 'project.client.organisation');
+
+        $organisation = $externalUser->project?->accessOrganisation();
+
+        if ($organisation) {
+            return redirect()->route('organisation.external-users', [
+                'organisation' => $organisation,
+                'project_id' => $externalUser->project_id,
+            ]);
+        }
+
+        return redirect()->route('dashboard');
     }
 
     public function linkAccount(Request $request, string $externalUser)

@@ -12,7 +12,6 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
-use App\Http\Controllers\UserController;
 use App\Support\LaravelIssueReportingDemo;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -67,7 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('organisations/{organisation}/users/{organisationUser}', [OrganisationUserController::class, 'destroy'])->name('organisation-users.destroy');
 
     // clients
-    Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
+    Route::get('clients', fn () => abort(404));
     Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
     Route::put('clients/{client}', [ClientController::class, 'update'])->name('clients.update');
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
@@ -129,14 +128,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('ai/improve', [AiRewriteController::class, 'improve'])->name('ai.improve');
 
     // External Users
-    Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users.index');
-    Route::get('external-users/{externalUser}/edit', [ExternalUserController::class, 'edit'])->name('external-users.edit');
+    Route::get('external-users', fn () => abort(404));
     Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
     Route::post('external-users/{externalUser}/linked-accounts', [ExternalUserController::class, 'linkAccount'])->name('external-users.linked-accounts.store');
     Route::delete('external-users/{externalUser}/linked-accounts/{linkedExternalUser}', [ExternalUserController::class, 'unlinkAccount'])->name('external-users.linked-accounts.destroy');
 
     // Users
-    Route::get('users', [UserController::class, 'index'])->name('users.index');
+    Route::get('users', fn () => abort(404));
 
     // Notifications
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
