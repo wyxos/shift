@@ -278,7 +278,7 @@ describe('ExternalUsers/Index.vue', () => {
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
-                filters: { search: '', sort_by: null },
+                filters: { search: '', sort_by: null, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
         });
@@ -299,7 +299,7 @@ describe('ExternalUsers/Index.vue', () => {
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
-                filters: { search: '', sort_by: null },
+                filters: { search: '', sort_by: null, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
         });
@@ -310,7 +310,7 @@ describe('ExternalUsers/Index.vue', () => {
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/external-users',
+            '/organisation/3/external-users',
             {
                 page: 1,
                 project_id: '2',
@@ -354,7 +354,7 @@ describe('ExternalUsers/Index.vue', () => {
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
-                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [
                     { id: 2, name: 'Portal' },
                     { id: 3, name: 'Billing' },
@@ -407,7 +407,7 @@ describe('ExternalUsers/Index.vue', () => {
                 canManageExternalRoles: true,
                 canManageLinkedAccounts: true,
                 externalUsers,
-                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
                 roles: [
                     { value: 'owner', label: 'Client Owner' },
@@ -471,14 +471,14 @@ describe('ExternalUsers/Index.vue', () => {
         const wrapper = mount(ExternalUsersIndex, {
             props: {
                 externalUsers,
-                filters: { search: 'qa', sort_by: 'name', project_id: 2 },
+                filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
         });
 
         await wrapper.get('[data-testid="emit-page-change"]').trigger('click');
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/external-users',
+            '/organisation/3/external-users',
             {
                 page: 2,
                 project_id: '2',

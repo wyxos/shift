@@ -216,7 +216,6 @@ vi.mock('axios', () => ({
 }));
 // prettier-ignore
 vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
-
 describe('Projects.vue', () => {
     const mockProjects = {
         data: [
@@ -225,6 +224,7 @@ describe('Projects.vue', () => {
                 name: 'Portal Refresh',
                 isOwner: true,
                 client_name: 'Acme Client',
+                organisation_id: 1,
                 organisation_name: 'Acme Org',
                 mcp_enabled: true,
                 environments: [
@@ -365,7 +365,7 @@ describe('Projects.vue', () => {
         expect(inertiaMocks.routerGet).toHaveBeenCalledWith('/tasks', { project_id: 1 });
 
         await wrapper.get('[data-testid="project-external-users-1"]').trigger('click');
-        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/external-users', { project_id: 1 });
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/1/external-users', { project_id: 1 });
     });
 
     it('keeps project row links scoped when opened from an organisation projects route', async () => {

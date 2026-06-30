@@ -101,9 +101,7 @@ const editForm = ref({
     email: '',
     role: '',
 });
-const indexPath = computed(() =>
-    props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/external-users` : '/external-users',
-);
+const indexPath = computed(() => (props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/external-users` : '/dashboard'));
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'External Users', href: indexPath.value }]);
 const projectFilterOptions = computed<SelectOption[]>(() => [
     { value: '', label: 'All projects' },
