@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrganisationRole;
 use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\Project;
@@ -9,6 +10,7 @@ use App\Models\User;
 use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
@@ -26,6 +28,8 @@ class ProjectController extends Controller
 
         $sortBy = request('sort_by');
         $organisationId = $organisation?->id ?? request('organisation_id');
+        $canCreateProject = $organisation instanceof Organisation
+            && $this->permissions->canManageOrganisation($organisation, auth()->id());
 
         $projects = Project::query()
             ->with([
@@ -81,16 +85,23 @@ class ProjectController extends Controller
                         'isOwner' => $project->isManagedByUser(auth()->id()),
                         ...$this->permissions->projectCapabilities($project, auth()->id()),
                     ]),
-                'clients' => Client::query()
-                    ->whereHas('organisation', function (Builder $query) {
-                        $query->where('author_id', auth()->id());
-                    })
-                    ->orderBy('name')
-                    ->get(['id', 'name']),
-                'organisations' => Organisation::query()
-                    ->where('author_id', auth()->id())
-                    ->orderBy('name')
-                    ->get(['id', 'name']),
+                'clients' => $canCreateProject
+                    ? Client::query()
+                        ->where('organisation_id', $organisation->id)
+                        ->orderBy('name')
+                        ->get(['id', 'name'])
+                    : collect(),
+                'organisations' => $canCreateProject
+                    ? collect([[
+                        'id' => $organisation->id,
+                        'name' => $organisation->name,
+                    ]])
+                    : collect(),
+                'currentOrganisation' => $organisation ? [
+                    'id' => $organisation->id,
+                    'name' => $organisation->name,
+                ] : null,
+                'canCreateProject' => $canCreateProject,
                 'accessUsers' => User::query()
                     ->orderBy('name')
                     ->get(['id', 'name', 'email']),
@@ -101,9 +112,11 @@ class ProjectController extends Controller
     {
         abort_unless($this->permissions->canManageProject($project, auth()->id()), 403);
 
+        $redirect = $this->redirectToProjectList($project);
+
         $project->delete();
 
-        return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
+        return $redirect->with('success', 'Project deleted successfully.');
     }
 
     public function update(Project $project)
@@ -114,7 +127,7 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
         ]));
 
-        return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
+        return $this->redirectToProjectList($project)->with('success', 'Project updated successfully.');
     }
 
     public function updateWidgetSettings(Project $project)
@@ -155,7 +168,7 @@ class ProjectController extends Controller
             ]);
         }
 
-        return redirect()->route('projects.index')->with('success', 'Widget settings updated successfully.');
+        return $this->redirectToProjectList($project)->with('success', 'Widget settings updated successfully.');
     }
 
     public function updateMcpSettings(Project $project)
@@ -178,7 +191,7 @@ class ProjectController extends Controller
             ]);
         }
 
-        return redirect()->route('projects.index')->with('success', 'MCP settings updated successfully.');
+        return $this->redirectToProjectList($project)->with('success', 'MCP settings updated successfully.');
     }
 
     public function store()
@@ -188,14 +201,12 @@ class ProjectController extends Controller
             'client_id' => [
                 'nullable',
                 Rule::exists('clients', 'id')
-                    ->where(fn ($query) => $query->whereIn('organisation_id', Organisation::query()
-                        ->select('id')
-                        ->where('author_id', auth()->id()))),
+                    ->where(fn ($query) => $query->whereIn('organisation_id', $this->manageableOrganisationsQuery()->select('id'))),
             ],
             'organisation_id' => [
                 'nullable',
                 Rule::exists('organisations', 'id')
-                    ->where(fn ($query) => $query->where('author_id', auth()->id())),
+                    ->where(fn ($query) => $query->whereIn('id', $this->manageableOrganisationsQuery()->select('id'))),
             ],
         ]);
 
@@ -210,12 +221,12 @@ class ProjectController extends Controller
             abort_unless($this->permissions->canManageOrganisation($organisation, auth()->id()), 403);
         }
 
-        Project::create([
+        $project = Project::create([
             ...$validated,
             'author_id' => auth()->id(),
         ]);
 
-        return redirect()->route('projects.index')->with('success', 'Project created successfully.');
+        return $this->redirectToProjectList($project)->with('success', 'Project created successfully.');
     }
 
     public function users(Project $project)
@@ -272,6 +283,33 @@ class ProjectController extends Controller
                     : false,
             ]);
         }
+    }
+
+    private function redirectToProjectList(Project $project): RedirectResponse
+    {
+        $project->loadMissing('organisation:id,name', 'client.organisation:id,name');
+
+        $organisation = $project->accessOrganisation();
+
+        if ($organisation) {
+            return redirect()->route('organisation.projects', $organisation);
+        }
+
+        return redirect()->route('dashboard');
+    }
+
+    private function manageableOrganisationsQuery(): Builder
+    {
+        return Organisation::query()
+            ->where(function (Builder $query) {
+                $query
+                    ->where('author_id', auth()->id())
+                    ->orWhereHas('organisationUsers', function (Builder $membershipQuery) {
+                        $membershipQuery
+                            ->where('user_id', auth()->id())
+                            ->where('role', OrganisationRole::Administrator->value);
+                    });
+            });
     }
 
     private function environmentPayload($environment): array

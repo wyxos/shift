@@ -2,11 +2,14 @@
 
 use App\Enums\TaskStatus;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
+use App\Notifications\AppErrorReportedNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 
 it('files a backend error as a task with a raw occurrence record', function () {
@@ -295,6 +298,158 @@ it('reopens a completed error task when the same signature occurs again', functi
     $this->withToken($token)->postJson('/api/errors', appErrorPayload())->assertCreated();
 
     expect($task->fresh()->status)->toBe(TaskStatus::Pending->value);
+});
+
+it('notifies configured visible app error recipients when a grouped error task is created', function () {
+    Notification::fake();
+
+    $sender = User::factory()->create();
+    $recipient = User::factory()->create();
+    $staleRecipient = User::factory()->create();
+    $project = Project::factory()->withAuthor($sender->id)->create(['token' => 'project-token']);
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'user_email' => $recipient->email,
+        'user_name' => $recipient->name,
+        'registration_status' => 'registered',
+    ]);
+
+    DB::table('project_app_error_notification_users')->insert([
+        [
+            'project_id' => $project->id,
+            'user_id' => $recipient->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'project_id' => $project->id,
+            'user_id' => $staleRecipient->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    $this->withToken($sender->createToken('sdk')->plainTextToken)
+        ->postJson('/api/errors', appErrorPayload())
+        ->assertCreated();
+
+    $task = Task::query()->with('project')->firstOrFail();
+    $notifications = Notification::sent($recipient, AppErrorReportedNotification::class);
+
+    expect($notifications)->toHaveCount(1);
+    expect($notifications->first()->toArray($recipient))->toMatchArray([
+        'task_id' => $task->id,
+        'task_title' => $task->title,
+        'project_id' => $project->id,
+        'project_name' => $project->name,
+        'url' => route('tasks.index', ['task' => $task->id]),
+        'reason' => 'created',
+    ]);
+
+    Notification::assertNotSentTo($sender, AppErrorReportedNotification::class);
+    Notification::assertNotSentTo($staleRecipient, AppErrorReportedNotification::class);
+});
+
+it('skips queued app error notification delivery after recipient access is revoked', function () {
+    Notification::fake();
+
+    $sender = User::factory()->create();
+    $recipient = User::factory()->create();
+    $project = Project::factory()->withAuthor($sender->id)->create(['token' => 'project-token']);
+    $projectUser = ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'user_email' => $recipient->email,
+        'user_name' => $recipient->name,
+        'registration_status' => 'registered',
+    ]);
+    $project->appErrorNotificationUsers()->attach($recipient->id);
+
+    $this->withToken($sender->createToken('sdk')->plainTextToken)
+        ->postJson('/api/errors', appErrorPayload())
+        ->assertCreated();
+
+    $notification = Notification::sent($recipient, AppErrorReportedNotification::class)->first();
+
+    expect($notification->shouldSend($recipient, 'mail'))->toBeTrue();
+
+    $project->appErrorNotificationUsers()->detach($recipient->id);
+    $projectUser->delete();
+
+    expect($notification->shouldSend($recipient, 'mail'))->toBeFalse();
+});
+
+it('records app errors even when app error notification dispatch fails', function () {
+    $sender = User::factory()->create();
+    $recipient = User::factory()->create();
+    $project = Project::factory()->withAuthor($sender->id)->create(['token' => 'project-token']);
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'user_email' => $recipient->email,
+        'user_name' => $recipient->name,
+        'registration_status' => 'registered',
+    ]);
+    $project->appErrorNotificationUsers()->attach($recipient->id);
+
+    Notification::shouldReceive('send')
+        ->once()
+        ->andThrow(new RuntimeException('Notification transport unavailable'));
+
+    $this->withToken($sender->createToken('sdk')->plainTextToken)
+        ->postJson('/api/errors', appErrorPayload())
+        ->assertCreated();
+
+    expect(Task::query()->count())->toBe(1)
+        ->and(DB::table('task_error_occurrences')->count())->toBe(1);
+});
+
+it('notifies configured recipients when a completed grouped error task reopens but not for open repeats', function () {
+    Notification::fake();
+
+    $sender = User::factory()->create();
+    $recipient = User::factory()->create();
+    $project = Project::factory()->withAuthor($sender->id)->create(['token' => 'project-token']);
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'user_email' => $recipient->email,
+        'user_name' => $recipient->name,
+        'registration_status' => 'registered',
+    ]);
+
+    DB::table('project_app_error_notification_users')->insert([
+        'project_id' => $project->id,
+        'user_id' => $recipient->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $token = $sender->createToken('sdk')->plainTextToken;
+
+    $this->withToken($token)->postJson('/api/errors', appErrorPayload())->assertCreated();
+    expect(Notification::sent($recipient, AppErrorReportedNotification::class))->toHaveCount(1);
+
+    $this->withToken($token)->postJson('/api/errors', appErrorPayload())->assertCreated();
+    expect(Notification::sent($recipient, AppErrorReportedNotification::class))->toHaveCount(1);
+
+    $task = Task::query()->firstOrFail();
+    $task->update(['status' => TaskStatus::Completed->value]);
+
+    $this->withToken($token)->postJson('/api/errors', appErrorPayload())->assertCreated();
+
+    $notifications = Notification::sent($recipient, AppErrorReportedNotification::class);
+    expect($notifications)->toHaveCount(2)
+        ->and($notifications->last()->toArray($recipient))->toMatchArray([
+            'task_id' => $task->id,
+            'task_title' => $task->fresh()->title,
+            'project_id' => $project->id,
+            'project_name' => $project->name,
+            'url' => route('tasks.index', ['task' => $task->id]),
+            'reason' => 'reopened',
+        ])
+        ->and($task->fresh()->status)->toBe(TaskStatus::Pending->value);
 });
 
 it('groups repeated errors across deployment revisions while retaining occurrence revisions', function () {

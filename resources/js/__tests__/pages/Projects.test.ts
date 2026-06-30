@@ -215,7 +215,7 @@ vi.mock('axios', () => ({
     },
 }));
 // prettier-ignore
-vi.mock('lucide-vue-next', () => Object.fromEntries(['Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
+vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
 
 describe('Projects.vue', () => {
     const mockProjects = {
@@ -264,6 +264,7 @@ describe('Projects.vue', () => {
             props: {
                 projects: mockProjects,
                 accessUsers: mockAccessUsers,
+                canCreateProject: true,
                 clients: mockClients,
                 organisations: mockOrganisations,
                 filters: {
@@ -443,7 +444,6 @@ describe('Projects.vue', () => {
 
     it('saves widget settings for project owners', async () => {
         const wrapper = mountPage();
-
         await wrapper.get('[data-testid="project-widget-1"]').trigger('click');
         await wrapper.get('[data-testid="project-widget-enabled"]').setValue(true);
         await wrapper.get('[data-testid="project-widget-guest-submissions"]').setValue(true);

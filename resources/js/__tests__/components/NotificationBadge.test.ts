@@ -127,10 +127,12 @@ describe('NotificationBadge', () => {
                     return `/notifications/${params?.id}/mark-as-read`;
                 case 'tasks.index':
                     return `/tasks?task=${params?.task}`;
-                case 'projects.index':
-                    return '/projects';
+                case 'organisation.projects':
+                    return `/organisation/${params?.organisation}/projects`;
                 case 'organisations.index':
                     return '/organisations';
+                case 'dashboard':
+                    return '/dashboard';
                 default:
                     return `/${name}`;
             }
@@ -148,8 +150,17 @@ describe('NotificationBadge', () => {
                         },
                         created_at: '1 minute ago',
                     },
+                    {
+                        id: 'notification-2',
+                        type: 'AppErrorReportedNotification',
+                        data: {
+                            task_title: 'Backend error: RuntimeException',
+                            task_id: 84,
+                        },
+                        created_at: 'just now',
+                    },
                 ],
-                count: 1,
+                count: 2,
             },
         });
 
@@ -159,6 +170,7 @@ describe('NotificationBadge', () => {
         expect(axiosGetMock).toHaveBeenCalledWith('/notifications/unread');
         expect(setIntervalSpy).not.toHaveBeenCalled();
         expect(wrapper.get('a[href="/tasks?task=42"]').text()).toContain('New Task: Broken footer');
+        expect(wrapper.get('a[href="/tasks?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
         expect(wrapper.get('a[href="/notifications"]').text()).toContain('View all notifications');
     });
 
@@ -175,10 +187,12 @@ describe('NotificationBadge', () => {
                     return `/notifications/${params?.id}/mark-as-read`;
                 case 'tasks.index':
                     return `/tasks?task=${params?.task}`;
-                case 'projects.index':
-                    return '/projects';
+                case 'organisation.projects':
+                    return `/organisation/${params?.organisation}/projects`;
                 case 'organisations.index':
                     return '/organisations';
+                case 'dashboard':
+                    return '/dashboard';
                 default:
                     return `/${name}`;
             }
@@ -229,5 +243,91 @@ describe('NotificationBadge', () => {
         wrapper.unmount();
 
         expect(leaveMock).toHaveBeenCalledWith('App.Models.User.1');
+    });
+
+    it('links project notifications to the scoped organisation projects list', async () => {
+        (globalThis as any).route = vi.fn((name: string, params?: Record<string, unknown>) => {
+            switch (name) {
+                case 'notifications.unread':
+                    return '/notifications/unread';
+                case 'notifications.index':
+                    return '/notifications';
+                case 'notifications.mark-all-as-read':
+                    return '/notifications/mark-all-as-read';
+                case 'notifications.mark-as-read':
+                    return `/notifications/${params?.id}/mark-as-read`;
+                case 'organisation.projects':
+                    return `/organisation/${params?.organisation}/projects`;
+                case 'dashboard':
+                    return '/dashboard';
+                default:
+                    return `/${name}`;
+            }
+        });
+
+        axiosGetMock.mockResolvedValue({
+            data: {
+                notifications: [
+                    {
+                        id: 'notification-1',
+                        type: 'ProjectInvitationNotification',
+                        data: {
+                            project_name: 'Atlas Billing Console',
+                            organisation_id: 3,
+                        },
+                        created_at: 'just now',
+                    },
+                ],
+                count: 1,
+            },
+        });
+
+        const wrapper = mount(NotificationBadge);
+        await flushPromises();
+
+        expect(wrapper.get('a[href="/organisation/3/projects"]').text()).toContain('Invited to project: Atlas Billing Console');
+    });
+
+    it('uses the dashboard as the project notification fallback when no organisation is present', async () => {
+        (globalThis as any).route = vi.fn((name: string, params?: Record<string, unknown>) => {
+            switch (name) {
+                case 'notifications.unread':
+                    return '/notifications/unread';
+                case 'notifications.index':
+                    return '/notifications';
+                case 'notifications.mark-all-as-read':
+                    return '/notifications/mark-all-as-read';
+                case 'notifications.mark-as-read':
+                    return `/notifications/${params?.id}/mark-as-read`;
+                case 'organisation.projects':
+                    return `/organisation/${params?.organisation}/projects`;
+                case 'dashboard':
+                    return '/dashboard';
+                default:
+                    return `/${name}`;
+            }
+        });
+
+        axiosGetMock.mockResolvedValue({
+            data: {
+                notifications: [
+                    {
+                        id: 'notification-1',
+                        type: 'ProjectUserRegisteredNotification',
+                        data: {
+                            project_name: 'Standalone Project',
+                            user_name: 'New User',
+                        },
+                        created_at: 'just now',
+                    },
+                ],
+                count: 1,
+            },
+        });
+
+        const wrapper = mount(NotificationBadge);
+        await flushPromises();
+
+        expect(wrapper.get('a[href="/dashboard"]').text()).toContain('New user registered: New User');
     });
 });

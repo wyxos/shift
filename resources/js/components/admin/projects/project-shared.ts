@@ -41,6 +41,8 @@ export type Option = {
     name: string;
 };
 
+export type NullableOption = Option | null;
+
 export type ProjectFilters = {
     search?: string | null;
     sort_by?: string | null;
@@ -48,6 +50,18 @@ export type ProjectFilters = {
 };
 
 export type ProjectAccessUser = ManagedAccessUser;
+
+export type ProjectAppErrorNotificationUser = {
+    id: number;
+    name?: string | null;
+    email: string;
+};
+
+export type ProjectAppErrorNotificationSettings = {
+    project_id?: number;
+    selected_user_ids: number[];
+    users: ProjectAppErrorNotificationUser[];
+};
 
 export type SortBy = 'newest' | 'oldest' | 'name';
 

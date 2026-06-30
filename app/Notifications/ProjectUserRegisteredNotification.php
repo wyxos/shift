@@ -51,12 +51,17 @@ class ProjectUserRegisteredNotification extends Notification implements ShouldQu
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $organisation = $this->project->accessOrganisation();
+        $url = $organisation
+            ? route('organisation.projects', $organisation)
+            : route('dashboard');
+
         return (new MailMessage)
             ->subject('New User Registration in Your Project')
             ->line('A new user has completed registration for your project: '.$this->project->name)
             ->line('User: '.$this->registeredUser->name)
             ->line('Email: '.$this->registeredUser->email)
-            ->action('View Project', url('/projects/'.$this->project->id))
+            ->action('View Project', $url)
             ->line('Please do not reply to this email directly.');
     }
 
@@ -67,9 +72,13 @@ class ProjectUserRegisteredNotification extends Notification implements ShouldQu
      */
     public function toArray(object $notifiable): array
     {
+        $organisation = $this->project->accessOrganisation();
+
         return [
             'project_id' => $this->project->id,
             'project_name' => $this->project->name,
+            'organisation_id' => $organisation?->id,
+            'organisation_name' => $organisation?->name,
             'user_id' => $this->registeredUser->id,
             'user_name' => $this->registeredUser->name,
             'user_email' => $this->registeredUser->email,

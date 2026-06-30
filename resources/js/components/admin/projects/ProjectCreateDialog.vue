@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -21,13 +22,22 @@ type CreateForm = {
     processing: boolean;
 };
 
-const { open, form, clients, organisations, otherErrors, disabled } = defineProps<{
+const {
+    open,
+    form,
+    clients,
+    organisations,
+    otherErrors,
+    disabled,
+    scopedOrganisation = null,
+} = defineProps<{
     open: boolean;
     form: CreateForm;
     clients: Option[];
     organisations: Option[];
     otherErrors: Record<string, string>;
     disabled: boolean;
+    scopedOrganisation?: Option | null;
 }>();
 
 const emit = defineEmits<{
@@ -61,7 +71,13 @@ function updateOpen(value: boolean) {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Create Project</DialogTitle>
-                <DialogDescription>Create a project and attach it to either a client or an organisation.</DialogDescription>
+                <DialogDescription>
+                    {{
+                        scopedOrganisation
+                            ? `Create a project in ${scopedOrganisation.name}.`
+                            : 'Create a project and attach it to either a client or an organisation.'
+                    }}
+                </DialogDescription>
             </DialogHeader>
 
             <div class="space-y-4">
@@ -81,12 +97,19 @@ function updateOpen(value: boolean) {
                         empty-label="No clients found."
                         searchable
                         test-id="create-project-client"
-                        :disabled="form.organisation_id !== null"
+                        :disabled="!scopedOrganisation && form.organisation_id !== null"
                     />
                     <p v-if="form.errors.client_id" class="text-sm text-red-500">{{ form.errors.client_id }}</p>
                 </div>
 
-                <div class="space-y-2">
+                <div v-if="scopedOrganisation" class="space-y-2">
+                    <Label>Organisation</Label>
+                    <div>
+                        <Badge variant="secondary">{{ scopedOrganisation.name }}</Badge>
+                    </div>
+                </div>
+
+                <div v-else class="space-y-2">
                     <Label for="create-project-organisation">Organisation</Label>
                     <Select
                         v-model="form.organisation_id"
@@ -101,7 +124,9 @@ function updateOpen(value: boolean) {
                     <p v-if="form.errors.organisation_id" class="text-sm text-red-500">{{ form.errors.organisation_id }}</p>
                 </div>
 
-                <p class="text-muted-foreground text-sm">Choose one parent or leave both empty for a standalone project.</p>
+                <p v-if="!scopedOrganisation" class="text-muted-foreground text-sm">
+                    Choose one parent or leave both empty for a standalone project.
+                </p>
                 <p v-for="(error, key) in otherErrors" :key="key" class="text-sm text-red-500">{{ error }}</p>
             </div>
 

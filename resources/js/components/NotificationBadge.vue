@@ -15,6 +15,7 @@ type NotificationData = {
     organisation_name?: string;
     url?: string;
     task_id?: number | string;
+    organisation_id?: number | string | null;
 };
 
 type NotificationItem = {
@@ -59,8 +60,14 @@ function getMarkAsReadUrl(id: NotificationItem['id']): string | null {
     return hasRouteHelper ? route('notifications.mark-as-read', { id }) : null;
 }
 
-function getProjectNotificationsUrl(): string | null {
-    return hasRouteHelper ? route('projects.index') : null;
+function getProjectNotificationsUrl(data: NotificationData): string | null {
+    if (!hasRouteHelper) return null;
+
+    if (data.organisation_id !== undefined && data.organisation_id !== null) {
+        return route('organisation.projects', { organisation: data.organisation_id });
+    }
+
+    return route('dashboard');
 }
 
 function getOrganisationNotificationsUrl(): string | null {
@@ -181,6 +188,8 @@ const getNotificationTitle = (notification: NotificationItem) => {
     switch (type) {
         case 'TaskCreationNotification':
             return `New Task: ${data.task_title}`;
+        case 'AppErrorReportedNotification':
+            return `App Error: ${data.task_title}`;
         case 'TaskThreadUpdated':
             return `New reply in ${data.type} thread for ${data.task_title}`;
         case 'ProjectInvitationNotification':
@@ -205,12 +214,13 @@ const getNotificationUrl = (notification: NotificationItem) => {
 
     switch (notification.type) {
         case 'TaskCreationNotification':
+        case 'AppErrorReportedNotification':
             return getTaskNotificationsUrl(data.task_id) ?? '#';
         case 'TaskThreadUpdated':
             return data.url ?? '#';
         case 'ProjectInvitationNotification':
         case 'ProjectUserRegisteredNotification':
-            return getProjectNotificationsUrl() ?? '#';
+            return getProjectNotificationsUrl(data) ?? '#';
         case 'OrganisationInvitationNotification':
         case 'OrganisationAccessNotification':
             return getOrganisationNotificationsUrl() ?? '#';

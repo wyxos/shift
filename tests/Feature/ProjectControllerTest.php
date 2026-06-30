@@ -11,7 +11,13 @@ beforeEach(function () {
     $this->user = User::factory()->create();
 });
 
-test('projects index includes owned and shared projects with ownership context', function () {
+test('global projects index is not available', function () {
+    $this->actingAs($this->user)
+        ->get('/projects')
+        ->assertNotFound();
+});
+
+test('organisation projects index includes scoped projects with ownership context', function () {
     $ownedOrganisation = Organisation::factory()->create([
         'author_id' => $this->user->id,
         'name' => 'Acme Org',
@@ -29,27 +35,6 @@ test('projects index includes owned and shared projects with ownership context',
         'author_id' => null,
     ]);
 
-    $sharedOwner = User::factory()->create();
-    $sharedOrganisation = Organisation::factory()->create([
-        'author_id' => $sharedOwner->id,
-        'name' => 'Partner Org',
-    ]);
-
-    $sharedProject = Project::factory()->create([
-        'name' => 'Shared Project',
-        'client_id' => null,
-        'organisation_id' => $sharedOrganisation->id,
-        'author_id' => $sharedOwner->id,
-    ]);
-
-    ProjectUser::create([
-        'project_id' => $sharedProject->id,
-        'user_id' => $this->user->id,
-        'user_email' => $this->user->email,
-        'user_name' => $this->user->name,
-        'registration_status' => 'registered',
-    ]);
-
     $hiddenOwner = User::factory()->create();
     $hiddenOrganisation = Organisation::factory()->create([
         'author_id' => $hiddenOwner->id,
@@ -64,12 +49,15 @@ test('projects index includes owned and shared projects with ownership context',
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('projects.index', ['sort_by' => 'name']));
+        ->get(route('organisation.projects', [
+            'organisation' => $ownedOrganisation,
+            'sort_by' => 'name',
+        ]));
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
         ->component('Projects')
-        ->has('projects.data', 2)
+        ->has('projects.data', 1)
         ->where('projects.data.0.id', $ownedProject->id)
         ->where('projects.data.0.client_name', 'Acme Client')
         ->where('projects.data.0.organisation_name', 'Acme Org')
@@ -77,16 +65,15 @@ test('projects index includes owned and shared projects with ownership context',
         ->where('projects.data.0.external_widget_enabled', false)
         ->where('projects.data.0.external_widget_guest_submissions_enabled', false)
         ->where('projects.data.0.mcp_enabled', false)
-        ->where('projects.data.1.id', $sharedProject->id)
-        ->where('projects.data.1.organisation_name', 'Partner Org')
-        ->where('projects.data.1.isOwner', false)
         ->where('filters.sort_by', 'name')
+        ->where('currentOrganisation.id', $ownedOrganisation->id)
+        ->where('canCreateProject', true)
         ->has('clients', 1)
         ->has('organisations', 1)
     );
 });
 
-test('projects index filters by search and sorts oldest first', function () {
+test('organisation projects index filters by search and sorts oldest first', function () {
     $ownedOrganisation = Organisation::factory()->create([
         'author_id' => $this->user->id,
         'name' => 'Acme Org',
@@ -116,7 +103,8 @@ test('projects index filters by search and sorts oldest first', function () {
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('projects.index', [
+        ->get(route('organisation.projects', [
+            'organisation' => $ownedOrganisation,
             'search' => 'Portal',
             'sort_by' => 'oldest',
         ]));
@@ -215,7 +203,51 @@ test('organisation members only see projects with explicit project access', func
         ->component('Projects')
         ->has('projects.data', 1)
         ->where('projects.data.0.id', $visibleProject->id)
+        ->where('canCreateProject', false)
     );
+});
+
+test('projects can be created inside a manageable organisation and redirect back to its projects list', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('projects.store'), [
+            'name' => 'Scoped Project',
+            'organisation_id' => $organisation->id,
+        ])
+        ->assertRedirect(route('organisation.projects', $organisation, absolute: false));
+
+    $this->assertDatabaseHas('projects', [
+        'name' => 'Scoped Project',
+        'organisation_id' => $organisation->id,
+        'author_id' => $this->user->id,
+    ]);
+});
+
+test('project mutations redirect back to the owning organisation projects list', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $project = Project::factory()->create([
+        'name' => 'Original Project',
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+        'author_id' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('projects.update', $project), [
+            'name' => 'Renamed Project',
+        ])
+        ->assertRedirect(route('organisation.projects', $organisation, absolute: false));
+
+    $this->assertDatabaseHas('projects', [
+        'id' => $project->id,
+        'name' => 'Renamed Project',
+    ]);
 });
 
 test('project managers can generate api tokens', function () {

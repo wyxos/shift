@@ -7,6 +7,7 @@ use App\Http\Controllers\ExternalUserController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
+use App\Http\Controllers\ProjectAppErrorNotificationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
@@ -72,7 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
 
     // projects
-    Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::get('projects', fn () => abort(404));
     Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
@@ -80,6 +81,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('projects/{project}/api-token', [ProjectController::class, 'generateApiToken'])->name('projects.api-token');
     Route::patch('projects/{project}/widget-settings', [ProjectController::class, 'updateWidgetSettings'])->name('projects.widget-settings');
     Route::patch('projects/{project}/mcp-settings', [ProjectController::class, 'updateMcpSettings'])->name('projects.mcp-settings');
+    Route::get('projects/{project}/app-error-notifications', [ProjectAppErrorNotificationController::class, 'show'])->name('projects.app-error-notifications.show');
+    Route::put('projects/{project}/app-error-notifications', [ProjectAppErrorNotificationController::class, 'update'])->name('projects.app-error-notifications.update');
 
     // project users (access control)
     Route::post('projects/{project}/users', [ProjectUserController::class, 'store'])->name('project-users.store');

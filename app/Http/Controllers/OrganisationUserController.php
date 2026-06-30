@@ -10,6 +10,7 @@ use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\OrganisationAccessNotification;
 use App\Notifications\OrganisationInvitationNotification;
+use App\Services\ProjectAppErrorNotificationService;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -20,7 +21,10 @@ use Illuminate\Validation\Rule;
 
 class OrganisationUserController extends Controller
 {
-    public function __construct(private readonly ShiftPermissionService $permissions) {}
+    public function __construct(
+        private readonly ShiftPermissionService $permissions,
+        private readonly ProjectAppErrorNotificationService $appErrorNotifications,
+    ) {}
 
     /**
      * Store a newly created resource in storage.
@@ -93,7 +97,9 @@ class OrganisationUserController extends Controller
         }
 
         $projectIds = $this->organisationProjectIds($organisation);
-        $this->projectUserQuery($organisationUser, $projectIds)->delete();
+        $projectUsers = $this->projectUserQuery($organisationUser, $projectIds)->get();
+        $this->appErrorNotifications->removeProjectUserRecipients($projectUsers);
+        ProjectUser::query()->whereKey($projectUsers->pluck('id'))->delete();
         $organisationUser->delete();
 
         if (request()->expectsJson()) {
@@ -137,11 +143,11 @@ class OrganisationUserController extends Controller
         $existingProjectUsers = $this->projectUserQuery($organisationUser, $projectIds)->get();
         $existingSelectedProjectUsers = $existingProjectUsers->whereIn('project_id', $selectedProjectIds);
         $existingSelectedProjectIds = $existingSelectedProjectUsers->pluck('project_id')->unique()->values();
-        $deleteIds = $existingProjectUsers
-            ->whereNotIn('project_id', $selectedProjectIds)
-            ->pluck('id');
+        $deletedProjectUsers = $existingProjectUsers->whereNotIn('project_id', $selectedProjectIds);
+        $deleteIds = $deletedProjectUsers->pluck('id');
 
         if ($deleteIds->isNotEmpty()) {
+            $this->appErrorNotifications->removeProjectUserRecipients($deletedProjectUsers);
             ProjectUser::query()->whereKey($deleteIds)->delete();
         }
 
