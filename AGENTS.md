@@ -7,6 +7,7 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 - SHIFT is the source-of-truth portal and external API for `../shift-sdk-package/` and `../shift-sdk-package/packages/shift-php`.
 
 ## Repo Rules
+- If a user correction proves a SHIFT Knowledge note or local planning artifact is stale, update the durable source in the same task when write access is allowed. Do not just patch the local note or repeat the corrected answer in chat; remove or reframe the stale guidance so future agents stop rediscovering it.
 - Treat SDK-facing route, payload, auth, attachment, install, or notification changes as cross-repo contract changes. Update the SDK in the same task.
 - For editor-backed task create and edit flows, use the V2 task endpoints and route names (`tasks.v2.*`), not the legacy redirect-based task pages.
 - For task and thread authorization tests, establish a real access path first. Hidden tasks intentionally return `404`.
