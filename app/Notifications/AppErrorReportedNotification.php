@@ -54,15 +54,26 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $reason = $this->reason === 'reopened' ? 'reopened' : 'created';
-        $subject = $reason === 'reopened'
-            ? 'App Error Reopened: '.$this->task->title
-            : 'App Error Reported: '.$this->task->title;
+        $event = $this->reason === 'reopened' ? 'Reopened' : 'Reported';
+        $subject = $event === 'Reopened'
+            ? $this->task->project->name.' Reopened - '.$this->task->title
+            : $this->task->project->name.' - '.$this->task->title;
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject($subject)
-            ->line('An app error task was '.$reason.' in the project: '.$this->task->project->name)
-            ->line('Task Title: '.$this->task->title)
+            ->greeting($this->task->title)
+            ->line('Project: '.$this->task->project->name)
+            ->line('Event: '.$event);
+
+        if (filled($this->task->error_environment)) {
+            $message->line('Environment: '.$this->task->error_environment);
+        }
+
+        if (filled($this->task->error_occurrences_count)) {
+            $message->line('Occurrences: '.$this->task->error_occurrences_count);
+        }
+
+        return $message
             ->action('View Task', $this->resolveUrl())
             ->line('Please do not reply to this email directly.');
     }
