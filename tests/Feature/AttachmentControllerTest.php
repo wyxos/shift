@@ -7,15 +7,13 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-;
-
 beforeEach(function () {
     // Create a fake disk for testing
     Storage::fake('local');
 
     $this->user = User::factory()->create();
     $this->project = Project::factory()->create([
-        'author_id' => $this->user->id
+        'author_id' => $this->user->id,
     ]);
 
     $this->task = Task::factory()->create([
@@ -23,7 +21,7 @@ beforeEach(function () {
     ]);
     $this->task->submitter()->associate($this->user)->save();
 
-    $this->tempIdentifier = 'test-' . time();
+    $this->tempIdentifier = 'test-'.time();
 });
 
 test('upload stores file in temp folder', function () {
@@ -39,7 +37,7 @@ test('upload stores file in temp folder', function () {
     $response->assertJsonStructure([
         'original_filename',
         'path',
-        'url'
+        'url',
     ]);
 
     // Check that the file exists in the temp folder
@@ -94,9 +92,9 @@ test('list temp files', function () {
             '*' => [
                 'path',
                 'original_filename',
-                'url'
-            ]
-        ]
+                'url',
+            ],
+        ],
     ]);
 
     expect($response->json('files'))->toHaveCount(1);
@@ -149,7 +147,7 @@ test('task creation with attachments', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), $taskData);
+        ->postJson(route('tasks.store'), $taskData);
 
     $response->assertCreated();
 
@@ -182,7 +180,7 @@ test('task creation without attachments', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), $taskData);
+        ->postJson(route('tasks.store'), $taskData);
 
     $response->assertCreated();
 
@@ -218,7 +216,7 @@ test('task update with attachments', function () {
 
     // Upload a new file to temp storage
     $file = UploadedFile::fake()->create('new-document.pdf', 100);
-    $tempIdentifier = 'update-test-' . time();
+    $tempIdentifier = 'update-test-'.time();
 
     $uploadResponse = $this->actingAs($this->user)
         ->post(route('attachments.upload'), [
@@ -239,7 +237,7 @@ test('task update with attachments', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->putJson(route('tasks.v2.update', $task), $updateData);
+        ->putJson(route('tasks.update', $task), $updateData);
 
     $response->assertOk();
 
@@ -307,8 +305,8 @@ test('list task attachments', function () {
                 'path',
                 'url',
                 'created_at',
-            ]
-        ]
+            ],
+        ],
     ]);
 
     expect($response->json('attachments'))->toHaveCount(2);
@@ -351,7 +349,7 @@ test('delete attachment', function () {
 });
 
 test('show temp serves image inline', function () {
-    $temp = 'temp-' . time();
+    $temp = 'temp-'.time();
     $filename = 'image.png';
     $path = "temp_attachments/{$temp}/{$filename}";
 

@@ -100,7 +100,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith(
-            '/tasks.v2.update',
+            '/tasks.update',
             expect.objectContaining({
                 priority: 'medium',
                 title: 'Owner task',
@@ -109,7 +109,7 @@ describe('Tasks/Index.vue', () => {
         );
 
         expect(axiosPatchMock).toHaveBeenCalledWith(
-            '/tasks.v2.collaborators.update',
+            '/tasks.collaborators.update',
             expect.objectContaining({
                 environment: 'staging',
                 internal_collaborator_ids: [91],

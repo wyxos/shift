@@ -219,7 +219,7 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="confirm-requirement-pack-finalize"]').trigger('click');
         await flushPromises();
 
-        expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.v2.batches.finalize', {});
+        expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.batches.finalize', {});
         expect(router.reload).toHaveBeenCalledWith({ preserveScroll: true, preserveState: true });
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirements finalized', {
             description: '2 items now appear in the active task list.',
@@ -314,7 +314,7 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="finalize-requirement"]').trigger('click');
         await flushPromises();
 
-        expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.v2.finalize', {
+        expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.finalize', {
             title: 'Export renewal data',
             description: '<p>Original requested export.</p>',
             requirement_status: 'ready-to-finalize',

@@ -61,7 +61,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         deleteLoading.value = taskId;
         error.value = null;
         try {
-            await axios.delete(route('tasks.v2.destroy', { task: taskId }));
+            await axios.delete(route('tasks.destroy', { task: taskId }));
             router.reload({ preserveScroll: true, preserveState: true });
             return true;
         } catch (e: any) {
@@ -77,7 +77,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         error.value = null;
 
         try {
-            const response = await axios.patch(route('requirements.v2.batches.finalize', { requirementBatch: batchId }), {});
+            const response = await axios.patch(route('requirements.batches.finalize', { requirementBatch: batchId }), {});
             const count = Number(response.data?.finalized_count ?? 0);
 
             router.reload({ preserveScroll: true, preserveState: true });

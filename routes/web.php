@@ -11,6 +11,7 @@ use App\Http\Controllers\ProjectAppErrorNotificationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskEmailImportController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Support\LaravelIssueReportingDemo;
 use Illuminate\Support\Facades\Route;
@@ -43,8 +44,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('organisation/{organisation}')->name('organisation.')->group(function () {
         Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-        Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks');
-        Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements');
+        Route::get('tasks', [TaskController::class, 'index'])->name('tasks');
+        Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements');
         Route::get('clients', [ClientController::class, 'index'])->name('clients');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects');
         Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users');
@@ -88,22 +89,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('projects/{project}/users/{projectUser}', [ProjectUserController::class, 'destroy'])->name('project-users.destroy');
 
     // tasks
-    Route::get('tasks', [TaskController::class, 'indexV2'])->name('tasks.index');
-    Route::get('requirements', [TaskController::class, 'requirementsV2'])->name('requirements.index');
-    Route::get('tasks-v2', fn () => redirect()->route('tasks.index', request()->query()))->name('tasks.v2');
-    Route::get('tasks-v2/tasks/{task}', [TaskController::class, 'showV2'])
-        ->missing(fn () => response()->json(['message' => TaskController::TASK_NOT_FOUND_MESSAGE], 404))
-        ->name('tasks.v2.show');
-    Route::get('tasks-v2/projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.v2.collaborators');
-    Route::post('tasks-v2/tasks', [TaskController::class, 'storeV2'])->name('tasks.v2.store');
-    Route::put('tasks-v2/tasks/{task}', [TaskController::class, 'updateV2'])->name('tasks.v2.update');
-    Route::patch('tasks-v2/tasks/{task}/collaborators', [TaskController::class, 'updateCollaboratorsV2'])->name('tasks.v2.collaborators.update');
-    Route::patch('tasks-v2/tasks/{task}/requirements/finalize', [TaskController::class, 'finalizeRequirementV2'])->name('requirements.v2.finalize');
-    Route::patch('requirements/batches/{requirementBatch}/finalize', [TaskController::class, 'finalizeRequirementBatchV2'])->name('requirements.v2.batches.finalize');
-    Route::delete('tasks-v2/tasks/{task}', [TaskController::class, 'destroyV2'])->name('tasks.v2.destroy');
-    Route::get('tasks/{task}/error-occurrences', [TaskErrorOccurrenceController::class, 'index'])->name('task-error-occurrences.index');
+    Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements.index');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');
+    Route::get('tasks/{task}/error-occurrences', [TaskErrorOccurrenceController::class, 'index'])->name('task-error-occurrences.index');
+    Route::get('tasks/{task}', [TaskController::class, 'show'])
+        ->missing(fn () => response()->json(['message' => TaskController::TASK_NOT_FOUND_MESSAGE], 404))
+        ->name('tasks.show');
+    Route::get('projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.collaborators');
+    Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::post('tasks/email-import', TaskEmailImportController::class)->name('tasks.email-import');
+    Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    Route::patch('tasks/{task}/collaborators', [TaskController::class, 'updateCollaborators'])->name('tasks.collaborators.update');
+    Route::patch('tasks/{task}/requirements/finalize', [TaskController::class, 'finalizeRequirement'])->name('requirements.finalize');
+    Route::patch('requirements/batches/{requirementBatch}/finalize', [TaskController::class, 'finalizeRequirementBatch'])->name('requirements.batches.finalize');
+    Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
 
     // Task Threads
     Route::get('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'index'])->name('task-threads.index');

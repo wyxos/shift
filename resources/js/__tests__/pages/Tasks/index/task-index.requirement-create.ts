@@ -24,7 +24,7 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
-    it('creates a requirement from the requirements review surface through the V2 task store route', async () => {
+    it('creates a requirement from the requirements review surface through the task store route', async () => {
         axiosPostMock.mockResolvedValueOnce({
             data: {
                 ok: true,
@@ -57,7 +57,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(axiosPostMock).toHaveBeenCalledWith(
-            '/tasks.v2.store',
+            '/tasks.store',
             expect.objectContaining({
                 title: 'Portal requirement',
                 project_id: 42,
