@@ -2,7 +2,7 @@ import Index from '@/pages/Tasks/Index.vue';
 import { router } from '@inertiajs/vue3';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
-import { axiosGetMock, axiosPostMock, makeTasksPage, sonnerMocks } from './test-helpers';
+import { axiosGetMock, axiosPostMock, makeTasksPage, setShiftAiEnabled, sonnerMocks } from './test-helpers';
 
 describe('Tasks/Index.vue', () => {
     it('keeps create disabled until a project and title are provided', async () => {
@@ -44,7 +44,7 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
-    it('creates a task from the V2 sheet and reloads the list', async () => {
+    it('creates a task from the task sheet and reloads the list', async () => {
         axiosGetMock.mockReset();
         axiosGetMock.mockResolvedValue({
             data: {
@@ -84,7 +84,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(axiosPostMock).toHaveBeenCalledWith(
-            '/tasks.v2.store',
+            '/tasks.store',
             expect.objectContaining({
                 title: 'Created from UI',
                 description: '<p>Details</p>',
@@ -99,6 +99,91 @@ describe('Tasks/Index.vue', () => {
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Task created', {
             description: 'Your task has been added to the queue.',
         });
+
+        wrapper.unmount();
+    });
+
+    it('hides the email import dropzone when AI is disabled', async () => {
+        axiosGetMock.mockReset();
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([]),
+                projects: [{ id: 42, name: 'Portal', environments: [] }],
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        await wrapper.get('[data-testid="open-create-task"]').trigger('click');
+
+        expect(wrapper.find('[data-testid="task-email-import-dropzone"]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('imports a dropped eml file into the create draft without creating the task when AI is enabled', async () => {
+        setShiftAiEnabled(true);
+        axiosGetMock.mockReset();
+        axiosPostMock.mockResolvedValueOnce({
+            data: {
+                data: {
+                    title: 'API fails when creating urgent fixes',
+                    priority: 'high',
+                    description_html: '<p>Customer reports the urgent fixes API fails during submission.</p>',
+                    missing_details: ['Exact request payload'],
+                    source: {
+                        subject: 'Fw: EXT Urgent Fixes - API question',
+                        from: 'Project Owner <owner@example.com>',
+                        attachments: ['trace.txt'],
+                    },
+                    ai_used: true,
+                },
+            },
+        });
+
+        const wrapper = mount(Index, {
+            props: {
+                tasks: makeTasksPage([]),
+                projects: [{ id: 42, name: 'Portal', environments: [] }],
+                filters: {
+                    status: ['pending', 'in-progress', 'awaiting-feedback'],
+                    priority: ['low', 'medium', 'high'],
+                    search: '',
+                },
+            },
+        });
+
+        await wrapper.get('[data-testid="open-create-task"]').trigger('click');
+
+        const email = new File(['Subject: Fw: EXT Urgent Fixes - API question'], 'issue.eml', { type: 'message/rfc822' });
+        await wrapper.get('[data-testid="task-email-import-dropzone"]').trigger('drop', {
+            dataTransfer: {
+                files: [email],
+            },
+        });
+        await flushPromises();
+
+        expect(axiosPostMock).toHaveBeenCalledTimes(1);
+        expect(axiosPostMock.mock.calls[0][0]).toBe('/tasks.email-import');
+        expect(axiosPostMock.mock.calls[0][1]).toBeInstanceOf(FormData);
+        expect((axiosPostMock.mock.calls[0][1] as FormData).get('project_id')).toBe('42');
+        expect((axiosPostMock.mock.calls[0][1] as FormData).get('email')).toBe(email);
+        expect(axiosPostMock.mock.calls[0][2]).toEqual(
+            expect.objectContaining({
+                headers: { 'Content-Type': 'multipart/form-data' },
+            }),
+        );
+        expect((wrapper.get('[data-testid="create-task-title"]').element as HTMLInputElement).value).toBe('API fails when creating urgent fixes');
+        expect(
+            (wrapper.get('[data-testid="create-description-editor"] [data-testid="stub-editor-input"]').element as HTMLTextAreaElement).value,
+        ).toBe('<p>Customer reports the urgent fixes API fails during submission.</p>');
+        expect(wrapper.get('[data-testid="create-task-priority-high"]').classes().join(' ')).toContain('bg-rose-100');
+        expect(wrapper.get('[data-testid="task-email-import-summary"]').text()).toContain('Fw: EXT Urgent Fixes - API question');
+        expect(wrapper.get('[data-testid="task-email-import-missing"]').text()).toContain('Exact request payload');
 
         wrapper.unmount();
     });
@@ -140,7 +225,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(axiosPostMock).toHaveBeenCalledWith(
-            '/tasks.v2.store',
+            '/tasks.store',
             expect.objectContaining({
                 project_id: 43,
                 environment: null,

@@ -220,7 +220,7 @@ function resolveLookupUrl(): string | null {
         return null;
     }
 
-    return route('tasks.v2.collaborators', { project: props.projectId });
+    return route('tasks.collaborators', { project: props.projectId });
 }
 
 async function fetchCollaborators() {

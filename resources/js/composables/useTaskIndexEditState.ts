@@ -241,12 +241,12 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                     deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
                 };
 
-                const response = await axios.put(route('tasks.v2.update', { task: taskId }), payload);
+                const response = await axios.put(route('tasks.update', { task: taskId }), payload);
                 mergeEditedTask(response.data?.task ?? null);
             }
 
             if (needsCollaboratorUpdate && collaboratorPayload) {
-                const response = await axios.patch(route('tasks.v2.collaborators.update', { task: taskId }), collaboratorPayload);
+                const response = await axios.patch(route('tasks.collaborators.update', { task: taskId }), collaboratorPayload);
                 mergeEditedTask(response.data?.task ?? null);
             }
 
@@ -275,7 +275,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         requirementFinalizeError.value = null;
 
         try {
-            const response = await axios.patch(route('requirements.v2.finalize', { task: editTask.value.id }), {
+            const response = await axios.patch(route('requirements.finalize', { task: editTask.value.id }), {
                 title: editForm.value.title,
                 description: editForm.value.description,
                 requirement_status: editForm.value.requirement_status,
@@ -330,7 +330,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         }
 
         try {
-            const response = await axios.get(route('tasks.v2.show', { task: taskId }));
+            const response = await axios.get(route('tasks.show', { task: taskId }));
             const data = response.data as TaskDetail;
             editTask.value = data;
             editForm.value = {

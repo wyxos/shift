@@ -195,7 +195,7 @@ describe('Tasks/Index.vue', () => {
         vi.useRealTimers();
     });
 
-    it('allows users with the task edit capability to change task status from the V2 edit sheet', async () => {
+    it('allows users with the task edit capability to change task status from the task edit sheet', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-02-10T18:00:00'));
         axiosGetMock.mockReset();
@@ -238,7 +238,7 @@ describe('Tasks/Index.vue', () => {
         vi.advanceTimersByTime(800);
         await flushPromises();
 
-        expect(axiosPutMock).toHaveBeenCalledWith('/tasks.v2.update', expect.objectContaining({ status: 'in-progress' }));
+        expect(axiosPutMock).toHaveBeenCalledWith('/tasks.update', expect.objectContaining({ status: 'in-progress' }));
         expect(router.reload).toHaveBeenCalledWith({
             only: ['tasks', 'filters', 'projects'],
             preserveScroll: true,
