@@ -135,7 +135,7 @@ describe('TaskCollaboratorField', () => {
         vi.advanceTimersByTime(250);
         await flushPromises();
 
-        expect(axiosGetMock).toHaveBeenLastCalledWith('/tasks.v2.collaborators/42', {
+        expect(axiosGetMock).toHaveBeenLastCalledWith('/tasks.collaborators/42', {
             params: {
                 search: 'guest',
                 environment: 'staging',

@@ -292,11 +292,11 @@ test('organisation members only see tasks for projects with explicit project acc
     );
 
     $this->actingAs($this->user)
-        ->getJson(route('tasks.v2.show', $hiddenTask))
+        ->getJson(route('tasks.show', $hiddenTask))
         ->assertNotFound();
 });
 
-test('tasks v2 can filter tasks by project query and includes project summary', function () {
+test('tasks can filter tasks by project query and includes project summary', function () {
     $firstProject = Project::factory()->create([
         'author_id' => $this->user->id,
         'name' => 'Billing Console',
@@ -331,7 +331,7 @@ test('tasks v2 can filter tasks by project query and includes project summary', 
     );
 });
 
-test('tasks v2 defaults to excluding completed tasks', function () {
+test('tasks defaults to excluding completed tasks', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -363,7 +363,7 @@ test('tasks v2 defaults to excluding completed tasks', function () {
     );
 });
 
-test('tasks v2 excludes requirement phase items from the active task list', function () {
+test('tasks excludes requirement phase items from the active task list', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -661,7 +661,7 @@ test('task detail includes external requirement submitter in collaborator list',
         'submitted_description' => 'Client wording.',
     ]);
 
-    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $requirement));
+    $response = $this->actingAs($this->user)->getJson(route('tasks.show', $requirement));
 
     $response
         ->assertOk()
@@ -670,7 +670,7 @@ test('task detail includes external requirement submitter in collaborator list',
         ->assertJsonPath('external_collaborators.0.email', 'client@example.com');
 });
 
-test('tasks v2 show includes created and updated timestamps', function () {
+test('tasks show includes created and updated timestamps', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -683,7 +683,7 @@ test('tasks v2 show includes created and updated timestamps', function () {
     ]);
     $task->submitter()->associate($this->user)->save();
 
-    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+    $response = $this->actingAs($this->user)->getJson(route('tasks.show', $task));
 
     $response->assertOk();
     $response->assertJsonPath('id', $task->id);
@@ -692,7 +692,7 @@ test('tasks v2 show includes created and updated timestamps', function () {
     expect($response->json('updated_at'))->toBeString()->not->toBeEmpty();
 });
 
-test('tasks v2 show includes error intake metadata for error tasks', function () {
+test('tasks show includes error intake metadata for error tasks', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -718,7 +718,7 @@ test('tasks v2 show includes error intake metadata for error tasks', function ()
     ]);
     $task->submitter()->associate($this->user)->save();
 
-    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+    $response = $this->actingAs($this->user)->getJson(route('tasks.show', $task));
 
     $response
         ->assertOk()
@@ -797,7 +797,7 @@ test('can finalize ready requirement items in a visible batch without promoting 
     ]);
 
     $response = $this->actingAs($this->user)
-        ->patchJson(route('requirements.v2.batches.finalize', $batch));
+        ->patchJson(route('requirements.batches.finalize', $batch));
 
     $response
         ->assertOk()
@@ -825,7 +825,7 @@ test('can finalize ready requirement items in a visible batch without promoting 
     ]);
 });
 
-test('tasks v2 can filter tasks by environment', function () {
+test('tasks can filter tasks by environment', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -865,7 +865,7 @@ test('tasks v2 can filter tasks by environment', function () {
     );
 });
 
-test('tasks v2 defaults to sorting by updated_at descending', function () {
+test('tasks defaults to sorting by updated_at descending', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -895,7 +895,7 @@ test('tasks v2 defaults to sorting by updated_at descending', function () {
     );
 });
 
-test('tasks v2 can sort tasks by priority', function () {
+test('tasks can sort tasks by priority', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -969,7 +969,7 @@ test('create route redirects to tasks index', function () {
     $response->assertRedirect(route('tasks.index'));
 });
 
-test('store v2 creates new task and returns json', function () {
+test('store creates new task and returns json', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -982,7 +982,7 @@ test('store v2 creates new task and returns json', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), $taskData);
+        ->postJson(route('tasks.store'), $taskData);
 
     $response->assertCreated();
     $response->assertJsonPath('ok', true);
@@ -998,13 +998,13 @@ test('store v2 creates new task and returns json', function () {
     ]);
 });
 
-test('store v2 can create portal requirement items', function () {
+test('store can create portal requirement items', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), [
+        ->postJson(route('tasks.store'), [
             'title' => 'Portal requirement',
             'description' => '<p>Review this request.</p>',
             'project_id' => $project->id,
@@ -1029,7 +1029,7 @@ test('store v2 can create portal requirement items', function () {
     ]);
 });
 
-test('store v2 syncs grouped collaborators and returns them in the response', function () {
+test('store syncs grouped collaborators and returns them in the response', function () {
     \Illuminate\Support\Facades\Http::fake([
         'https://client-app.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
             'url' => 'https://client-app.test',
@@ -1063,7 +1063,7 @@ test('store v2 syncs grouped collaborators and returns them in the response', fu
     ]);
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), [
+        ->postJson(route('tasks.store'), [
             'title' => 'Task with collaborators',
             'project_id' => $project->id,
             'environment' => 'production',
@@ -1101,7 +1101,7 @@ test('store v2 syncs grouped collaborators and returns them in the response', fu
     $response->assertJsonPath('data.external_collaborators.0.id', 'client-7');
 });
 
-test('store v2 persists temp attachments and rewrites editor temp urls', function () {
+test('store persists temp attachments and rewrites editor temp urls', function () {
     \Illuminate\Support\Facades\Storage::fake();
 
     $project = Project::factory()->create([
@@ -1117,7 +1117,7 @@ test('store v2 persists temp attachments and rewrites editor temp urls', functio
         json_encode(['original_filename' => 'Task Screenshot.png'], JSON_THROW_ON_ERROR),
     );
 
-    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+    $response = $this->actingAs($this->user)->postJson(route('tasks.store'), [
         'title' => 'Task with inline upload',
         'description' => "<p><img src=\"/attachments/temp/{$tempIdentifier}/task-screenshot.png\"></p>",
         'project_id' => $project->id,
@@ -1142,10 +1142,10 @@ test('store v2 persists temp attachments and rewrites editor temp urls', functio
     \Illuminate\Support\Facades\Storage::assertMissing("{$tempPath}.meta");
 });
 
-test('store v2 rejects inaccessible project ids', function () {
+test('store rejects inaccessible project ids', function () {
     $otherUsersProject = Project::factory()->create();
 
-    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+    $response = $this->actingAs($this->user)->postJson(route('tasks.store'), [
         'title' => 'Blocked task',
         'project_id' => $otherUsersProject->id,
     ]);
@@ -1154,13 +1154,13 @@ test('store v2 rejects inaccessible project ids', function () {
     $response->assertJsonValidationErrors('project_id');
 });
 
-test('store v2 requires an environment before syncing external collaborators', function () {
+test('store requires an environment before syncing external collaborators', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
         'token' => 'project-token',
     ]);
 
-    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+    $response = $this->actingAs($this->user)->postJson(route('tasks.store'), [
         'title' => 'Needs environment',
         'project_id' => $project->id,
         'external_collaborators' => [
@@ -1189,7 +1189,7 @@ test('internal collaborator can view task details without broader project visibi
     $task->submitter()->associate($owner)->save();
     $task->internalCollaborators()->attach($this->user->id);
 
-    $response = $this->actingAs($this->user)->getJson(route('tasks.v2.show', $task));
+    $response = $this->actingAs($this->user)->getJson(route('tasks.show', $task));
 
     $response
         ->assertOk()
@@ -1220,7 +1220,7 @@ test('collaborator candidate endpoint requires an environment before external lo
     ]);
 
     $response = $this->actingAs($this->user)
-        ->getJson(route('tasks.v2.collaborators', $project));
+        ->getJson(route('tasks.collaborators', $project));
 
     $response
         ->assertOk()
@@ -1257,7 +1257,7 @@ test('collaborator candidate endpoint uses the selected environment registration
     ]);
 
     $response = $this->actingAs($this->user)
-        ->getJson(route('tasks.v2.collaborators', [
+        ->getJson(route('tasks.collaborators', [
             'project' => $project,
             'environment' => 'staging',
         ]));
@@ -1268,7 +1268,7 @@ test('collaborator candidate endpoint uses the selected environment registration
         ->assertJsonPath('external.0.id', 'client-7');
 });
 
-test('edit route redirects to v2 task view', function () {
+test('edit route redirects to the task view', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -1284,7 +1284,7 @@ test('edit route redirects to v2 task view', function () {
     $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
-test('update v2 updates an owned task', function () {
+test('update updates an owned task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -1305,7 +1305,7 @@ test('update v2 updates an owned task', function () {
     ];
 
     $response = $this->actingAs($this->user)
-        ->putJson(route('tasks.v2.update', $task), $updateData);
+        ->putJson(route('tasks.update', $task), $updateData);
 
     $response
         ->assertOk()
@@ -1323,7 +1323,7 @@ test('update v2 updates an owned task', function () {
     ]);
 });
 
-test('update v2 preserves requirement metadata when no environment is selected', function () {
+test('update preserves requirement metadata when no environment is selected', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -1347,7 +1347,7 @@ test('update v2 preserves requirement metadata when no environment is selected',
     ]);
 
     $this->actingAs($this->user)
-        ->putJson(route('tasks.v2.update', $requirement), [
+        ->putJson(route('tasks.update', $requirement), [
             'title' => 'Updated requirement',
             'description' => '<p>Updated requirement details.</p>',
             'status' => 'pending',
@@ -1369,7 +1369,7 @@ test('update v2 preserves requirement metadata when no environment is selected',
     ]);
 });
 
-test('destroy v2 deletes task', function () {
+test('destroy deletes task', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -1403,7 +1403,7 @@ test('destroy v2 deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertExists($attachment2->path);
 
     $response = $this->actingAs($this->user)
-        ->deleteJson(route('tasks.v2.destroy', $task));
+        ->deleteJson(route('tasks.destroy', $task));
 
     $response
         ->assertOk()
@@ -1427,7 +1427,7 @@ test('destroy v2 deletes task', function () {
     \Illuminate\Support\Facades\Storage::assertMissing($attachment2->path);
 });
 
-test('update v2 blocks an attached collaborator from updating status', function () {
+test('update blocks an attached collaborator from updating status', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create([
         'author_id' => $owner->id,
@@ -1441,7 +1441,7 @@ test('update v2 blocks an attached collaborator from updating status', function 
     $task->internalCollaborators()->attach($this->user->id);
 
     $response = $this->actingAs($this->user)
-        ->putJson(route('tasks.v2.update', $task), [
+        ->putJson(route('tasks.update', $task), [
             'status' => 'awaiting-feedback',
         ]);
 
@@ -1480,7 +1480,7 @@ test('task creation notifies the submitter and explicitly tagged collaborators o
     ]);
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), [
+        ->postJson(route('tasks.store'), [
             'title' => 'Notification Policy Task',
             'project_id' => $project->id,
             'internal_collaborator_ids' => [$taggedCollaborator->id],
@@ -1521,7 +1521,7 @@ test('task creation notifies tagged internal collaborators', function () {
     ]);
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), [
+        ->postJson(route('tasks.store'), [
             'title' => 'Tagged internal collaborator task',
             'project_id' => $project->id,
             'internal_collaborator_ids' => [$collaborator->id],
@@ -1535,7 +1535,7 @@ test('task creation notifies tagged internal collaborators', function () {
     );
 });
 
-test('store v2 dispatches create notification jobs for tagged external collaborators', function () {
+test('store dispatches create notification jobs for tagged external collaborators', function () {
     \Illuminate\Support\Facades\Http::fake([
         'https://client-app.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
             'url' => 'https://client-app.test',
@@ -1562,7 +1562,7 @@ test('store v2 dispatches create notification jobs for tagged external collabora
     ]);
 
     $response = $this->actingAs($this->user)
-        ->postJson(route('tasks.v2.store'), [
+        ->postJson(route('tasks.store'), [
             'title' => 'Tagged external collaborator task',
             'project_id' => $project->id,
             'environment' => 'local',
@@ -1649,7 +1649,7 @@ test('edit route redirects for external submitted task', function () {
     $response->assertRedirect(route('tasks.index', ['task' => $task->id]));
 });
 
-test('attached internal collaborator cannot update collaborators through the v2 collaborator endpoint', function () {
+test('attached internal collaborator cannot update collaborators through the collaborator endpoint', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create([
         'author_id' => $owner->id,
@@ -1681,7 +1681,7 @@ test('attached internal collaborator cannot update collaborators through the v2 
     $task->internalCollaborators()->attach($manager->id);
 
     $response = $this->actingAs($manager)
-        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+        ->patchJson(route('tasks.collaborators.update', $task), [
             'internal_collaborator_ids' => [$manager->id, $newCollaborator->id],
         ]);
 
@@ -1714,7 +1714,7 @@ test('visible project member without task attachment cannot update collaborators
     $task->submitter()->associate($owner)->save();
 
     $response = $this->actingAs($viewer)
-        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+        ->patchJson(route('tasks.collaborators.update', $task), [
             'internal_collaborator_ids' => [$viewer->id],
         ]);
 
@@ -1744,7 +1744,7 @@ test('adding an internal collaborator to an existing task sends collaborator add
     $task->submitter()->associate($this->user)->save();
 
     $response = $this->actingAs($this->user)
-        ->patchJson(route('tasks.v2.collaborators.update', $task), [
+        ->patchJson(route('tasks.collaborators.update', $task), [
             'internal_collaborator_ids' => [$collaborator->id],
         ]);
 
@@ -1756,7 +1756,7 @@ test('adding an internal collaborator to an existing task sends collaborator add
     );
 });
 
-test('store v2 sanitizes dangerous description html without breaking inline uploads', function () {
+test('store sanitizes dangerous description html without breaking inline uploads', function () {
     \Illuminate\Support\Facades\Storage::fake();
 
     $project = Project::factory()->create([
@@ -1772,7 +1772,7 @@ test('store v2 sanitizes dangerous description html without breaking inline uplo
         json_encode(['original_filename' => 'Task Screenshot.png'], JSON_THROW_ON_ERROR),
     );
 
-    $response = $this->actingAs($this->user)->postJson(route('tasks.v2.store'), [
+    $response = $this->actingAs($this->user)->postJson(route('tasks.store'), [
         'title' => 'Task with sanitized inline upload',
         'description' => implode('', [
             "<p><img src=\"/attachments/temp/{$tempIdentifier}/task-screenshot.png\" class=\"editor-tile extra\" onerror=\"alert(1)\"></p>",

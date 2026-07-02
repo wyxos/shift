@@ -22,6 +22,13 @@ return [
     'model' => env('SHIFT_AI_MODEL', 'llama3.1'),
     'timeout' => (int) env('SHIFT_AI_TIMEOUT', 60),
 
+    'email_import' => [
+        'enabled' => (bool) env('SHIFT_AI_EMAIL_IMPORT_ENABLED', env('SHIFT_AI_ENABLED', false)),
+        'provider' => env('SHIFT_AI_EMAIL_IMPORT_PROVIDER', env('SHIFT_AI_PROVIDER', 'openai')),
+        'model' => env('SHIFT_AI_EMAIL_IMPORT_MODEL', env('SHIFT_AI_MODEL')),
+        'timeout' => (int) env('SHIFT_AI_EMAIL_IMPORT_TIMEOUT', env('SHIFT_AI_TIMEOUT', 60)),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Ollama Provider

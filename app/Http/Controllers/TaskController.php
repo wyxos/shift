@@ -650,7 +650,7 @@ class TaskController extends Controller
         return $payload;
     }
 
-    public function indexV2(?Organisation $organisation = null)
+    public function index(?Organisation $organisation = null)
     {
         if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
             abort(404);
@@ -785,7 +785,7 @@ class TaskController extends Controller
             ]);
     }
 
-    public function requirementsV2(?Organisation $organisation = null)
+    public function requirements(?Organisation $organisation = null)
     {
         $defaultStatuses = RequirementStatus::values();
         $allPriorities = ['low', 'medium', 'high'];
@@ -963,7 +963,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function showV2(Task $task): JsonResponse
+    public function show(Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
         $this->markTaskNotificationsAsRead($task);
@@ -973,7 +973,7 @@ class TaskController extends Controller
         return response()->json($this->serializeTaskDetail($task));
     }
 
-    public function updateV2(Request $request, Task $task): JsonResponse
+    public function update(Request $request, Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
 
@@ -1056,7 +1056,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function updateCollaboratorsV2(Request $request, Task $task): JsonResponse
+    public function updateCollaborators(Request $request, Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
 
@@ -1100,7 +1100,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function finalizeRequirementV2(Request $request, Task $task): JsonResponse
+    public function finalizeRequirement(Request $request, Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
         abort_unless($this->permissions->canFinalizeRequirement($task, auth()->id()), 403);
@@ -1138,7 +1138,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function finalizeRequirementBatchV2(RequirementBatch $requirementBatch): JsonResponse
+    public function finalizeRequirementBatch(RequirementBatch $requirementBatch): JsonResponse
     {
         if (! $this->visibleProjectsQuery()->whereKey($requirementBatch->project_id)->exists()) {
             abort(404);
@@ -1202,7 +1202,7 @@ class TaskController extends Controller
         $task->threads()->save($thread);
     }
 
-    public function destroyV2(Task $task): JsonResponse
+    public function destroy(Task $task): JsonResponse
     {
         $this->ensureTaskVisible($task);
         abort_unless($this->permissions->canDeleteTask($task, auth()->id()), 403);
@@ -1212,7 +1212,7 @@ class TaskController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function storeV2(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $attributes = $this->validateStoreAttributes($request);
         $task = $this->createTaskFromAttributes($attributes);

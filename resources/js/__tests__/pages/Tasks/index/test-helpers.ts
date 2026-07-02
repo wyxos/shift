@@ -18,6 +18,11 @@ const router = vi.hoisted(() => ({
     get: vi.fn(),
     reload: vi.fn(),
 }));
+const inertiaPageProps = vi.hoisted(() => ({
+    shift: {
+        ai_enabled: false,
+    },
+}));
 
 vi.mock('axios', () => ({
     default: {
@@ -426,11 +431,7 @@ vi.mock('@inertiajs/vue3', () => ({
     router,
     usePage: () => ({
         url: '/tasks',
-        props: {
-            shift: {
-                ai_enabled: false,
-            },
-        },
+        props: inertiaPageProps,
     }),
 }));
 
@@ -446,7 +447,12 @@ beforeEach(() => {
     axiosDeleteMock.mockReset();
     (router.get as any).mockClear();
     (router.reload as any).mockClear();
+    inertiaPageProps.shift.ai_enabled = false;
 });
+
+function setShiftAiEnabled(enabled: boolean) {
+    inertiaPageProps.shift.ai_enabled = enabled;
+}
 
 export function makeTasksPage(
     tasks: any[],
@@ -469,4 +475,16 @@ export function makeTasksPage(
     };
 }
 
-export { axiosDeleteMock, axiosGetMock, axiosPatchMock, axiosPostMock, axiosPutMock, flushPromises, Index, mount, router, sonnerMocks };
+export {
+    axiosDeleteMock,
+    axiosGetMock,
+    axiosPatchMock,
+    axiosPostMock,
+    axiosPutMock,
+    flushPromises,
+    Index,
+    mount,
+    router,
+    setShiftAiEnabled,
+    sonnerMocks,
+};

@@ -138,7 +138,7 @@ test('opening a task detail marks matching task notifications as read', function
         ->get()
         ->first(fn (DatabaseNotification $notification) => (int) $notification->data['task_id'] === $otherTask->id);
 
-    $this->getJson(route('tasks.v2.show', ['task' => $task->id]))
+    $this->getJson(route('tasks.show', ['task' => $task->id]))
         ->assertOk();
 
     expect($matchingNotification->refresh()->read_at)->not->toBeNull()
@@ -149,7 +149,7 @@ test('missing task detail route returns a friendly not found message', function 
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    $this->getJson(route('tasks.v2.show', ['task' => 999999]))
+    $this->getJson(route('tasks.show', ['task' => 999999]))
         ->assertNotFound()
         ->assertJson([
             'message' => 'This task is no longer available or you do not have access to it.',
