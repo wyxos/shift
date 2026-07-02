@@ -602,7 +602,7 @@ test('finalizing a requirement preserves the task id and existing threads', func
     $requirement->threads()->save($thread);
 
     $response = $this->actingAs($this->user)
-        ->patchJson(route('requirements.v2.finalize', $requirement), [
+        ->patchJson(route('requirements.finalize', $requirement), [
             'title' => 'Confirmed renewal export',
             'description' => '<p>Build the confirmed export.</p>',
         ]);
@@ -656,7 +656,7 @@ test('parked requirement items cannot be finalized until they are ready', functi
     ]);
 
     $this->actingAs($this->user)
-        ->patchJson(route('requirements.v2.finalize', $requirement), [
+        ->patchJson(route('requirements.finalize', $requirement), [
             'title' => 'Parked requirement',
             'description' => 'Too early for this work.',
         ])
@@ -695,7 +695,7 @@ test('external users cannot finalize requirements', function () {
     ]);
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
-        ->patchJson(route('requirements.v2.finalize', $requirement), [
+        ->patchJson(route('requirements.finalize', $requirement), [
             'title' => 'Attempted finalize',
             'description' => 'External users should not be able to finalize.',
         ])

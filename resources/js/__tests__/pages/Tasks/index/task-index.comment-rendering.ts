@@ -59,7 +59,7 @@ describe('Tasks/Index.vue', () => {
         axiosGetMock.mockReset();
 
         axiosGetMock.mockImplementation((url: string, config?: { params?: Record<string, unknown> }) => {
-            if (url === '/tasks.v2.show') {
+            if (url === '/tasks.show') {
                 return Promise.resolve({
                     data: {
                         id: 1,
