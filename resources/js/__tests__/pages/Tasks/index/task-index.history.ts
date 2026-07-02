@@ -76,7 +76,7 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="task-title-1"]').trigger('click');
         await flushPromises();
 
-        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.show');
         expect(window.location.search).toContain('task=1');
         expect(pushStateSpy.mock.calls.some(([, , next]) => next === '/tasks?task=1')).toBe(true);
 
@@ -113,7 +113,7 @@ describe('Tasks/Index.vue', () => {
 
         await flushPromises();
 
-        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.show');
         expect(axiosGetMock).toHaveBeenCalledWith('/task-threads.index');
 
         wrapper.unmount();
@@ -149,7 +149,7 @@ describe('Tasks/Index.vue', () => {
         window.dispatchEvent(new PopStateEvent('popstate'));
         await flushPromises();
 
-        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.v2.show');
+        expect(axiosGetMock).toHaveBeenCalledWith('/tasks.show');
 
         window.history.replaceState({}, '', '/tasks');
         window.dispatchEvent(new PopStateEvent('popstate'));

@@ -10,7 +10,7 @@ import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
 import TaskCreateForm from '@shared/components/TaskCreateForm.vue';
 import axios from 'axios';
-import { Plus } from 'lucide-vue-next';
+import { AlertCircle, CheckCircle2, LoaderCircle, Mail, Plus, UploadCloud } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -21,6 +21,20 @@ type TaskCreateDraft = {
     projectId: number | null;
     environment: string | null;
     collaborators: TaskCollaboratorSelection;
+};
+
+type TaskEmailImportResult = {
+    title?: string;
+    priority?: string;
+    description_html?: string;
+    missing_details?: string[];
+    source?: {
+        subject?: string;
+        from?: string;
+        attachments?: string[];
+    };
+    ai_used?: boolean;
+    ai_error?: string | null;
 };
 
 const props = withDefaults(
@@ -45,6 +59,11 @@ const createLoading = ref(false);
 const createUploading = ref(false);
 const createError = ref<string | null>(null);
 const createTempIdentifier = ref(Date.now().toString());
+const emailImportInput = ref<HTMLInputElement | null>(null);
+const emailImportLoading = ref(false);
+const emailImportDragging = ref(false);
+const emailImportError = ref<string | null>(null);
+const emailImportResult = ref<TaskEmailImportResult | null>(null);
 const isRequirementSurface = computed(() => props.surface === 'requirements');
 
 const defaultProjectId = computed(() => (props.projects.length === 1 ? props.projects[0].id : null));
@@ -69,6 +88,8 @@ const createSuccessTitle = computed(() => (isRequirementSurface.value ? 'Require
 const createSuccessDescription = computed(() =>
     isRequirementSurface.value ? 'Your requirement has been added to the review queue.' : 'Your task has been added to the queue.',
 );
+const importedAttachmentCount = computed(() => emailImportResult.value?.source?.attachments?.length ?? 0);
+const importedMissingDetails = computed(() => emailImportResult.value?.missing_details ?? []);
 
 const createForm = ref<TaskCreateDraft>({
     title: '',
@@ -91,6 +112,14 @@ function resetCreateForm() {
     createTempIdentifier.value = Date.now().toString();
     createError.value = null;
     createUploading.value = false;
+    emailImportError.value = null;
+    emailImportLoading.value = false;
+    emailImportDragging.value = false;
+    emailImportResult.value = null;
+
+    if (emailImportInput.value) {
+        emailImportInput.value.value = '';
+    }
 }
 
 function openCreate() {
@@ -111,10 +140,117 @@ function updateProject(projectId: number | null) {
     createForm.value.projectId = projectId;
     createForm.value.environment = null;
     createForm.value.collaborators = emptyTaskCollaborators();
+    emailImportError.value = null;
 }
 
 function updateProjectFromSelect(value: SelectOptionValue) {
     updateProject(typeof value === 'number' ? value : value ? Number(value) : null);
+}
+
+function openEmailImportFilePicker() {
+    if (!aiImproveEnabled.value || emailImportLoading.value) {
+        return;
+    }
+
+    emailImportInput.value?.click();
+}
+
+function handleEmailImportInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = firstImportFile(input.files);
+
+    void importEmailFile(file);
+
+    input.value = '';
+}
+
+function handleEmailImportDrop(event: DragEvent) {
+    emailImportDragging.value = false;
+    void importEmailFile(firstImportFile(event.dataTransfer?.files));
+}
+
+function firstImportFile(files: FileList | File[] | null | undefined): File | null {
+    if (!files || files.length < 1) {
+        return null;
+    }
+
+    return typeof files.item === 'function' ? files.item(0) : files[0];
+}
+
+function isEmlFile(file: File): boolean {
+    return file.name.toLowerCase().endsWith('.eml') || file.type === 'message/rfc822';
+}
+
+function applyEmailImportResult(result: TaskEmailImportResult) {
+    const title = typeof result.title === 'string' ? result.title.trim() : '';
+    const description = typeof result.description_html === 'string' ? result.description_html.trim() : '';
+    const priority = typeof result.priority === 'string' ? result.priority : '';
+
+    if (title !== '') {
+        createForm.value.title = title;
+    }
+
+    if (['low', 'medium', 'high'].includes(priority)) {
+        createForm.value.priority = priority;
+    }
+
+    if (description !== '') {
+        createForm.value.description = description;
+    }
+}
+
+async function importEmailFile(file: File | null) {
+    if (!aiImproveEnabled.value) {
+        return;
+    }
+
+    if (!file) {
+        return;
+    }
+
+    if (createForm.value.projectId === null) {
+        emailImportError.value = 'Select a project before importing an email.';
+        return;
+    }
+
+    if (!isEmlFile(file)) {
+        emailImportError.value = 'Use an .eml email file.';
+        return;
+    }
+
+    emailImportLoading.value = true;
+    emailImportError.value = null;
+    emailImportResult.value = null;
+
+    try {
+        const formData = new FormData();
+
+        formData.append('project_id', String(createForm.value.projectId));
+        formData.append('email', file);
+
+        const response = await axios.post(route('tasks.email-import'), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const result = (response.data?.data ?? response.data ?? {}) as TaskEmailImportResult;
+
+        applyEmailImportResult(result);
+        emailImportResult.value = result;
+
+        if (result.ai_error) {
+            emailImportError.value = result.ai_error;
+        }
+
+        toast.success('Email imported', { description: 'Review the task draft before creating it.' });
+    } catch (error: any) {
+        emailImportError.value =
+            error.response?.data?.errors?.email?.[0] ||
+            error.response?.data?.errors?.project_id?.[0] ||
+            error.response?.data?.message ||
+            error.message ||
+            'The email could not be imported.';
+    } finally {
+        emailImportLoading.value = false;
+    }
 }
 
 async function createTask() {
@@ -127,7 +263,7 @@ async function createTask() {
     createLoading.value = true;
 
     try {
-        const response = await axios.post(route('tasks.v2.store'), {
+        const response = await axios.post(route('tasks.store'), {
             title: createForm.value.title,
             description: createForm.value.description,
             priority: createForm.value.priority,
@@ -210,6 +346,79 @@ async function createTask() {
                         test-id="create-task-project"
                         @update:modelValue="updateProjectFromSelect"
                     />
+                </div>
+
+                <div v-if="aiImproveEnabled && !isRequirementSurface" class="space-y-2">
+                    <label class="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium select-none">
+                        <Mail class="h-4 w-4" />
+                        Email
+                    </label>
+                    <input
+                        ref="emailImportInput"
+                        accept=".eml,message/rfc822"
+                        class="sr-only"
+                        data-testid="task-email-import-input"
+                        type="file"
+                        @change="handleEmailImportInput"
+                    />
+                    <button
+                        type="button"
+                        data-testid="task-email-import-dropzone"
+                        :disabled="emailImportLoading"
+                        class="border-muted-foreground/30 hover:border-primary/60 hover:bg-muted/40 flex w-full items-center gap-3 rounded-md border border-dashed px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-70"
+                        :class="emailImportDragging ? 'border-primary bg-muted/50' : ''"
+                        @click="openEmailImportFilePicker"
+                        @dragenter.prevent="emailImportDragging = true"
+                        @dragover.prevent="emailImportDragging = true"
+                        @dragleave.prevent="emailImportDragging = false"
+                        @drop.prevent="handleEmailImportDrop"
+                    >
+                        <LoaderCircle v-if="emailImportLoading" class="text-muted-foreground h-5 w-5 animate-spin" />
+                        <UploadCloud v-else class="text-muted-foreground h-5 w-5" />
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-sm font-medium">
+                                {{ emailImportLoading ? 'Digesting email...' : 'Drop .eml or browse' }}
+                            </span>
+                            <span class="text-muted-foreground block truncate text-xs">
+                                {{ emailImportResult ? (emailImportResult.ai_used ? 'AI draft ready' : 'Imported without AI') : 'Outlook export' }}
+                            </span>
+                        </span>
+                    </button>
+
+                    <div
+                        v-if="emailImportResult?.source?.subject"
+                        data-testid="task-email-import-summary"
+                        class="border-border bg-muted/30 space-y-1 rounded-md border px-3 py-2 text-sm"
+                    >
+                        <div class="flex min-w-0 items-center gap-2">
+                            <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-600" />
+                            <span class="truncate font-medium">{{ emailImportResult.source.subject }}</span>
+                        </div>
+                        <p v-if="emailImportResult.source.from" class="text-muted-foreground truncate text-xs">
+                            From {{ emailImportResult.source.from }}
+                        </p>
+                        <p v-if="importedAttachmentCount > 0" class="text-muted-foreground text-xs">
+                            {{ importedAttachmentCount }} attachment{{ importedAttachmentCount === 1 ? '' : 's' }} referenced
+                        </p>
+                    </div>
+
+                    <div
+                        v-if="importedMissingDetails.length > 0"
+                        data-testid="task-email-import-missing"
+                        class="border-border bg-background rounded-md border px-3 py-2 text-sm"
+                    >
+                        <div class="text-muted-foreground mb-1 flex items-center gap-2 text-xs font-medium">
+                            <AlertCircle class="h-4 w-4" />
+                            Missing details
+                        </div>
+                        <ul class="list-disc space-y-1 pl-5">
+                            <li v-for="detail in importedMissingDetails" :key="detail">{{ detail }}</li>
+                        </ul>
+                    </div>
+
+                    <p v-if="emailImportError" data-testid="task-email-import-error" class="text-sm text-red-600">
+                        {{ emailImportError }}
+                    </p>
                 </div>
 
                 <TaskEnvironmentField

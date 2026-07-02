@@ -160,20 +160,20 @@ test('developer can comment but cannot edit delete or finalize visible requireme
         ->assertCreated();
 
     $this->actingAs($developer)
-        ->putJson(route('tasks.v2.update', $requirement), [
+        ->putJson(route('tasks.update', $requirement), [
             'status' => 'completed',
         ])
         ->assertForbidden();
 
     $this->actingAs($developer)
-        ->patchJson(route('requirements.v2.finalize', $requirement), [
+        ->patchJson(route('requirements.finalize', $requirement), [
             'title' => 'Accepted requirement',
             'description' => '<p>Accepted scope</p>',
         ])
         ->assertForbidden();
 
     $this->actingAs($developer)
-        ->deleteJson(route('tasks.v2.destroy', $requirement))
+        ->deleteJson(route('tasks.destroy', $requirement))
         ->assertForbidden();
 });
 
@@ -194,7 +194,7 @@ test('client project manager can edit and finalize visible requirements', functi
     createProjectMember($project, $projectManager, OrganisationRole::ClientProjectManager);
 
     $this->actingAs($projectManager)
-        ->patchJson(route('requirements.v2.finalize', $requirement), [
+        ->patchJson(route('requirements.finalize', $requirement), [
             'title' => 'Accepted requirement',
             'description' => '<p>Accepted scope</p>',
         ])
