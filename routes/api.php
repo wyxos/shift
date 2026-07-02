@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/collaborators/internal', [\App\Http\Controllers\Api\ExternalTaskController::class, 'internalCollaborators'])->name('collaborators.internal');
         Route::get('/tasks', [\App\Http\Controllers\Api\ExternalTaskController::class, 'index'])->name('tasks.index');
         Route::get('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'show'])->name('tasks.show');
+        Route::post('/tasks/email-import', [\App\Http\Controllers\Api\ExternalTaskEmailImportController::class, 'store'])->name('tasks.email-import');
         Route::post('/tasks', [\App\Http\Controllers\Api\ExternalTaskController::class, 'store'])->name('tasks.store');
         Route::put('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'update'])->name('tasks.update');
         Route::patch('/tasks/{task}/collaborators', [\App\Http\Controllers\Api\ExternalTaskController::class, 'updateCollaborators'])->name('tasks.collaborators.update');
