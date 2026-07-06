@@ -65,6 +65,7 @@ test('users can reset their mcp token', function () {
     expect($newToken)->not->toBeNull();
     expect($newToken->tokenable_id)->toBe($this->user->id);
     expect($newToken->abilities)->toContain('mcp:use');
+    expect($newToken->abilities)->toContain('mcp:write');
 });
 
 test('users can reset one of their shift sdk tokens', function () {

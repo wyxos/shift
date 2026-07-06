@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Mcp\Support\ShiftMcpAccess;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,7 +14,12 @@ class ApiController extends Controller
 {
     private const MCP_TOKEN_NAME = 'shift-mcp';
 
-    private const MCP_TOKEN_ABILITY = 'mcp:use';
+    private const MCP_TOKEN_ABILITY = ShiftMcpAccess::READ_ABILITY;
+
+    private const MCP_TOKEN_ABILITIES = [
+        ShiftMcpAccess::READ_ABILITY,
+        ShiftMcpAccess::WRITE_ABILITY,
+    ];
 
     private const SDK_INSTALL_TOKEN_PREFIX = 'shift-sdk-install:';
 
@@ -48,7 +54,7 @@ class ApiController extends Controller
 
         return back()->with([
             'success' => 'API token created successfully.',
-            'token' => $token->plainTextToken
+            'token' => $token->plainTextToken,
         ]);
     }
 
@@ -63,7 +69,7 @@ class ApiController extends Controller
                 }
             });
 
-        $token = $request->user()->createToken(self::MCP_TOKEN_NAME, [self::MCP_TOKEN_ABILITY]);
+        $token = $request->user()->createToken(self::MCP_TOKEN_NAME, self::MCP_TOKEN_ABILITIES);
 
         return response()->json($this->tokenResponse($token));
     }
