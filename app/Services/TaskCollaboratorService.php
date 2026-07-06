@@ -105,10 +105,10 @@ class TaskCollaboratorService
             'internal_ids' => $afterInternalIds->all(),
             'external_ids' => $afterExternalIds->all(),
             'added_internal' => $addedInternalIds->isEmpty()
-                ? new EloquentCollection()
+                ? new EloquentCollection
                 : User::query()->whereIn('id', $addedInternalIds)->get(),
             'added_external' => $addedExternalIds->isEmpty()
-                ? new EloquentCollection()
+                ? new EloquentCollection
                 : ExternalUser::query()->whereIn('id', $addedExternalIds)->get(),
         ];
     }
@@ -142,12 +142,13 @@ class TaskCollaboratorService
         $task->loadMissing(['submitter', 'internalCollaborators']);
 
         $users = collect();
-
-        if ($task->submitter instanceof User) {
-            $users->push($task->submitter);
-        }
+        $submitterId = $task->submitter instanceof User ? $task->submitter->id : null;
 
         foreach ($task->internalCollaborators as $collaborator) {
+            if ($collaborator->id === $submitterId) {
+                continue;
+            }
+
             if (! $users->contains('id', $collaborator->id)) {
                 $users->push($collaborator);
             }
@@ -158,10 +159,16 @@ class TaskCollaboratorService
 
     public function externalTaskCreateAudience(Task $task): Collection
     {
-        $task->loadMissing('externalCollaborators');
+        $task->loadMissing(['submitter', 'externalCollaborators']);
 
         $users = collect();
+        $submitterId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
+
         foreach ($task->externalCollaborators as $collaborator) {
+            if ($collaborator->id === $submitterId) {
+                continue;
+            }
+
             if (! $users->contains('id', $collaborator->id)) {
                 $users->push($collaborator);
             }

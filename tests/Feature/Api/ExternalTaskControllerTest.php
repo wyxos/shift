@@ -560,16 +560,37 @@ test('store dispatches create notification jobs for tagged external collaborator
     });
 });
 
-test('store does not dispatch create notification job for the external submitter', function () {
+test('store does not dispatch create notification job for the external creator when self tagged as collaborator', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://example.com/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://example.com',
+            'environment' => 'testing',
+            'users' => [
+                [
+                    'id' => 'ext-123',
+                    'name' => 'External User',
+                    'email' => 'external@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+
     \Illuminate\Support\Facades\Queue::fake();
 
     $taskData = [
-        'title' => 'New External Task Without Collaborators',
+        'title' => 'New External Task With Self Collaborator',
         'project' => $this->project->token,
         'user' => $this->externalUserData,
         'metadata' => [
             'url' => 'https://example.com/task/self-notification',
             'environment' => 'testing',
+        ],
+        'external_collaborators' => [
+            [
+                'id' => 'ext-123',
+                'name' => 'External User',
+                'email' => 'external@example.com',
+            ],
         ],
     ];
 
@@ -578,7 +599,7 @@ test('store does not dispatch create notification job for the external submitter
 
     $response->assertCreated();
 
-    $task = Task::query()->where('title', 'New External Task Without Collaborators')->firstOrFail();
+    $task = Task::query()->where('title', 'New External Task With Self Collaborator')->firstOrFail();
 
     \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task) {
         return $job->taskId === $task->id
