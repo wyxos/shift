@@ -2,7 +2,12 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\AddTaskThreadCommentTool;
+use App\Mcp\Tools\CreateTaskTool;
+use App\Mcp\Tools\EditTaskThreadCommentTool;
+use App\Mcp\Tools\EditTaskTool;
 use App\Mcp\Tools\GetTaskTool;
+use App\Mcp\Tools\GetTaskWriteContextTool;
 use App\Mcp\Tools\ListNotificationsTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListTaskThreadsTool;
@@ -16,11 +21,11 @@ class ShiftServer extends Server
     protected string $version = '0.1.0';
 
     protected string $instructions = <<<'MARKDOWN'
-        Read-only access to the SHIFT portal, scoped to the authenticated SHIFT user.
-        Use these tools to inspect visible
-        projects, tasks, task threads, collaborators, and the user's own notification
-        records. Do not use this server for mutations; it intentionally exposes no
-        write tools.
+        Access to the SHIFT portal, scoped to the authenticated SHIFT user.
+        Use read tools to inspect visible projects, tasks, task threads, collaborators,
+        writable fields, capabilities, and the user's own notification records. Mutation
+        tools require the authenticated token to include mcp:write and should only be
+        used after the user approves the specific task or thread change.
     MARKDOWN;
 
     /**
@@ -30,7 +35,12 @@ class ShiftServer extends Server
         ListProjectsTool::class,
         SearchTasksTool::class,
         GetTaskTool::class,
+        GetTaskWriteContextTool::class,
         ListTaskThreadsTool::class,
         ListNotificationsTool::class,
+        CreateTaskTool::class,
+        EditTaskTool::class,
+        AddTaskThreadCommentTool::class,
+        EditTaskThreadCommentTool::class,
     ];
 }

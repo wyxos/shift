@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Mcp\Support\ShiftMcpAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,8 +12,9 @@ class EnsureShiftMcpTokenAbility
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->user()?->currentAccessToken();
+        $access = app(ShiftMcpAccess::class);
 
-        if (! $token || ! in_array('mcp:use', $token->abilities ?? [], true)) {
+        if (! $token || ! $access->tokenHasExplicitAbility($token, ShiftMcpAccess::READ_ABILITY)) {
             abort(403);
         }
 
