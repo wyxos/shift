@@ -1,8 +1,15 @@
 <?php
 
 use App\Enums\TaskCollaboratorKind;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Mcp\Servers\ShiftServer;
+use App\Mcp\Tools\AddTaskThreadCommentTool;
+use App\Mcp\Tools\CreateTaskTool;
+use App\Mcp\Tools\EditTaskThreadCommentTool;
+use App\Mcp\Tools\EditTaskTool;
 use App\Mcp\Tools\GetTaskTool;
+use App\Mcp\Tools\GetTaskWriteContextTool;
 use App\Mcp\Tools\ListNotificationsTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListTaskThreadsTool;
@@ -19,6 +26,14 @@ use App\Notifications\TaskThreadUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Server\Registrar;
+
+function shiftMcpAs(User $user, array $abilities = ['mcp:use']): \Laravel\Mcp\Server\Testing\PendingTestResponse
+{
+    $token = $user->createToken('shift-mcp-test', $abilities)->accessToken;
+    $user->withAccessToken($token);
+
+    return ShiftServer::actingAs($user);
+}
 
 test('mcp tools fail closed without an authenticated user', function () {
     Task::factory()->create([
@@ -348,6 +363,180 @@ test('list task threads returns thread content for a task', function () {
     ])
         ->assertOk()
         ->assertSee(['internal', 'The reproduction is attached to this task.', 'Thread Sender']);
+});
+
+test('get task write context returns fields enums and capabilities for inline drafting', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => TaskStatus::Pending->value,
+        'priority' => TaskPriority::Medium->value,
+    ]);
+
+    shiftMcpAs($user)->tool(GetTaskWriteContextTool::class, [
+        'task_id' => $task->id,
+    ])
+        ->assertOk()
+        ->assertSee([
+            'editable_task_fields',
+            'thread_comment_fields',
+            'pending',
+            'completed',
+            'high',
+            'can_edit_task',
+            'can_comment',
+        ]);
+});
+
+test('mcp write tools require the mcp write ability', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+
+    shiftMcpAs($user)->tool(CreateTaskTool::class, [
+        'project_id' => $project->id,
+        'title' => 'Should not be created',
+    ])
+        ->assertHasErrors(['mcp:write']);
+});
+
+test('mcp write tools can create and edit tasks with write ability', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+        'project_id' => $project->id,
+        'title' => 'MCP created task',
+        'description' => '<p>Created from Codex.</p>',
+        'priority' => TaskPriority::High->value,
+    ])
+        ->assertOk()
+        ->assertSee(['MCP created task', 'Created from Codex.', 'high']);
+
+    $task = Task::query()->where('title', 'MCP created task')->firstOrFail();
+
+    expect($task->submitter_id)->toBe($user->id);
+    expect($task->submitter_type)->toBe(User::class);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+        'task_id' => $task->id,
+        'title' => 'MCP edited task',
+        'status' => TaskStatus::Completed->value,
+        'priority' => TaskPriority::Low->value,
+    ])
+        ->assertOk()
+        ->assertSee(['MCP edited task', 'completed', 'low']);
+
+    $this->assertDatabaseHas('tasks', [
+        'id' => $task->id,
+        'title' => 'MCP edited task',
+        'status' => TaskStatus::Completed->value,
+        'priority' => TaskPriority::Low->value,
+    ]);
+});
+
+test('mcp task edit tool does not edit requirement phase items', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Submitted requirement',
+    ]);
+    $task->metadata()->create([
+        'url' => 'https://example.com/requirement',
+        'phase' => 'requirement',
+        'source' => 'embedded_requirement_pack',
+        'intake_type' => 'requirement',
+        'submitted_title' => 'Submitted requirement',
+        'submitted_description' => 'Original requirement details.',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+        'task_id' => $task->id,
+        'title' => 'Edited requirement',
+    ])
+        ->assertHasErrors(['Requirement-phase items']);
+
+    $this->assertDatabaseHas('tasks', [
+        'id' => $task->id,
+        'title' => 'Submitted requirement',
+    ]);
+});
+
+test('mcp write tools can add and edit own thread comments', function () {
+    $user = User::factory()->create([
+        'name' => 'Codex Operator',
+    ]);
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+        'task_id' => $task->id,
+        'content' => '<p>Initial Codex reply.</p><script>alert("x")</script>',
+    ])
+        ->assertOk()
+        ->assertSee(['Initial Codex reply.', 'Codex Operator'])
+        ->assertDontSee('script');
+
+    $thread = TaskThread::query()->where('task_id', $task->id)->firstOrFail();
+
+    expect($thread->sender_id)->toBe($user->id);
+    expect($thread->sender_type)->toBe(User::class);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+        'thread_id' => $thread->id,
+        'content' => '<p>Edited Codex reply.</p>',
+    ])
+        ->assertOk()
+        ->assertSee('Edited Codex reply.');
+
+    $this->assertDatabaseHas('task_threads', [
+        'id' => $thread->id,
+        'content' => '<p>Edited Codex reply.</p>',
+    ]);
+});
+
+test('mcp write tools cannot edit another users thread comment', function () {
+    $owner = User::factory()->create();
+    $other = User::factory()->create();
+    $project = Project::factory()->withAuthor($owner->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+    $thread = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'internal',
+        'content' => '<p>Original owner comment.</p>',
+        'sender_name' => $owner->name,
+        'sender_type' => User::class,
+        'sender_id' => $owner->id,
+    ]);
+    $task->internalCollaborators()->attach($other->id);
+
+    shiftMcpAs($other, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+        'thread_id' => $thread->id,
+        'content' => '<p>Unauthorized edit.</p>',
+    ])
+        ->assertHasErrors(['own messages']);
+
+    $this->assertDatabaseHas('task_threads', [
+        'id' => $thread->id,
+        'content' => '<p>Original owner comment.</p>',
+    ]);
 });
 
 test('list notifications filters database notifications by user and task', function () {

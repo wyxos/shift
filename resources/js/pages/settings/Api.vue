@@ -136,7 +136,7 @@ async function resetSdkToken(token: SdkTokenRecord) {
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h2 class="text-base font-semibold">MCP token</h2>
-                            <p class="text-muted-foreground text-sm">Used by Codex MCP connections.</p>
+                            <p class="text-muted-foreground text-sm">Used by Codex MCP connections for read and approved write tools.</p>
                         </div>
                         <Button type="button" :disabled="mcpResetting" data-testid="reset-mcp-token" @click="resetMcpToken">
                             <RefreshCw class="mr-2 h-4 w-4" />
