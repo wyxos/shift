@@ -1453,7 +1453,7 @@ test('update blocks an attached collaborator from updating status', function () 
     ]);
 });
 
-test('task creation notifies the submitter and explicitly tagged collaborators only', function () {
+test('task creation notifies explicitly tagged collaborators but not the creator', function () {
     \Illuminate\Support\Facades\Notification::fake();
 
     $project = Project::factory()->create([
@@ -1483,12 +1483,12 @@ test('task creation notifies the submitter and explicitly tagged collaborators o
         ->postJson(route('tasks.store'), [
             'title' => 'Notification Policy Task',
             'project_id' => $project->id,
-            'internal_collaborator_ids' => [$taggedCollaborator->id],
+            'internal_collaborator_ids' => [$this->user->id, $taggedCollaborator->id],
         ]);
 
     $response->assertCreated();
 
-    \Illuminate\Support\Facades\Notification::assertSentTo(
+    \Illuminate\Support\Facades\Notification::assertNotSentTo(
         $this->user,
         \App\Notifications\TaskCreationNotification::class,
     );

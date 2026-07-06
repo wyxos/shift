@@ -1225,7 +1225,7 @@ class TaskController extends Controller
     }
 
     /**
-     * Send creation notifications only to the submitter and explicitly tagged collaborators.
+     * Send creation notifications only to explicitly tagged collaborators, excluding the creator.
      */
     protected function sendTaskCreationNotifications(Task $task)
     {

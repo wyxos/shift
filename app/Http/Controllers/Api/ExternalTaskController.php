@@ -556,7 +556,7 @@ class ExternalTaskController extends Controller
     }
 
     /**
-     * Send creation notifications only to the submitter and explicitly tagged collaborators.
+     * Send creation notifications only to explicitly tagged collaborators, excluding the creator.
      */
     private function sendTaskCreationNotifications(Task $task): void
     {
