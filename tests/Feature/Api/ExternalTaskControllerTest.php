@@ -1242,6 +1242,61 @@ test('external submitter can update collaborators through collaborator endpoint'
     ]);
 });
 
+test('external submitter can explicitly remain a collaborator without self notification job', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'https://example.com/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+            'url' => 'https://example.com',
+            'environment' => 'testing',
+            'users' => [
+                [
+                    'id' => 'ext-123',
+                    'name' => 'External User',
+                    'email' => 'external@example.com',
+                ],
+            ],
+        ], 200),
+    ]);
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'External self collaborator update',
+    ]);
+    $task->submitter()->associate($this->externalUser)->save();
+    $task->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$task->id}/collaborators", [
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'external_collaborators' => [
+                [
+                    'id' => 'ext-123',
+                    'name' => 'External User',
+                    'email' => 'external@example.com',
+                ],
+            ],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('external_collaborators.0.id', 'ext-123');
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $this->externalUser->id,
+        'kind' => 'external',
+    ]);
+
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalCollaboratorAdded::class, function ($job) use ($task) {
+        return $job->taskId === $task->id
+            && $job->externalUserId === $this->externalUser->id;
+    });
+});
+
 test('non submitter external collaborator cannot update collaborators', function () {
     $otherExternalUser = ExternalUser::create([
         'external_id' => 'other-123',

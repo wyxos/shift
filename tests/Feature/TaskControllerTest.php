@@ -1101,6 +1101,38 @@ test('store syncs grouped collaborators and returns them in the response', funct
     $response->assertJsonPath('data.external_collaborators.0.id', 'client-7');
 });
 
+test('store persists explicitly selected creator collaborator without notifying the creator', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('tasks.store'), [
+            'title' => 'Task with creator collaborator',
+            'project_id' => $project->id,
+            'internal_collaborator_ids' => [$this->user->id],
+        ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('data.internal_collaborators.0.id', $this->user->id);
+
+    $task = Task::query()->where('title', 'Task with creator collaborator')->firstOrFail();
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $this->user->id,
+        'kind' => 'internal',
+    ]);
+
+    \Illuminate\Support\Facades\Notification::assertNotSentTo(
+        $this->user,
+        \App\Notifications\TaskCreationNotification::class,
+    );
+});
+
 test('store persists temp attachments and rewrites editor temp urls', function () {
     \Illuminate\Support\Facades\Storage::fake();
 
@@ -1752,6 +1784,40 @@ test('adding an internal collaborator to an existing task sends collaborator add
 
     \Illuminate\Support\Facades\Notification::assertSentTo(
         $collaborator,
+        \App\Notifications\TaskCollaboratorAddedNotification::class,
+    );
+});
+
+test('adding the submitter as an explicit collaborator persists without sending collaborator added notification', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Creator collaborator update',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $response = $this->actingAs($this->user)
+        ->patchJson(route('tasks.collaborators.update', $task), [
+            'internal_collaborator_ids' => [$this->user->id],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('task.internal_collaborators.0.id', $this->user->id);
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $this->user->id,
+        'kind' => 'internal',
+    ]);
+
+    \Illuminate\Support\Facades\Notification::assertNotSentTo(
+        $this->user,
         \App\Notifications\TaskCollaboratorAddedNotification::class,
     );
 });

@@ -12,6 +12,7 @@ use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Services\ExternalUserService;
@@ -263,7 +264,10 @@ class ExternalTaskController extends Controller
     {
         $task->loadMissing('project');
 
-        $addedInternal = $syncResult['added_internal'] ?? collect();
+        $addedInternal = ($syncResult['added_internal'] ?? collect())
+            ->reject(fn (User $user): bool => $task->submitter_type === User::class && (int) $task->submitter_id === $user->id)
+            ->values();
+
         if ($addedInternal->isNotEmpty()) {
             Notification::send(
                 $addedInternal,
@@ -271,7 +275,11 @@ class ExternalTaskController extends Controller
             );
         }
 
-        foreach (($syncResult['added_external'] ?? collect()) as $externalUser) {
+        $addedExternal = ($syncResult['added_external'] ?? collect())
+            ->reject(fn (ExternalUser $externalUser): bool => $task->submitter_type === ExternalUser::class && (int) $task->submitter_id === $externalUser->id)
+            ->values();
+
+        foreach ($addedExternal as $externalUser) {
             if ($externalUser->email !== null || $externalUser->url !== null) {
                 NotifyExternalCollaboratorAdded::dispatch($externalUser->id, $task->id);
             }
