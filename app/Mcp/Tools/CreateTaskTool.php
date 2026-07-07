@@ -6,6 +6,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
+use App\Mcp\Tools\Concerns\HandlesTaskEnvironments;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\ShiftPermissionService;
@@ -22,6 +23,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 class CreateTaskTool extends Tool
 {
     use FormatsShiftRecords;
+    use HandlesTaskEnvironments;
 
     protected string $name = 'create_task';
 
@@ -35,6 +37,7 @@ class CreateTaskTool extends Tool
             'description' => ['nullable', 'string'],
             'status' => ['nullable', 'string', Rule::in(TaskStatus::values())],
             'priority' => ['nullable', 'string', Rule::in(TaskPriority::values())],
+            'environment' => ['nullable', 'string', 'max:255'],
         ]);
 
         $access = app(ShiftMcpAccess::class);
@@ -58,6 +61,16 @@ class CreateTaskTool extends Tool
             return Response::error("You do not have permission to create tasks for project [{$project->id}].");
         }
 
+        $environment = null;
+
+        if (array_key_exists('environment', $validated)) {
+            [$environment, $environmentError] = $this->resolveMcpProjectEnvironment($project, $validated['environment'] ?? null);
+
+            if ($environmentError !== null) {
+                return Response::error($environmentError);
+            }
+        }
+
         $task = Task::query()->create([
             'project_id' => $project->id,
             'title' => $validated['title'],
@@ -67,6 +80,10 @@ class CreateTaskTool extends Tool
         ]);
 
         $task->submitter()->associate($principal->user)->save();
+        if ($environment !== null) {
+            $this->syncMcpTaskEnvironment($task, $environment);
+        }
+
         $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalUser']);
 
         return Response::structured([
@@ -93,6 +110,8 @@ class CreateTaskTool extends Tool
                 ->description('Optional task priority.')
                 ->enum(TaskPriority::values())
                 ->default(TaskPriority::Medium->value),
+            'environment' => $schema->string()
+                ->description('Optional registered project environment key to store on task metadata, for example development or production. Blank leaves metadata empty.'),
         ];
     }
 }

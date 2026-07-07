@@ -370,6 +370,11 @@ test('get task write context returns fields enums and capabilities for inline dr
     $project = Project::factory()->withAuthor($user->id)->create([
         'mcp_enabled' => true,
     ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
     $task = Task::factory()->create([
         'project_id' => $project->id,
         'status' => TaskStatus::Pending->value,
@@ -388,6 +393,9 @@ test('get task write context returns fields enums and capabilities for inline dr
             'high',
             'can_edit_task',
             'can_comment',
+            'environment',
+            'development',
+            'voidcare-v3.lawcreative.dev',
         ]);
 });
 
@@ -438,6 +446,96 @@ test('mcp write tools can create and edit tasks with write ability', function ()
         'title' => 'MCP edited task',
         'status' => TaskStatus::Completed->value,
         'priority' => TaskPriority::Low->value,
+    ]);
+});
+
+test('mcp create task stores registered project environment metadata', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+        'project_id' => $project->id,
+        'title' => 'MCP task with environment',
+        'environment' => 'Development',
+    ])
+        ->assertOk()
+        ->assertSee(['MCP task with environment', 'development', 'voidcare-v3.lawcreative.dev']);
+
+    $task = Task::query()->where('title', 'MCP task with environment')->firstOrFail();
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $task->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+});
+
+test('mcp create task rejects unregistered project environment metadata', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+        'project_id' => $project->id,
+        'title' => 'MCP task with bad environment',
+        'environment' => 'production',
+    ])
+        ->assertHasErrors(['selected environment is not registered']);
+
+    $this->assertDatabaseMissing('tasks', [
+        'title' => 'MCP task with bad environment',
+    ]);
+});
+
+test('mcp edit task can set and clear registered project environment metadata', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'MCP environment edit task',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+        'task_id' => $task->id,
+        'environment' => 'development',
+    ])
+        ->assertOk()
+        ->assertSee(['MCP environment edit task', 'development', 'voidcare-v3.lawcreative.dev']);
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $task->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+        'task_id' => $task->id,
+        'environment' => '',
+    ])
+        ->assertOk();
+
+    $this->assertDatabaseMissing('task_metadata', [
+        'task_id' => $task->id,
     ]);
 });
 
