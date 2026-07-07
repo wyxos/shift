@@ -6,6 +6,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
+use App\Mcp\Tools\Concerns\HandlesTaskEnvironments;
 use App\Models\Task;
 use App\Services\ShiftPermissionService;
 use App\Support\RichContentSanitizer;
@@ -21,6 +22,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 class EditTaskTool extends Tool
 {
     use FormatsShiftRecords;
+    use HandlesTaskEnvironments;
 
     protected string $name = 'edit_task';
 
@@ -34,6 +36,7 @@ class EditTaskTool extends Tool
             'description' => ['nullable', 'string'],
             'status' => ['nullable', 'string', Rule::in(TaskStatus::values())],
             'priority' => ['nullable', 'string', Rule::in(TaskPriority::values())],
+            'environment' => ['nullable', 'string', 'max:255'],
         ]);
 
         $access = app(ShiftMcpAccess::class);
@@ -63,21 +66,37 @@ class EditTaskTool extends Tool
             return Response::error('Requirement-phase items cannot be edited with the normal task edit tool.');
         }
 
-        $fields = collect(['title', 'description', 'status', 'priority'])
+        $fields = collect(['title', 'description', 'status', 'priority', 'environment'])
             ->filter(fn (string $field): bool => array_key_exists($field, $validated))
             ->values();
 
         if ($fields->isEmpty()) {
-            return Response::error('Provide at least one editable task field: title, description, status, or priority.');
+            return Response::error('Provide at least one editable task field: title, description, status, priority, or environment.');
         }
 
-        foreach ($fields as $field) {
+        $environment = null;
+        $hasEnvironmentField = $fields->contains('environment');
+
+        if ($hasEnvironmentField) {
+            [$environment, $environmentError] = $this->resolveMcpProjectEnvironment($task->project, $validated['environment'] ?? null);
+
+            if ($environmentError !== null) {
+                return Response::error($environmentError);
+            }
+        }
+
+        foreach ($fields->reject(fn (string $field): bool => $field === 'environment') as $field) {
             $task->{$field} = $field === 'description'
                 ? app(RichContentSanitizer::class)->sanitize($validated[$field] ?? null)
                 : $validated[$field];
         }
 
         $task->save();
+
+        if ($hasEnvironmentField) {
+            $this->syncMcpTaskEnvironment($task, $environment);
+        }
+
         $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalUser']);
 
         return Response::structured([
@@ -101,6 +120,8 @@ class EditTaskTool extends Tool
             'priority' => $schema->string()
                 ->description('Optional replacement task priority.')
                 ->enum(TaskPriority::values()),
+            'environment' => $schema->string()
+                ->description('Optional registered project environment key to store on task metadata. Omit to preserve metadata; pass blank to clear it.'),
         ];
     }
 }

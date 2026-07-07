@@ -6,6 +6,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
+use App\Mcp\Tools\Concerns\HandlesTaskEnvironments;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\ShiftPermissionService;
@@ -24,6 +25,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 class GetTaskWriteContextTool extends Tool
 {
     use FormatsShiftRecords;
+    use HandlesTaskEnvironments;
 
     protected string $name = 'get_task_write_context';
 
@@ -49,7 +51,7 @@ class GetTaskWriteContextTool extends Tool
 
         if (isset($validated['task_id'])) {
             $task = $access->tasksFor($principal)
-                ->with(['project', 'submitter', 'metadata', 'collaborators.user', 'collaborators.externalUser'])
+                ->with(['project.environments', 'submitter', 'metadata', 'collaborators.user', 'collaborators.externalUser'])
                 ->find($validated['task_id']);
 
             if (! $task instanceof Task) {
@@ -58,7 +60,9 @@ class GetTaskWriteContextTool extends Tool
 
             $project = $task->project;
         } elseif (isset($validated['project_id'])) {
-            $project = $access->projectsFor($principal)->find($validated['project_id']);
+            $project = $access->projectsFor($principal)
+                ->with('environments')
+                ->find($validated['project_id']);
 
             if (! $project instanceof Project) {
                 return Response::error("Project [{$validated['project_id']}] was not found or is not visible to the authenticated user.");
@@ -70,6 +74,7 @@ class GetTaskWriteContextTool extends Tool
             'project' => $project ? [
                 'id' => $project->id,
                 'name' => $project->name,
+                'environments' => $this->mcpProjectEnvironmentOptions($project),
                 'capabilities' => $permissions->projectCapabilities($project, $principal->user->id),
             ] : null,
             'task' => $task ? [
@@ -100,6 +105,13 @@ class GetTaskWriteContextTool extends Tool
                 'description' => ['type' => 'html_string', 'required_on_create' => false],
                 'status' => ['type' => 'enum', 'values' => TaskStatus::values()],
                 'priority' => ['type' => 'enum', 'values' => TaskPriority::values()],
+                'environment' => [
+                    'type' => 'string',
+                    'required_on_create' => false,
+                    'accepted_values_source' => 'project.environments[].environment',
+                    'create_behavior' => 'Omit or pass blank to leave metadata empty.',
+                    'edit_behavior' => 'Omit to preserve metadata; pass blank to clear it.',
+                ],
             ],
             'thread_comment_fields' => [
                 'content' => ['type' => 'html_string', 'required' => true],
