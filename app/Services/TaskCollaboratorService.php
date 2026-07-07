@@ -301,18 +301,6 @@ class TaskCollaboratorService
             ->unique()
             ->values();
 
-        if ($task->submitter_type === User::class && $task->submitter_id !== null) {
-            $normalizedInternalIds = $normalizedInternalIds
-                ->reject(fn (int $id) => $id === (int) $task->submitter_id)
-                ->values();
-        }
-
-        if ($task->submitter_type === ExternalUser::class && $task->submitter_id !== null) {
-            $normalizedExternalIds = $normalizedExternalIds
-                ->reject(fn (int $id) => $id === (int) $task->submitter_id)
-                ->values();
-        }
-
         return [$normalizedInternalIds, $normalizedExternalIds];
     }
 }
