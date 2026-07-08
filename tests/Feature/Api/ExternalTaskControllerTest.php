@@ -507,7 +507,7 @@ test('store creates new task', function () {
     ]);
 });
 
-test('store dispatches create notification jobs for tagged external collaborators', function () {
+test('store schedules create notification jobs for tagged external collaborators', function () {
     \Illuminate\Support\Facades\Http::fake([
         'https://example.com/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
             'url' => 'https://example.com',
@@ -549,15 +549,26 @@ test('store dispatches create notification jobs for tagged external collaborator
     $task = Task::query()->where('title', 'New External Task With Collaborator')->firstOrFail();
     $externalUser = ExternalUser::query()->where('email', 'other-collaborator@example.com')->firstOrFail();
 
-    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task, $externalUser) {
-        return $job->taskId === $task->id
-            && $job->externalUserId === $externalUser->id;
-    });
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
+        ->where('kind', 'external')
+        ->where('external_user_id', $externalUser->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
 
-    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task) {
-        return $job->taskId === $task->id
-            && $job->externalUserId === $this->externalUser->id;
-    });
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
+    );
+
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
+        'kind' => 'external',
+        'external_user_id' => $this->externalUser->id,
+    ]);
 });
 
 test('store does not dispatch create notification job for the external creator when self tagged as collaborator', function () {
@@ -601,10 +612,14 @@ test('store does not dispatch create notification job for the external creator w
 
     $task = Task::query()->where('title', 'New External Task With Self Collaborator')->firstOrFail();
 
-    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task) {
-        return $job->taskId === $task->id
-            && $job->externalUserId === $this->externalUser->id;
-    });
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\SendPendingTaskCollaboratorNotification::class);
+
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
+        'kind' => 'external',
+        'external_user_id' => $this->externalUser->id,
+    ]);
 });
 
 test('update updates task', function () {
@@ -888,6 +903,7 @@ test('store rejects tagged external collaborators when the environment is not re
 
 test('external task creation only notifies explicitly tagged internal collaborators', function () {
     \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
 
     $taggedInternalCollaborator = User::factory()->create();
     $untaggedProjectUser = User::factory()->create();
@@ -927,18 +943,29 @@ test('external task creation only notifies explicitly tagged internal collaborat
 
     $response->assertStatus(201);
 
-    \Illuminate\Support\Facades\Notification::assertSentTo(
-        $taggedInternalCollaborator,
-        \App\Notifications\TaskCreationNotification::class,
-        function ($notification, $channels, $notifiable) use ($response) {
-            return $notification->toArray($notifiable)['url'] === route('tasks.index', ['task' => $response->json('id')]);
-        }
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $response->json('id'))
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
+        ->where('kind', 'internal')
+        ->where('user_id', $taggedInternalCollaborator->id)
+        ->where('url', route('tasks.index', ['task' => $response->json('id')]))
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
     );
 
-    \Illuminate\Support\Facades\Notification::assertNotSentTo(
-        [$this->user, $untaggedProjectUser],
-        \App\Notifications\TaskCreationNotification::class,
-    );
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $response->json('id'),
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
+        'kind' => 'internal',
+        'user_id' => $untaggedProjectUser->id,
+    ]);
 });
 test('index returns tasks with granted access', function () {
     $this->externalUser->update(['role' => 'client_developer']);
@@ -1205,6 +1232,9 @@ test('internal collaborator lookup endpoint returns registered shift users for t
 });
 
 test('external submitter can update collaborators through collaborator endpoint', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
+
     $internalCollaborator = User::factory()->create();
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $this->project->id,
@@ -1240,6 +1270,23 @@ test('external submitter can update collaborators through collaborator endpoint'
         'task_id' => $task->id,
         'user_id' => $internalCollaborator->id,
     ]);
+
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED)
+        ->where('kind', 'internal')
+        ->where('user_id', $internalCollaborator->id)
+        ->where('url', route('tasks.index', ['task' => $task->id]))
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
+    );
 });
 
 test('external submitter can explicitly remain a collaborator without self notification job', function () {
@@ -1291,10 +1338,14 @@ test('external submitter can explicitly remain a collaborator without self notif
         'kind' => 'external',
     ]);
 
-    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\NotifyExternalCollaboratorAdded::class, function ($job) use ($task) {
-        return $job->taskId === $task->id
-            && $job->externalUserId === $this->externalUser->id;
-    });
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\SendPendingTaskCollaboratorNotification::class);
+
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED,
+        'kind' => 'external',
+        'external_user_id' => $this->externalUser->id,
+    ]);
 });
 
 test('non submitter external collaborator cannot update collaborators', function () {

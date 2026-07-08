@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
-use App\Jobs\NotifyExternalCollaboratorAdded;
-use App\Jobs\NotifyExternalUser;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Organisation;
@@ -21,12 +19,12 @@ use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
+use App\Services\TaskCollaboratorNotificationScheduler;
 use App\Services\TaskCollaboratorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -38,6 +36,7 @@ class TaskController extends Controller
 
     public function __construct(
         private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly TaskCollaboratorNotificationScheduler $collaboratorNotifications,
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly ShiftPermissionService $permissions,
@@ -315,25 +314,7 @@ class TaskController extends Controller
 
     private function sendCollaboratorAddedNotifications(Task $task, array $syncResult): void
     {
-        $task->loadMissing('project');
-
-        $addedInternal = ($syncResult['added_internal'] ?? collect())
-            ->reject(fn (User $user): bool => $task->submitter_type === User::class && (int) $task->submitter_id === $user->id)
-            ->values();
-
-        if ($addedInternal->isNotEmpty()) {
-            Notification::send($addedInternal, new TaskCollaboratorAddedNotification($task));
-        }
-
-        $addedExternal = ($syncResult['added_external'] ?? collect())
-            ->reject(fn (ExternalUser $externalUser): bool => $task->submitter_type === ExternalUser::class && (int) $task->submitter_id === $externalUser->id)
-            ->values();
-
-        foreach ($addedExternal as $externalUser) {
-            if ($externalUser->email !== null || $externalUser->url !== null) {
-                NotifyExternalCollaboratorAdded::dispatch($externalUser->id, $task->id);
-            }
-        }
+        $this->collaboratorNotifications->scheduleCollaboratorAdded($task, $syncResult);
     }
 
     private function createTaskFromAttributes(array $attributes): Task
@@ -1236,17 +1217,6 @@ class TaskController extends Controller
      */
     protected function sendTaskCreationNotifications(Task $task)
     {
-        $task->load(['submitter', 'internalCollaborators', 'externalCollaborators', 'project']);
-
-        $usersToNotify = $this->taskCollaboratorService->internalTaskCreateAudience($task);
-        if ($usersToNotify->isNotEmpty()) {
-            Notification::send($usersToNotify, new TaskCreationNotification($task));
-        }
-
-        foreach ($this->taskCollaboratorService->externalTaskCreateAudience($task) as $externalUser) {
-            if ($externalUser->email !== null || $externalUser->url !== null) {
-                NotifyExternalUser::dispatch($externalUser->id, $task->id);
-            }
-        }
+        $this->collaboratorNotifications->scheduleTaskCreated($task);
     }
 }
