@@ -100,10 +100,14 @@ class TaskCollaboratorService
 
         $addedInternalIds = $afterInternalIds->diff($beforeInternalIds)->values();
         $addedExternalIds = $afterExternalIds->diff($beforeExternalIds)->values();
+        $removedInternalIds = $beforeInternalIds->diff($afterInternalIds)->values();
+        $removedExternalIds = $beforeExternalIds->diff($afterExternalIds)->values();
 
         return [
             'internal_ids' => $afterInternalIds->all(),
             'external_ids' => $afterExternalIds->all(),
+            'removed_internal_ids' => $removedInternalIds->all(),
+            'removed_external_ids' => $removedExternalIds->all(),
             'added_internal' => $addedInternalIds->isEmpty()
                 ? new EloquentCollection
                 : User::query()->whereIn('id', $addedInternalIds)->get(),

@@ -1487,6 +1487,7 @@ test('update blocks an attached collaborator from updating status', function () 
 
 test('task creation notifies explicitly tagged collaborators but not the creator', function () {
     \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
 
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -1519,25 +1520,42 @@ test('task creation notifies explicitly tagged collaborators but not the creator
         ]);
 
     $response->assertCreated();
+    $task = Task::query()->where('title', 'Notification Policy Task')->firstOrFail();
 
-    \Illuminate\Support\Facades\Notification::assertNotSentTo(
-        $this->user,
-        \App\Notifications\TaskCreationNotification::class,
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
+        ->where('kind', 'internal')
+        ->where('user_id', $taggedCollaborator->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
     );
 
-    \Illuminate\Support\Facades\Notification::assertSentTo(
-        $taggedCollaborator,
-        \App\Notifications\TaskCreationNotification::class,
-    );
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
+        'kind' => 'internal',
+        'user_id' => $this->user->id,
+    ]);
 
-    \Illuminate\Support\Facades\Notification::assertNotSentTo(
-        $untaggedProjectUser,
-        \App\Notifications\TaskCreationNotification::class,
-    );
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
+        'kind' => 'internal',
+        'user_id' => $untaggedProjectUser->id,
+    ]);
 });
 
-test('task creation notifies tagged internal collaborators', function () {
+test('task creation schedules tagged internal collaborator notifications', function () {
     \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
 
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -1560,14 +1578,28 @@ test('task creation notifies tagged internal collaborators', function () {
         ]);
 
     $response->assertCreated();
+    $task = Task::query()->where('title', 'Tagged internal collaborator task')->firstOrFail();
 
-    \Illuminate\Support\Facades\Notification::assertSentTo(
-        $collaborator,
-        \App\Notifications\TaskCreationNotification::class,
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
+        ->where('kind', 'internal')
+        ->where('user_id', $collaborator->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    expect($pending->scheduled_at)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
     );
 });
 
-test('store dispatches create notification jobs for tagged external collaborators', function () {
+test('store schedules create notification jobs for tagged external collaborators', function () {
     \Illuminate\Support\Facades\Http::fake([
         'https://client-app.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
             'url' => 'https://client-app.test',
@@ -1612,10 +1644,19 @@ test('store dispatches create notification jobs for tagged external collaborator
     $task = Task::query()->where('title', 'Tagged external collaborator task')->firstOrFail();
     $externalUser = ExternalUser::query()->where('email', 'client@example.com')->firstOrFail();
 
-    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\NotifyExternalUser::class, function ($job) use ($task, $externalUser) {
-        return $job->taskId === $task->id
-            && $job->externalUserId === $externalUser->id;
-    });
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
+        ->where('kind', 'external')
+        ->where('external_user_id', $externalUser->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
+    );
 });
 
 test('edit route redirects for internal task', function () {
@@ -1753,8 +1794,9 @@ test('visible project member without task attachment cannot update collaborators
     $response->assertForbidden();
 });
 
-test('adding an internal collaborator to an existing task sends collaborator added notification', function () {
+test('adding an internal collaborator to an existing task schedules collaborator added notification', function () {
     \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
 
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -1782,14 +1824,74 @@ test('adding an internal collaborator to an existing task sends collaborator add
 
     $response->assertOk();
 
-    \Illuminate\Support\Facades\Notification::assertSentTo(
-        $collaborator,
-        \App\Notifications\TaskCollaboratorAddedNotification::class,
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED)
+        ->where('kind', 'internal')
+        ->where('user_id', $collaborator->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\SendPendingTaskCollaboratorNotification::class,
+        fn ($job): bool => $job->notificationId === $pending->id,
     );
+});
+
+test('removing a pending internal collaborator cancels unsent collaborator added notification', function () {
+    \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $collaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $collaborator->id,
+        'user_email' => $collaborator->email,
+        'user_name' => $collaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Mistaken collaborator task',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+
+    $this->actingAs($this->user)
+        ->patchJson(route('tasks.collaborators.update', $task), [
+            'internal_collaborator_ids' => [$collaborator->id],
+        ])
+        ->assertOk();
+
+    $pending = \App\Models\TaskCollaboratorNotification::query()
+        ->where('task_id', $task->id)
+        ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED)
+        ->where('kind', 'internal')
+        ->where('user_id', $collaborator->id)
+        ->whereNull('sent_at')
+        ->whereNull('cancelled_at')
+        ->firstOrFail();
+
+    $this->actingAs($this->user)
+        ->patchJson(route('tasks.collaborators.update', $task), [
+            'internal_collaborator_ids' => [],
+        ])
+        ->assertOk();
+
+    expect($pending->fresh()->cancelled_at)->not->toBeNull();
+    \Illuminate\Support\Facades\Notification::assertNothingSent();
 });
 
 test('adding the submitter as an explicit collaborator persists without sending collaborator added notification', function () {
     \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Queue::fake();
 
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
@@ -1820,6 +1922,15 @@ test('adding the submitter as an explicit collaborator persists without sending 
         $this->user,
         \App\Notifications\TaskCollaboratorAddedNotification::class,
     );
+
+    \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\SendPendingTaskCollaboratorNotification::class);
+
+    $this->assertDatabaseMissing('task_collaborator_notifications', [
+        'task_id' => $task->id,
+        'event' => \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED,
+        'kind' => 'internal',
+        'user_id' => $this->user->id,
+    ]);
 });
 
 test('store sanitizes dangerous description html without breaking inline uploads', function () {
