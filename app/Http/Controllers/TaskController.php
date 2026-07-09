@@ -988,13 +988,25 @@ class TaskController extends Controller
             $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
         }
 
-        $selectedEnvironment = $this->resolveTaskEnvironment(
-            $task->project()->with('environments')->firstOrFail(),
-            $attributes['environment'] ?? null,
-            $this->externalCollaboratorsRequested($attributes),
-        );
+        $project = $task->project()->with('environments')->firstOrFail();
+        $hasEnvironmentField = array_key_exists('environment', $attributes);
+        $hasCollaboratorFields = array_key_exists('internal_collaborator_ids', $attributes)
+            || array_key_exists('external_collaborators', $attributes);
+        $externalCollaboratorsRequested = $this->externalCollaboratorsRequested($attributes);
+        $rawEnvironment = $hasEnvironmentField
+            ? ($attributes['environment'] ?? null)
+            : ($externalCollaboratorsRequested ? $this->taskEnvironment($task) : null);
+
+        $selectedEnvironment = null;
+        if ($hasEnvironmentField || $externalCollaboratorsRequested) {
+            $selectedEnvironment = $this->resolveTaskEnvironment(
+                $project,
+                $rawEnvironment,
+                $externalCollaboratorsRequested && ! filled($rawEnvironment),
+            );
+        }
         $selectedEnvironmentUrl = $selectedEnvironment !== null
-            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
+            ? $project->environments()->where('environment', $selectedEnvironment)->value('url')
             : null;
 
         $task->title = $attributes['title'];
@@ -1004,7 +1016,9 @@ class TaskController extends Controller
         $task->save();
         $wasRequirementPhase = $task->isRequirementPhase();
 
-        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl, $wasRequirementPhase);
+        if ($hasEnvironmentField) {
+            $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl, $wasRequirementPhase);
+        }
         if ($wasRequirementPhase && array_key_exists('requirement_status', $attributes)) {
             $task->metadata()->updateOrCreate(
                 ['task_id' => $task->id],
@@ -1034,8 +1048,10 @@ class TaskController extends Controller
             }
         }
 
-        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
-        $this->sendCollaboratorAddedNotifications($task, $syncResult);
+        if ($hasCollaboratorFields) {
+            $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+            $this->sendCollaboratorAddedNotifications($task, $syncResult);
+        }
         $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);
 
         return response()->json([
