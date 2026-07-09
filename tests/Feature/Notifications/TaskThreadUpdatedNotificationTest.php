@@ -24,3 +24,18 @@ test('thread update mail preview renders rich content as plain text', function (
     expect($notification->toArray(new stdClass)['content'])
         ->toBe('<p>Production-backed embedded-client QA comment &amp; marker.</p><p>Marker: qa-marker</p>');
 });
+
+test('thread update mail subject uses shift branding without exposing payload type', function () {
+    $notification = new TaskThreadUpdated([
+        'type' => 'task_thread',
+        'task_id' => 123,
+        'task_title' => 'Production QA task',
+        'thread_id' => 456,
+        'content' => 'Thread updated',
+        'url' => 'https://shift.wyxos.com/tasks?task=123',
+    ]);
+
+    $mail = $notification->toMail(User::factory()->create());
+
+    expect($mail->subject)->toBe('SHIFT: New reply on Production QA task');
+});
