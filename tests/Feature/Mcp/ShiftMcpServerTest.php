@@ -539,6 +539,40 @@ test('mcp edit task can set and clear registered project environment metadata', 
     ]);
 });
 
+test('mcp edit task preserves environment metadata when environment is omitted', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'MCP status edit task',
+        'status' => 'pending',
+    ]);
+    $task->metadata()->create([
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+        'task_id' => $task->id,
+        'status' => 'awaiting-feedback',
+    ])
+        ->assertOk()
+        ->assertSee(['MCP status edit task', 'awaiting-feedback', 'development', 'voidcare-v3.lawcreative.dev']);
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $task->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+});
+
 test('mcp task edit tool does not edit requirement phase items', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create([

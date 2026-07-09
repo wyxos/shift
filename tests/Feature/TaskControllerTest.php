@@ -1355,6 +1355,97 @@ test('update updates an owned task', function () {
     ]);
 });
 
+test('update preserves task environment metadata and collaborators when they are omitted', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $project->environments()->create([
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+    $collaborator = User::factory()->create();
+    \App\Models\ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => $collaborator->id,
+        'user_email' => $collaborator->email,
+        'user_name' => $collaborator->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Task with environment',
+        'status' => 'pending',
+        'priority' => 'low',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+    $task->metadata()->create([
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+    $task->internalCollaborators()->attach($collaborator->id);
+
+    $this->actingAs($this->user)
+        ->putJson(route('tasks.update', $task), [
+            'title' => 'Task with environment',
+            'description' => '<p>Updated description</p>',
+            'status' => 'awaiting-feedback',
+            'priority' => 'low',
+        ])
+        ->assertOk()
+        ->assertJsonPath('task.status', 'awaiting-feedback')
+        ->assertJsonPath('task.environment', 'development');
+
+    $this->assertDatabaseHas('task_metadata', [
+        'task_id' => $task->id,
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'user_id' => $collaborator->id,
+        'kind' => 'internal',
+    ]);
+});
+
+test('update clears task environment metadata when environment is explicitly blank', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $project->environments()->create([
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Task with environment',
+        'status' => 'pending',
+        'priority' => 'low',
+    ]);
+    $task->submitter()->associate($this->user)->save();
+    $task->metadata()->create([
+        'environment' => 'development',
+        'url' => 'https://voidcare-v3.lawcreative.dev',
+    ]);
+
+    $this->actingAs($this->user)
+        ->putJson(route('tasks.update', $task), [
+            'title' => 'Task with environment',
+            'description' => '<p>Updated description</p>',
+            'status' => 'awaiting-feedback',
+            'priority' => 'low',
+            'environment' => '',
+        ])
+        ->assertOk()
+        ->assertJsonPath('task.status', 'awaiting-feedback')
+        ->assertJsonPath('task.environment', null);
+
+    $this->assertDatabaseMissing('task_metadata', [
+        'task_id' => $task->id,
+    ]);
+});
+
 test('update preserves requirement metadata when no environment is selected', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
