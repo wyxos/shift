@@ -22,6 +22,7 @@ type LinkedAccount = {
     email?: string | null;
     provider?: string | null;
     environment?: string | null;
+    url?: string | null;
     unlink_url?: string | null;
     unlinkUrl?: string | null;
     can_unlink?: boolean | null;
@@ -192,6 +193,13 @@ function normalizeValidationErrors(errors: Record<string, string[] | string> | u
 }
 function reloadExternalUsers() {
     router.reload({ only: ['externalUsers'], preserveScroll: true });
+}
+function handleLinkedAccountsChanged(externalUser: ExternalUserRow) {
+    if (editingExternalUser.value?.id === externalUser.id) {
+        editingExternalUser.value = externalUser;
+    }
+
+    reloadExternalUsers();
 }
 async function saveExternalUser() {
     if (!editingExternalUser.value || editDisabled.value) return;
@@ -420,7 +428,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                             v-if="editingExternalUser"
                             :can-manage-linked-accounts="canManageLinkedAccounts"
                             :external-user="editingExternalUser"
-                            @changed="reloadExternalUsers"
+                            @changed="handleLinkedAccountsChanged"
                         />
 
                         <p v-if="editError" class="text-destructive text-sm">{{ editError }}</p>
