@@ -73,7 +73,7 @@ export function useProjectAppErrorNotificationsState() {
                 { headers: { Accept: 'application/json' } },
             );
             closeAppErrorNotificationsModal();
-            router.reload({ only: ['projects'], preserveScroll: true });
+            router.reload({ only: ['projects'] });
         } catch (error) {
             console.error('Error saving app error notification settings:', error);
             appErrorNotificationsError.value = 'Unable to save notification settings right now.';

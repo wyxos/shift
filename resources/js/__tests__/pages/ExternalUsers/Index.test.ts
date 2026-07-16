@@ -388,7 +388,6 @@ describe('ExternalUsers/Index.vue', () => {
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['externalUsers'],
-                preserveScroll: true,
             }),
         );
     });
@@ -445,7 +444,6 @@ describe('ExternalUsers/Index.vue', () => {
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['externalUsers'],
-                preserveScroll: true,
             }),
         );
 

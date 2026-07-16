@@ -23,6 +23,5 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-package-lock.json
 .DS_Store
 .zephyr/

@@ -28,6 +28,22 @@ type ProjectPoint = {
     count: number;
 };
 
+type SegmentDatum = {
+    segment: string;
+    label: string;
+    value: number;
+};
+
+type OrderedDatum = {
+    key: string;
+    value: number;
+    order: number;
+};
+
+type PriorityDatum = OrderedDatum & { label: string };
+type ProjectDatum = OrderedDatum & { project: string };
+type ThroughputDatum = ThroughputPoint & { date: Date };
+
 const props = defineProps<{
     metrics: {
         total: number;
@@ -65,7 +81,7 @@ const environmentSegments = computed(() => props.charts?.environments ?? []);
 const throughputPoints = computed(() => props.charts?.throughput ?? []);
 const projectPoints = computed(() => props.charts?.projects ?? []);
 
-const statusData = computed(() =>
+const statusData = computed<SegmentDatum[]>(() =>
     statusSegments.value
         .filter((item) => item.count > 0)
         .map((item) => ({
@@ -75,7 +91,7 @@ const statusData = computed(() =>
         })),
 );
 
-const environmentData = computed(() =>
+const environmentData = computed<SegmentDatum[]>(() =>
     environmentSegments.value
         .filter((item) => item.count > 0)
         .map((item) => ({
@@ -85,7 +101,7 @@ const environmentData = computed(() =>
         })),
 );
 
-const priorityData = computed(() =>
+const priorityData = computed<PriorityDatum[]>(() =>
     prioritySegments.value.map((item, index) => ({
         key: item.key,
         label: item.label,
@@ -94,7 +110,7 @@ const priorityData = computed(() =>
     })),
 );
 
-const projectData = computed(() =>
+const projectData = computed<ProjectDatum[]>(() =>
     projectPoints.value.map((item, index) => ({
         key: `project-${index}`,
         project: item.project,
@@ -103,12 +119,25 @@ const projectData = computed(() =>
     })),
 );
 
-const throughputData = computed(() =>
+const throughputData = computed<ThroughputDatum[]>(() =>
     throughputPoints.value.map((item) => ({
         ...item,
         date: new Date(item.week_start),
     })),
 );
+
+const throughputDate = (datum: ThroughputDatum) => datum.date;
+const throughputCreated = (datum: ThroughputDatum) => datum.created;
+const throughputCompleted = (datum: ThroughputDatum) => datum.completed;
+const segmentValue = (datum: SegmentDatum) => datum.value;
+const statusColor = (datum: SegmentDatum) => statusChartConfig[datum.segment as keyof typeof statusChartConfig]?.color;
+const priorityOrder = (datum: PriorityDatum) => datum.order;
+const priorityValue = (datum: PriorityDatum) => datum.value;
+const priorityColor = (datum: PriorityDatum) => priorityChartConfig[datum.key as keyof typeof priorityChartConfig]?.color;
+const projectOrder = (datum: ProjectDatum) => datum.order;
+const projectValue = (datum: ProjectDatum) => datum.value;
+const projectColor = (datum: ProjectDatum) => projectChartConfig.value[datum.key]?.color;
+const environmentColor = (datum: SegmentDatum) => environmentChartConfig.value[datum.segment]?.color;
 
 const statusChartConfig = {
     value: {
@@ -299,14 +328,14 @@ const totalThroughputDelta = computed(() => {
                         <ChartContainer v-else :config="throughputChartConfig" class="h-[300px] w-full" cursor>
                             <VisXYContainer :data="throughputData" :margin="{ left: -12, right: 12 }" :y-domain="[0, undefined]">
                                 <VisGroupedBar
-                                    :x="(d) => d.date"
-                                    :y="[(d) => d.created, (d) => d.completed]"
+                                    :x="throughputDate"
+                                    :y="[throughputCreated, throughputCompleted]"
                                     :color="[throughputChartConfig.created.color, throughputChartConfig.completed.color]"
                                     :rounded-corners="6"
                                 />
                                 <VisAxis
                                     type="x"
-                                    :x="(d) => d.date"
+                                    :x="throughputDate"
                                     :tick-values="throughputData.map((d) => d.date)"
                                     :tick-line="false"
                                     :domain-line="false"
@@ -334,12 +363,7 @@ const totalThroughputDelta = computed(() => {
                         <div v-if="statusData.length === 0" class="text-muted-foreground py-8 text-center text-sm">No status data yet.</div>
                         <ChartContainer v-else :config="statusChartConfig" class="mx-auto h-[300px] max-w-[320px]">
                             <VisSingleContainer :data="statusData" :margin="{ top: 10, bottom: 10 }">
-                                <VisDonut
-                                    :value="(d) => d.value"
-                                    :color="(d) => statusChartConfig[d.segment as keyof typeof statusChartConfig]?.color"
-                                    :arc-width="24"
-                                    :corner-radius="3"
-                                />
+                                <VisDonut :value="segmentValue" :color="statusColor" :arc-width="24" :corner-radius="3" />
                             </VisSingleContainer>
                         </ChartContainer>
                     </CardContent>
@@ -357,16 +381,16 @@ const totalThroughputDelta = computed(() => {
                         <ChartContainer v-else :config="priorityChartConfig" class="h-[280px] w-full" cursor>
                             <VisXYContainer :data="priorityData" :margin="{ left: 8, right: 12 }" :y-domain="[0, undefined]">
                                 <VisGroupedBar
-                                    :x="(d) => d.order"
-                                    :y="(d) => d.value"
-                                    :color="(d) => priorityChartConfig[d.key as keyof typeof priorityChartConfig]?.color"
+                                    :x="priorityOrder"
+                                    :y="priorityValue"
+                                    :color="priorityColor"
                                     :group-max-width="42"
                                     :group-padding="0.2"
                                     :rounded-corners="8"
                                 />
                                 <VisAxis
                                     type="x"
-                                    :x="(d) => d.order"
+                                    :x="priorityOrder"
                                     :tick-values="priorityData.map((d) => d.order)"
                                     :tick-line="false"
                                     :domain-line="false"
@@ -389,16 +413,16 @@ const totalThroughputDelta = computed(() => {
                         <ChartContainer v-else :config="projectChartConfig" class="h-[280px] w-full" cursor>
                             <VisXYContainer :data="projectData" :margin="{ left: 12, right: 12 }" :y-domain="[0, undefined]">
                                 <VisGroupedBar
-                                    :x="(d) => d.order"
-                                    :y="(d) => d.value"
-                                    :color="(d) => projectChartConfig[d.key as keyof typeof projectChartConfig]?.color"
+                                    :x="projectOrder"
+                                    :y="projectValue"
+                                    :color="projectColor"
                                     :group-max-width="42"
                                     :group-padding="0.2"
                                     :rounded-corners="8"
                                 />
                                 <VisAxis
                                     type="x"
-                                    :x="(d) => d.order"
+                                    :x="projectOrder"
                                     :tick-values="projectData.map((d) => d.order)"
                                     :tick-line="false"
                                     :domain-line="false"
@@ -422,12 +446,7 @@ const totalThroughputDelta = computed(() => {
                     <div v-else class="grid gap-4 md:grid-cols-[300px_1fr] md:items-center">
                         <ChartContainer :config="environmentChartConfig" class="mx-auto h-[260px] w-full max-w-[300px]">
                             <VisSingleContainer :data="environmentData" :margin="{ top: 8, bottom: 8 }">
-                                <VisDonut
-                                    :value="(d) => d.value"
-                                    :color="(d) => environmentChartConfig[d.segment]?.color"
-                                    :arc-width="22"
-                                    :corner-radius="3"
-                                />
+                                <VisDonut :value="segmentValue" :color="environmentColor" :arc-width="22" :corner-radius="3" />
                             </VisSingleContainer>
                         </ChartContainer>
 

@@ -38,6 +38,7 @@ type OrganisationPaginator = {
 };
 
 type OrganisationIdentity = Pick<OrganisationRow, 'id' | 'name'>;
+type SortBy = 'newest' | 'oldest' | 'name';
 
 type OrganisationTeamUser = {
     id: string;
@@ -289,7 +290,6 @@ function addAccess() {
             if (isTeamMode.value) {
                 router.reload({
                     only: ['panelOrganisation'],
-                    preserveScroll: true,
                 });
                 return;
             }
@@ -450,7 +450,7 @@ watch(
         </div>
 
         <DeleteDialog
-            :error="deleteError"
+            :error="deleteError ?? undefined"
             :is-open="deleteForm.isActive"
             :loading="deleteProcessing"
             @cancel="deleteForm.isActive = false"

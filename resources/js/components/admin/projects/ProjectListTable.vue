@@ -45,7 +45,7 @@ function hasWidgetEnabled(project: ProjectRow) {
 function hasGuestSubmissionsEnabled(project: ProjectRow) {
     return Boolean(
         project.external_widget_guest_submissions_enabled ||
-            project.environments?.some((environment) => environment.external_widget_guest_submissions_enabled),
+        project.environments?.some((environment) => environment.external_widget_guest_submissions_enabled),
     );
 }
 </script>
