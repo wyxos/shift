@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Select, type SelectOption } from '@/components/ui/select';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 type LinkedAccount = {
     id: number | string;
@@ -11,6 +12,7 @@ type LinkedAccount = {
     email?: string | null;
     provider?: string | null;
     environment?: string | null;
+    url?: string | null;
     unlink_url?: string | null;
     unlinkUrl?: string | null;
     can_unlink?: boolean | null;
@@ -19,11 +21,19 @@ type LinkedAccount = {
 };
 type ExternalUserRow = {
     id: number;
+    name: string;
+    email?: string | null;
+    environment?: string | null;
+    role?: string | null;
+    role_label?: string | null;
+    can_manage_role?: boolean | null;
+    canManageRole?: boolean | null;
     linked_accounts?: LinkedAccount[];
     linkedAccounts?: LinkedAccount[];
     linkable_accounts?: LinkedAccount[];
     linkableAccounts?: LinkedAccount[];
     links?: { link_accounts?: string | null; linkAccounts?: string | null };
+    project?: { id: number; name: string } | null;
 };
 
 const props = defineProps<{
@@ -31,7 +41,7 @@ const props = defineProps<{
     canManageLinkedAccounts: boolean;
 }>();
 const emit = defineEmits<{
-    changed: [];
+    changed: [externalUser: ExternalUserRow];
 }>();
 
 const jsonHeaders = { headers: { Accept: 'application/json' } };
@@ -59,7 +69,9 @@ function linkedAccountsFor(externalUser: ExternalUserRow) {
 }
 
 function linkableAccountsFor(externalUser: ExternalUserRow) {
-    return externalUser.linkable_accounts ?? externalUser.linkableAccounts ?? [];
+    return (externalUser.linkable_accounts ?? externalUser.linkableAccounts ?? []).filter(
+        (account) => String(account.id) !== String(externalUser.id),
+    );
 }
 
 function linkedAccountLabel(account: LinkedAccount) {
@@ -67,7 +79,22 @@ function linkedAccountLabel(account: LinkedAccount) {
 }
 
 function linkedAccountMeta(account: LinkedAccount) {
-    return [account.email, account.provider, account.environment].filter((value): value is string => Boolean(value?.trim())).join(' / ');
+    const label = linkedAccountLabel(account);
+
+    return [account.email, account.provider, account.environment, linkedAccountHost(account)]
+        .filter((value): value is string => Boolean(value?.trim()) && value?.trim() !== label)
+        .join(' / ');
+}
+
+function linkedAccountHost(account: LinkedAccount) {
+    const url = account.url?.trim();
+    if (!url) return null;
+
+    try {
+        return new URL(url).host;
+    } catch {
+        return url;
+    }
 }
 
 function linkedAccountOptionLabel(account: LinkedAccount) {
@@ -88,6 +115,12 @@ function canUnlinkLinkedAccount(account: LinkedAccount) {
     return props.canManageLinkedAccounts && account.can_unlink !== false && account.canUnlink !== false && Boolean(linkedAccountUnlinkUrl(account));
 }
 
+function requestErrorMessage(error: unknown, fallback: string) {
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message?.trim();
+
+    return message || fallback;
+}
+
 async function linkSelectedAccount() {
     const storeUrl = linkedAccountStoreUrl(props.externalUser);
     if (!storeUrl || !selectedAccountId.value || linking.value) return;
@@ -95,7 +128,7 @@ async function linkSelectedAccount() {
     linking.value = true;
     errorMessage.value = null;
     try {
-        await axios.post(
+        const response = await axios.post<{ external_user: ExternalUserRow }>(
             storeUrl,
             {
                 linked_external_user_id: selectedAccountId.value,
@@ -103,10 +136,11 @@ async function linkSelectedAccount() {
             jsonHeaders,
         );
         selectedAccountId.value = '';
-        emit('changed');
+        emit('changed', response.data.external_user);
+        toast.success('Account linked');
     } catch (error) {
         console.error('Error linking external user account:', error);
-        errorMessage.value = 'Unable to link this account right now.';
+        errorMessage.value = requestErrorMessage(error, 'Unable to link this account right now.');
     } finally {
         linking.value = false;
     }
@@ -119,11 +153,12 @@ async function unlinkLinkedAccount(account: LinkedAccount) {
     savingId.value = account.id;
     errorMessage.value = null;
     try {
-        await axios.delete(unlinkUrl, jsonHeaders);
-        emit('changed');
+        const response = await axios.delete<{ external_user: ExternalUserRow }>(unlinkUrl, jsonHeaders);
+        emit('changed', response.data.external_user);
+        toast.success('Account unlinked');
     } catch (error) {
         console.error('Error unlinking external user account:', error);
-        errorMessage.value = 'Unable to unlink this account right now.';
+        errorMessage.value = requestErrorMessage(error, 'Unable to unlink this account right now.');
     } finally {
         savingId.value = null;
     }
@@ -184,6 +219,6 @@ async function unlinkLinkedAccount(account: LinkedAccount) {
             </div>
         </div>
         <p v-else class="text-muted-foreground rounded-lg border p-3 text-sm">No linked accounts yet.</p>
-        <p v-if="errorMessage" class="text-destructive text-sm">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="text-destructive text-sm" role="alert">{{ errorMessage }}</p>
     </div>
 </template>

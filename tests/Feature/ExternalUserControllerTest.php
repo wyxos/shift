@@ -136,12 +136,14 @@ test('external users index includes linked and linkable account management data'
         'name' => 'Bravo Staging Client',
         'email' => 'staging@example.com',
         'environment' => 'staging',
+        'url' => 'https://portal-staging.example.com',
     ]);
     $linkableUser = ExternalUser::factory()->create([
         'project_id' => $project->id,
         'name' => 'Charlie Production Client',
         'email' => 'production@example.com',
         'environment' => 'production',
+        'url' => 'https://portal.example.com',
     ]);
 
     $response = $this->actingAs($this->user)
@@ -159,7 +161,9 @@ test('external users index includes linked and linkable account management data'
         ->where('externalUsers.data.0.id', $externalUser->id)
         ->has('externalUsers.data.0.linked_accounts', 1)
         ->where('externalUsers.data.0.linked_accounts.0.id', $linkedUser->id)
+        ->where('externalUsers.data.0.linked_accounts.0.url', 'https://portal-staging.example.com')
         ->where('externalUsers.data.0.linkable_accounts.0.id', $linkableUser->id)
+        ->where('externalUsers.data.0.linkable_accounts.0.url', 'https://portal.example.com')
         ->where('externalUsers.data.0.can_manage_role', true)
         ->where('externalUsers.data.0.links.link_accounts', route('external-users.linked-accounts.store', $externalUser))
         ->where('externalUsers.data.0.linked_accounts.0.unlink_url', route('external-users.linked-accounts.destroy', [$externalUser, $linkedUser]))
@@ -428,6 +432,24 @@ test('trusted internal users can link and unlink same project external accounts'
     $sandboxUser->refresh();
     $productionUser->refresh();
     expect($productionUser->external_contact_id)->not()->toBe($sandboxUser->external_contact_id);
+});
+
+test('an external account cannot be linked to itself', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $externalUser = ExternalUser::factory()->create([
+        'project_id' => $project->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->postJson(route('external-users.linked-accounts.store', $externalUser), [
+            'linked_external_user_id' => $externalUser->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'An external account cannot be linked to itself.');
+
+    expect($externalUser->refresh()->external_contact_id)->toBeNull();
 });
 
 test('external account links stay within a project', function () {

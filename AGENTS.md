@@ -9,7 +9,7 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 ## Repo Rules
 - If a user correction proves a SHIFT Knowledge note or local planning artifact is stale, update the durable source in the same task when write access is allowed. Do not just patch the local note or repeat the corrected answer in chat; remove or reframe the stale guidance so future agents stop rediscovering it.
 - Treat SDK-facing route, payload, auth, attachment, install, or notification changes as cross-repo contract changes. Update the SDK in the same task.
-- For editor-backed task create and edit flows, use the V2 task endpoints and route names (`tasks.v2.*`), not the legacy redirect-based task pages.
+- For editor-backed task create and edit flows, use the canonical task-list routes and route names (`tasks.*`), with create/edit state owned by the `Tasks/Index` sheet flow. The former `tasks.v2.*`/`tasks-v2` surface was removed; `tasks.create` and `tasks.edit` are redirect compatibility routes, not page owners.
 - For task and thread authorization tests, establish a real access path first. Hidden tasks intentionally return `404`.
 - For MCP route, auth, tool, or project-visibility work, read `shared:projects/notes/shift-mcp.md` through Knowledge MCP before changing behavior.
 - Shared task UI or helpers that may be consumed by the SDK must not rely on a global Ziggy `route()` helper at SDK runtime. Pass explicit `/shift/api/**` URLs from the consuming SDK layer when needed.
