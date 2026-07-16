@@ -24,8 +24,7 @@
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "typecheck": "vue-tsc --noEmit --project tsconfig.app.json",
-        "check": "npm run composer:check && npm run pint:check && npm run format:check && npm run lint:check && npm run typecheck && npm run test && npm run build && npm run test:php",
-        "release": "npx @wyxos/zephyr@latest"
+        "check": "npm run composer:check && npm run pint:check && npm run format:check && npm run lint:check && npm run typecheck && npm run test && npm run build && npm run test:php"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
