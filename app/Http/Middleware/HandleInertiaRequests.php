@@ -59,7 +59,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'shift' => [
-                'ai_enabled' => (bool) config('shift_ai.enabled', false),
+                'ai_rewrite_enabled' => (bool) config('ai_features.rewrite.enabled', false),
+                'ai_email_import_enabled' => (bool) config('ai_features.email_import.enabled', false),
             ],
             'sidebarOrganisations' => fn () => $resolveSidebarOrganisations()['items'],
             'sidebarOrganisationsHasMore' => fn () => $resolveSidebarOrganisations()['hasMore'],

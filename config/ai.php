@@ -116,14 +116,26 @@ return [
         'ollama' => [
             'driver' => 'ollama',
             'key' => env('OLLAMA_API_KEY', ''),
-            'url' => env('OLLAMA_URL', env('SHIFT_AI_OLLAMA_BASE_URL', 'http://localhost:11434')),
+            'url' => env('OLLAMA_URL', 'http://localhost:11434'),
+        ],
+
+        'lmstudio' => [
+            'driver' => 'openai',
+            'key' => env('LMSTUDIO_API_KEY', 'lm-studio'),
+            'url' => env('LMSTUDIO_URL', 'http://localhost:1234/v1'),
+            'store' => false,
+            'models' => [
+                'text' => [
+                    'default' => env('LMSTUDIO_MODEL', 'local-model'),
+                ],
+            ],
         ],
 
         'openai' => [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', env('OPENAI_BASE_URL', 'https://api.openai.com/v1')),
-            'store' => env('OPENAI_STORE', true),
+            'store' => env('OPENAI_STORE', false),
         ],
 
         'openrouter' => [

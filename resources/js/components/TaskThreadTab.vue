@@ -63,7 +63,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const page = usePage<SharedData>();
-const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
 const aiContext = computed(() =>
     buildThreadAiContext(
         props.messages.map((message) => ({
