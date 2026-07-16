@@ -181,63 +181,22 @@ class TaskCollaboratorService
         return $users->values();
     }
 
-    public function internalAudience(Task $task, ?int $excludingUserId = null): Collection
+    public function internalReplyAudience(Task $task, ?int $excludingUserId = null): Collection
     {
-        $task->loadMissing(['project.author', 'project.projectUser.user', 'internalCollaborators']);
+        $task->loadMissing('internalCollaborators');
 
-        $users = collect();
-
-        if ($task->project?->author !== null && $task->project->author->id !== $excludingUserId) {
-            $users->push($task->project->author);
-        }
-
-        foreach ($task->project?->projectUser ?? [] as $projectUser) {
-            if ($projectUser->user === null || $projectUser->user->id === $excludingUserId) {
-                continue;
-            }
-
-            if (! $users->contains('id', $projectUser->user->id)) {
-                $users->push($projectUser->user);
-            }
-        }
-
-        foreach ($task->internalCollaborators as $collaborator) {
-            if ($collaborator->id === $excludingUserId) {
-                continue;
-            }
-
-            if (! $users->contains('id', $collaborator->id)) {
-                $users->push($collaborator);
-            }
-        }
-
-        return $users->values();
+        return $task->internalCollaborators
+            ->reject(fn (User $collaborator) => $collaborator->id === $excludingUserId)
+            ->values();
     }
 
-    public function externalAudience(Task $task, ?int $excludingExternalUserId = null): Collection
+    public function externalReplyAudience(Task $task, ?int $excludingExternalUserId = null): Collection
     {
-        $task->loadMissing(['submitter', 'externalCollaborators']);
+        $task->loadMissing('externalCollaborators');
 
-        $users = collect();
-
-        if (
-            $task->submitter instanceof ExternalUser &&
-            $task->submitter->id !== $excludingExternalUserId
-        ) {
-            $users->push($task->submitter);
-        }
-
-        foreach ($task->externalCollaborators as $collaborator) {
-            if ($collaborator->id === $excludingExternalUserId) {
-                continue;
-            }
-
-            if (! $users->contains('id', $collaborator->id)) {
-                $users->push($collaborator);
-            }
-        }
-
-        return $users->values();
+        return $task->externalCollaborators
+            ->reject(fn (ExternalUser $collaborator) => $collaborator->id === $excludingExternalUserId)
+            ->values();
     }
 
     private function persistSelection(Task $task, Collection $internalIds, Collection $externalIds): void

@@ -9,6 +9,7 @@ use App\Notifications\TaskThreadUpdated;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -74,8 +75,10 @@ test('internal thread with 2 embedded images and 1 non-embedded PDF returns only
     expect($attachments[0]['original_filename'])->toBe('doc.pdf');
 });
 
-test('external thread creation sends notification to external user in non production', function () {
+test('external thread creation sends notification to external collaborator in non production', function () {
     Notification::fake();
+
+    $this->task->externalCollaborators()->attach($this->externalUser);
 
     // Mock the HTTP call to the external system
     Http::fake([
@@ -107,6 +110,8 @@ test('external thread creation sends notification to external user in non produc
 test('external thread creation does not send notification in production', function () {
     Notification::fake();
 
+    $this->task->externalCollaborators()->attach($this->externalUser);
+
     // Mock the HTTP call to the external system
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
@@ -128,8 +133,15 @@ test('external thread creation does not send notification in production', functi
     Notification::assertNothingSent();
 });
 
-test('internal thread creation does not send notification', function () {
+test('internal thread creation only notifies internal task collaborators except the author', function () {
     Notification::fake();
+    Queue::fake();
+
+    $internalCollaborator = User::factory()->create();
+    $this->task->internalCollaborators()->attach([
+        $this->user->id,
+        $internalCollaborator->id,
+    ]);
 
     // Create a thread message as the authenticated user
     $response = $this->actingAs($this->user)
@@ -140,8 +152,9 @@ test('internal thread creation does not send notification', function () {
 
     $response->assertStatus(201);
 
-    // Assert that no notification was sent
-    Notification::assertNothingSent();
+    Notification::assertSentTo($internalCollaborator, TaskThreadUpdated::class);
+    Notification::assertNotSentTo($this->user, TaskThreadUpdated::class);
+    Queue::assertNothingPushed();
 });
 
 test('external thread creation with non external submitter sends notification to external users', function () {
