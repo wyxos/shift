@@ -8,19 +8,17 @@ use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
-use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalUserService;
-use App\Services\TaskCollaboratorService;
+use App\Services\TaskThreadNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 class ExternalTaskThreadController extends Controller
 {
     public function __construct(
         private readonly ExternalUserService $externalUserService,
-        private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly TaskThreadNotificationService $taskThreadNotificationService,
     ) {}
 
     private function resolveProjectFromRequest(): ?Project
@@ -208,22 +206,7 @@ class ExternalTaskThreadController extends Controller
         // Get the thread with attachments
         $thread->load('attachments');
 
-        $usersToNotify = $this->taskCollaboratorService->internalAudience($task);
-
-        // Send notification to users in chunks with delays to prevent SMTP connection issues
-        if ($usersToNotify->isNotEmpty()) {
-            Notification::send(
-                $usersToNotify,
-                new TaskThreadUpdated([
-                    'type' => 'external',
-                    'task_id' => $task->id,
-                    'task_title' => $task->title,
-                    'thread_id' => $thread->id,
-                    'content' => $thread->content,
-                    'url' => route('tasks.index', ['task' => $task->id]),
-                ])
-            );
-        }
+        $this->taskThreadNotificationService->send($task, $thread);
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
