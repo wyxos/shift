@@ -197,7 +197,7 @@ class ExternalRoleController extends Controller
         return collect(ExternalUserRole::cases())
             ->map(fn (ExternalUserRole $role) => [
                 'value' => $role->value,
-                'label' => $role->label(),
+                'label' => $role->consumingAppLabel(),
             ])
             ->values()
             ->all();
