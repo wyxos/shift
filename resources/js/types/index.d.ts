@@ -34,7 +34,8 @@ export interface SharedData extends PageProps {
     sidebarOrganisations?: SidebarOrganisation[];
     sidebarOrganisationsHasMore?: boolean;
     shift?: {
-        ai_enabled: boolean;
+        ai_rewrite_enabled: boolean;
+        ai_email_import_enabled: boolean;
     };
 }
 

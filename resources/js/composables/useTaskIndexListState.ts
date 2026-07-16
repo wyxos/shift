@@ -14,7 +14,7 @@ type UseTaskIndexListStateOptions = {
 
 export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     const page = usePage<SharedData>();
-    const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+    const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
 
     const tasksPage = ref<TaskPaginator>({ ...unref(options.tasks) });
     watch(
