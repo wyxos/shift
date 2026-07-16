@@ -19,6 +19,23 @@ it('redirects legacy create route to the tasks list', function () {
         ->assertSee('Tasks');
 });
 
+it('renders email import independently from editor rewriting', function () {
+    config()->set('ai_features.email_import.enabled', true);
+    config()->set('ai_features.rewrite.enabled', false);
+
+    $user = User::factory()->create();
+    Project::factory()->withAuthor($user->id)->create();
+
+    $this->actingAs($user);
+
+    visit('/tasks')
+        ->assertNoSmoke()
+        ->click('[data-testid="open-create-task"]')
+        ->assertVisible('[data-testid="task-email-import-dropzone"]')
+        ->assertSee('Drop .eml or browse')
+        ->assertDontSee('Improve with AI');
+});
+
 it('opens an error intake task with tabbed comments and occurrences', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create();

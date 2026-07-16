@@ -20,7 +20,8 @@ const router = vi.hoisted(() => ({
 }));
 const inertiaPageProps = vi.hoisted(() => ({
     shift: {
-        ai_enabled: false,
+        ai_rewrite_enabled: false,
+        ai_email_import_enabled: false,
     },
 }));
 
@@ -447,11 +448,18 @@ beforeEach(() => {
     axiosDeleteMock.mockReset();
     (router.get as any).mockClear();
     (router.reload as any).mockClear();
-    inertiaPageProps.shift.ai_enabled = false;
+    inertiaPageProps.shift.ai_rewrite_enabled = false;
+    inertiaPageProps.shift.ai_email_import_enabled = false;
 });
 
 function setShiftAiEnabled(enabled: boolean) {
-    inertiaPageProps.shift.ai_enabled = enabled;
+    inertiaPageProps.shift.ai_rewrite_enabled = enabled;
+    inertiaPageProps.shift.ai_email_import_enabled = enabled;
+}
+
+function setShiftAiFeatures(features: { rewrite?: boolean; emailImport?: boolean }) {
+    inertiaPageProps.shift.ai_rewrite_enabled = features.rewrite ?? false;
+    inertiaPageProps.shift.ai_email_import_enabled = features.emailImport ?? false;
 }
 
 export function makeTasksPage(
@@ -486,5 +494,6 @@ export {
     mount,
     router,
     setShiftAiEnabled,
+    setShiftAiFeatures,
     sonnerMocks,
 };

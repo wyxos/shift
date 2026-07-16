@@ -15,6 +15,12 @@ class ExternalTaskEmailImportController extends Controller
 
     public function store(ImportExternalTaskEmailRequest $request, TaskEmailImportService $importer): JsonResponse
     {
+        if (! config('ai_features.email_import.enabled', false)) {
+            return response()->json([
+                'error' => 'AI email import is disabled.',
+            ], 404);
+        }
+
         $attributes = $request->validated();
 
         $project = Project::query()

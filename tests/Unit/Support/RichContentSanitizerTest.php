@@ -29,3 +29,11 @@ test('leaves non html content untouched', function () {
 
     expect($sanitizer->sanitize('**hello**'))->toBe('**hello**');
 });
+
+test('sanitizes dangerous descendants before unwrapping unsupported containers', function () {
+    $sanitizer = new RichContentSanitizer;
+
+    $sanitized = $sanitizer->sanitize('<html><body><custom-element><script>alert(1)</script><p onclick="steal()">Safe</p></custom-element></body></html>');
+
+    expect($sanitized)->toBe('<p>Safe</p>');
+});

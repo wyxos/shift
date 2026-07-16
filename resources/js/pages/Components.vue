@@ -10,7 +10,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Components', href: '/components
 const shiftRef = ref<InstanceType<typeof ShiftEditor> | null>(null);
 const editor = computed(() => shiftRef.value?.editor ?? null);
 const page = usePage<SharedData>();
-const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
 
 defineExpose({ editor });
 </script>
