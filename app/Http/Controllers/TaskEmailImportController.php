@@ -11,6 +11,12 @@ class TaskEmailImportController extends Controller
 {
     public function __invoke(ImportTaskEmailRequest $request, TaskEmailImportService $importer): JsonResponse
     {
+        if (! config('ai_features.email_import.enabled', false)) {
+            return response()->json([
+                'error' => 'AI email import is disabled.',
+            ], 404);
+        }
+
         $project = Project::query()->findOrFail($request->integer('project_id'));
 
         return response()->json([
