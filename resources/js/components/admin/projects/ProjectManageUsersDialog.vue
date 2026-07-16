@@ -21,7 +21,7 @@ type AccessForm = {
     processing: boolean;
 };
 
-const { open, form, loading, error, accessForm, accessUsers, accessDisabled } = defineProps<{
+const { open, form, loading, error, accessForm, accessUsers, accessDisabled, removingAccessId } = defineProps<{
     accessDisabled: boolean;
     accessForm: AccessForm;
     accessUsers: AccessUserCandidate[];

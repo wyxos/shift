@@ -156,7 +156,6 @@ export function useProjectIntegrationDialogs() {
             closeWidgetSettingsModal();
             router.reload({
                 only: ['projects'],
-                preserveScroll: true,
             });
         } catch (error) {
             console.error('Error saving widget settings:', error);
@@ -188,7 +187,6 @@ export function useProjectIntegrationDialogs() {
             closeMcpSettingsModal();
             router.reload({
                 only: ['projects'],
-                preserveScroll: true,
             });
         } catch (error) {
             console.error('Error saving MCP settings:', error);

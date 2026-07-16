@@ -191,7 +191,7 @@ function normalizeValidationErrors(errors: Record<string, string[] | string> | u
     return Object.fromEntries(Object.entries(errors).map(([key, value]) => [key, Array.isArray(value) ? (value[0] ?? '') : value])) as EditErrors;
 }
 function reloadExternalUsers() {
-    router.reload({ only: ['externalUsers'], preserveScroll: true });
+    router.reload({ only: ['externalUsers'] });
 }
 async function saveExternalUser() {
     if (!editingExternalUser.value || editDisabled.value) return;

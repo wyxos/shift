@@ -8,14 +8,16 @@ use Illuminate\Support\Facades\Mail;
 class SparkpostTest extends Command
 {
     protected $signature = 'sparkpost:test';
+
     protected $description = 'Send a test email using current SMTP configuration';
 
     public function handle(): int
     {
         $to = $this->ask('Enter recipient email address');
 
-        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        if (! filter_var($to, FILTER_VALIDATE_EMAIL)) {
             $this->error('Invalid email address.');
+
             return self::FAILURE;
         }
 
@@ -28,9 +30,11 @@ class SparkpostTest extends Command
             });
 
             $this->info("Test email sent successfully to: $to");
+
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error("Failed to send email: " . $e->getMessage());
+            $this->error('Failed to send email: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

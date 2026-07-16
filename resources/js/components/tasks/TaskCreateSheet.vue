@@ -174,7 +174,7 @@ function firstImportFile(files: FileList | File[] | null | undefined): File | nu
         return null;
     }
 
-    return typeof files.item === 'function' ? files.item(0) : files[0];
+    return files[0] ?? null;
 }
 
 function isEmlFile(file: File): boolean {

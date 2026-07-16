@@ -4,9 +4,6 @@ use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Foundation\Testing\WithFaker;
-
-;
 
 test('external user can be associated with task', function () {
     // Create a user, project, external user, and task
@@ -14,13 +11,13 @@ test('external user can be associated with task', function () {
     $project = Project::factory()->create(['author_id' => $user->id]);
 
     $externalUser = ExternalUser::factory()->create([
-        'project_id' => $project->id
+        'project_id' => $project->id,
     ]);
 
     $task = Task::factory()->create([
         'project_id' => $project->id,
         'submitter_id' => $user->id,
-        'submitter_type' => User::class
+        'submitter_type' => User::class,
     ]);
 
     // Associate the external user with the task
@@ -43,12 +40,12 @@ test('multiple external users can be associated with task', function () {
     $task = Task::factory()->create([
         'project_id' => $project->id,
         'submitter_id' => $user->id,
-        'submitter_type' => User::class
+        'submitter_type' => User::class,
     ]);
 
     // Create multiple external users
     $externalUsers = ExternalUser::factory()->count(3)->create([
-        'project_id' => $project->id
+        'project_id' => $project->id,
     ]);
 
     // Associate all external users with the task
@@ -72,14 +69,14 @@ test('task can be associated with multiple external users', function () {
     $project = Project::factory()->create(['author_id' => $user->id]);
 
     $externalUser = ExternalUser::factory()->create([
-        'project_id' => $project->id
+        'project_id' => $project->id,
     ]);
 
     // Create multiple tasks
     $tasks = Task::factory()->count(3)->create([
         'project_id' => $project->id,
         'submitter_id' => $user->id,
-        'submitter_type' => User::class
+        'submitter_type' => User::class,
     ]);
 
     // Associate all tasks with the external user

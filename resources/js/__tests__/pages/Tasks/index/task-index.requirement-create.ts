@@ -67,8 +67,6 @@ describe('Tasks/Index.vue', () => {
         expect(router.reload).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['tasks', 'filters', 'projects'],
-                preserveScroll: true,
-                preserveState: true,
             }),
         );
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirement created', {
