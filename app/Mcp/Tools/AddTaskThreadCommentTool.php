@@ -2,13 +2,12 @@
 
 namespace App\Mcp\Tools;
 
-use App\Jobs\SendTaskThreadNotification;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\ShiftPermissionService;
-use App\Services\TaskCollaboratorService;
+use App\Services\TaskThreadNotificationService;
 use App\Support\RichContentSanitizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
@@ -69,9 +68,7 @@ class AddTaskThreadCommentTool extends Tool
 
         $thread->load(['sender', 'attachments']);
 
-        if ($thread->type === 'external') {
-            $this->dispatchExternalNotifications($task, $thread);
-        }
+        app(TaskThreadNotificationService::class)->send($task, $thread);
 
         return Response::structured([
             'thread' => $this->thread($thread),
@@ -92,27 +89,5 @@ class AddTaskThreadCommentTool extends Tool
                 ->enum(['internal', 'external'])
                 ->default('internal'),
         ];
-    }
-
-    private function dispatchExternalNotifications(Task $task, TaskThread $thread): void
-    {
-        foreach (app(TaskCollaboratorService::class)->externalAudience($task) as $externalUser) {
-            SendTaskThreadNotification::dispatch(
-                $thread->id,
-                [
-                    'url' => $externalUser->url,
-                    'email' => $externalUser->email,
-                    'external_id' => $externalUser->external_id,
-                ],
-                [
-                    'type' => 'task_thread',
-                    'user_id' => $externalUser->external_id,
-                    'task_id' => $task->id,
-                    'task_title' => $task->title,
-                    'thread_id' => $thread->id,
-                    'content' => $thread->content,
-                ]
-            );
-        }
     }
 }

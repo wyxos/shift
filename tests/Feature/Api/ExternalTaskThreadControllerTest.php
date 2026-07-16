@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\SendTaskThreadNotification;
 use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
@@ -7,6 +8,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -95,8 +97,9 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
     expect($attachments[0]['original_filename'])->toBe('doc.pdf');
 });
 
-test('external thread creation sends notifications to project users', function () {
+test('external thread creation does not notify untagged project users', function () {
     Notification::fake();
+    Queue::fake();
 
     // Create additional users with access to the project
     $projectUser1 = User::factory()->create();
@@ -131,21 +134,28 @@ test('external thread creation sends notifications to project users', function (
 
     $response->assertStatus(201);
 
-    // Assert that notifications were sent to all project users
-    Notification::assertSentTo(
-        [$this->user, $projectUser1, $projectUser2],
-        TaskThreadUpdated::class,
-        function (TaskThreadUpdated $notification) {
-            return ($notification->data['url'] ?? null) === route('tasks.index', ['task' => $this->task->id]);
-        }
-    );
+    Notification::assertNotSentTo([$this->user, $projectUser1, $projectUser2], TaskThreadUpdated::class);
+    Queue::assertNothingPushed();
 });
 
-test('external thread creation sends notifications to tagged internal collaborators', function () {
+test('external thread creation only notifies tagged internal and external collaborators except the author', function () {
     Notification::fake();
+    Queue::fake();
 
     $internalCollaborator = User::factory()->create();
     $this->task->internalCollaborators()->attach($internalCollaborator->id);
+
+    $externalCollaborator = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
+        'external_id' => 'ext-456',
+        'environment' => 'testing',
+        'url' => 'https://collaborator.example.com',
+        'email' => 'collaborator@example.com',
+    ]);
+    $this->task->externalCollaborators()->attach([
+        $this->externalUser->id,
+        $externalCollaborator->id,
+    ]);
 
     $threadData = [
         'content' => 'External collaborator update',
@@ -163,6 +173,8 @@ test('external thread creation sends notifications to tagged internal collaborat
         $internalCollaborator,
         TaskThreadUpdated::class,
     );
+    Notification::assertNotSentTo($this->user, TaskThreadUpdated::class);
+    Queue::assertPushed(SendTaskThreadNotification::class, 1);
 });
 
 test('external API thread replaces temp URLs in content with final download URLs', function () {
