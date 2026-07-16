@@ -75,7 +75,7 @@ class RichContentSanitizer
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
 
-            return $content;
+            return htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
         }
 
         $this->sanitizeChildren($root);
@@ -138,6 +138,7 @@ class RichContentSanitizer
         }
 
         if (! in_array($tag, self::ALLOWED_TAGS, true)) {
+            $this->sanitizeChildren($element);
             $this->unwrap($element);
 
             return;
