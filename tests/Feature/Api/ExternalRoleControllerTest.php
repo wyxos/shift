@@ -197,6 +197,27 @@ test('client project managers can assign external roles for accessible projects'
     ]);
 });
 
+test('external role options use consuming app labels without changing role values', function () {
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/external-roles/capabilities?'.http_build_query([
+            'project' => $this->project->token,
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://consumer.test',
+            ],
+        ]))
+        ->assertOk()
+        ->assertJsonPath('roles.0.value', ExternalUserRole::Owner->value)
+        ->assertJsonPath('roles.0.label', 'Owner')
+        ->assertJsonPath('roles.1.value', ExternalUserRole::ClientDeveloper->value)
+        ->assertJsonPath('roles.1.label', 'Developer')
+        ->assertJsonPath('roles.2.label', 'SHIFT Lead Developer')
+        ->assertJsonPath('roles.3.label', 'SHIFT Developer');
+
+    expect(ExternalUserRole::Owner->label())->toBe('Client Owner')
+        ->and(ExternalUserRole::ClientDeveloper->label())->toBe('Client Developer');
+});
+
 test('external role index returns collaborator candidates with stored roles', function () {
     Http::fake([
         'https://consumer.test/shift/api/collaborators/external*' => Http::response([
