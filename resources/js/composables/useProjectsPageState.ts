@@ -143,7 +143,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     const projectCreate = useProjectCreateState(props, createForm);
 
     function buildIndexParams(page = 1) {
-        const params: Record<string, unknown> = {
+        const params: Record<string, string | number | undefined> = {
             search: appliedSearchTerm.value.trim() || undefined,
             sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
             page,
@@ -369,7 +369,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
                 { headers: { Accept: 'application/json' } },
             );
             closeWidgetSettingsModal();
-            router.reload({ only: ['projects'], preserveScroll: true });
+            router.reload({ only: ['projects'] });
         } catch (error) {
             console.error('Error saving widget settings:', error);
             widgetSettingsError.value = 'Unable to save widget settings right now.';
@@ -392,7 +392,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
                 { headers: { Accept: 'application/json' } },
             );
             closeMcpSettingsModal();
-            router.reload({ only: ['projects'], preserveScroll: true });
+            router.reload({ only: ['projects'] });
         } catch (error) {
             console.error('Error saving MCP settings:', error);
             mcpSettingsError.value = 'Unable to save MCP settings right now.';

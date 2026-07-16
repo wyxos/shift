@@ -4,15 +4,13 @@ use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-;
-
 beforeEach(function () {
     Storage::fake('local');
 });
 
 test('command deletes old temp files', function () {
     // Create a temp directory with a file that's older than 24 hours
-    $oldTempId = 'old-temp-' . time();
+    $oldTempId = 'old-temp-'.time();
     $oldTempPath = "temp_attachments/{$oldTempId}";
     Storage::makeDirectory($oldTempPath);
 
@@ -27,7 +25,7 @@ test('command deletes old temp files', function () {
     touch(Storage::path($oldTempPath), $yesterday->timestamp);
 
     // Create a temp directory with a file that's newer than 24 hours
-    $newTempId = 'new-temp-' . time();
+    $newTempId = 'new-temp-'.time();
     $newTempPath = "temp_attachments/{$newTempId}";
     Storage::makeDirectory($newTempPath);
 
@@ -54,7 +52,7 @@ test('command deletes old temp files', function () {
 
 test('command does not delete new temp files', function () {
     // Create a temp directory with a file that's newer than 24 hours
-    $newTempId = 'new-temp-' . time();
+    $newTempId = 'new-temp-'.time();
     $newTempPath = "temp_attachments/{$newTempId}";
     Storage::makeDirectory($newTempPath);
 

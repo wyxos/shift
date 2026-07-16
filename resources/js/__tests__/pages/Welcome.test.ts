@@ -3,7 +3,15 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 
-// Welcome.vue is a thin wrapper around Home.vue; test that it forwards $page.props.auth.
+const { usePageMock } = vi.hoisted(() => ({
+    usePageMock: vi.fn(),
+}));
+
+vi.mock('@inertiajs/vue3', () => ({
+    usePage: usePageMock,
+}));
+
+// Welcome.vue is a thin wrapper around Home.vue; test that it forwards the shared auth prop.
 vi.mock('@/pages/Home.vue', () => ({
     default: {
         props: ['auth'],
@@ -14,34 +22,24 @@ vi.mock('@/pages/Home.vue', () => ({
 }));
 
 describe('Welcome.vue', () => {
-    it('forwards $page.props.auth into Home', () => {
-        const wrapper = mount(Welcome, {
-            global: {
-                mocks: {
-                    $page: {
-                        props: {
-                            auth: { user: null },
-                        },
-                    },
-                },
+    it('forwards anonymous auth into Home', () => {
+        usePageMock.mockReturnValue({
+            props: {
+                auth: { user: null },
             },
         });
+        const wrapper = mount(Welcome);
 
         expect(wrapper.find('[data-test="home"]').text()).toBe('anon');
     });
 
     it('forwards authenticated user into Home', () => {
-        const wrapper = mount(Welcome, {
-            global: {
-                mocks: {
-                    $page: {
-                        props: {
-                            auth: { user: { id: 1 } },
-                        },
-                    },
-                },
+        usePageMock.mockReturnValue({
+            props: {
+                auth: { user: { id: 1 } },
             },
         });
+        const wrapper = mount(Welcome);
 
         expect(wrapper.find('[data-test="home"]').text()).toBe('authed');
     });

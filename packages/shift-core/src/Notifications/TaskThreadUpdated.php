@@ -14,9 +14,7 @@ class TaskThreadUpdated extends Notification
     /**
      * Create a new notification instance.
      */
-    public function __construct(public array $data)
-    {
-    }
+    public function __construct(public array $data) {}
 
     /**
      * Get the notification's delivery channels.
@@ -33,8 +31,8 @@ class TaskThreadUpdated extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $taskTitle = $this->data['task_title'] ?? 'Task #' . $this->data['task_id'];
-        $threadType = ucfirst($this->data['type']) . ' thread';
+        $taskTitle = $this->data['task_title'] ?? 'Task #'.$this->data['task_id'];
+        $threadType = ucfirst($this->data['type']).' thread';
         $snippet = Str::limit($this->data['content'], 120);
         $url = $this->resolveUrl();
 
@@ -43,7 +41,7 @@ class TaskThreadUpdated extends Notification
             ->line('A new message was posted.')
             ->line("Preview: \"{$snippet}\"");
 
-        if (!empty($url)) {
+        if (! empty($url)) {
             $message->action('View Thread', $url);
         }
 

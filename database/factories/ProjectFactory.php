@@ -26,7 +26,6 @@ class ProjectFactory extends Factory
     /**
      * Set the author ID for the project.
      *
-     * @param int $userId
      * @return $this
      */
     public function withAuthor(int $userId): self

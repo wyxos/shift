@@ -29,7 +29,7 @@ export interface SharedData extends PageProps {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
-    ziggy: Config & { location: string };
+    ziggy: Omit<Config, 'location'> & { location: string };
     sidebarOpen: boolean;
     sidebarOrganisations?: SidebarOrganisation[];
     sidebarOrganisationsHasMore?: boolean;
@@ -49,3 +49,9 @@ export interface User {
 }
 
 export type BreadcrumbItemType = BreadcrumbItem;
+
+declare module '@inertiajs/core' {
+    interface InertiaConfig {
+        sharedPageProps: SharedData;
+    }
+}

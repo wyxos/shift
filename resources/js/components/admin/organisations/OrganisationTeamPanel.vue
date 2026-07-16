@@ -432,7 +432,7 @@ function confirmRemoveOrganisationAccess() {
     </Sheet>
 
     <DeleteDialog
-        :error="removingUserError"
+        :error="removingUserError ?? undefined"
         :is-open="removeDialogOpen"
         :loading="removingUserProcessing"
         loading-label="Removing..."

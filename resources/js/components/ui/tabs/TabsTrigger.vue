@@ -14,7 +14,7 @@ const updateValue = inject('tabs-update-value', (value: string) => {})
 const isSelected = computed(() => selectedValue.value === props.value)
 
 // Handle click event
-const handleClick = (event) => {
+const handleClick = (event: MouseEvent) => {
   if (props.disabled) return
   // Prevent form submission
   event.preventDefault()
