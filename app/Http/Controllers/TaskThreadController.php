@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Models\Task;
 use App\Models\TaskThread;
-use App\Services\TaskCollaboratorService;
+use App\Services\TaskThreadNotificationService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 class TaskThreadController extends Controller
 {
     public function __construct(
-        private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly TaskThreadNotificationService $taskThreadNotificationService,
     ) {}
 
     private function ensureTaskVisible(Task $task): void
@@ -141,31 +141,7 @@ class TaskThreadController extends Controller
         // Get the thread with attachments
         $thread->load('attachments');
 
-        if ($request->input('type') === 'external') {
-            foreach ($this->taskCollaboratorService->externalAudience($task) as $externalUser) {
-                $payload = [
-                    'type' => 'task_thread',
-                    'user_id' => $externalUser->external_id,
-                    'task_id' => $task->id,
-                    'task_title' => $task->title,
-                    'thread_id' => $thread->id,
-                    'content' => $thread->content,
-                ];
-
-                $externalUserData = [
-                    'url' => $externalUser->url,
-                    'email' => $externalUser->email,
-                    'external_id' => $externalUser->external_id,
-                ];
-
-                // Dispatch job with 1-minute delay that will check if thread still exists
-                \App\Jobs\SendTaskThreadNotification::dispatch(
-                    $thread->id,
-                    $externalUserData,
-                    $payload
-                );
-            }
-        }
+        $this->taskThreadNotificationService->send($task, $thread);
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
