@@ -293,6 +293,37 @@ describe('ShiftEditor toolbar', () => {
         expect(unchangedHtml).toContain('Original content stays.');
     });
 
+    it('reports no suggested changes when AI returns text-equivalent content', async () => {
+        postMock.mockImplementation((url: string) => {
+            if (url === '/ai/improve') {
+                return Promise.resolve({
+                    data: {
+                        improved_html: '<p><strong>This&nbsp;already reads clearly.</strong></p>',
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>This already reads clearly.</p>');
+        await nextTick();
+
+        await wrapper.get('[data-testid="toolbar-ai-improve"]').trigger('click');
+        await nextTick();
+
+        expect(wrapper.get('[data-testid="ai-improve-notice"]').text()).toBe('This already reads clearly—no changes suggested.');
+        expect(wrapper.get('[data-testid="ai-improve-drawer"]').attributes('data-state')).toBe('closed');
+        expect(ed?.getHTML()).toBe('<p>This already reads clearly.</p>');
+
+        ed?.commands.setContent('<p>This text now needs another review.</p>');
+        await nextTick();
+        expect(wrapper.find('[data-testid="ai-improve-notice"]').exists()).toBe(false);
+    });
+
     it('sends provided thread context to AI improvement endpoint', async () => {
         postMock.mockImplementation((url: string) => {
             if (url === '/ai/improve') {
