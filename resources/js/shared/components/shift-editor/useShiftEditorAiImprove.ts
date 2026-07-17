@@ -11,6 +11,29 @@ type UseShiftEditorAiImproveOptions = {
     onAccept: (html: string) => void;
 };
 
+const protectedRichContentSelector = 'img, blockquote.shift-reply, blockquote[data-reply-to]';
+
+export function containsAiImprovableText(html: string): boolean {
+    const content = String(html ?? '');
+    if (!content.trim()) return false;
+
+    if (typeof DOMParser === 'undefined') {
+        return (
+            content
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/&nbsp;|&#160;/gi, ' ')
+                .replace(/[\u00a0\u200b\ufeff]/g, ' ')
+                .trim().length > 0
+        );
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<body>${content}</body>`, 'text/html');
+    doc.body.querySelectorAll(protectedRichContentSelector).forEach((node) => node.remove());
+
+    return (doc.body.textContent ?? '').replace(/[\u00a0\u200b\ufeff]/g, ' ').trim().length > 0;
+}
+
 function createProtectedToken(index: number): string {
     return `[[SHIFT_KEEP_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}]]`;
 }
@@ -24,7 +47,7 @@ function prepareHtmlForAi(html: string): { preparedHtml: string; protectedFragme
     const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
     const protectedFragments: ProtectedFragment[] = [];
 
-    const protectedNodes = doc.body.querySelectorAll('img, blockquote.shift-reply, blockquote[data-reply-to]');
+    const protectedNodes = doc.body.querySelectorAll(protectedRichContentSelector);
     protectedNodes.forEach((node, index) => {
         const token = createProtectedToken(index);
         protectedFragments.push({ token, html: node.outerHTML });
@@ -69,7 +92,7 @@ export function useShiftEditorAiImprove(options: UseShiftEditorAiImproveOptions)
         }
 
         const currentHtml = options.editor.value?.getHTML() ?? '';
-        if (!currentHtml.trim()) {
+        if (!containsAiImprovableText(currentHtml)) {
             aiError.value = 'Write a message before using AI improvement.';
             return;
         }

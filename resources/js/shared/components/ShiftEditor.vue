@@ -23,7 +23,7 @@ import { renderRichContent } from '../tasks/rich-content';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
 import type { SentAttachment } from './shift-editor/types';
-import { useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
+import { containsAiImprovableText, useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
@@ -69,6 +69,7 @@ const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString()
 const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
 const editorFocused = ref(false);
+const hasAiImprovableText = ref(containsAiImprovableText(resolveEditorContent(props.modelValue)));
 const axiosClient = computed(() => props.axiosInstance ?? axios);
 const {
     attachments,
@@ -111,6 +112,7 @@ watch(
     (val) => {
         const current = editor.value?.getHTML() ?? '';
         const next = resolveEditorContent(val);
+        hasAiImprovableText.value = containsAiImprovableText(next);
         if (next !== current) {
             editor.value?.commands.setContent(next, false);
         }
@@ -173,8 +175,12 @@ const editor = useEditor({
         }),
     ],
     content: resolveEditorContent(props.modelValue),
-    onUpdate: () => {
-        const html = editor.value?.getHTML() ?? '';
+    onTransaction: ({ editor: editorInstance, transaction }) => {
+        if (!transaction.docChanged) return;
+        hasAiImprovableText.value = containsAiImprovableText(editorInstance.getHTML());
+    },
+    onUpdate: ({ editor: editorInstance }) => {
+        const html = editorInstance.getHTML();
         emit('update:modelValue', html);
         hasUploadPlaceholder.value = hasImageUploadPlaceholders();
     },
@@ -248,7 +254,10 @@ const { acceptAiImprove, aiError, aiImproving, aiPreviewHtml, aiPreviewOpen, imp
     isUploading,
     resolveAiImproveUrl,
     getAiContext: () => props.aiContext ?? '',
-    onAccept: (html) => emit('update:modelValue', html),
+    onAccept: (html) => {
+        hasAiImprovableText.value = containsAiImprovableText(html);
+        emit('update:modelValue', html);
+    },
 });
 
 watch(
@@ -296,6 +305,7 @@ const editorStyle = computed(() => {
 
 function reset() {
     editor.value?.commands.clearContent();
+    hasAiImprovableText.value = false;
     emit('update:modelValue', '');
     resetAttachments();
 }
@@ -330,7 +340,7 @@ defineExpose({ editor, reset });
                     type="button"
                     data-testid="toolbar-ai-improve"
                     class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="isUploading || aiImproving"
+                    :disabled="isUploading || aiImproving || !hasAiImprovableText"
                     @click="improveWithAi"
                 >
                     <Sparkles :size="14" />
