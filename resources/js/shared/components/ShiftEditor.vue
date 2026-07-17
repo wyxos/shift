@@ -70,6 +70,7 @@ const showEmoji = ref(false);
 const hasUploadPlaceholder = ref(false);
 const editorFocused = ref(false);
 const hasAiImprovableText = ref(containsAiImprovableText(resolveEditorContent(props.modelValue)));
+const aiNotice = ref('');
 const axiosClient = computed(() => props.axiosInstance ?? axios);
 const {
     attachments,
@@ -113,6 +114,7 @@ watch(
         const current = editor.value?.getHTML() ?? '';
         const next = resolveEditorContent(val);
         hasAiImprovableText.value = containsAiImprovableText(next);
+        aiNotice.value = '';
         if (next !== current) {
             editor.value?.commands.setContent(next, false);
         }
@@ -178,6 +180,7 @@ const editor = useEditor({
     onTransaction: ({ editor: editorInstance, transaction }) => {
         if (!transaction.docChanged) return;
         hasAiImprovableText.value = containsAiImprovableText(editorInstance.getHTML());
+        aiNotice.value = '';
     },
     onUpdate: ({ editor: editorInstance }) => {
         const html = editorInstance.getHTML();
@@ -258,6 +261,9 @@ const { acceptAiImprove, aiError, aiImproving, aiPreviewHtml, aiPreviewOpen, imp
         hasAiImprovableText.value = containsAiImprovableText(html);
         emit('update:modelValue', html);
     },
+    onNoChange: () => {
+        aiNotice.value = 'This already reads clearly—no changes suggested.';
+    },
 });
 
 watch(
@@ -306,8 +312,14 @@ const editorStyle = computed(() => {
 function reset() {
     editor.value?.commands.clearContent();
     hasAiImprovableText.value = false;
+    aiNotice.value = '';
     emit('update:modelValue', '');
     resetAttachments();
+}
+
+function requestAiImprove() {
+    aiNotice.value = '';
+    void improveWithAi();
 }
 
 // Expose the ref so parents (and tests) can observe / control the editor once it initializes.
@@ -341,7 +353,7 @@ defineExpose({ editor, reset });
                     data-testid="toolbar-ai-improve"
                     class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="isUploading || aiImproving || !hasAiImprovableText"
-                    @click="improveWithAi"
+                    @click="requestAiImprove"
                 >
                     <Sparkles :size="14" />
                     <span>{{ aiImproving ? 'Improving...' : 'Improve with AI' }}</span>
@@ -377,6 +389,10 @@ defineExpose({ editor, reset });
 
         <div v-if="aiError" data-testid="ai-improve-error" class="mt-2 px-1 text-xs text-red-600">
             {{ aiError }}
+        </div>
+
+        <div v-if="aiNotice" data-testid="ai-improve-notice" class="mt-2 px-1 text-xs text-slate-600" role="status" aria-live="polite">
+            {{ aiNotice }}
         </div>
 
         <ShiftEditorAiPreviewDrawer :html="aiPreviewHtml" :open="aiPreviewOpen" @accept="acceptAiImprove" @reject="rejectAiImprove" />
