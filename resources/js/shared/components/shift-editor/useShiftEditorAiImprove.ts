@@ -9,6 +9,7 @@ type UseShiftEditorAiImproveOptions = {
     resolveAiImproveUrl: () => string | null;
     getAiContext: () => string;
     onAccept: (html: string) => void;
+    onNoChange: () => void;
 };
 
 const protectedRichContentSelector = 'img, blockquote.shift-reply, blockquote[data-reply-to]';
@@ -32,6 +33,31 @@ export function containsAiImprovableText(html: string): boolean {
     doc.body.querySelectorAll(protectedRichContentSelector).forEach((node) => node.remove());
 
     return (doc.body.textContent ?? '').replace(/[\u00a0\u200b\ufeff]/g, ' ').trim().length > 0;
+}
+
+export function normalizeAiRewriteText(html: string): string {
+    const content = String(html ?? '');
+
+    if (typeof DOMParser === 'undefined') {
+        return content
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&nbsp;|&#160;/gi, ' ')
+            .replace(/[\u00a0\u200b\ufeff]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<body>${content}</body>`, 'text/html');
+    doc.body.querySelectorAll('br').forEach((node) => node.replaceWith(doc.createTextNode(' ')));
+    doc.body.querySelectorAll('p, div, li, blockquote, pre, h1, h2, h3, h4, h5, h6').forEach((node) => {
+        node.append(doc.createTextNode(' '));
+    });
+
+    return (doc.body.textContent ?? '')
+        .replace(/[\u00a0\u200b\ufeff]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function createProtectedToken(index: number): string {
@@ -118,6 +144,13 @@ export function useShiftEditorAiImprove(options: UseShiftEditorAiImproveOptions)
             const { restoredHtml, missingTokens } = restoreProtectedFragments(improvedHtml, protectedFragments);
             if (missingTokens.length > 0) {
                 throw new Error('AI response omitted protected rich content. No changes were applied.');
+            }
+
+            if (normalizeAiRewriteText(restoredHtml) === normalizeAiRewriteText(currentHtml)) {
+                aiPreviewHtml.value = '';
+                aiPreviewOpen.value = false;
+                options.onNoChange();
+                return;
             }
 
             aiPreviewHtml.value = restoredHtml;
