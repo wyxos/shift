@@ -63,6 +63,30 @@ describe('ShiftEditor toolbar', () => {
         expect(wrapper.find('[data-testid="toolbar-ai-improve"]').exists()).toBe(false);
     });
 
+    it('only enables AI improvement when the editor contains improvable text', async () => {
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+
+        const button = wrapper.get('[data-testid="toolbar-ai-improve"]');
+        const ed: any = (wrapper.vm as any).editor;
+
+        expect(button.attributes('disabled')).toBeDefined();
+
+        ed?.commands.setContent(
+            '<blockquote class="shift-reply" data-reply-to="42"><p>Quoted text</p></blockquote><p><img src="/attachments/1/download"></p>',
+        );
+        await nextTick();
+        expect(button.attributes('disabled')).toBeDefined();
+
+        ed?.commands.setContent('<p>Draft text to improve</p>');
+        await nextTick();
+        expect(button.attributes('disabled')).toBeUndefined();
+
+        ed?.commands.clearContent();
+        await nextTick();
+        expect(button.attributes('disabled')).toBeDefined();
+    });
+
     it('inserts emoji into the editor via emoji picker', async () => {
         const wrapper = mount(ShiftEditor);
         await nextTick();
