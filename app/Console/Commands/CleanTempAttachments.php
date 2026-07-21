@@ -2,12 +2,18 @@
 
 namespace App\Console\Commands;
 
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
 class CleanTempAttachments extends Command
 {
+    private const MAX_AGE_HOURS = 24;
+
+    private const TEMPORARY_ROOTS = [
+        'temp_attachments' => 'temporary attachment',
+        'temp_chunks' => 'temporary chunk',
+    ];
+
     /**
      * The name and signature of the console command.
      *
@@ -20,34 +26,67 @@ class CleanTempAttachments extends Command
      *
      * @var string
      */
-    protected $description = 'Clean temporary attachments older than 24 hours';
+    protected $description = 'Clean temporary upload directories older than 24 hours';
 
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         $this->info('Cleaning temporary attachments...');
 
-        // Get all directories in the temp_attachments folder
-        $tempDirs = Storage::directories('temp_attachments');
-        $count = 0;
+        $cutoff = now()->subHours(self::MAX_AGE_HOURS)->getTimestamp();
+        $deletedByRoot = array_fill_keys(array_keys(self::TEMPORARY_ROOTS), 0);
 
-        foreach ($tempDirs as $dir) {
-            // Get the last modified time of the directory
-            $lastModified = Storage::lastModified($dir);
-            $lastModifiedDate = Carbon::createFromTimestamp($lastModified);
+        foreach (self::TEMPORARY_ROOTS as $root => $label) {
+            foreach (Storage::directories($root) as $directory) {
+                if (! $this->isWithinRoot($directory, $root)) {
+                    continue;
+                }
 
-            // If the directory is older than 24 hours, delete it
-            if ($lastModifiedDate->diffInHours(now()) >= 24) {
-                Storage::deleteDirectory($dir);
-                $this->info("Deleted: {$dir}");
-                $count++;
+                if ($this->lastModifiedAt($directory) > $cutoff) {
+                    continue;
+                }
+
+                if (! Storage::deleteDirectory($directory)) {
+                    $this->warn("Failed to delete: {$directory}");
+
+                    continue;
+                }
+
+                $this->info("Deleted: {$directory}");
+                $deletedByRoot[$root]++;
             }
+
+            $this->info("Cleaned {$deletedByRoot[$root]} {$label} directories.");
         }
 
-        $this->info("Cleaned {$count} temporary attachment directories.");
-
         return Command::SUCCESS;
+    }
+
+    private function isWithinRoot(string $directory, string $root): bool
+    {
+        $rootPath = realpath(Storage::path($root));
+        $directoryPath = realpath(Storage::path($directory));
+
+        if ($rootPath === false || $directoryPath === false) {
+            return false;
+        }
+
+        return str_starts_with($directoryPath, $rootPath.DIRECTORY_SEPARATOR);
+    }
+
+    private function lastModifiedAt(string $directory): int
+    {
+        $paths = [
+            $directory,
+            ...Storage::allDirectories($directory),
+            ...Storage::allFiles($directory),
+        ];
+
+        return max(array_map(
+            fn (string $path): int => Storage::lastModified($path),
+            $paths,
+        ));
     }
 }
