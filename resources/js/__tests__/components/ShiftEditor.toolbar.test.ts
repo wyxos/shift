@@ -63,6 +63,30 @@ describe('ShiftEditor toolbar', () => {
         expect(wrapper.find('[data-testid="toolbar-ai-improve"]').exists()).toBe(false);
     });
 
+    it('only enables AI improvement when the editor contains improvable text', async () => {
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+
+        const button = wrapper.get('[data-testid="toolbar-ai-improve"]');
+        const ed: any = (wrapper.vm as any).editor;
+
+        expect(button.attributes('disabled')).toBeDefined();
+
+        ed?.commands.setContent(
+            '<blockquote class="shift-reply" data-reply-to="42"><p>Quoted text</p></blockquote><p><img src="/attachments/1/download"></p>',
+        );
+        await nextTick();
+        expect(button.attributes('disabled')).toBeDefined();
+
+        ed?.commands.setContent('<p>Draft text to improve</p>');
+        await nextTick();
+        expect(button.attributes('disabled')).toBeUndefined();
+
+        ed?.commands.clearContent();
+        await nextTick();
+        expect(button.attributes('disabled')).toBeDefined();
+    });
+
     it('inserts emoji into the editor via emoji picker', async () => {
         const wrapper = mount(ShiftEditor);
         await nextTick();
@@ -267,6 +291,37 @@ describe('ShiftEditor toolbar', () => {
 
         const unchangedHtml = ed?.getHTML() ?? '';
         expect(unchangedHtml).toContain('Original content stays.');
+    });
+
+    it('reports no suggested changes when AI returns text-equivalent content', async () => {
+        postMock.mockImplementation((url: string) => {
+            if (url === '/ai/improve') {
+                return Promise.resolve({
+                    data: {
+                        improved_html: '<p><strong>This&nbsp;already reads clearly.</strong></p>',
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        const wrapper = mount(ShiftEditor);
+        await nextTick();
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.commands.setContent('<p>This already reads clearly.</p>');
+        await nextTick();
+
+        await wrapper.get('[data-testid="toolbar-ai-improve"]').trigger('click');
+        await nextTick();
+
+        expect(wrapper.get('[data-testid="ai-improve-notice"]').text()).toBe('This already reads clearly—no changes suggested.');
+        expect(wrapper.get('[data-testid="ai-improve-drawer"]').attributes('data-state')).toBe('closed');
+        expect(ed?.getHTML()).toBe('<p>This already reads clearly.</p>');
+
+        ed?.commands.setContent('<p>This text now needs another review.</p>');
+        await nextTick();
+        expect(wrapper.find('[data-testid="ai-improve-notice"]').exists()).toBe(false);
     });
 
     it('sends provided thread context to AI improvement endpoint', async () => {

@@ -1,4 +1,5 @@
 import ExternalUsersIndex from '@/pages/ExternalUsers/Index.vue';
+import LinkedAccountsManager from '@/pages/ExternalUsers/LinkedAccountsManager.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
@@ -7,8 +8,6 @@ const routerGetMock = vi.fn();
 const routerVisitMock = vi.fn();
 const routerReloadMock = vi.fn();
 const axiosPutMock = vi.fn();
-const axiosPostMock = vi.fn();
-const axiosDeleteMock = vi.fn();
 
 vi.mock('@/layouts/AppLayout.vue', () => ({
     default: {
@@ -215,8 +214,6 @@ vi.mock('@inertiajs/vue3', () => ({
 
 vi.mock('axios', () => ({
     default: {
-        delete: (...args: unknown[]) => axiosDeleteMock(...args),
-        post: (...args: unknown[]) => axiosPostMock(...args),
         put: (...args: unknown[]) => axiosPutMock(...args),
     },
 }));
@@ -241,6 +238,8 @@ describe('ExternalUsers/Index.vue', () => {
                         id: 12,
                         label: 'Portal SSO',
                         email: 'linked@example.com',
+                        environment: 'Development',
+                        url: 'https://portal-v3.example.com',
                         unlink_url: '/external-users/7/linked-accounts/12',
                         can_unlink: true,
                     },
@@ -251,6 +250,7 @@ describe('ExternalUsers/Index.vue', () => {
                         label: 'Production Login',
                         email: 'prod@example.com',
                         environment: 'Production',
+                        url: 'https://portal.example.com',
                     },
                 ],
                 links: {
@@ -388,19 +388,14 @@ describe('ExternalUsers/Index.vue', () => {
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['externalUsers'],
-                preserveScroll: true,
             }),
         );
     });
 
-    it('edits roles when allowed and manages linked accounts from the sheet', async () => {
+    it('edits roles and applies refreshed linked-account state without closing the sheet', async () => {
         routerReloadMock.mockReset();
         axiosPutMock.mockReset();
-        axiosPostMock.mockReset();
-        axiosDeleteMock.mockReset();
         axiosPutMock.mockResolvedValue({ data: { external_user: { id: 7 } } });
-        axiosPostMock.mockResolvedValue({ data: {} });
-        axiosDeleteMock.mockResolvedValue({ data: {} });
 
         const wrapper = mount(ExternalUsersIndex, {
             props: {
@@ -420,32 +415,34 @@ describe('ExternalUsers/Index.vue', () => {
 
         expect(wrapper.get('[data-testid="external-user-edit-role"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('Production Login');
+        expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('portal.example.com');
         expect(wrapper.get('[data-testid="external-user-linked-accounts"]').text()).toContain('Portal SSO');
         expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('linked@example.com');
+        expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('portal-v3.example.com');
 
-        await wrapper.get('[data-testid="external-user-link-account-select"]').setValue('13');
-        await wrapper.get('[data-testid="external-user-link-account-submit"]').trigger('click');
-        await flushPromises();
+        wrapper.getComponent(LinkedAccountsManager).vm.$emit('changed', {
+            ...externalUsers.data[0],
+            linked_accounts: [
+                ...externalUsers.data[0].linked_accounts,
+                {
+                    id: 13,
+                    label: 'Production Login',
+                    email: 'prod@example.com',
+                    environment: 'Production',
+                    url: 'https://portal.example.com',
+                    unlink_url: '/external-users/7/linked-accounts/13',
+                    can_unlink: true,
+                },
+            ],
+            linkable_accounts: [],
+        });
+        await wrapper.vm.$nextTick();
 
-        expect(axiosPostMock).toHaveBeenCalledWith(
-            '/external-users/7/linked-accounts',
-            {
-                linked_external_user_id: '13',
-            },
-            expect.objectContaining({ headers: { Accept: 'application/json' } }),
-        );
-
-        await wrapper.get('[data-testid="external-user-linked-account-unlink-12"]').trigger('click');
-        await flushPromises();
-
-        expect(axiosDeleteMock).toHaveBeenCalledWith(
-            '/external-users/7/linked-accounts/12',
-            expect.objectContaining({ headers: { Accept: 'application/json' } }),
-        );
+        expect(wrapper.get('[data-testid="external-user-linked-account-13"]').text()).toContain('portal.example.com');
+        expect(wrapper.find('[data-testid="external-user-link-account-select"]').exists()).toBe(false);
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['externalUsers'],
-                preserveScroll: true,
             }),
         );
 

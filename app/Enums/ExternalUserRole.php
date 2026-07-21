@@ -23,6 +23,15 @@ enum ExternalUserRole: string
         };
     }
 
+    public function consumingAppLabel(): string
+    {
+        return match ($this) {
+            self::Owner => 'Owner',
+            self::ClientDeveloper => 'Developer',
+            default => $this->label(),
+        };
+    }
+
     public function canSubmitRequirements(): bool
     {
         return in_array($this, [

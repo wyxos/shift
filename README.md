@@ -30,7 +30,7 @@ The portal still has the normal structure needed to manage the work (organisatio
 ### Prerequisites
 
 - PHP 8.3+
-- Node.js 18+
+- Node.js 22+
 - Composer
 - MySQL/PostgreSQL
 
@@ -43,7 +43,7 @@ cd shift
 
 # Install dependencies
 composer install
-npm install
+npm ci
 
 # Setup environment
 cp .env.example .env

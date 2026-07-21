@@ -53,7 +53,8 @@ const emit = defineEmits<{
 }>();
 
 const page = usePage<SharedData>();
-const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
+const emailImportEnabled = computed(() => Boolean(page.props.shift?.ai_email_import_enabled));
 const createOpen = ref(false);
 const createLoading = ref(false);
 const createUploading = ref(false);
@@ -148,7 +149,7 @@ function updateProjectFromSelect(value: SelectOptionValue) {
 }
 
 function openEmailImportFilePicker() {
-    if (!aiImproveEnabled.value || emailImportLoading.value) {
+    if (!emailImportEnabled.value || emailImportLoading.value) {
         return;
     }
 
@@ -174,7 +175,7 @@ function firstImportFile(files: FileList | File[] | null | undefined): File | nu
         return null;
     }
 
-    return typeof files.item === 'function' ? files.item(0) : files[0];
+    return files[0] ?? null;
 }
 
 function isEmlFile(file: File): boolean {
@@ -200,7 +201,7 @@ function applyEmailImportResult(result: TaskEmailImportResult) {
 }
 
 async function importEmailFile(file: File | null) {
-    if (!aiImproveEnabled.value) {
+    if (!emailImportEnabled.value) {
         return;
     }
 
@@ -348,7 +349,7 @@ async function createTask() {
                     />
                 </div>
 
-                <div v-if="aiImproveEnabled && !isRequirementSurface" class="space-y-2">
+                <div v-if="emailImportEnabled && !isRequirementSurface" class="space-y-2">
                     <label class="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium select-none">
                         <Mail class="h-4 w-4" />
                         Email

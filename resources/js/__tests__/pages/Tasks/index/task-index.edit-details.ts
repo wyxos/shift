@@ -241,8 +241,6 @@ describe('Tasks/Index.vue', () => {
         expect(axiosPutMock).toHaveBeenCalledWith('/tasks.update', expect.objectContaining({ status: 'in-progress' }));
         expect(router.reload).toHaveBeenCalledWith({
             only: ['tasks', 'filters', 'projects'],
-            preserveScroll: true,
-            preserveState: true,
             onSuccess: expect.any(Function),
         });
         expect(sonnerMocks.toastLoadingMock).toHaveBeenCalledWith('Saving task changes...');

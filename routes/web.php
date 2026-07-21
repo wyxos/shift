@@ -99,7 +99,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('tasks.show');
     Route::get('projects/{project}/collaborators', [TaskController::class, 'collaborators'])->name('tasks.collaborators');
     Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
-    Route::post('tasks/email-import', TaskEmailImportController::class)->name('tasks.email-import');
+    Route::post('tasks/email-import', TaskEmailImportController::class)->middleware('throttle:ai-email-import')->name('tasks.email-import');
     Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     Route::patch('tasks/{task}/collaborators', [TaskController::class, 'updateCollaborators'])->name('tasks.collaborators.update');
     Route::patch('tasks/{task}/requirements/finalize', [TaskController::class, 'finalizeRequirement'])->name('requirements.finalize');
@@ -126,7 +126,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('attachments/{attachment}', [AttachmentController::class, 'deleteAttachment'])->name('attachments.delete');
     Route::get('attachments/{attachment}/download', [AttachmentController::class, 'downloadAttachment'])->name('attachments.download');
     Route::get('attachments/temp/{temp}/{filename}', [AttachmentController::class, 'showTemp'])->where('filename', '.*')->name('attachments.temp');
-    Route::post('ai/improve', [AiRewriteController::class, 'improve'])->name('ai.improve');
+    Route::post('ai/improve', [AiRewriteController::class, 'improve'])->middleware('throttle:ai-rewrite')->name('ai.improve');
 
     // External Users
     Route::get('external-users', fn () => abort(404));

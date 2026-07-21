@@ -13,7 +13,7 @@ import {
 import { buildThreadAiContext } from '@/shared/tasks/ai';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
-import { computed, ref, watch, type Ref } from 'vue';
+import { computed, ref, watch, type ComponentPublicInstance, type Ref } from 'vue';
 import TaskThreadMessage from './TaskThreadMessage.vue';
 
 interface Message {
@@ -63,7 +63,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const page = usePage<SharedData>();
-const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
 const aiContext = computed(() =>
     buildThreadAiContext(
         props.messages.map((message) => ({
@@ -75,10 +75,10 @@ const aiContext = computed(() =>
 );
 
 // Assign messages container element to the passed-in ref
-const setMessagesContainer = (el: Element | null) => {
+const setMessagesContainer = (el: Element | ComponentPublicInstance | null) => {
     const target: any = (props as any).messagesContainer;
     if (target && typeof target === 'object' && 'value' in target) {
-        target.value = el as HTMLElement | null;
+        target.value = el instanceof HTMLElement ? el : null;
     }
 };
 

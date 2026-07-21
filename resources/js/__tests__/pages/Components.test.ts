@@ -17,7 +17,8 @@ vi.mock('@inertiajs/vue3', () => ({
     usePage: () => ({
         props: {
             shift: {
-                ai_enabled: false,
+                ai_rewrite_enabled: false,
+                ai_email_import_enabled: false,
             },
         },
     }),

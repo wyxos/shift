@@ -206,7 +206,6 @@ describe('Organisations/Index.vue', () => {
         );
         expect(routerReloadMock).toHaveBeenCalledWith({
             only: ['panelOrganisation'],
-            preserveScroll: true,
         });
         await flushPromises();
         expect(wrapper.find('[data-testid="organisation-access-submit"]').exists()).toBe(true);

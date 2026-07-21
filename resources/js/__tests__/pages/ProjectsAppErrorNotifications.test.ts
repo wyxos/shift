@@ -222,6 +222,6 @@ describe('Projects app error notifications', () => {
             },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
-        expect(pageMocks.routerReload).toHaveBeenCalledWith(expect.objectContaining({ only: ['projects'], preserveScroll: true }));
+        expect(pageMocks.routerReload).toHaveBeenCalledWith(expect.objectContaining({ only: ['projects'] }));
     });
 });

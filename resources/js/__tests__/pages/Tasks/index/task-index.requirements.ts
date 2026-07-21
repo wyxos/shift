@@ -220,7 +220,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(axiosPatchMock).toHaveBeenCalledWith('/requirements.batches.finalize', {});
-        expect(router.reload).toHaveBeenCalledWith({ preserveScroll: true, preserveState: true });
+        expect(router.reload).toHaveBeenCalledWith();
         expect(sonnerMocks.toastSuccessMock).toHaveBeenCalledWith('Requirements finalized', {
             description: '2 items now appear in the active task list.',
         });
