@@ -1,13 +1,33 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { BreadcrumbItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import { reactive, ref } from 'vue';
+import { reactive } from 'vue';
 
-const props = defineProps({
-    notifications: Object,
-});
+type NotificationPayload = Record<string, any>;
+
+type NotificationRow = {
+    id: string;
+    type: string;
+    data: string | NotificationPayload;
+    read_at: string | null;
+    created_at: string;
+};
+
+type NotificationPaginator = {
+    data: NotificationRow[];
+    from: number | null;
+    to: number | null;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+};
+
+const props = defineProps<{
+    notifications: NotificationPaginator;
+}>();
 
 // Create a reactive copy of the notifications data
 const localNotifications = reactive({
@@ -19,13 +39,17 @@ const localNotifications = reactive({
     next_page_url: props.notifications?.next_page_url,
 });
 
-const breadcrumbs = ref([
-    { name: 'Dashboard', href: route('dashboard') },
-    { name: 'Notifications', href: route('notifications.index') },
-]);
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Dashboard', href: route('dashboard') },
+    { title: 'Notifications', href: route('notifications.index') },
+];
+
+function notificationData(notification: NotificationRow): NotificationPayload {
+    return typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+}
 
 // Mark a notification as read
-const markAsRead = async (id) => {
+const markAsRead = async (id: NotificationRow['id']) => {
     try {
         await axios.post(route('notifications.mark-as-read', { id }));
 
@@ -40,7 +64,7 @@ const markAsRead = async (id) => {
 };
 
 // Mark a notification as unread
-const markAsUnread = async (id) => {
+const markAsUnread = async (id: NotificationRow['id']) => {
     try {
         await axios.post(route('notifications.mark-as-unread', { id }));
 
@@ -70,10 +94,9 @@ const markAllAsRead = async () => {
 };
 
 // Format notification title based on type
-const getNotificationTitle = (notification) => {
+const getNotificationTitle = (notification: NotificationRow) => {
     const type = notification.type;
-    // Handle both string and object data formats
-    const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+    const data = notificationData(notification);
 
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
@@ -96,9 +119,8 @@ const getNotificationTitle = (notification) => {
 };
 
 // Get notification URL
-const getNotificationUrl = (notification) => {
-    // Handle both string and object data formats
-    const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+const getNotificationUrl = (notification: NotificationRow) => {
+    const data = notificationData(notification);
 
     if (data.url) {
         return data.url;
@@ -124,15 +146,14 @@ const getNotificationUrl = (notification) => {
 };
 
 // Format date
-const formatDate = (dateString) => {
+const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
 };
 
 // Get notification description
-const getNotificationDescription = (notification) => {
-    // Handle both string and object data formats
-    const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+const getNotificationDescription = (notification: NotificationRow) => {
+    const data = notificationData(notification);
     const type = notification.type;
 
     switch (type) {

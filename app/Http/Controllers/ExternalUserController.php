@@ -160,6 +160,7 @@ class ExternalUserController extends Controller
             'name' => $account->name,
             'email' => $account->email,
             'environment' => $account->environment,
+            'url' => $account->url,
             'role' => $account->role?->value,
             'role_label' => $account->role?->label(),
             'project' => $account->project ? [

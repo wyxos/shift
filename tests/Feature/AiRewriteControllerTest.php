@@ -1,8 +1,9 @@
 <?php
 
+use App\Ai\Agents\ContentRewriteAgent;
 use App\Models\Project;
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Prompts\AgentPrompt;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -12,21 +13,16 @@ beforeEach(function () {
         'author_id' => $this->user->id,
     ]);
 
-    config()->set('shift_ai.provider', 'ollama');
-    config()->set('shift_ai.enabled', true);
-    config()->set('shift_ai.model', 'llama3.1');
-    config()->set('shift_ai.ollama.base_url', 'http://127.0.0.1:11434');
-    config()->set('shift_ai.timeout', 30);
+    config()->set('ai_features.rewrite.enabled', true);
+    config()->set('ai_features.rewrite.provider', 'openai');
+    config()->set('ai_features.rewrite.model', 'gpt-5.4-mini');
+    config()->set('ai_features.rewrite.timeout', 30);
 });
 
-test('web ai improve endpoint returns improved html', function () {
-    Http::fake([
-        'http://127.0.0.1:11434/api/chat' => Http::response([
-            'message' => [
-                'content' => '<p>Improved note [[SHIFT_KEEP_1]]</p>',
-            ],
-        ], 200),
-    ]);
+test('web ai improve endpoint uses Laravel AI with OpenAI and returns sanitized HTML', function () {
+    ContentRewriteAgent::fake([
+        '<p>Improved note [[SHIFT_KEEP_1]]</p>',
+    ])->preventStrayPrompts();
 
     $response = $this->actingAs($this->user)->postJson(route('ai.improve'), [
         'html' => '<p>original [[SHIFT_KEEP_1]]</p>',
@@ -34,25 +30,23 @@ test('web ai improve endpoint returns improved html', function () {
         'context' => '1. Alice: prior comment context',
     ]);
 
-    $response->assertOk();
-    $response->assertJsonPath('improved_html', '<p>Improved note [[SHIFT_KEEP_1]]</p>');
+    $response
+        ->assertOk()
+        ->assertJsonPath('improved_html', '<p>Improved note [[SHIFT_KEEP_1]]</p>');
 
-    Http::assertSent(function ($request) {
-        $userPrompt = (string) data_get($request->data(), 'messages.1.content', '');
-
-        return str_contains($userPrompt, 'Thread context (for reference, use when rewriting):')
-            && str_contains($userPrompt, '1. Alice: prior comment context');
+    ContentRewriteAgent::assertPrompted(function (AgentPrompt $prompt): bool {
+        return $prompt->provider()->name() === 'openai'
+            && $prompt->model === 'gpt-5.4-mini'
+            && $prompt->timeout === 30
+            && $prompt->contains('untrusted application data')
+            && $prompt->contains('1. Alice: prior comment context');
     });
 });
 
-test('external api ai improve endpoint returns improved html', function () {
-    Http::fake([
-        'http://127.0.0.1:11434/api/chat' => Http::response([
-            'message' => [
-                'content' => '<p>Improved via api</p>',
-            ],
-        ], 200),
-    ]);
+test('external api ai improve endpoint supports OpenAI through Laravel AI', function () {
+    ContentRewriteAgent::fake([
+        '<p>Improved via api</p>',
+    ])->preventStrayPrompts();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)->postJson('/api/ai/improve', [
         'project' => $this->project->token,
@@ -60,32 +54,53 @@ test('external api ai improve endpoint returns improved html', function () {
         'context' => '1. Bob: external context',
     ]);
 
-    $response->assertOk();
-    $response->assertJsonPath('improved_html', '<p>Improved via api</p>');
+    $response
+        ->assertOk()
+        ->assertJsonPath('improved_html', '<p>Improved via api</p>');
+
+    ContentRewriteAgent::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->provider()->name() === 'openai');
 });
 
-test('ai improve endpoint rejects model output that loses protected tokens', function () {
-    Http::fake([
-        'http://127.0.0.1:11434/api/chat' => Http::response([
-            'message' => [
-                'content' => '<p>Token disappeared</p>',
-            ],
-        ], 200),
+test('ai improve sanitizes malicious model output before previewing it', function () {
+    ContentRewriteAgent::fake([
+        '<p onclick="steal()">Safe text<img src="javascript:alert(1)" onerror="steal()"><script>alert(1)</script><a href="javascript:alert(1)">link</a></p>',
+    ])->preventStrayPrompts();
+
+    $response = $this->actingAs($this->user)->postJson(route('ai.improve'), [
+        'html' => '<p>Original</p>',
     ]);
+
+    $response->assertOk();
+
+    $html = (string) $response->json('improved_html');
+    expect($html)
+        ->toContain('<p>Safe text')
+        ->toContain('<a>link</a>')
+        ->not->toContain('onclick')
+        ->not->toContain('onerror')
+        ->not->toContain('<script')
+        ->not->toContain('javascript:');
+});
+
+test('ai improve rejects model output that loses protected tokens without exposing internals', function () {
+    ContentRewriteAgent::fake([
+        '<p>Token disappeared</p>',
+    ])->preventStrayPrompts();
 
     $response = $this->actingAs($this->user)->postJson(route('ai.improve'), [
         'html' => '<p>Original [[SHIFT_KEEP_1]]</p>',
         'protected_tokens' => ['[[SHIFT_KEEP_1]]'],
     ]);
 
-    $response->assertStatus(422);
-    $response->assertJsonPath('error', 'AI response did not preserve protected placeholders.');
+    $response
+        ->assertStatus(422)
+        ->assertJsonPath('error', 'Unable to improve message with AI.');
 });
 
-test('ai improve endpoints surface local provider failures as validation errors', function () {
-    Http::fake([
-        'http://127.0.0.1:11434/api/chat' => Http::response([], 500),
-    ]);
+test('ai improve endpoints do not expose provider failure details', function () {
+    ContentRewriteAgent::fake(function (): never {
+        throw new RuntimeException('secret provider response');
+    });
 
     $webResponse = $this->actingAs($this->user)->postJson(route('ai.improve'), [
         'html' => '<p>Original</p>',
@@ -93,7 +108,8 @@ test('ai improve endpoints surface local provider failures as validation errors'
 
     $webResponse
         ->assertStatus(422)
-        ->assertJsonPath('error', 'Local AI request failed: 500');
+        ->assertJsonPath('error', 'Unable to improve message with AI.')
+        ->assertJsonMissing(['error' => 'secret provider response']);
 
     $apiResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)->postJson('/api/ai/improve', [
         'project' => $this->project->token,
@@ -102,24 +118,54 @@ test('ai improve endpoints surface local provider failures as validation errors'
 
     $apiResponse
         ->assertStatus(422)
-        ->assertJsonPath('error', 'Local AI request failed: 500');
+        ->assertJsonPath('error', 'Unable to improve message with AI.')
+        ->assertJsonMissing(['error' => 'secret provider response']);
+});
+
+test('ai improve validates bounded inputs', function () {
+    ContentRewriteAgent::fake()->preventStrayPrompts();
+
+    $response = $this->actingAs($this->user)->postJson(route('ai.improve'), [
+        'html' => str_repeat('a', 50001),
+        'protected_tokens' => array_fill(0, 101, 'token'),
+    ]);
+
+    $response
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['html', 'protected_tokens']);
+
+    ContentRewriteAgent::assertNeverPrompted();
 });
 
 test('ai improve endpoints return not found when feature is disabled', function () {
-    config()->set('shift_ai.enabled', false);
+    config()->set('ai_features.rewrite.enabled', false);
+    ContentRewriteAgent::fake()->preventStrayPrompts();
 
     $webResponse = $this->actingAs($this->user)->postJson(route('ai.improve'), [
         'html' => '<p>Original</p>',
     ]);
 
-    $webResponse->assertStatus(404);
-    $webResponse->assertJsonPath('error', 'AI improvement is disabled.');
+    $webResponse
+        ->assertStatus(404)
+        ->assertJsonPath('error', 'AI improvement is disabled.');
 
     $apiResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)->postJson('/api/ai/improve', [
         'project' => $this->project->token,
         'html' => '<p>Original</p>',
     ]);
 
-    $apiResponse->assertStatus(404);
-    $apiResponse->assertJsonPath('error', 'AI improvement is disabled.');
+    $apiResponse
+        ->assertStatus(404)
+        ->assertJsonPath('error', 'AI improvement is disabled.');
+
+    ContentRewriteAgent::assertNeverPrompted();
+});
+
+test('ai rewrite and email import routes use separate scoped rate limiters', function () {
+    $routes = app('router')->getRoutes();
+
+    expect($routes->getByName('ai.improve')?->gatherMiddleware())->toContain('throttle:ai-rewrite')
+        ->and($routes->getByName('api.ai.improve')?->gatherMiddleware())->toContain('throttle:ai-rewrite')
+        ->and($routes->getByName('tasks.email-import')?->gatherMiddleware())->toContain('throttle:ai-email-import')
+        ->and($routes->getByName('api.tasks.email-import')?->gatherMiddleware())->toContain('throttle:ai-email-import');
 });

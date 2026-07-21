@@ -31,14 +31,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/collaborators/internal', [\App\Http\Controllers\Api\ExternalTaskController::class, 'internalCollaborators'])->name('collaborators.internal');
         Route::get('/tasks', [\App\Http\Controllers\Api\ExternalTaskController::class, 'index'])->name('tasks.index');
         Route::get('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'show'])->name('tasks.show');
-        Route::post('/tasks/email-import', [\App\Http\Controllers\Api\ExternalTaskEmailImportController::class, 'store'])->name('tasks.email-import');
+        Route::post('/tasks/email-import', [\App\Http\Controllers\Api\ExternalTaskEmailImportController::class, 'store'])->middleware('throttle:ai-email-import')->name('tasks.email-import');
         Route::post('/tasks', [\App\Http\Controllers\Api\ExternalTaskController::class, 'store'])->name('tasks.store');
         Route::put('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'update'])->name('tasks.update');
         Route::patch('/tasks/{task}/collaborators', [\App\Http\Controllers\Api\ExternalTaskController::class, 'updateCollaborators'])->name('tasks.collaborators.update');
         Route::delete('/tasks/{task}', [\App\Http\Controllers\Api\ExternalTaskController::class, 'destroy'])->name('tasks.destroy');
         Route::patch('/tasks/{task}/toggle-status', [\App\Http\Controllers\Api\ExternalTaskController::class, 'toggleStatus'])->name('tasks.toggle-status');
         Route::patch('/tasks/{task}/toggle-priority', [\App\Http\Controllers\Api\ExternalTaskController::class, 'togglePriority'])->name('tasks.toggle-priority');
-        Route::post('/ai/improve', [\App\Http\Controllers\Api\ExternalAiController::class, 'improve'])->name('ai.improve');
+        Route::post('/ai/improve', [\App\Http\Controllers\Api\ExternalAiController::class, 'improve'])->middleware('throttle:ai-rewrite')->name('ai.improve');
         Route::post('/project-environments/register', [\App\Http\Controllers\Api\ProjectEnvironmentController::class, 'register'])->name('project-environments.register');
         Route::post('/errors', [\App\Http\Controllers\Api\AppErrorController::class, 'store'])->name('errors.store');
 

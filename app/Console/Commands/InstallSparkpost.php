@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 class InstallSparkpost extends Command
 {
     protected $signature = 'install:sparkpost';
+
     protected $description = 'Interactively set up SparkPost SMTP in .env';
 
     public function handle(): int
@@ -20,18 +21,18 @@ class InstallSparkpost extends Command
 
         $smtpUser = $this->ask('SMTP username', 'SMTP_Injection');
         $smtpPass = $this->secret('SMTP password (API key)');
-        $from     = $this->ask('MAIL_FROM_ADDRESS', $defaultFrom);
+        $from = $this->ask('MAIL_FROM_ADDRESS', $defaultFrom);
         $fromName = $this->ask('MAIL_FROM_NAME', config('app.name'));
 
         $this->updateEnv([
-            'MAIL_MAILER'       => 'smtp',
-            'MAIL_HOST'         => 'smtp.sparkpostmail.com',
-            'MAIL_PORT'         => '587',
-            'MAIL_ENCRYPTION'   => 'tls',
-            'MAIL_USERNAME'     => $smtpUser,
-            'MAIL_PASSWORD'     => $smtpPass,
+            'MAIL_MAILER' => 'smtp',
+            'MAIL_HOST' => 'smtp.sparkpostmail.com',
+            'MAIL_PORT' => '587',
+            'MAIL_ENCRYPTION' => 'tls',
+            'MAIL_USERNAME' => $smtpUser,
+            'MAIL_PASSWORD' => $smtpPass,
             'MAIL_FROM_ADDRESS' => $from,
-            'MAIL_FROM_NAME'    => $fromName,
+            'MAIL_FROM_NAME' => $fromName,
         ]);
 
         $this->info('SparkPost configuration added to .env');
@@ -51,11 +52,11 @@ class InstallSparkpost extends Command
         $env = file_get_contents($envPath);
 
         foreach ($data as $key => $value) {
-            $line = "$key=" . $this->escape($value);
+            $line = "$key=".$this->escape($value);
             if (preg_match("/^$key=.*$/m", $env)) {
                 $env = preg_replace("/^$key=.*$/m", $line, $env);
             } else {
-                $env .= PHP_EOL . $line;
+                $env .= PHP_EOL.$line;
             }
         }
 
@@ -64,7 +65,6 @@ class InstallSparkpost extends Command
 
     protected function escape(string $value): string
     {
-        return Str::contains($value, [' ', '#', '"']) ? '"' . addslashes($value) . '"' : $value;
+        return Str::contains($value, [' ', '#', '"']) ? '"'.addslashes($value).'"' : $value;
     }
-
 }

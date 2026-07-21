@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('attachments', function (Blueprint $table) {
-            if (!Schema::hasColumn('attachments', 'attachable_id')) {
+            if (! Schema::hasColumn('attachments', 'attachable_id')) {
                 $table->unsignedBigInteger('attachable_id')->nullable();
             }
 
-            if (!Schema::hasColumn('attachments', 'attachable_type')) {
+            if (! Schema::hasColumn('attachments', 'attachable_type')) {
                 $table->string('attachable_type')->nullable();
             }
         });

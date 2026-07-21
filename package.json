@@ -1,19 +1,30 @@
 {
+    "name": "shift",
     "private": true,
     "type": "module",
+    "packageManager": "npm@10.9.3",
+    "engines": {
+        "node": ">=22.18 <23",
+        "npm": "10.9.3"
+    },
     "scripts": {
         "build": "NODE_OPTIONS=--max-old-space-size=1536 vite build",
         "build:ssr": "NODE_OPTIONS=--max-old-space-size=1536 vite build && NODE_OPTIONS=--max-old-space-size=1536 vite build --ssr",
         "dev": "vite",
         "docs:screenshots": "node scripts/capture-laravel-issue-reporting-screenshots.mjs",
         "docs:screenshots:test": "node --test tests/docs/laravel-issue-reporting-screenshots.test.mjs",
-        "format": "prettier --write resources/",
-        "format:check": "prettier --check resources/",
+        "composer:check": "composer validate --no-check-publish --strict --no-interaction",
+        "format": "prettier --write resources/ .github/workflows/",
+        "format:check": "prettier --check resources/ .github/workflows/",
         "lint": "eslint . --fix",
+        "lint:check": "eslint .",
+        "pint:check": "vendor/bin/pint --test",
         "test": "vitest run",
+        "test:php": "composer run test",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "release": "npx @wyxos/zephyr@latest"
+        "typecheck": "vue-tsc --noEmit --project tsconfig.app.json",
+        "check": "npm run composer:check && npm run pint:check && npm run format:check && npm run lint:check && npm run typecheck && npm run test && npm run build && npm run test:php"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
@@ -22,7 +33,7 @@
         "@vitest/coverage-v8": "^4.1.8",
         "@vue/eslint-config-typescript": "^14.3.0",
         "@vue/test-utils": "^2.4.6",
-        "eslint": "9.26.0",
+        "eslint": "9.39.5",
         "eslint-config-prettier": "^10.0.1",
         "eslint-plugin-vue": "^9.32.0",
         "jsdom": "^26.1.0",
