@@ -1,5 +1,6 @@
 import type { TaskPaginator } from '@/shared/tasks/types';
 import type { SharedData } from '@/types';
+import type { RequestPayload } from '@inertiajs/core';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, unref, watch, type Ref } from 'vue';
@@ -7,13 +8,13 @@ import { toast } from 'vue-sonner';
 
 type UseTaskIndexListStateOptions = {
     tasks: TaskPaginator | Ref<TaskPaginator>;
-    buildListQuery: (page: number) => Record<string, unknown>;
+    buildListQuery: (page: number) => RequestPayload;
     indexPath?: () => string;
 };
 
 export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     const page = usePage<SharedData>();
-    const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_enabled));
+    const aiImproveEnabled = computed(() => Boolean(page.props.shift?.ai_rewrite_enabled));
 
     const tasksPage = ref<TaskPaginator>({ ...unref(options.tasks) });
     watch(
@@ -62,7 +63,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         error.value = null;
         try {
             await axios.delete(route('tasks.destroy', { task: taskId }));
-            router.reload({ preserveScroll: true, preserveState: true });
+            router.reload();
             return true;
         } catch (e: any) {
             error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete task';
@@ -80,7 +81,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
             const response = await axios.patch(route('requirements.batches.finalize', { requirementBatch: batchId }), {});
             const count = Number(response.data?.finalized_count ?? 0);
 
-            router.reload({ preserveScroll: true, preserveState: true });
+            router.reload();
             toast.success('Requirements finalized', {
                 description: `${count} ${count === 1 ? 'item' : 'items'} now ${count === 1 ? 'appears' : 'appear'} in the active task list.`,
             });
@@ -88,7 +89,7 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
         } catch (e: any) {
             error.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to finalize requirements';
             toast.error('Failed to finalize requirements', {
-                description: error.value,
+                description: error.value ?? undefined,
             });
             return false;
         } finally {
@@ -99,8 +100,6 @@ export function useTaskIndexListState(options: UseTaskIndexListStateOptions) {
     function handleTaskCreated(taskId: number | null) {
         router.reload({
             only: ['tasks', 'filters', 'projects'],
-            preserveScroll: true,
-            preserveState: true,
             onSuccess: () => {
                 if (taskId !== null) {
                     highlightTask(taskId);

@@ -176,7 +176,7 @@ const createDisabled = computed(() => createForm.processing || !createForm.name.
 const editDisabled = computed(() => editForm.processing || !editForm.name.trim());
 
 function buildIndexParams(page = 1) {
-    const params: Record<string, unknown> = {
+    const params: Record<string, string | number | undefined> = {
         search: appliedSearchTerm.value.trim() || undefined,
         sort_by: appliedSortBy.value !== defaultSortBy ? appliedSortBy.value : undefined,
         page,
@@ -409,7 +409,7 @@ function confirmDelete() {
         </div>
 
         <DeleteDialog
-            :error="deleteError"
+            :error="deleteError ?? undefined"
             :is-open="deleteForm.isActive"
             :loading="deleteProcessing"
             @cancel="deleteForm.isActive = false"

@@ -61,21 +61,21 @@ class RichContentSanitizer
             return $content;
         }
 
-        if (!$this->hasHtmlMarkup($content)) {
+        if (! $this->hasHtmlMarkup($content)) {
             return $content;
         }
 
         $previous = libxml_use_internal_errors(true);
         $document = new DOMDocument('1.0', 'UTF-8');
-        $wrapped = '<?xml encoding="utf-8" ?><div id="shift-rich-content-root">' . $content . '</div>';
+        $wrapped = '<?xml encoding="utf-8" ?><div id="shift-rich-content-root">'.$content.'</div>';
         $loaded = $document->loadHTML($wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $root = $loaded ? $document->documentElement : null;
 
-        if (!$root instanceof DOMElement || $root->getAttribute('id') !== 'shift-rich-content-root') {
+        if (! $root instanceof DOMElement || $root->getAttribute('id') !== 'shift-rich-content-root') {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
 
-            return $content;
+            return htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
         }
 
         $this->sanitizeChildren($root);
@@ -137,7 +137,8 @@ class RichContentSanitizer
             return;
         }
 
-        if (!in_array($tag, self::ALLOWED_TAGS, true)) {
+        if (! in_array($tag, self::ALLOWED_TAGS, true)) {
+            $this->sanitizeChildren($element);
             $this->unwrap($element);
 
             return;
@@ -145,7 +146,7 @@ class RichContentSanitizer
 
         $this->sanitizeAttributes($element, $tag);
 
-        if ($tag === 'img' && !$element->hasAttribute('src')) {
+        if ($tag === 'img' && ! $element->hasAttribute('src')) {
             $element->parentNode?->removeChild($element);
 
             return;
@@ -155,7 +156,7 @@ class RichContentSanitizer
             $hasHref = $element->hasAttribute('href');
             $target = $element->getAttribute('target');
 
-            if (!$hasHref) {
+            if (! $hasHref) {
                 $element->removeAttribute('target');
                 $element->removeAttribute('rel');
             } elseif ($target === '_blank') {
@@ -173,7 +174,7 @@ class RichContentSanitizer
     {
         $parent = $element->parentNode;
 
-        if (!$parent) {
+        if (! $parent) {
             return;
         }
 
@@ -192,13 +193,13 @@ class RichContentSanitizer
             $name = strtolower($attribute->name);
             $value = trim($attribute->value);
 
-            if (str_starts_with($name, 'on') || !in_array($name, $allowedAttributes, true)) {
+            if (str_starts_with($name, 'on') || ! in_array($name, $allowedAttributes, true)) {
                 $element->removeAttribute($attribute->name);
 
                 continue;
             }
 
-            if ($tag === 'a' && $name === 'href' && !$this->isSafeHref($value)) {
+            if ($tag === 'a' && $name === 'href' && ! $this->isSafeHref($value)) {
                 $element->removeAttribute($attribute->name);
 
                 continue;
@@ -210,7 +211,7 @@ class RichContentSanitizer
                 continue;
             }
 
-            if ($tag === 'img' && $name === 'src' && !$this->isSafeImageSource($value)) {
+            if ($tag === 'img' && $name === 'src' && ! $this->isSafeImageSource($value)) {
                 $element->removeAttribute($attribute->name);
 
                 continue;
@@ -246,7 +247,7 @@ class RichContentSanitizer
 
             if ($tag === 'code' && $name === 'class') {
                 $classes = preg_split('/\s+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                $allowed = array_values(array_filter($classes, fn(string $class) => $class === 'hljs' || str_starts_with($class, 'language-')));
+                $allowed = array_values(array_filter($classes, fn (string $class) => $class === 'hljs' || str_starts_with($class, 'language-')));
                 if ($allowed === []) {
                     $element->removeAttribute($attribute->name);
                 } else {
@@ -294,14 +295,14 @@ class RichContentSanitizer
             return true;
         }
 
-        $scheme = strtolower((string)parse_url($value, PHP_URL_SCHEME));
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
 
         return in_array($scheme, ['http', 'https', 'mailto', 'tel'], true);
     }
 
     private function isSafeRelativeUrl(string $value): bool
     {
-        return (str_starts_with($value, '/') && !str_starts_with($value, '//'))
+        return (str_starts_with($value, '/') && ! str_starts_with($value, '//'))
             || str_starts_with($value, '#')
             || str_starts_with($value, '?');
     }
@@ -312,7 +313,7 @@ class RichContentSanitizer
             return true;
         }
 
-        $scheme = strtolower((string)parse_url($value, PHP_URL_SCHEME));
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
         if (in_array($scheme, ['http', 'https'], true)) {
             return true;
         }
@@ -323,7 +324,7 @@ class RichContentSanitizer
     private function normalizeAllowedClasses(string $value, array $allowed): string
     {
         $classes = preg_split('/\s+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $filtered = array_values(array_filter($classes, fn(string $class) => in_array($class, $allowed, true)));
+        $filtered = array_values(array_filter($classes, fn (string $class) => in_array($class, $allowed, true)));
 
         return implode(' ', array_unique($filtered));
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Rules\EmailMessageFile;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportExternalTaskEmailRequest extends FormRequest
@@ -20,7 +21,7 @@ class ImportExternalTaskEmailRequest extends FormRequest
     {
         return [
             'project' => ['required', 'exists:projects,token'],
-            'email' => ['required', 'file', 'max:20480'],
+            'email' => ['bail', 'required', 'file', 'max:20480', 'extensions:eml', new EmailMessageFile],
             'user.id' => ['nullable'],
             'user.name' => ['nullable', 'string', 'max:255'],
             'user.email' => ['nullable', 'email'],

@@ -470,7 +470,6 @@ describe('Projects.vue', () => {
         expect(inertiaMocks.routerReload).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['projects'],
-                preserveScroll: true,
             }),
         );
     });
@@ -493,7 +492,6 @@ describe('Projects.vue', () => {
         expect(inertiaMocks.routerReload).toHaveBeenCalledWith(
             expect.objectContaining({
                 only: ['projects'],
-                preserveScroll: true,
             }),
         );
     });

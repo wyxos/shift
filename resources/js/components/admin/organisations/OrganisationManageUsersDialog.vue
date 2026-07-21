@@ -34,6 +34,7 @@ const {
     accessDisabled,
     loading,
     error,
+    removingAccessId,
     showUsers = true,
 } = defineProps<{
     accessDisabled: boolean;

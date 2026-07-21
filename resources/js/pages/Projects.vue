@@ -156,7 +156,7 @@ const {
         </div>
 
         <DeleteDialog
-            :error="deleteError"
+            :error="deleteError ?? undefined"
             :is-open="deleteForm.isActive"
             :loading="deleteProcessing"
             @cancel="deleteForm.isActive = false"

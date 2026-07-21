@@ -64,14 +64,16 @@ watch(
     },
 );
 
-function updateQuery(value: string) {
-    query.value = value;
+function updateQuery(value: string | number) {
+    const queryValue = String(value);
+
+    query.value = queryValue;
     open.value = true;
     interacted.value = true;
-    emit('update:email', value.trim());
+    emit('update:email', queryValue.trim());
 
     if (!props.name.trim() || props.name === deriveNameFromEmail(props.email)) {
-        emit('update:name', deriveNameFromEmail(value.trim()));
+        emit('update:name', deriveNameFromEmail(queryValue.trim()));
     }
 }
 

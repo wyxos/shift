@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Project;
+use App\Rules\EmailMessageFile;
 use App\Services\ShiftPermissionService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -23,7 +24,7 @@ class ImportTaskEmailRequest extends FormRequest
     {
         return [
             'project_id' => ['required', 'integer', 'exists:projects,id'],
-            'email' => ['required', 'file', 'max:20480'],
+            'email' => ['bail', 'required', 'file', 'max:20480', 'extensions:eml', new EmailMessageFile],
         ];
     }
 
