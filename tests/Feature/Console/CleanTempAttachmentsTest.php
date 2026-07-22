@@ -1,73 +1,96 @@
 <?php
 
-use Carbon\Carbon;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
 });
 
-test('command deletes old temp files', function () {
-    // Create a temp directory with a file that's older than 24 hours
-    $oldTempId = 'old-temp-'.time();
-    $oldTempPath = "temp_attachments/{$oldTempId}";
-    Storage::makeDirectory($oldTempPath);
+test('command deletes stale temporary attachment and chunk directories with their metadata', function () {
+    $attachmentDirectory = 'temp_attachments/stale-attachment';
+    $attachmentPath = "{$attachmentDirectory}/document.pdf";
+    $attachmentMetadataPath = "{$attachmentPath}.meta";
+    $chunkDirectory = 'temp_chunks/stale-upload';
+    $chunkPath = "{$chunkDirectory}/chunk_0.part";
+    $chunkMetadataPath = "{$chunkDirectory}/meta.json";
 
-    // Create a file in the old temp directory
-    $file = UploadedFile::fake()->create('old-document.pdf', 100);
-    $oldFilePath = "{$oldTempPath}/old-document.pdf";
-    Storage::put($oldFilePath, file_get_contents($file));
+    Storage::put($attachmentPath, 'attachment');
+    Storage::put($attachmentMetadataPath, json_encode(['original_filename' => 'document.pdf']));
+    Storage::put($chunkPath, 'chunk');
+    Storage::put($chunkMetadataPath, json_encode(['created_at' => now()->subHours(25)->toIso8601String()]));
 
-    // Modify the last modified time to be older than 24 hours
-    $yesterday = Carbon::now()->subHours(25);
-    touch(Storage::path($oldFilePath), $yesterday->timestamp);
-    touch(Storage::path($oldTempPath), $yesterday->timestamp);
+    $staleTimestamp = now()->subHours(25)->getTimestamp();
 
-    // Create a temp directory with a file that's newer than 24 hours
-    $newTempId = 'new-temp-'.time();
-    $newTempPath = "temp_attachments/{$newTempId}";
-    Storage::makeDirectory($newTempPath);
+    foreach ([
+        $attachmentPath,
+        $attachmentMetadataPath,
+        $attachmentDirectory,
+        $chunkPath,
+        $chunkMetadataPath,
+        $chunkDirectory,
+    ] as $path) {
+        touch(Storage::path($path), $staleTimestamp);
+    }
 
-    // Create a file in the new temp directory
-    $file = UploadedFile::fake()->create('new-document.pdf', 100);
-    $newFilePath = "{$newTempPath}/new-document.pdf";
-    Storage::put($newFilePath, file_get_contents($file));
-
-    // Run the command
     $this->artisan('attachments:clean-temp')
         ->expectsOutput('Cleaning temporary attachments...')
-        ->expectsOutput("Deleted: {$oldTempPath}")
+        ->expectsOutput("Deleted: {$attachmentDirectory}")
         ->expectsOutput('Cleaned 1 temporary attachment directories.')
+        ->expectsOutput("Deleted: {$chunkDirectory}")
+        ->expectsOutput('Cleaned 1 temporary chunk directories.')
         ->assertSuccessful();
 
-    // Check that the old directory was deleted
-    Storage::assertMissing($oldTempPath);
-    Storage::assertMissing($oldFilePath);
-
-    // Check that the new directory still exists
-    Storage::assertExists($newTempPath);
-    Storage::assertExists($newFilePath);
+    Storage::assertMissing($attachmentDirectory);
+    Storage::assertMissing($attachmentPath);
+    Storage::assertMissing($attachmentMetadataPath);
+    Storage::assertMissing($chunkDirectory);
+    Storage::assertMissing($chunkPath);
+    Storage::assertMissing($chunkMetadataPath);
 });
 
-test('command does not delete new temp files', function () {
-    // Create a temp directory with a file that's newer than 24 hours
-    $newTempId = 'new-temp-'.time();
-    $newTempPath = "temp_attachments/{$newTempId}";
-    Storage::makeDirectory($newTempPath);
+test('command keeps temporary directories with recent file or metadata activity', function () {
+    $attachmentDirectory = 'temp_attachments/fresh-attachment';
+    $attachmentPath = "{$attachmentDirectory}/document.pdf";
+    $attachmentMetadataPath = "{$attachmentPath}.meta";
+    $chunkDirectory = 'temp_chunks/fresh-upload';
+    $chunkPath = "{$chunkDirectory}/chunk_0.part";
+    $chunkMetadataPath = "{$chunkDirectory}/meta.json";
 
-    // Create a file in the new temp directory
-    $file = UploadedFile::fake()->create('new-document.pdf', 100);
-    $newFilePath = "{$newTempPath}/new-document.pdf";
-    Storage::put($newFilePath, file_get_contents($file));
+    Storage::put($attachmentPath, 'attachment');
+    Storage::put($attachmentMetadataPath, json_encode(['original_filename' => 'document.pdf']));
+    Storage::put($chunkPath, 'chunk');
+    Storage::put($chunkMetadataPath, json_encode(['created_at' => now()->toIso8601String()]));
 
-    // Run the command
+    $staleTimestamp = now()->subHours(25)->getTimestamp();
+    touch(Storage::path($attachmentDirectory), $staleTimestamp);
+    touch(Storage::path($chunkDirectory), $staleTimestamp);
+
     $this->artisan('attachments:clean-temp')
         ->expectsOutput('Cleaning temporary attachments...')
         ->expectsOutput('Cleaned 0 temporary attachment directories.')
+        ->expectsOutput('Cleaned 0 temporary chunk directories.')
         ->assertSuccessful();
 
-    // Check that the new directory still exists
-    Storage::assertExists($newTempPath);
-    Storage::assertExists($newFilePath);
+    Storage::assertExists($attachmentDirectory);
+    Storage::assertExists($attachmentPath);
+    Storage::assertExists($attachmentMetadataPath);
+    Storage::assertExists($chunkDirectory);
+    Storage::assertExists($chunkPath);
+    Storage::assertExists($chunkMetadataPath);
+});
+
+test('command never deletes permanent attachments', function () {
+    $permanentDirectory = 'attachments/task-1';
+    $permanentPath = "{$permanentDirectory}/document.pdf";
+
+    Storage::put($permanentPath, 'permanent attachment');
+
+    $staleTimestamp = now()->subDays(30)->getTimestamp();
+    touch(Storage::path($permanentPath), $staleTimestamp);
+    touch(Storage::path($permanentDirectory), $staleTimestamp);
+
+    $this->artisan('attachments:clean-temp')->assertSuccessful();
+
+    Storage::assertExists($permanentDirectory);
+    Storage::assertExists($permanentPath);
 });
