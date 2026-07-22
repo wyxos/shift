@@ -13,9 +13,3 @@ Schedule::command('attachments:clean-temp')
     ->timezone(config('app.timezone'))
     ->withoutOverlapping(60)
     ->onOneServer();
-
-Schedule::command('tasks:notify-awaiting-feedback')
-    ->daily()
-    ->timezone(config('app.timezone'))
-    ->withoutOverlapping(60)
-    ->onOneServer();
