@@ -1,23 +1,36 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
+import RequestButton from '@/shared/components/RequestButton.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import { reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
-type NotificationPayload = Record<string, any>;
+type NotificationData = {
+    content?: string;
+    organisation_id?: number;
+    organisation_name?: string;
+    project_name?: string;
+    task_id?: number | string;
+    task_title?: string;
+    type?: string;
+    url?: string;
+    user_email?: string;
+    user_name?: string;
+    [key: string]: unknown;
+};
 
-type NotificationRow = {
+type Notification = {
     id: string;
     type: string;
-    data: string | NotificationPayload;
-    read_at: string | null;
+    data: NotificationData | string;
     created_at: string;
+    read_at: string | null;
 };
 
 type NotificationPaginator = {
-    data: NotificationRow[];
+    data: Notification[];
     from: number | null;
     to: number | null;
     total: number;
@@ -25,18 +38,15 @@ type NotificationPaginator = {
     next_page_url: string | null;
 };
 
+type NotificationMutation = 'read' | 'unread';
+
 const props = defineProps<{
     notifications: NotificationPaginator;
 }>();
 
-// Create a reactive copy of the notifications data
-const localNotifications = reactive({
-    data: [...(props.notifications?.data || [])],
-    from: props.notifications?.from,
-    to: props.notifications?.to,
-    total: props.notifications?.total,
-    prev_page_url: props.notifications?.prev_page_url,
-    next_page_url: props.notifications?.next_page_url,
+const localNotifications = reactive<NotificationPaginator>({
+    ...props.notifications,
+    data: props.notifications.data.map((notification) => ({ ...notification })),
 });
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -44,59 +54,89 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Notifications', href: route('notifications.index') },
 ];
 
-function notificationData(notification: NotificationRow): NotificationPayload {
-    return typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
-}
+const pendingNotificationActions = reactive(new Map<string, NotificationMutation>());
+const isMarkAllPending = ref(false);
+const hasUnreadNotifications = computed(() => localNotifications.data.some((notification) => !notification.read_at));
+const hasPendingNotificationAction = computed(() => pendingNotificationActions.size > 0);
 
-// Mark a notification as read
-const markAsRead = async (id: NotificationRow['id']) => {
+const getNotificationData = (notification: Notification): NotificationData => {
+    if (typeof notification.data !== 'string') {
+        return notification.data;
+    }
+
     try {
-        await axios.post(route('notifications.mark-as-read', { id }));
+        const parsed: unknown = JSON.parse(notification.data);
 
-        // Update the local state
-        const index = localNotifications.data.findIndex((n) => n.id === id);
-        if (index !== -1) {
-            localNotifications.data[index].read_at = new Date().toISOString();
-        }
-    } catch (error) {
-        console.error('Error marking notification as read:', error);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as NotificationData) : {};
+    } catch {
+        return {};
     }
 };
 
-// Mark a notification as unread
-const markAsUnread = async (id: NotificationRow['id']) => {
-    try {
-        await axios.post(route('notifications.mark-as-unread', { id }));
+const updateNotificationReadState = async (id: string, action: NotificationMutation): Promise<void> => {
+    if (pendingNotificationActions.has(id) || isMarkAllPending.value) {
+        return;
+    }
 
-        // Update the local state
-        const index = localNotifications.data.findIndex((n) => n.id === id);
-        if (index !== -1) {
-            localNotifications.data[index].read_at = null;
-        }
-    } catch (error) {
-        console.error('Error marking notification as unread:', error);
+    const notification = localNotifications.data.find((item) => item.id === id);
+
+    if (!notification) {
+        return;
+    }
+
+    const previousReadAt = notification.read_at;
+    const isMarkingRead = action === 'read';
+
+    pendingNotificationActions.set(id, action);
+    notification.read_at = isMarkingRead ? new Date().toISOString() : null;
+
+    try {
+        await axios.post(route(isMarkingRead ? 'notifications.mark-as-read' : 'notifications.mark-as-unread', { id }));
+        toast.success(isMarkingRead ? 'Notification marked as read' : 'Notification marked as unread');
+    } catch {
+        notification.read_at = previousReadAt;
+        toast.error(isMarkingRead ? 'Could not mark notification as read' : 'Could not mark notification as unread', {
+            description: 'The previous status was restored. Please try again.',
+        });
+    } finally {
+        pendingNotificationActions.delete(id);
     }
 };
 
-// Mark all notifications as read
-const markAllAsRead = async () => {
+const markAsRead = (id: string): Promise<void> => updateNotificationReadState(id, 'read');
+const markAsUnread = (id: string): Promise<void> => updateNotificationReadState(id, 'unread');
+
+const markAllAsRead = async (): Promise<void> => {
+    if (isMarkAllPending.value || hasPendingNotificationAction.value) {
+        return;
+    }
+
+    const previousReadStates = new Map(localNotifications.data.map((notification) => [notification.id, notification.read_at]));
+    const now = new Date().toISOString();
+
+    isMarkAllPending.value = true;
+    localNotifications.data.forEach((notification) => {
+        notification.read_at = now;
+    });
+
     try {
         await axios.post(route('notifications.mark-all-as-read'));
-
-        // Update the local state
-        const now = new Date().toISOString();
+        toast.success('All notifications marked as read');
+    } catch {
         localNotifications.data.forEach((notification) => {
-            notification.read_at = now;
+            notification.read_at = previousReadStates.get(notification.id) ?? null;
         });
-    } catch (error) {
-        console.error('Error marking all notifications as read:', error);
+        toast.error('Could not mark all notifications as read', {
+            description: 'The previous statuses were restored. Please try again.',
+        });
+    } finally {
+        isMarkAllPending.value = false;
     }
 };
 
-// Format notification title based on type
-const getNotificationTitle = (notification: NotificationRow) => {
+const getNotificationTitle = (notification: Notification): string => {
     const type = notification.type;
-    const data = notificationData(notification);
+    const data = getNotificationData(notification);
 
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
@@ -118,9 +158,8 @@ const getNotificationTitle = (notification: NotificationRow) => {
     }
 };
 
-// Get notification URL
-const getNotificationUrl = (notification: NotificationRow) => {
-    const data = notificationData(notification);
+const getNotificationUrl = (notification: Notification): string => {
+    const data = getNotificationData(notification);
 
     if (data.url) {
         return data.url;
@@ -133,7 +172,7 @@ const getNotificationUrl = (notification: NotificationRow) => {
         case 'App\\Notifications\\AppErrorReportedNotification':
             return route('tasks.index', { task: data.task_id });
         case 'App\\Notifications\\TaskThreadUpdated':
-            return data.url;
+            return data.url ?? '#';
         case 'App\\Notifications\\ProjectInvitationNotification':
         case 'App\\Notifications\\ProjectUserRegisteredNotification':
             return data.organisation_id ? route('organisation.projects', { organisation: data.organisation_id }) : route('dashboard');
@@ -145,15 +184,13 @@ const getNotificationUrl = (notification: NotificationRow) => {
     }
 };
 
-// Format date
-const formatDate = (dateString: string) => {
+const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleString();
 };
 
-// Get notification description
-const getNotificationDescription = (notification: NotificationRow) => {
-    const data = notificationData(notification);
+const getNotificationDescription = (notification: Notification): string => {
+    const data = getNotificationData(notification);
     const type = notification.type;
 
     switch (type) {
@@ -178,11 +215,22 @@ const getNotificationDescription = (notification: NotificationRow) => {
 </script>
 
 <template>
+    <Head title="Notifications" />
+
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="container mx-auto py-6">
-            <div class="mb-6 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">Notifications</h1>
-                <Button v-if="localNotifications.data.some((n) => !n.read_at)" @click="markAllAsRead"> Mark all as read </Button>
+        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h1 class="text-2xl font-semibold tracking-tight">Notifications</h1>
+                <RequestButton
+                    v-if="hasUnreadNotifications || isMarkAllPending"
+                    data-testid="mark-all-as-read"
+                    :disabled="hasPendingNotificationAction"
+                    :loading="isMarkAllPending"
+                    loading-label="Marking all as read..."
+                    @click="markAllAsRead"
+                >
+                    Mark all as read
+                </RequestButton>
             </div>
 
             <div class="bg-card rounded-lg border">
@@ -206,33 +254,63 @@ const getNotificationDescription = (notification: NotificationRow) => {
                                 class="border-muted-foreground/30 mt-1.5 h-2 w-2 shrink-0 rounded-full border"
                                 title="Read notification"
                             ></div>
-                            <div class="flex-1">
-                                <div class="mb-1 flex items-center justify-between">
+                            <div class="min-w-0 flex-1">
+                                <div class="mb-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <Link
                                         :href="getNotificationUrl(notification)"
-                                        class="text-lg font-medium"
+                                        class="min-w-0 text-lg font-medium break-words"
                                         :class="{ 'font-bold': !notification.read_at }"
                                         @click="!notification.read_at && markAsRead(notification.id)"
                                     >
                                         {{ getNotificationTitle(notification) }}
                                     </Link>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-muted-foreground text-sm">{{ formatDate(notification.created_at) }}</span>
-                                        <Button v-if="!notification.read_at" variant="ghost" size="sm" @click="markAsRead(notification.id)">
+                                    <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                                        <span class="text-muted-foreground text-sm whitespace-nowrap">{{ formatDate(notification.created_at) }}</span>
+                                        <RequestButton
+                                            v-if="pendingNotificationActions.get(notification.id) === 'read'"
+                                            :data-testid="`notification-action-${notification.id}`"
+                                            loading
+                                            loading-label="Marking as read..."
+                                            size="sm"
+                                            variant="ghost"
+                                        />
+                                        <RequestButton
+                                            v-else-if="pendingNotificationActions.get(notification.id) === 'unread'"
+                                            :data-testid="`notification-action-${notification.id}`"
+                                            loading
+                                            loading-label="Marking as unread..."
+                                            size="sm"
+                                            variant="ghost"
+                                        />
+                                        <RequestButton
+                                            v-else-if="!notification.read_at"
+                                            :data-testid="`notification-action-${notification.id}`"
+                                            :disabled="isMarkAllPending"
+                                            size="sm"
+                                            variant="ghost"
+                                            @click="markAsRead(notification.id)"
+                                        >
                                             Mark as read
-                                        </Button>
-                                        <Button v-if="notification.read_at" variant="ghost" size="sm" @click="markAsUnread(notification.id)">
+                                        </RequestButton>
+                                        <RequestButton
+                                            v-else
+                                            :data-testid="`notification-action-${notification.id}`"
+                                            :disabled="isMarkAllPending"
+                                            size="sm"
+                                            variant="ghost"
+                                            @click="markAsUnread(notification.id)"
+                                        >
                                             Mark as unread
-                                        </Button>
+                                        </RequestButton>
                                     </div>
                                 </div>
-                                <p class="text-muted-foreground">{{ getNotificationDescription(notification) }}</p>
+                                <p class="text-muted-foreground break-words">{{ getNotificationDescription(notification) }}</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Pagination -->
-                    <div class="flex items-center justify-between border-t p-4">
+                    <div class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div class="text-muted-foreground text-sm">
                             Showing {{ localNotifications.from }} to {{ localNotifications.to }} of {{ localNotifications.total }} notifications
                         </div>
