@@ -15,11 +15,25 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public int $tries = 3;
+
+    public int $timeout = 45;
+
     public function __construct(
         protected Task $task,
         protected string $reason,
         protected ?string $url = null,
     ) {}
+
+    /**
+     * Get the number of seconds to wait before retrying the notification.
+     *
+     * @return array<int, int>
+     */
+    public function backoff(): array
+    {
+        return [60, 300];
+    }
 
     /**
      * Get the notification's delivery channels.

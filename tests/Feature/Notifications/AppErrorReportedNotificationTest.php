@@ -4,6 +4,20 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppErrorReportedNotification;
+use Illuminate\Notifications\SendQueuedNotifications;
+
+it('bounds queued app error notification delivery', function () {
+    $notification = new AppErrorReportedNotification(
+        task: new Task,
+        reason: 'created',
+    );
+    $job = new SendQueuedNotifications(new User, $notification, ['mail']);
+
+    expect(config('mail.mailers.smtp.timeout'))->toBe(15)
+        ->and($job->tries)->toBe(3)
+        ->and($job->timeout)->toBe(45)
+        ->and($job->backoff())->toBe([60, 300]);
+});
 
 it('renders app error mail with the error summary first', function () {
     $project = Project::factory()->create(['name' => 'Example']);
