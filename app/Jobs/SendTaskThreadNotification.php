@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\ExternalNotificationException;
+use App\Models\ExternalNotificationDelivery;
 use App\Models\TaskThread;
 use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalNotificationService;
@@ -11,52 +13,48 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SendTaskThreadNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * The task thread instance.
-     *
-     * @var int
-     */
-    protected $threadId;
+    public int $tries = 3;
+
+    public int $timeout = 45;
+
+    public bool $failOnTimeout = true;
 
     /**
-     * The external user data.
-     *
-     * @var array
+     * @param  array<string, mixed>  $externalUserData
+     * @param  array<string, mixed>  $payload
      */
-    protected $externalUserData;
-
-    /**
-     * The notification payload.
-     *
-     * @var array
-     */
-    protected $payload;
-
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(int $threadId, array $externalUserData, array $payload)
-    {
-        $this->threadId = $threadId;
-        $this->externalUserData = $externalUserData;
-        $this->payload = $payload;
-        $this->delay(60); // 1 minute delay
+    public function __construct(
+        protected int $threadId,
+        protected array $externalUserData,
+        protected array $payload,
+    ) {
+        $this->delay(60);
     }
 
     /**
-     * Execute the job.
+     * @return array<int, int>
      */
-    public function handle(): void
+    public function backoff(): array
     {
-        // Check if the thread still exists
+        return [60, 300];
+    }
+
+    public function handle(ExternalNotificationService $notificationService): void
+    {
         $thread = TaskThread::find($this->threadId);
 
         if (! $thread) {
+            ExternalNotificationDelivery::findForTaskThread(
+                $this->threadId,
+                $this->recipientKey(),
+            )?->markCancelled();
+
             Log::info('Thread notification cancelled - thread no longer exists', [
                 'thread_id' => $this->threadId,
             ]);
@@ -66,33 +64,106 @@ class SendTaskThreadNotification implements ShouldQueue
 
         $thread->loadMissing('task.project');
 
-        $notificationService = new ExternalNotificationService;
-        $url = $this->externalUserData['url'];
-        $email = $this->externalUserData['email'];
-
-        // Send notification to the external API
-        $response = $notificationService->sendNotification(
-            $url,
+        $delivery = ExternalNotificationDelivery::forTaskThread(
+            $thread,
+            $this->recipientKey(),
             'thread.update',
-            $this->payload,
-            [],
-            $thread->task?->project?->token,
         );
 
-        // Create notification object with additional URL for email
-        $notificationData = array_merge($this->payload, [
-            'url' => rtrim($this->externalUserData['url'], '/').'/shift/tasks?task='.$this->payload['task_id'],
-        ]);
+        if (! $delivery->callback_delivered_at) {
+            $delivery->recordAttempt();
 
-        $notificationService->sendFallbackEmailIfNeeded(
-            $response,
-            $email,
-            new TaskThreadUpdated($notificationData)
-        );
+            try {
+                $response = $notificationService->sendNotification(
+                    (string) $this->externalUserData['url'],
+                    'thread.update',
+                    $this->payload,
+                    [],
+                    $thread->task?->project?->token,
+                    $delivery->delivery_id,
+                );
+            } catch (ExternalNotificationException $exception) {
+                $delivery->recordAttemptFailure($exception->failureType, $exception->statusCode);
 
-        Log::info('Thread notification sent after delay', [
+                if ($exception->retryable) {
+                    throw $exception;
+                }
+
+                $delivery->markFailed($exception->failureType, $exception->statusCode);
+
+                Log::warning('Thread notification permanently failed', [
+                    'thread_id' => $this->threadId,
+                    'failure_type' => $exception->failureType,
+                    'status' => $exception->statusCode,
+                ]);
+
+                return;
+            }
+
+            $delivery->markCallbackDelivered(
+                (bool) $response->json('production'),
+                $response->status(),
+            );
+        }
+
+        $email = $this->externalUserData['email'] ?? null;
+
+        if ($delivery->production === false && filled($email)) {
+            if (! $delivery->fallback_dispatched_at) {
+                $notificationData = array_merge($this->payload, [
+                    'url' => rtrim((string) $this->externalUserData['url'], '/').'/shift/tasks?task='.$this->payload['task_id'],
+                ]);
+
+                SendExternalNotificationFallbackEmail::dispatch(
+                    $delivery->id,
+                    (string) $email,
+                    new TaskThreadUpdated($notificationData),
+                );
+
+                $delivery->markFallbackDispatched();
+            }
+
+            Log::info('Thread callback delivered and fallback email queued', [
+                'thread_id' => $this->threadId,
+            ]);
+
+            return;
+        }
+
+        $delivery->markCompleted();
+
+        Log::info('Thread notification delivered after delay', [
             'thread_id' => $this->threadId,
-            'external_user_email' => $email,
         ]);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $delivery = ExternalNotificationDelivery::findForTaskThread(
+            $this->threadId,
+            $this->recipientKey(),
+        );
+
+        if (! $delivery || $delivery->completed_at || $delivery->cancelled_at) {
+            return;
+        }
+
+        if ($exception instanceof ExternalNotificationException) {
+            $delivery->markFailed($exception->failureType, $exception->statusCode);
+
+            return;
+        }
+
+        $delivery->markFailed('job_exhausted');
+    }
+
+    private function recipientKey(): string
+    {
+        return (string) (
+            $this->externalUserData['external_id']
+            ?? $this->externalUserData['email']
+            ?? $this->externalUserData['url']
+            ?? 'unknown'
+        );
     }
 }
