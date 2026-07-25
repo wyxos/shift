@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use Exception;
+use App\Exceptions\ExternalNotificationException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Throwable;
 
 class ExternalNotificationService
 {
@@ -18,64 +19,108 @@ class ExternalNotificationService
     /**
      * Send a notification to an external API endpoint.
      */
-    public function sendNotification(string $url, string $handler, array $payload, array $source = [], ?string $signingSecret = null): ?Response
-    {
-        try {
-            $data = [
-                'handler' => $handler,
-                'payload' => $payload,
+    public function sendNotification(
+        string $url,
+        string $handler,
+        array $payload,
+        array $source = [],
+        ?string $signingSecret = null,
+        ?string $deliveryId = null,
+    ): Response {
+        $data = [
+            'handler' => $handler,
+            'payload' => $payload,
+        ];
+
+        if (filled($deliveryId)) {
+            $data['delivery_id'] = $deliveryId;
+        }
+
+        $data['source'] = ! empty($source)
+            ? $source
+            : [
+                'url' => config('app.url'),
+                'environment' => app()->environment(),
             ];
 
-            // Add source information if provided
-            if (! empty($source)) {
-                $data['source'] = $source;
-            } else {
-                // Use default source information if not provided
-                $data['source'] = [
-                    'url' => config('app.url'),
-                    'environment' => app()->environment(),
-                ];
-            }
+        $body = json_encode($data, JSON_THROW_ON_ERROR);
+        $request = Http::acceptJson()
+            ->connectTimeout((int) config('shift.notifications.callback_connect_timeout_seconds', 5))
+            ->timeout((int) config('shift.notifications.callback_timeout_seconds', 15))
+            ->withBody($body, 'application/json');
 
-            $body = json_encode($data, JSON_THROW_ON_ERROR);
-            $request = Http::acceptJson()
-                ->withBody($body, 'application/json');
+        if (filled($signingSecret)) {
+            $timestamp = (string) now()->timestamp;
 
-            if (filled($signingSecret)) {
-                $timestamp = (string) now()->timestamp;
+            $request = $request->withHeaders([
+                self::TIMESTAMP_HEADER => $timestamp,
+                self::SIGNATURE_HEADER => $this->signature($timestamp, $body, $signingSecret),
+            ]);
+        }
 
-                $request = $request->withHeaders([
-                    self::TIMESTAMP_HEADER => $timestamp,
-                    self::SIGNATURE_HEADER => $this->signature($timestamp, $body, $signingSecret),
-                ]);
-            }
+        if ($this->isLocalOrPrivateUrl($url)) {
+            $request = $request->withoutVerifying();
+        }
 
-            if ($this->isLocalOrPrivateUrl($url)) {
-                $request = $request->withoutVerifying();
-            }
-
+        try {
             $response = $request->post($url.'/shift/api/notifications');
-
-            if ($response->successful()) {
-                Log::info("Notification sent to external API: {$handler}", [
-                    'response' => $response->json(),
-                ]);
-            } else {
-                Log::warning("Failed to send notification to external API: {$handler}", [
-                    'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
-            }
-
-            return $response;
-        } catch (Exception $e) {
-            Log::error("Exception when sending notification to external API: {$e->getMessage()}", [
+        } catch (Throwable $exception) {
+            Log::warning('External notification callback could not be reached', [
                 'handler' => $handler,
-                'exception' => $e,
+                'failure_type' => 'connection',
             ]);
 
-            return null;
+            throw new ExternalNotificationException(
+                failureType: 'connection',
+                retryable: true,
+                previous: $exception,
+            );
         }
+
+        if ($response->serverError() || in_array($response->status(), [408, 425, 429], true)) {
+            Log::warning('External notification callback returned a retryable failure', [
+                'handler' => $handler,
+                'status' => $response->status(),
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'retryable_response',
+                retryable: true,
+                statusCode: $response->status(),
+            );
+        }
+
+        if (! $response->successful()) {
+            Log::warning('External notification callback returned a permanent failure', [
+                'handler' => $handler,
+                'status' => $response->status(),
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'permanent_response',
+                retryable: false,
+                statusCode: $response->status(),
+            );
+        }
+
+        if (! is_bool($response->json('production'))) {
+            Log::warning('External notification callback returned an invalid success response', [
+                'handler' => $handler,
+                'status' => $response->status(),
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'malformed_response',
+                retryable: false,
+                statusCode: $response->status(),
+            );
+        }
+
+        Log::info("Notification sent to external API: {$handler}", [
+            'status' => $response->status(),
+        ]);
+
+        return $response;
     }
 
     /**
