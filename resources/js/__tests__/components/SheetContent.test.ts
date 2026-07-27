@@ -87,14 +87,14 @@ describe('SheetContent', () => {
         expect(content.attributes()).not.toHaveProperty('width-preset');
     });
 
-    it('does not render a default close icon inside sheet content', () => {
+    it('renders a discoverable default close control inside sheet content', () => {
         const wrapper = mount(SheetContent, {
             props: {
                 side: 'right',
             },
         });
 
-        expect(wrapper.find('.dialog-close-stub').exists()).toBe(false);
-        expect(wrapper.text()).not.toContain('Close');
+        expect(wrapper.find('.dialog-close-stub').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Close');
     });
 });

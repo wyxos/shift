@@ -33,6 +33,11 @@ const emit = defineEmits<{
 const query = ref(props.email);
 const open = ref(false);
 const interacted = ref(false);
+const activeIndex = ref(-1);
+const comboboxRoot = ref<HTMLElement | null>(null);
+
+const inputId = computed(() => `${props.testIdPrefix}-email`);
+const listboxId = computed(() => `${props.testIdPrefix}-listbox`);
 
 const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filteredCandidates = computed(() => {
@@ -45,15 +50,20 @@ const filteredCandidates = computed(() => {
     return props.candidates.filter((candidate) => `${candidate.name} ${candidate.email}`.toLowerCase().includes(needle)).slice(0, 6);
 });
 const showCandidates = computed(() => open.value && (interacted.value || Boolean(normalizedQuery.value)) && filteredCandidates.value.length > 0);
-const hasErrors = computed(() => Object.keys(props.errors ?? {}).length > 0);
+const errorEntries = computed(() => Object.entries(props.errors ?? {}).filter(([, message]) => Boolean(message)));
+const hasErrors = computed(() => errorEntries.value.length > 0);
+const errorDescriptionIds = computed(() =>
+    errorEntries.value.map(([key]) => `${props.testIdPrefix}-error-${key.replace(/[^a-z0-9_-]/gi, '-')}`).join(' '),
+);
+const activeCandidate = computed(() => filteredCandidates.value[activeIndex.value] ?? null);
+const activeOptionId = computed(() => (showCandidates.value && activeCandidate.value ? candidateOptionId(activeCandidate.value) : undefined));
 
 watch(
     () => props.email,
     (email) => {
         if (!email) {
             query.value = '';
-            open.value = false;
-            interacted.value = false;
+            closeSuggestions();
 
             return;
         }
@@ -68,6 +78,7 @@ function updateQuery(value: string) {
     query.value = value;
     open.value = true;
     interacted.value = true;
+    activeIndex.value = filteredCandidates.value.length > 0 ? 0 : -1;
     emit('update:email', value.trim());
 
     if (!props.name.trim() || props.name === deriveNameFromEmail(props.email)) {
@@ -78,19 +89,99 @@ function updateQuery(value: string) {
 function openSuggestions() {
     interacted.value = true;
     open.value = true;
+    activeIndex.value = filteredCandidates.value.length > 0 ? 0 : -1;
 }
 
 function handleFocus() {
     open.value = Boolean(normalizedQuery.value);
+
+    if (open.value && filteredCandidates.value.length > 0) {
+        activeIndex.value = 0;
+    }
+}
+
+function handleFocusOut(event: FocusEvent) {
+    const nextTarget = event.relatedTarget;
+
+    if (nextTarget instanceof Node && comboboxRoot.value?.contains(nextTarget)) {
+        return;
+    }
+
+    closeSuggestions();
+}
+
+function closeSuggestions() {
+    open.value = false;
+    interacted.value = false;
+    activeIndex.value = -1;
+}
+
+function moveActiveOption(direction: 1 | -1) {
+    const candidates = filteredCandidates.value;
+    const wasOpen = showCandidates.value;
+
+    interacted.value = true;
+    open.value = true;
+
+    if (candidates.length === 0) {
+        activeIndex.value = -1;
+        return;
+    }
+
+    if (!wasOpen || activeIndex.value < 0) {
+        activeIndex.value = direction === 1 ? 0 : candidates.length - 1;
+        return;
+    }
+
+    activeIndex.value = (activeIndex.value + direction + candidates.length) % candidates.length;
+}
+
+function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        moveActiveOption(1);
+        return;
+    }
+
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        moveActiveOption(-1);
+        return;
+    }
+
+    if (event.key === 'Enter' && showCandidates.value && activeCandidate.value) {
+        event.preventDefault();
+        selectCandidate(activeCandidate.value);
+        return;
+    }
+
+    if (event.key === 'Escape' && open.value) {
+        event.preventDefault();
+        closeSuggestions();
+    }
+}
+
+function candidateOptionId(candidate: AccessUserCandidate) {
+    return `${props.testIdPrefix}-candidate-option-${candidate.id}`;
 }
 
 function selectCandidate(candidate: AccessUserCandidate) {
     query.value = `${candidate.name} (${candidate.email})`;
-    open.value = false;
-    interacted.value = false;
+    closeSuggestions();
     emit('update:email', candidate.email);
     emit('update:name', candidate.name);
 }
+
+watch(filteredCandidates, (candidates) => {
+    if (candidates.length === 0) {
+        activeIndex.value = -1;
+        return;
+    }
+
+    if (activeIndex.value >= candidates.length) {
+        activeIndex.value = candidates.length - 1;
+    }
+});
 </script>
 
 <template>
@@ -98,32 +189,48 @@ function selectCandidate(candidate: AccessUserCandidate) {
         <div class="flex flex-col gap-2">
             <Label :for="`${testIdPrefix}-email`" class="sr-only">Add user</Label>
             <div class="flex gap-2">
-                <div class="relative min-w-0 flex-1">
+                <div ref="comboboxRoot" class="relative min-w-0 flex-1" @focusout="handleFocusOut">
                     <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                     <Input
-                        :id="`${testIdPrefix}-email`"
+                        :id="inputId"
                         :model-value="query"
+                        :aria-activedescendant="activeOptionId"
+                        aria-autocomplete="list"
+                        :aria-controls="listboxId"
+                        :aria-describedby="errorDescriptionIds || undefined"
+                        :aria-expanded="showCandidates"
+                        :aria-invalid="hasErrors"
                         autocomplete="off"
                         class="pl-9"
                         :data-testid="`${testIdPrefix}-email`"
+                        :disabled="processing"
                         placeholder="Type an email or search users"
-                        @blur="open = false"
                         @click="openSuggestions"
                         @focus="handleFocus"
-                        @keydown.escape.prevent="open = false"
+                        @keydown="handleKeydown"
                         @update:model-value="updateQuery"
+                        role="combobox"
                     />
                     <div
                         v-if="showCandidates"
+                        :id="listboxId"
+                        :aria-label="`User suggestions for ${query || 'all users'}`"
                         class="bg-popover text-popover-foreground absolute z-50 mt-1 w-full overflow-hidden rounded-md border shadow-md"
+                        role="listbox"
                     >
                         <button
-                            v-for="candidate in filteredCandidates"
+                            v-for="(candidate, index) in filteredCandidates"
                             :key="candidate.id"
+                            :id="candidateOptionId(candidate)"
+                            :aria-selected="index === activeIndex"
                             class="hover:bg-accent hover:text-accent-foreground flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm"
+                            :class="index === activeIndex ? 'bg-accent text-accent-foreground' : ''"
                             :data-testid="`${testIdPrefix}-candidate-${candidate.id}`"
+                            role="option"
+                            tabindex="-1"
                             type="button"
-                            @mousedown.prevent="selectCandidate(candidate)"
+                            @click="selectCandidate(candidate)"
+                            @mousedown.prevent
                         >
                             <span class="min-w-0">
                                 <span class="block truncate font-medium">{{ candidate.name }}</span>
@@ -148,7 +255,15 @@ function selectCandidate(candidate: AccessUserCandidate) {
         </div>
 
         <div v-if="hasErrors" class="space-y-1">
-            <p v-for="(error, key) in errors" :key="key" class="text-destructive text-sm">{{ error }}</p>
+            <p
+                v-for="[key, error] in errorEntries"
+                :id="`${testIdPrefix}-error-${key.replace(/[^a-z0-9_-]/gi, '-')}`"
+                :key="key"
+                class="text-destructive text-sm"
+                role="alert"
+            >
+                {{ error }}
+            </p>
         </div>
     </div>
 </template>

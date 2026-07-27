@@ -10,6 +10,8 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
+import { X } from 'lucide-vue-next'
+import SheetClose from './SheetClose.vue'
 import SheetOverlay from './SheetOverlay.vue'
 
 interface SheetContentProps extends DialogContentProps {
@@ -76,6 +78,15 @@ const horizontalSheetWidthPreset = computed(() => horizontalSheetWidthPresets[pr
       v-bind="{ ...forwarded, ...$attrs }"
     >
       <slot />
+      <SheetClose
+        aria-label="Close sheet"
+        class="ring-offset-background focus:ring-ring absolute top-4 right-4 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none"
+        data-testid="sheet-close"
+        type="button"
+      >
+        <X class="size-4" aria-hidden="true" />
+        <span class="sr-only">Close</span>
+      </SheetClose>
     </DialogContent>
   </DialogPortal>
 </template>
