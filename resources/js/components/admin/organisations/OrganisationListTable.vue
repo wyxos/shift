@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ResponsiveRecordItem, ResponsiveRecordList } from '@/components/ui/record-list';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Link } from '@inertiajs/vue3';
 import { Building2, Eye, FolderKanban, Users } from 'lucide-vue-next';
@@ -49,61 +50,127 @@ function canManageOrgAccess(organisation: OrganisationRow) {
 </script>
 
 <template>
-    <Table>
-        <TableHeader>
-            <TableRow>
-                <TableHead>Organisation</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead class="text-right">Actions</TableHead>
-            </TableRow>
-        </TableHeader>
-        <TableBody>
-            <TableEmpty v-if="organisations.length === 0" :colspan="4">No organisations found.</TableEmpty>
+    <ResponsiveRecordList :empty="organisations.length === 0" empty-label="No organisations found." label="Organisations">
+        <template #desktop>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Organisation</TableHead>
+                        <TableHead>Access</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead class="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableEmpty v-if="organisations.length === 0" :colspan="4">No organisations found.</TableEmpty>
 
-            <TableRow v-for="organisation in organisations" v-else :key="organisation.id" :data-testid="`organisation-row-${organisation.id}`">
-                <TableCell>
-                    <div class="flex items-start gap-3">
-                        <div class="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-lg">
-                            <Building2 class="h-4 w-4" />
-                        </div>
-                        <div class="min-w-0">
-                            <div class="truncate font-medium">{{ organisation.name }}</div>
-                        </div>
+                    <TableRow
+                        v-for="organisation in organisations"
+                        v-else
+                        :key="organisation.id"
+                        :data-testid="`organisation-row-${organisation.id}`"
+                    >
+                        <TableCell>
+                            <div class="flex items-start gap-3">
+                                <div class="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-lg">
+                                    <Building2 class="h-4 w-4" />
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="truncate font-medium">{{ organisation.name }}</div>
+                                </div>
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <div class="flex flex-wrap gap-2">
+                                <Badge variant="secondary">{{ usersLabel(organisation.organisation_users_count) }}</Badge>
+                                <Badge variant="outline" class="gap-1">
+                                    <FolderKanban class="h-3 w-3" />
+                                    {{ projectsLabel(organisation.projects_count) }}
+                                </Badge>
+                            </div>
+                        </TableCell>
+                        <TableCell class="text-muted-foreground">{{ formatDate(organisation.created_at) }}</TableCell>
+                        <TableCell>
+                            <div class="flex flex-wrap justify-end gap-2">
+                                <Button
+                                    v-if="canManageOrgAccess(organisation)"
+                                    size="sm"
+                                    variant="outline"
+                                    :data-testid="`organisation-manage-${organisation.id}`"
+                                    title="Manage users"
+                                    @click="emit('open-manage-users', organisation)"
+                                >
+                                    <Users class="h-4 w-4" />
+                                    <span class="sr-only">Manage users</span>
+                                </Button>
+                                <Button
+                                    as-child
+                                    size="sm"
+                                    variant="outline"
+                                    :data-testid="`organisation-view-${organisation.id}`"
+                                    title="View organisation"
+                                >
+                                    <Link :href="dashboardHref(organisation)">
+                                        <Eye class="h-4 w-4" />
+                                        <span class="sr-only">View organisation</span>
+                                    </Link>
+                                </Button>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </template>
+
+        <template #compact>
+            <ResponsiveRecordItem
+                v-for="organisation in organisations"
+                :key="organisation.id"
+                :data-testid="`organisation-compact-row-${organisation.id}`"
+            >
+                <div class="flex min-w-0 items-start gap-3">
+                    <div class="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+                        <Building2 class="h-4 w-4" />
                     </div>
-                </TableCell>
-                <TableCell>
-                    <div class="flex flex-wrap gap-2">
-                        <Badge variant="secondary">{{ usersLabel(organisation.organisation_users_count) }}</Badge>
-                        <Badge variant="outline" class="gap-1">
-                            <FolderKanban class="h-3 w-3" />
-                            {{ projectsLabel(organisation.projects_count) }}
-                        </Badge>
+                    <h2 class="min-w-0 truncate font-medium">{{ organisation.name }}</h2>
+                </div>
+
+                <dl class="grid grid-cols-2 gap-3">
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Access</dt>
+                        <dd class="flex flex-wrap gap-2">
+                            <Badge variant="secondary">{{ usersLabel(organisation.organisation_users_count) }}</Badge>
+                            <Badge variant="outline" class="gap-1">
+                                <FolderKanban class="h-3 w-3" />
+                                {{ projectsLabel(organisation.projects_count) }}
+                            </Badge>
+                        </dd>
                     </div>
-                </TableCell>
-                <TableCell class="text-muted-foreground">{{ formatDate(organisation.created_at) }}</TableCell>
-                <TableCell>
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <Button
-                            v-if="canManageOrgAccess(organisation)"
-                            size="sm"
-                            variant="outline"
-                            :data-testid="`organisation-manage-${organisation.id}`"
-                            title="Manage users"
-                            @click="emit('open-manage-users', organisation)"
-                        >
-                            <Users class="h-4 w-4" />
-                            <span class="sr-only">Manage users</span>
-                        </Button>
-                        <Button as-child size="sm" variant="outline" :data-testid="`organisation-view-${organisation.id}`" title="View organisation">
-                            <Link :href="dashboardHref(organisation)">
-                                <Eye class="h-4 w-4" />
-                                <span class="sr-only">View organisation</span>
-                            </Link>
-                        </Button>
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Created</dt>
+                        <dd class="text-sm">{{ formatDate(organisation.created_at) }}</dd>
                     </div>
-                </TableCell>
-            </TableRow>
-        </TableBody>
-    </Table>
+                </dl>
+
+                <template #actions>
+                    <Button
+                        v-if="canManageOrgAccess(organisation)"
+                        size="sm"
+                        variant="outline"
+                        :data-testid="`organisation-compact-manage-${organisation.id}`"
+                        @click="emit('open-manage-users', organisation)"
+                    >
+                        <Users class="h-4 w-4" />
+                        Manage users
+                    </Button>
+                    <Button as-child size="sm" variant="outline" :data-testid="`organisation-compact-view-${organisation.id}`">
+                        <Link :href="dashboardHref(organisation)">
+                            <Eye class="h-4 w-4" />
+                            View
+                        </Link>
+                    </Button>
+                </template>
+            </ResponsiveRecordItem>
+        </template>
+    </ResponsiveRecordList>
 </template>

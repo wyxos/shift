@@ -59,7 +59,7 @@ const sidebarCollapsedStyle = computed(() => ({
       data-slot="sidebar"
       data-mobile="true"
       :side="side"
-      class="bg-sidebar text-sidebar-foreground p-0 [&>button]:hidden"
+      class="bg-sidebar text-sidebar-foreground p-0"
     >
       <SheetHeader class="sr-only">
         <SheetTitle>Sidebar</SheetTitle>

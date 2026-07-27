@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
+import { ResponsiveRecordItem, ResponsiveRecordList } from '@/components/ui/record-list';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
 import { BellRing, Bot, KeyRound, ListTodo, MessageSquare, Pencil, Trash2, Users, UserSearch } from 'lucide-vue-next';
@@ -51,143 +52,285 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
 </script>
 
 <template>
-    <Table>
-        <TableHeader>
-            <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead v-if="showOrganisationColumn">Organisation</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead class="text-right">Actions</TableHead>
-            </TableRow>
-        </TableHeader>
-        <TableBody>
-            <template v-if="projects.length">
-                <TableRow v-for="project in projects" :key="project.id" :data-testid="`project-row-${project.id}`">
-                    <TableCell>
-                        <div class="flex flex-col gap-1">
-                            <span class="font-medium">{{ project.name }}</span>
-                            <div v-if="projectClientLabel(project) || hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
-                                <Badge v-if="projectClientLabel(project)" :data-testid="`project-client-${project.id}`" variant="secondary">
-                                    {{ projectClientLabel(project) }}
+    <ResponsiveRecordList :empty="projects.length === 0" empty-label="No projects found." label="Projects">
+        <template #desktop>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Project</TableHead>
+                        <TableHead v-if="showOrganisationColumn">Organisation</TableHead>
+                        <TableHead>Access</TableHead>
+                        <TableHead class="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <template v-if="projects.length">
+                        <TableRow v-for="project in projects" :key="project.id" :data-testid="`project-row-${project.id}`">
+                            <TableCell>
+                                <div class="flex flex-col gap-1">
+                                    <span class="font-medium">{{ project.name }}</span>
+                                    <div
+                                        v-if="projectClientLabel(project) || hasWidgetEnabled(project) || project.mcp_enabled"
+                                        class="flex flex-wrap gap-1"
+                                    >
+                                        <Badge v-if="projectClientLabel(project)" :data-testid="`project-client-${project.id}`" variant="secondary">
+                                            {{ projectClientLabel(project) }}
+                                        </Badge>
+                                        <Badge
+                                            v-if="hasWidgetEnabled(project)"
+                                            :data-testid="`project-widget-enabled-${project.id}`"
+                                            variant="secondary"
+                                        >
+                                            Widget
+                                        </Badge>
+                                        <Badge
+                                            v-if="hasGuestSubmissionsEnabled(project)"
+                                            :data-testid="`project-widget-guests-${project.id}`"
+                                            class="bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                            variant="secondary"
+                                        >
+                                            Guests
+                                        </Badge>
+                                        <Badge v-if="project.mcp_enabled" :data-testid="`project-mcp-enabled-${project.id}`" variant="secondary"
+                                            >MCP</Badge
+                                        >
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell v-if="showOrganisationColumn">
+                                <Badge :data-testid="`project-scope-${project.id}`" variant="secondary">
+                                    {{ projectOrganisationLabel(project) }}
                                 </Badge>
-                                <Badge v-if="hasWidgetEnabled(project)" :data-testid="`project-widget-enabled-${project.id}`" variant="secondary">
-                                    Widget
-                                </Badge>
+                            </TableCell>
+                            <TableCell>
                                 <Badge
-                                    v-if="hasGuestSubmissionsEnabled(project)"
-                                    :data-testid="`project-widget-guests-${project.id}`"
-                                    class="bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                    :data-testid="`project-access-${project.id}`"
+                                    :class="
+                                        project.isOwner
+                                            ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+                                            : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
+                                    "
                                     variant="secondary"
                                 >
-                                    Guests
+                                    {{ project.isOwner ? 'Owner' : 'Shared' }}
                                 </Badge>
-                                <Badge v-if="project.mcp_enabled" :data-testid="`project-mcp-enabled-${project.id}`" variant="secondary">MCP</Badge>
-                            </div>
-                        </div>
-                    </TableCell>
-                    <TableCell v-if="showOrganisationColumn">
-                        <Badge :data-testid="`project-scope-${project.id}`" variant="secondary">
-                            {{ projectOrganisationLabel(project) }}
-                        </Badge>
-                    </TableCell>
-                    <TableCell>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <ActionIconButton
+                                        label="View project tasks"
+                                        title="Tasks"
+                                        :data-testid="`project-tasks-${project.id}`"
+                                        @click="emit('open-tasks', project)"
+                                    >
+                                        <ListTodo class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        label="View external users"
+                                        title="External users"
+                                        :data-testid="`project-external-users-${project.id}`"
+                                        @click="emit('open-external-users', project)"
+                                    >
+                                        <UserSearch class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canManageProjectAccess(project)"
+                                        label="Manage project access"
+                                        title="Manage access"
+                                        :data-testid="`project-manage-${project.id}`"
+                                        @click="emit('open-manage-users', project)"
+                                    >
+                                        <Users class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canManageTechnicalSettings(project)"
+                                        label="Manage API token"
+                                        title="API token"
+                                        :data-testid="`project-token-${project.id}`"
+                                        @click="emit('open-api-token', project)"
+                                    >
+                                        <KeyRound class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canManageTechnicalSettings(project)"
+                                        label="Manage widget settings"
+                                        title="Widget"
+                                        :data-testid="`project-widget-${project.id}`"
+                                        @click="emit('open-widget-settings', project)"
+                                    >
+                                        <MessageSquare class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canManageTechnicalSettings(project)"
+                                        label="Manage MCP settings"
+                                        title="MCP"
+                                        :data-testid="`project-mcp-${project.id}`"
+                                        @click="emit('open-mcp-settings', project)"
+                                    >
+                                        <Bot class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canManageTechnicalSettings(project)"
+                                        label="Manage app error notifications"
+                                        title="App errors"
+                                        :data-testid="`project-app-error-notifications-${project.id}`"
+                                        @click="emit('open-app-error-notifications', project)"
+                                    >
+                                        <BellRing class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canEditProject(project)"
+                                        label="Edit project"
+                                        title="Edit"
+                                        :data-testid="`project-edit-${project.id}`"
+                                        @click="emit('open-edit', project)"
+                                    >
+                                        <Pencil class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="canDeleteProject(project)"
+                                        label="Delete project"
+                                        title="Delete"
+                                        variant="destructive"
+                                        :data-testid="`project-delete-${project.id}`"
+                                        @click="emit('open-delete', project)"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </ActionIconButton>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </template>
+                    <TableEmpty v-else :colspan="showOrganisationColumn ? 4 : 3">No projects found.</TableEmpty>
+                </TableBody>
+            </Table>
+        </template>
+
+        <template #compact>
+            <ResponsiveRecordItem v-for="project in projects" :key="project.id" :data-testid="`project-compact-row-${project.id}`">
+                <div class="flex min-w-0 flex-col gap-2">
+                    <h2 class="truncate font-medium">{{ project.name }}</h2>
+                    <div v-if="projectClientLabel(project) || hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
+                        <Badge v-if="projectClientLabel(project)" variant="secondary">{{ projectClientLabel(project) }}</Badge>
+                        <Badge v-if="hasWidgetEnabled(project)" variant="secondary">Widget</Badge>
                         <Badge
-                            :data-testid="`project-access-${project.id}`"
-                            :class="
-                                project.isOwner ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100' : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
-                            "
+                            v-if="hasGuestSubmissionsEnabled(project)"
+                            class="bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
                             variant="secondary"
                         >
-                            {{ project.isOwner ? 'Owner' : 'Shared' }}
+                            Guests
                         </Badge>
-                    </TableCell>
-                    <TableCell>
-                        <div class="flex flex-wrap justify-end gap-2">
-                            <ActionIconButton
-                                label="View project tasks"
-                                title="Tasks"
-                                :data-testid="`project-tasks-${project.id}`"
-                                @click="emit('open-tasks', project)"
+                        <Badge v-if="project.mcp_enabled" variant="secondary">MCP</Badge>
+                    </div>
+                </div>
+
+                <dl class="grid grid-cols-2 gap-3">
+                    <div v-if="showOrganisationColumn" class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Organisation</dt>
+                        <dd>
+                            <Badge variant="secondary">{{ projectOrganisationLabel(project) }}</Badge>
+                        </dd>
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Access</dt>
+                        <dd>
+                            <Badge
+                                :class="
+                                    project.isOwner
+                                        ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+                                        : 'bg-sky-100 text-sky-900 hover:bg-sky-100'
+                                "
+                                variant="secondary"
                             >
-                                <ListTodo class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                label="View external users"
-                                title="External users"
-                                :data-testid="`project-external-users-${project.id}`"
-                                @click="emit('open-external-users', project)"
-                            >
-                                <UserSearch class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canManageProjectAccess(project)"
-                                label="Manage project access"
-                                title="Manage access"
-                                :data-testid="`project-manage-${project.id}`"
-                                @click="emit('open-manage-users', project)"
-                            >
-                                <Users class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canManageTechnicalSettings(project)"
-                                label="Manage API token"
-                                title="API token"
-                                :data-testid="`project-token-${project.id}`"
-                                @click="emit('open-api-token', project)"
-                            >
-                                <KeyRound class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canManageTechnicalSettings(project)"
-                                label="Manage widget settings"
-                                title="Widget"
-                                :data-testid="`project-widget-${project.id}`"
-                                @click="emit('open-widget-settings', project)"
-                            >
-                                <MessageSquare class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canManageTechnicalSettings(project)"
-                                label="Manage MCP settings"
-                                title="MCP"
-                                :data-testid="`project-mcp-${project.id}`"
-                                @click="emit('open-mcp-settings', project)"
-                            >
-                                <Bot class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canManageTechnicalSettings(project)"
-                                label="Manage app error notifications"
-                                title="App errors"
-                                :data-testid="`project-app-error-notifications-${project.id}`"
-                                @click="emit('open-app-error-notifications', project)"
-                            >
-                                <BellRing class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canEditProject(project)"
-                                label="Edit project"
-                                title="Edit"
-                                :data-testid="`project-edit-${project.id}`"
-                                @click="emit('open-edit', project)"
-                            >
-                                <Pencil class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="canDeleteProject(project)"
-                                label="Delete project"
-                                title="Delete"
-                                variant="destructive"
-                                :data-testid="`project-delete-${project.id}`"
-                                @click="emit('open-delete', project)"
-                            >
-                                <Trash2 class="h-4 w-4" />
-                            </ActionIconButton>
-                        </div>
-                    </TableCell>
-                </TableRow>
-            </template>
-            <TableEmpty v-else :colspan="showOrganisationColumn ? 4 : 3">No projects found.</TableEmpty>
-        </TableBody>
-    </Table>
+                                {{ project.isOwner ? 'Owner' : 'Shared' }}
+                            </Badge>
+                        </dd>
+                    </div>
+                </dl>
+
+                <template #actions>
+                    <ActionIconButton
+                        label="View project tasks"
+                        title="Tasks"
+                        :data-testid="`project-compact-tasks-${project.id}`"
+                        @click="emit('open-tasks', project)"
+                    >
+                        <ListTodo class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        label="View external users"
+                        title="External users"
+                        :data-testid="`project-compact-external-users-${project.id}`"
+                        @click="emit('open-external-users', project)"
+                    >
+                        <UserSearch class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canManageProjectAccess(project)"
+                        label="Manage project access"
+                        title="Manage access"
+                        :data-testid="`project-compact-manage-${project.id}`"
+                        @click="emit('open-manage-users', project)"
+                    >
+                        <Users class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canManageTechnicalSettings(project)"
+                        label="Manage API token"
+                        title="API token"
+                        :data-testid="`project-compact-token-${project.id}`"
+                        @click="emit('open-api-token', project)"
+                    >
+                        <KeyRound class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canManageTechnicalSettings(project)"
+                        label="Manage widget settings"
+                        title="Widget"
+                        :data-testid="`project-compact-widget-${project.id}`"
+                        @click="emit('open-widget-settings', project)"
+                    >
+                        <MessageSquare class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canManageTechnicalSettings(project)"
+                        label="Manage MCP settings"
+                        title="MCP"
+                        :data-testid="`project-compact-mcp-${project.id}`"
+                        @click="emit('open-mcp-settings', project)"
+                    >
+                        <Bot class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canManageTechnicalSettings(project)"
+                        label="Manage app error notifications"
+                        title="App errors"
+                        :data-testid="`project-compact-app-error-notifications-${project.id}`"
+                        @click="emit('open-app-error-notifications', project)"
+                    >
+                        <BellRing class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canEditProject(project)"
+                        label="Edit project"
+                        title="Edit"
+                        :data-testid="`project-compact-edit-${project.id}`"
+                        @click="emit('open-edit', project)"
+                    >
+                        <Pencil class="h-4 w-4" />
+                    </ActionIconButton>
+                    <ActionIconButton
+                        v-if="canDeleteProject(project)"
+                        label="Delete project"
+                        title="Delete"
+                        variant="destructive"
+                        :data-testid="`project-compact-delete-${project.id}`"
+                        @click="emit('open-delete', project)"
+                    >
+                        <Trash2 class="h-4 w-4" />
+                    </ActionIconButton>
+                </template>
+            </ResponsiveRecordItem>
+        </template>
+    </ResponsiveRecordList>
 </template>
