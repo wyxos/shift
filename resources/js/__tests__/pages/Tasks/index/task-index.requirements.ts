@@ -77,6 +77,11 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.text()).toContain('2 open');
         expect(wrapper.text()).toContain('2 ready');
         expect(wrapper.find('[data-testid="requirement-pack-finalize-7"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="requirement-pack-compact-finalize-7"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="requirement-compact-row-1"]').text()).toContain('Ready');
+        expect(wrapper.find('[data-testid="requirement-compact-row-1"]').text()).toContain('Medium');
+        expect(wrapper.find('[data-testid="requirement-compact-open-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="requirement-compact-delete-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="task-project-badge-1"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="task-status-badge-1"]').text()).toContain('Ready');
         expect(wrapper.get('[data-testid="task-status-badge-3"]').text()).toContain('Finalized');

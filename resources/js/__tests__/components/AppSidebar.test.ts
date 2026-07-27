@@ -16,20 +16,37 @@ const { mockPage } = vi.hoisted(() => ({
 }));
 
 const fetchMock = vi.hoisted(() => vi.fn());
+const sidebarMocks = vi.hoisted(() => ({
+    setOpenMobile: vi.fn(),
+}));
 
 vi.mock('@inertiajs/vue3', async () => {
     const { defineComponent, h } = await import('vue');
 
     return {
         Link: defineComponent({
+            inheritAttrs: false,
             props: {
                 href: {
                     type: String,
                     required: true,
                 },
             },
-            setup(props, { slots }) {
-                return () => h('a', { href: props.href }, slots.default?.());
+            setup(props, { attrs, slots }) {
+                return () =>
+                    h(
+                        'a',
+                        {
+                            ...attrs,
+                            href: props.href,
+                            onClick: (event: MouseEvent) => {
+                                event.preventDefault();
+                                const handler = attrs.onClick as ((event: MouseEvent) => void) | undefined;
+                                handler?.(event);
+                            },
+                        },
+                        slots.default?.(),
+                    );
             },
         }),
         usePage: () => mockPage,
@@ -130,6 +147,9 @@ vi.mock('@/components/ui/sidebar', async () => {
             },
         }),
         SidebarMenuItem: passthrough('li'),
+        useSidebar: () => ({
+            setOpenMobile: sidebarMocks.setOpenMobile,
+        }),
     };
 });
 
@@ -143,6 +163,7 @@ describe('AppSidebar', () => {
         ];
         mockPage.props.sidebarOrganisationsHasMore = false;
         fetchMock.mockReset();
+        sidebarMocks.setOpenMobile.mockReset();
         vi.stubGlobal('fetch', fetchMock);
     });
 
@@ -174,6 +195,20 @@ describe('AppSidebar', () => {
         expect(wrapper.find('a[href="/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
+    });
+
+    it('matches root navigation by pathname and closes mobile navigation after selection', async () => {
+        mockPage.url = '/tasks?status=pending&priority=high';
+        const wrapper = mountSidebar();
+        const tasksLink = wrapper.get('a[href="/tasks"]');
+
+        expect(tasksLink.element.parentElement?.getAttribute('data-active')).toBe('true');
+
+        await tasksLink.trigger('click');
+        expect(sidebarMocks.setOpenMobile).toHaveBeenCalledWith(false);
+
+        await wrapper.get('a[href="/organisation/3/dashboard"]').trigger('click');
+        expect(sidebarMocks.setOpenMobile).toHaveBeenCalledTimes(2);
     });
 
     it('hides the organisation show more link when the sidebar list is complete', () => {
