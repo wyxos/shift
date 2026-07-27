@@ -44,7 +44,9 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.find('[data-testid="filters-trigger"]').exists()).toBe(true);
 
         const rows = wrapper.findAll('[data-testid="task-row"]');
+        const compactRows = wrapper.findAll('[data-testid^="task-compact-row-"]');
         expect(rows).toHaveLength(2);
+        expect(compactRows).toHaveLength(2);
         expect(wrapper.text()).toContain('Auth issue');
         expect(wrapper.text()).toContain('UI polish');
         expect(wrapper.find('[data-testid="task-project-badge-1"]').text()).toContain('Portal');
@@ -54,6 +56,12 @@ describe('Tasks/Index.vue', () => {
             expect(row.find('button[title="Open details"]').exists()).toBe(true);
             expect(row.find('button[title="Delete"]').exists()).toBe(true);
         }
+
+        expect(compactRows[0].text()).toContain('Pending');
+        expect(compactRows[0].text()).toContain('High');
+        expect(compactRows[0].find('[data-slot="responsive-record-item-actions"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="task-compact-open-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="task-compact-delete-1"]').exists()).toBe(true);
 
         wrapper.unmount();
     });

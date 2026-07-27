@@ -15,6 +15,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData, type SidebarOrganisation } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
@@ -23,6 +24,7 @@ import { computed, ref, watch } from 'vue';
 import AppLogo from './AppLogo.vue';
 
 const page = usePage<SharedData>();
+const { setOpenMobile } = useSidebar();
 
 const mainNavItems: NavItem[] = [
     {
@@ -174,6 +176,10 @@ const organisationNavItems = computed(() => {
 
 function canManageOrgAccess(organisation: SidebarOrganisation) {
     return organisation.can_manage_org_access ?? organisation.isOwner;
+}
+
+function closeMobileNavigation() {
+    setOpenMobile(false);
 }
 
 function organisationTeamHref(organisation: SidebarOrganisation) {
@@ -329,7 +335,7 @@ function organisationRouteState(url: URL) {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton as-child size="lg">
-                        <Link :href="route('dashboard')">
+                        <Link :href="route('dashboard')" @click="closeMobileNavigation">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
@@ -345,7 +351,7 @@ function organisationRouteState(url: URL) {
                             <SidebarMenu>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton as-child size="sm" tooltip="Back">
-                                        <Link href="/dashboard">
+                                        <Link href="/dashboard" @click="closeMobileNavigation">
                                             <ArrowLeft />
                                             <span>Back</span>
                                         </Link>
@@ -363,7 +369,7 @@ function organisationRouteState(url: URL) {
                             <SidebarMenu>
                                 <SidebarMenuItem v-for="item in organisationNavItems" :key="item.title">
                                     <SidebarMenuButton as-child :is-active="isOrganisationNavActive(item.href)" :tooltip="item.title">
-                                        <Link :href="item.href">
+                                        <Link :href="item.href" @click="closeMobileNavigation">
                                             <component :is="item.icon" />
                                             <span>{{ item.title }}</span>
                                         </Link>
@@ -375,12 +381,17 @@ function organisationRouteState(url: URL) {
                 </div>
 
                 <div v-else key="sidebar-root">
-                    <NavMain :items="mainNavItems" />
+                    <NavMain :items="mainNavItems" @navigate="closeMobileNavigation" />
 
                     <SidebarGroup class="px-2 py-0">
                         <SidebarGroupLabel>Organisation</SidebarGroupLabel>
                         <SidebarGroupAction as-child class="top-1.5">
-                            <Link aria-label="Add organisation" href="/organisations?create=1" title="Add organisation">
+                            <Link
+                                aria-label="Add organisation"
+                                href="/organisations?create=1"
+                                title="Add organisation"
+                                @click="closeMobileNavigation"
+                            >
                                 <Plus />
                             </Link>
                         </SidebarGroupAction>
@@ -397,7 +408,7 @@ function organisationRouteState(url: URL) {
                                 <TransitionGroup name="sidebar-organisation-list">
                                     <SidebarMenuItem v-for="organisation in organisations" :key="organisation.id">
                                         <SidebarMenuButton as-child :is-active="isOrganisationItemActive(organisation)" :tooltip="organisation.name">
-                                            <Link :href="organisationPageHref(organisation, 'dashboard')">
+                                            <Link :href="organisationPageHref(organisation, 'dashboard')" @click="closeMobileNavigation">
                                                 <Network />
                                                 <span class="min-w-0">
                                                     <span class="block truncate">{{ organisation.name }}</span>
@@ -414,7 +425,7 @@ function organisationRouteState(url: URL) {
                                 </TransitionGroup>
                                 <SidebarMenuItem v-if="organisations.length === 0">
                                     <SidebarMenuButton as-child tooltip="Add organisation">
-                                        <Link href="/organisations?create=1">
+                                        <Link href="/organisations?create=1" @click="closeMobileNavigation">
                                             <Plus />
                                             <span>Add organisation</span>
                                         </Link>

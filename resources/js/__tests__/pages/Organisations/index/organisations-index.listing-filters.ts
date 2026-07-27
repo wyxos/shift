@@ -14,6 +14,14 @@ describe('Organisations/Index.vue', () => {
         expect(wrapper.text()).toContain('1 user');
         expect(wrapper.text()).toContain('3 projects');
         expect(wrapper.text()).toContain('Unknown');
+
+        const compactRow = wrapper.get('[data-testid="organisation-compact-row-1"]');
+        expect(compactRow.text()).toContain('Acme Labs');
+        expect(compactRow.text()).toContain('1 user');
+        expect(compactRow.text()).toContain('3 projects');
+        expect(compactRow.find('[data-slot="responsive-record-item-actions"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="organisation-compact-manage-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="organisation-compact-view-1"]').exists()).toBe(true);
     });
 
     it('shows an empty state when no organisations are returned', () => {
