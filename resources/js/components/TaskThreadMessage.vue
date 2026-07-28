@@ -9,7 +9,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import xmlLang from 'highlight.js/lib/languages/xml';
 import 'highlight.js/styles/github.css';
 import { Paperclip, Trash2 } from 'lucide-vue-next';
-import { defineProps, nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 
 hljs.registerLanguage('javascript', jsLang);
 hljs.registerLanguage('js', jsLang);
