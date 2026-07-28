@@ -4,7 +4,7 @@
     "type": "module",
     "packageManager": "npm@10.9.3",
     "engines": {
-        "node": ">=22.18 <23",
+        "node": ">=22.22.2 <23",
         "npm": "10.9.3"
     },
     "scripts": {
@@ -27,15 +27,14 @@
         "check": "npm run composer:check && npm run pint:check && npm run format:check && npm run lint:check && npm run typecheck && npm run test && npm run build && npm run test:php"
     },
     "devDependencies": {
-        "@eslint/js": "^9.19.0",
-        "@testing-library/vue": "^8.1.0",
+        "@eslint/js": "^10.0.1",
         "@types/node": "^22.13.5",
         "@vitest/coverage-v8": "^4.1.8",
         "@vue/eslint-config-typescript": "^14.3.0",
         "@vue/test-utils": "^2.4.6",
-        "eslint": "9.39.5",
+        "eslint": "10.8.0",
         "eslint-config-prettier": "^10.0.1",
-        "eslint-plugin-vue": "^9.32.0",
+        "eslint-plugin-vue": "^10.10.0",
         "jsdom": "^26.1.0",
         "laravel-echo": "^2.3.7",
         "prettier": "^3.4.2",
@@ -44,7 +43,7 @@
         "pusher-js": "^8.5.0",
         "typescript-eslint": "^8.23.0",
         "vitest": "^4.1.8",
-        "vue-tsc": "^2.2.4"
+        "vue-tsc": "^3.3.8"
     },
     "dependencies": {
         "@inertiajs/vue3": "^2.0.0-beta.3",
@@ -60,7 +59,7 @@
         "@unovis/vue": "^1.6.4",
         "@vitejs/plugin-vue": "^5.2.1",
         "@vueuse/core": "^12.8.2",
-        "axios": "1.16.1",
+        "axios": "1.18.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "concurrently": "^9.0.1",
@@ -87,6 +86,9 @@
         "lightningcss-linux-x64-gnu": "^1.29.1"
     },
     "overrides": {
-        "lodash": "^4.18.1"
+        "brace-expansion": "5.0.8",
+        "js-beautify": "2.0.3",
+        "lodash": "^4.18.1",
+        "nopt": "10.0.1"
     }
 }
