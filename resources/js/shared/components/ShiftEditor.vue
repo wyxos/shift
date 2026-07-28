@@ -14,7 +14,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
 import ReplyQuote from '../extensions/replyQuote';
@@ -98,6 +98,10 @@ lowlight.register({ css: cssLang });
 lowlight.register({ php: phpLang });
 lowlight.register({ html: htmlLang, xml: htmlLang });
 lowlight.register({ python: pythonLang, py: pythonLang });
+
+function setFileInput(element: Element | ComponentPublicInstance | null): void {
+    fileInput.value = element instanceof HTMLInputElement ? element : null;
+}
 
 // Keep tempIdentifier in sync with prop if provided
 watch(
@@ -379,7 +383,7 @@ defineExpose({ editor, reset });
                 >
                     <Send :size="18" />
                 </button>
-                <input ref="fileInput" data-testid="file-input" type="file" class="hidden" multiple @change="onFileChosen" />
+                <input :ref="setFileInput" data-testid="file-input" type="file" class="hidden" multiple @change="onFileChosen" />
             </div>
         </div>
 
