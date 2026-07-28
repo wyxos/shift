@@ -111,7 +111,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                     >
                         <button
                             type="button"
-                            class="text-card-foreground hover:text-primary focus-visible:ring-ring self-start rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                            class="text-card-foreground hover:text-primary focus-visible:ring-ring min-w-0 self-start rounded-sm text-left font-medium [overflow-wrap:anywhere] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                             :aria-label="`Open requirement details for ${task.title}`"
                             @click="openEdit(task.id)"
                         >
@@ -177,7 +177,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
             >
                 <button
                     type="button"
-                    class="text-card-foreground hover:text-primary focus-visible:ring-ring self-start rounded-sm text-left font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    class="text-card-foreground hover:text-primary focus-visible:ring-ring min-w-0 self-start rounded-sm text-left font-medium [overflow-wrap:anywhere] transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     :aria-label="`Open task details for ${task.title}`"
                     @click="openEdit(task.id)"
                 >

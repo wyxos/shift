@@ -59,6 +59,7 @@ describe('Tasks/Index.vue', () => {
 
         expect(compactRows[0].text()).toContain('Pending');
         expect(compactRows[0].text()).toContain('High');
+        expect(compactRows[0].get('button[aria-label="Open task details for Auth issue"]').classes()).toContain('[overflow-wrap:anywhere]');
         expect(compactRows[0].find('[data-slot="responsive-record-item-actions"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="task-compact-open-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="task-compact-delete-1"]').exists()).toBe(true);
