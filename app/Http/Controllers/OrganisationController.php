@@ -6,9 +6,9 @@ use App\Enums\OrganisationRole;
 use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\ProjectUser;
-use App\Models\User;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
+use Inertia\Inertia;
 
 class OrganisationController extends Controller
 {
@@ -96,9 +96,7 @@ class OrganisationController extends Controller
                     'isOwner' => $organisation->author_id === $userId,
                     ...$this->permissions->organisationCapabilities($organisation, $userId),
                 ]),
-            'accessUsers' => User::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'email']),
+            'accessUsers' => Inertia::always([]),
             'panel' => $panel,
             'panelOrganisation' => $panelOrganisation ? [
                 'id' => $panelOrganisation->id,

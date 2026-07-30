@@ -52,11 +52,9 @@ describe('Organisations/Index.vue', () => {
         expect(wrapper.find('[data-testid="organisation-view-2"]').exists()).toBe(true);
     });
 
-    it('adds a user from the manage access dialog', async () => {
+    it('adds a user by email without a candidate directory', async () => {
         const wrapper = mount(Index, {
-            props: makeProps({
-                accessUsers: [{ id: 9, name: 'Existing Staff', email: 'existing@example.com' }],
-            }),
+            props: makeProps(),
         });
 
         await wrapper.get('[data-testid="organisation-manage-1"]').trigger('click');
