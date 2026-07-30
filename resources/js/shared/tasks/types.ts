@@ -157,7 +157,15 @@ export type ThreadMessage = {
     isYou?: boolean;
     pending?: boolean;
     failed?: boolean;
+    audience: 'all' | 'team';
     attachments?: TaskAttachment[];
+    mentions?: ThreadMention[];
+};
+
+export type ThreadMention = {
+    kind: 'internal' | 'external';
+    id: number | string;
+    name: string;
 };
 
 export type TaskIndexFilters = {

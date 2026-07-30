@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
+import { Badge } from '@/components/ui/badge';
+import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
+import type { MentionCandidate } from '@/shared/components/shift-editor/types';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
@@ -19,6 +22,17 @@ const deleteDialogOpen = ref(false);
 const deleteConfirmLoading = ref(false);
 const deleteConfirmError = ref<string | null>(null);
 const pendingDeleteMessage = ref<any | null>(null);
+const pendingMentionCandidate = ref<MentionCandidate | null>(null);
+const mentionAddDialogOpen = ref(false);
+const audienceOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'team', label: 'Team' },
+];
+const audienceModel = computed({
+    get: () => state.threadAudience,
+    set: (value: 'all' | 'team') => state.setThreadAudience(value),
+});
+const audienceDisabled = computed(() => Boolean(state.threadSending || state.threadEditSaving || state.threadComposerUploading));
 const deleteDialogOpenModel = computed({
     get: () => deleteDialogOpen.value,
     set: (value: boolean) => {
@@ -36,6 +50,19 @@ const requestDeleteThreadMessage = (message: any) => {
 
 const clearPendingDeleteMessage = () => {
     pendingDeleteMessage.value = null;
+};
+
+const requestMentionCollaboratorAddition = (candidate: MentionCandidate) => {
+    pendingMentionCandidate.value = candidate;
+    mentionAddDialogOpen.value = true;
+};
+
+const confirmMentionCollaboratorAddition = () => {
+    if (!pendingMentionCandidate.value) return;
+
+    state.threadComposerRef?.confirmMentionAddition?.(pendingMentionCandidate.value);
+    mentionAddDialogOpen.value = false;
+    pendingMentionCandidate.value = null;
 };
 
 const requestErrorMessage = (error: unknown, fallback: string) => {
@@ -71,6 +98,10 @@ const confirmDeleteThreadMessage = async () => {
 
 const assignCommentsScrollRef = (value: Element | ComponentPublicInstance | null) => {
     state.commentsScrollRef = value instanceof HTMLElement ? value : null;
+};
+
+const assignThreadComposerRef = (value: Element | ComponentPublicInstance | null) => {
+    state.threadComposerRef = value;
 };
 
 const showOccurrences = computed(() => state.isErrorIntakeTask && state.activeErrorThreadTab === 'occurrences');
@@ -166,11 +197,23 @@ watch(deleteDialogOpen, (open) => {
                                         : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
                                 "
                                 class="rounded-lg px-3 py-2 text-sm shadow-sm"
+                                @copy="state.onMessageCopy(message, $event)"
                                 @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                                 @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
-                                <div v-if="!message.isYou" class="text-foreground/80 mb-1 text-[11px] font-semibold">
-                                    {{ message.author }}
+                                <div
+                                    v-if="!message.isYou || message.audience === 'team'"
+                                    class="mb-1 flex items-center justify-between gap-2 text-[11px] font-semibold"
+                                >
+                                    <span v-if="!message.isYou" class="text-foreground/80">{{ message.author }}</span>
+                                    <Badge
+                                        v-if="message.audience === 'team'"
+                                        variant="secondary"
+                                        :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
+                                        class="ml-auto px-1.5 py-0 text-[10px]"
+                                    >
+                                        Team
+                                    </Badge>
                                 </div>
                                 <div
                                     class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
@@ -256,22 +299,47 @@ watch(deleteDialogOpen, (open) => {
         </div>
 
         <div v-if="!showOccurrences" class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
+            <div v-if="state.threadAudienceError" class="text-destructive mb-2 text-xs">{{ state.threadAudienceError }}</div>
             <div v-if="state.threadEditError" class="text-destructive mb-2 text-xs">{{ state.threadEditError }}</div>
             <ShiftEditor
                 v-if="state.canComment"
-                ref="state.threadComposerRef"
+                :ref="assignThreadComposerRef"
                 v-model="threadComposerHtmlModel"
                 :enable-ai-improve="state.aiImproveEnabled"
+                enable-mentions
                 :ai-context="state.threadAiContext"
                 :cancelable="Boolean(state.threadEditingId)"
                 :clear-on-send="false"
+                :mention-candidates="state.threadMentionCandidates"
+                :mention-error="state.threadMentionError"
+                :mention-loading="state.threadMentionLoading"
+                :send-disabled="audienceDisabled"
+                :slash-commands="['all', 'team']"
                 :temp-identifier="state.threadTempIdentifier"
                 data-testid="comments-editor"
                 :placeholder="state.threadEditingId ? 'Edit your comment...' : 'Write a comment...'"
                 @cancel="state.cancelThreadEdit"
+                @mention-add-request="requestMentionCollaboratorAddition"
+                @mention-query="state.handleMentionQuery"
+                @slash-command="state.handleSlashCommand"
                 @uploading="state.setThreadComposerUploading($event)"
                 @send="state.handleThreadSend"
-            />
+            >
+                <template #before-send>
+                    <Badge v-if="state.threadEditingId" variant="outline" class="h-8 px-2.5" data-testid="thread-audience-locked">
+                        {{ state.threadAudience === 'team' ? 'Team' : 'All' }}
+                    </Badge>
+                    <ButtonGroup
+                        v-else
+                        v-model="audienceModel"
+                        aria-label="Message audience"
+                        class="flex-nowrap gap-1"
+                        :disabled="audienceDisabled"
+                        :options="audienceOptions"
+                        test-id-prefix="thread-audience"
+                    />
+                </template>
+            </ShiftEditor>
             <div v-else class="text-muted-foreground py-2 text-sm">Commenting is unavailable for this task.</div>
         </div>
 
@@ -288,6 +356,20 @@ watch(deleteDialogOpen, (open) => {
             @confirm="confirmDeleteThreadMessage"
         >
             <template #description>Delete this comment from the thread? This cannot be undone.</template>
+        </ConfirmRequestDialog>
+
+        <ConfirmRequestDialog
+            v-model:open="mentionAddDialogOpen"
+            :title="`Add ${pendingMentionCandidate?.name ?? 'person'} to task?`"
+            confirm-label="Add and mention"
+            confirm-test-id="confirm-mention-collaborator-add"
+            @cancel="pendingMentionCandidate = null"
+            @confirm="confirmMentionCollaboratorAddition"
+        >
+            <template #description>
+                They will become a task collaborator and receive this reply under the normal {{ state.threadAudience === 'team' ? 'Team' : 'All' }}
+                notification rules.
+            </template>
         </ConfirmRequestDialog>
     </div>
 </template>

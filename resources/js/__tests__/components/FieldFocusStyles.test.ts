@@ -31,6 +31,10 @@ function styleRule(source: string, selector: string) {
     return source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
 }
 
+function sharedEditorStyles() {
+    return readFileSync(join(process.cwd(), 'resources/js/shared/components/shift-editor/editor.css'), 'utf8');
+}
+
 describe('field focus styles', () => {
     it('keeps the input primitive focus treatment to a border change', () => {
         const wrapper = mount(Input);
@@ -96,7 +100,7 @@ describe('field focus styles', () => {
     });
 
     it('keeps the shared rich editor neutral until focus changes only the border', () => {
-        const source = readFileSync(join(process.cwd(), 'resources/js/shared/components/ShiftEditor.vue'), 'utf8');
+        const source = sharedEditorStyles();
         const baseRule = styleRule(source, '.ProseMirror');
         const focusedRule = styleRule(source, '.tiptap.is-focused .ProseMirror');
 
@@ -129,7 +133,7 @@ describe('field focus styles', () => {
     });
 
     it('keeps shared rich editor code blocks compact', () => {
-        const source = readFileSync(join(process.cwd(), 'resources/js/shared/components/ShiftEditor.vue'), 'utf8');
+        const source = sharedEditorStyles();
         const preRule = styleRule(source, '.tiptap pre');
 
         expect(preRule).toContain('border-radius: 0.25rem;');

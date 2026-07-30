@@ -2,21 +2,31 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskCollaboratorKind;
+use App\Enums\TaskThreadAudience;
 use App\Models\Attachment;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Models\User;
+use App\Services\TaskThreadAudienceService;
+use App\Services\TaskThreadMentionService;
 use App\Services\TaskThreadNotificationService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TaskThreadController extends Controller
 {
     public function __construct(
+        private readonly TaskThreadAudienceService $audiences,
+        private readonly TaskThreadMentionService $mentions,
         private readonly TaskThreadNotificationService $taskThreadNotificationService,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
@@ -41,6 +51,14 @@ class TaskThreadController extends Controller
         return response()->json([
             'internal' => $internalThreads,
             'external' => $externalThreads,
+            'threads' => collect($internalThreads)
+                ->concat($externalThreads)
+                ->sortBy([
+                    ['created_at', 'asc'],
+                    ['id', 'asc'],
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -52,14 +70,15 @@ class TaskThreadController extends Controller
         return $task->threads()
             ->ofType($type)
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
+            ->with(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
             ->get()
             ->map(function (TaskThread $thread) use ($task) {
                 // Filter out attachments that are already embedded in the content
                 $content = (string) ($thread->content ?? '');
-                $attachments = $thread->attachments()->get()
+                $attachments = $thread->attachments
                     ->filter(function ($attachment) use ($content) {
                         $downloadUrlRel = route('attachments.download', $attachment, false);
-                        $downloadUrlAbs = url($downloadUrlRel);
 
                         return Str::doesntContain($content, $downloadUrlRel);
                     })
@@ -81,6 +100,8 @@ class TaskThreadController extends Controller
                     'is_current_user' => $this->isCurrentUserThread($task, $thread),
                     'created_at' => $thread->created_at,
                     'attachments' => $attachments,
+                    'audience' => $this->audiences->audience($thread)->value,
+                    'mentions' => $this->mentions->serialize($thread),
                 ];
             })
             ->toArray();
@@ -110,19 +131,42 @@ class TaskThreadController extends Controller
             'content' => 'required|string',
             'type' => 'required|in:internal,external',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
+            'mentions' => ['sometimes', 'array', 'max:50'],
+            'mentions.*.kind' => ['required', Rule::enum(TaskCollaboratorKind::class)],
+            'mentions.*.id' => ['required', $this->mentionIdentityRule()],
+            'add_collaborators' => ['sometimes', 'array', 'max:20'],
+            'add_collaborators.*.kind' => ['required', Rule::enum(TaskCollaboratorKind::class)],
+            'add_collaborators.*.id' => ['required', $this->mentionIdentityRule()],
         ]);
 
+        /** @var User $user */
         $user = Auth::user();
+        $audience = TaskThreadAudience::fromStoredType($request->string('type')->toString());
+        $content = (string) $this->sanitizeRichContent($request->input('content'));
+        $this->audiences->assertContentMayBeShared($task, $audience, $content);
+        $resolvedMentions = $this->mentions->resolve(
+            $task,
+            $user,
+            $audience,
+            $request->input('mentions', []),
+            $request->input('add_collaborators', []),
+        );
+        $content = $this->mentions->normalizeContent($content, $resolvedMentions);
 
-        $thread = new TaskThread([
-            'task_id' => $task->id,
-            'type' => $request->input('type'),
-            'content' => $this->sanitizeRichContent($request->input('content')),
-            'sender_name' => $user->name,
-        ]);
+        $thread = DB::transaction(function () use ($task, $user, $audience, $content, $resolvedMentions): TaskThread {
+            $thread = new TaskThread([
+                'task_id' => $task->id,
+                'type' => $audience->storedType(),
+                'content' => $content,
+                'sender_name' => $user->name,
+            ]);
 
-        $thread->sender()->associate($user);
-        $thread->save();
+            $thread->sender()->associate($user);
+            $thread->save();
+            $this->mentions->persist($task, $thread, $resolvedMentions);
+
+            return $thread;
+        });
 
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
@@ -141,7 +185,7 @@ class TaskThreadController extends Controller
         }
 
         // Get the thread with attachments
-        $thread->load('attachments');
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
         $this->taskThreadNotificationService->send($task, $thread);
 
@@ -170,6 +214,8 @@ class TaskThreadController extends Controller
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
                 'attachments' => $responseAttachments,
+                'audience' => $audience->value,
+                'mentions' => $this->mentions->serialize($thread),
             ],
         ], 201);
     }
@@ -258,6 +304,8 @@ class TaskThreadController extends Controller
                 'is_current_user' => $thread->sender_id === Auth::id() && $thread->sender_type === get_class(Auth::user()),
                 'created_at' => $thread->created_at,
                 'attachments' => $attachments,
+                'audience' => $this->audiences->audience($thread)->value,
+                'mentions' => $this->mentions->serialize($thread),
             ],
         ]);
     }
@@ -314,10 +362,47 @@ class TaskThreadController extends Controller
         $request->validate([
             'content' => 'required|string',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
+            'type' => ['nullable', 'in:internal,external'],
+            'mentions' => ['sometimes', 'array', 'max:50'],
+            'mentions.*.kind' => ['required', Rule::enum(TaskCollaboratorKind::class)],
+            'mentions.*.id' => ['required', $this->mentionIdentityRule()],
+            'add_collaborators' => ['prohibited'],
         ]);
 
-        $thread->content = $this->sanitizeRichContent($request->input('content'));
-        $thread->save();
+        if ($request->filled('type') && $request->string('type')->toString() !== $thread->type) {
+            throw ValidationException::withMessages([
+                'type' => 'Editing a message cannot change its audience.',
+            ]);
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+        $audience = $this->audiences->audience($thread);
+        $content = (string) $this->sanitizeRichContent($request->input('content'));
+        $this->audiences->assertContentMayBeShared($task, $audience, $content);
+        $resolvedMentions = $request->has('mentions')
+            ? $this->mentions->resolve(
+                $task,
+                $user,
+                $audience,
+                $request->input('mentions', []),
+                [],
+                false,
+            )
+            : null;
+        $content = $this->mentions->normalizeContent(
+            $content,
+            $resolvedMentions ?? $this->mentions->resolvedForThread($thread),
+        );
+
+        DB::transaction(function () use ($thread, $content, $resolvedMentions): void {
+            $thread->content = $content;
+            $thread->save();
+
+            if ($resolvedMentions !== null) {
+                $this->mentions->replace($thread, $resolvedMentions);
+            }
+        });
 
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
@@ -335,7 +420,7 @@ class TaskThreadController extends Controller
             $thread->save();
         }
 
-        $thread->load('attachments');
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
@@ -362,6 +447,8 @@ class TaskThreadController extends Controller
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
                 'attachments' => $responseAttachments,
+                'audience' => $audience->value,
+                'mentions' => $this->mentions->serialize($thread),
             ],
         ]);
     }
@@ -397,5 +484,16 @@ class TaskThreadController extends Controller
         }
 
         return $out;
+    }
+
+    private function mentionIdentityRule(): \Closure
+    {
+        return static function (string $attribute, mixed $value, \Closure $fail): void {
+            if ((! is_int($value) && ! is_string($value))
+                || trim((string) $value) === ''
+                || mb_strlen((string) $value) > 255) {
+                $fail("The {$attribute} field must contain a valid collaborator identity.");
+            }
+        };
     }
 }

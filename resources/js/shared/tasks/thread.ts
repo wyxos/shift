@@ -5,7 +5,13 @@ export type MappedThreadMessage<TAttachment = unknown> = {
     time: string;
     content: string;
     isYou: boolean;
+    audience: 'all' | 'team';
     attachments: TAttachment[];
+    mentions: Array<{
+        kind: 'internal' | 'external';
+        id: number | string;
+        name: string;
+    }>;
 };
 
 export function formatThreadTime(value: any): string {
@@ -39,6 +45,9 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
     const content = String(thread?.content ?? '');
     const time = formatThreadTime(thread?.created_at);
     const attachments = Array.isArray(thread?.attachments) ? (thread.attachments as TAttachment[]) : [];
+    const audience = thread?.audience === 'team' || thread?.type === 'internal' ? 'team' : 'all';
+    const mentions = Array.isArray(thread?.mentions) ? thread.mentions : [];
+
     return {
         clientId: id ? `thread-${id}` : `thread-${Date.now()}`,
         id,
@@ -46,7 +55,9 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
         time,
         content,
         isYou,
+        audience,
         attachments,
+        mentions,
     };
 }
 

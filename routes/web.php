@@ -112,6 +112,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'show'])->name('task-threads.show');
     Route::put('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'update'])->name('task-threads.update');
     Route::delete('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'destroy'])->name('task-threads.destroy');
+    Route::get('tasks/{task}/thread-mention-candidates', [\App\Http\Controllers\TaskThreadMentionController::class, 'index'])
+        ->name('task-thread-mentions.candidates');
 
     // Attachments
     Route::post('attachments/upload', [AttachmentController::class, 'upload'])->name('attachments.upload');

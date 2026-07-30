@@ -14,13 +14,17 @@ describe('shared/tasks/thread', () => {
             content: '<p>hello</p>',
             is_current_user: true,
             created_at: new Date().toISOString(),
+            audience: 'team',
             attachments: [{ id: 1 }],
+            mentions: [{ kind: 'internal', id: 4, name: 'Alice' }],
         });
 
         expect(mapped.id).toBe(7);
         expect(mapped.author).toBe('Alice');
         expect(mapped.isYou).toBe(true);
+        expect(mapped.audience).toBe('team');
         expect(mapped.attachments).toEqual([{ id: 1 }]);
+        expect(mapped.mentions).toEqual([{ kind: 'internal', id: 4, name: 'Alice' }]);
     });
 
     it('parses reply target ids', () => {

@@ -17,14 +17,17 @@ import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
+import ShiftMention from '../extensions/mention';
 import ReplyQuote from '../extensions/replyQuote';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
 import { renderRichContent } from '../tasks/rich-content';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
-import type { SentAttachment } from './shift-editor/types';
+import ShiftEditorMentionSuggestions from './shift-editor/ShiftEditorMentionSuggestions.vue';
+import type { MentionCandidate, MentionIdentity, SentAttachment } from './shift-editor/types';
 import { containsAiImprovableText, useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
+import { useShiftEditorMentions } from './shift-editor/useShiftEditorMentions';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
 
@@ -33,10 +36,21 @@ declare const route: undefined | ((name: string, params?: Record<string, unknown
 // Emits
 // Include attachments in the payload so consumers can persist them alongside the content
 const emit = defineEmits<{
-    (e: 'send', payload: { html: string; attachments: SentAttachment[] }): void;
+    (
+        e: 'send',
+        payload: {
+            html: string;
+            attachments: SentAttachment[];
+            mentions: MentionIdentity[];
+            addCollaborators: MentionIdentity[];
+        },
+    ): void;
     (e: 'update:modelValue', value: string): void;
     (e: 'uploading', value: boolean): void;
     (e: 'cancel'): void;
+    (e: 'mention-query', value: string): void;
+    (e: 'mention-add-request', candidate: MentionCandidate): void;
+    (e: 'slash-command', command: string): void;
 }>();
 
 // Props
@@ -56,12 +70,23 @@ const props = withDefaults(
         aiImproveUrl?: string;
         aiContext?: string;
         enableAiImprove?: boolean;
+        enableMentions?: boolean;
+        mentionCandidates?: MentionCandidate[];
+        mentionLoading?: boolean;
+        mentionError?: string | null;
+        sendDisabled?: boolean;
+        slashCommands?: string[];
     }>(),
     {
         clearOnSend: true,
         sendable: true,
         cancelable: false,
         enableAiImprove: true,
+        enableMentions: false,
+        mentionCandidates: () => [],
+        mentionLoading: false,
+        sendDisabled: false,
+        slashCommands: () => [],
     },
 );
 
@@ -172,6 +197,7 @@ const editor = useEditor({
             },
         }),
         InlineImage.configure({ inline: true, allowBase64: true, HTMLAttributes: { class: 'editor-tile' } }),
+        ShiftMention,
         ImageUpload.configure({
             getTempIdentifier: () => tempIdentifier.value,
             onNonImageFile: (file: File) => uploadAttachment(file),
@@ -186,10 +212,16 @@ const editor = useEditor({
         hasAiImprovableText.value = containsAiImprovableText(editorInstance.getHTML());
         aiNotice.value = '';
     },
+    onSelectionUpdate: ({ editor: editorInstance }) => {
+        refreshMentionSuggestions(editorInstance);
+    },
     onUpdate: ({ editor: editorInstance }) => {
+        if (consumeSlashCommand(editorInstance)) return;
+
         const html = editorInstance.getHTML();
         emit('update:modelValue', html);
         hasUploadPlaceholder.value = hasImageUploadPlaceholders();
+        refreshMentionSuggestions(editorInstance);
     },
     editorProps: {
         handleDrop: (_view: any, event: DragEvent) => {
@@ -225,10 +257,35 @@ const editor = useEditor({
             return false;
         },
         handleKeyDown: (_view: any, event: KeyboardEvent) => {
+            if (props.enableMentions && mentionQuery.value !== null && props.mentionCandidates.length > 0) {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const direction = event.key === 'ArrowDown' ? 1 : -1;
+                    moveMentionSelection(direction);
+                    return true;
+                }
+
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectMentionCandidate(props.mentionCandidates[mentionActiveIndex.value]);
+                    return true;
+                }
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeMentionSuggestions();
+                    return true;
+                }
+            }
+
             if (event.key !== 'Enter') return false;
             if (!props.sendable) return false;
             if (event.shiftKey || event.isComposing) return false;
             if (isInRichBlockNeedingEnter(editor.value)) return false;
+            if (editor.value && consumeSlashCommand(editor.value, true)) {
+                event.preventDefault();
+                return true;
+            }
 
             event.preventDefault();
             onSend();
@@ -236,6 +293,19 @@ const editor = useEditor({
         },
     },
 });
+const {
+    closeMentionSuggestions,
+    collectCollaboratorAdditions,
+    collectMentionIdentities,
+    confirmMentionAddition,
+    consumeSlashCommand,
+    mentionActiveIndex,
+    mentionQuery,
+    moveMentionSelection,
+    refreshMentionSuggestions,
+    resetMentions,
+    selectMentionCandidate,
+} = useShiftEditorMentions(props, editor, emit);
 
 function hasImageUploadPlaceholders(): boolean {
     const ed = editor.value;
@@ -287,7 +357,7 @@ function onEmojiClick(ev: Event) {
 
 function onSend() {
     if (!props.sendable) return;
-    if (isUploading.value) return;
+    if (isUploading.value || props.sendDisabled) return;
     const html = editor.value?.getHTML() ?? '';
     const toSend: SentAttachment[] = attachments.value.map((a) => ({
         name: a.name,
@@ -297,7 +367,13 @@ function onSend() {
         status: a.status,
         progress: a.progress,
     }));
-    emit('send', { html, attachments: toSend });
+    const mentions = collectMentionIdentities();
+    emit('send', {
+        html,
+        attachments: toSend,
+        mentions,
+        addCollaborators: collectCollaboratorAdditions(mentions),
+    });
 
     if (props.clearOnSend === false) {
         return;
@@ -319,6 +395,7 @@ function reset() {
     aiNotice.value = '';
     emit('update:modelValue', '');
     resetAttachments();
+    resetMentions();
 }
 
 function requestAiImprove() {
@@ -327,7 +404,7 @@ function requestAiImprove() {
 }
 
 // Expose the ref so parents (and tests) can observe / control the editor once it initializes.
-defineExpose({ editor, reset });
+defineExpose({ confirmMentionAddition, editor, reset });
 </script>
 
 <template>
@@ -343,8 +420,16 @@ defineExpose({ editor, reset });
         </div>
 
         <div class="flex flex-col gap-2">
+            <ShiftEditorMentionSuggestions
+                :active-index="mentionActiveIndex"
+                :candidates="props.mentionCandidates"
+                :error="props.mentionError"
+                :loading="props.mentionLoading"
+                :open="props.enableMentions && mentionQuery !== null"
+                @select="selectMentionCandidate"
+            />
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
-            <div class="flex items-center justify-start gap-2 p-2 px-1">
+            <div class="flex flex-wrap items-center justify-start gap-2 p-2 px-1">
                 <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-gray-100" @click="showEmoji = !showEmoji">
                     <Smile :size="18" />
                 </button>
@@ -373,16 +458,19 @@ defineExpose({ editor, reset });
                 >
                     <X :size="18" />
                 </button>
-                <button
-                    v-if="props.sendable"
-                    type="button"
-                    data-testid="toolbar-send"
-                    class="ml-auto rounded p-1 text-blue-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="isUploading"
-                    @click="onSend"
-                >
-                    <Send :size="18" />
-                </button>
+                <div class="ml-auto flex items-center gap-2">
+                    <slot name="before-send" />
+                    <button
+                        v-if="props.sendable"
+                        type="button"
+                        data-testid="toolbar-send"
+                        class="rounded p-1 text-blue-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="isUploading || props.sendDisabled"
+                        @click="onSend"
+                    >
+                        <Send :size="18" />
+                    </button>
+                </div>
                 <input :ref="setFileInput" data-testid="file-input" type="file" class="hidden" multiple @change="onFileChosen" />
             </div>
         </div>
@@ -403,58 +491,4 @@ defineExpose({ editor, reset });
     </div>
 </template>
 
-<style>
-@reference "tailwindcss";
-.ProseMirror img.editor-tile,
-.tiptap img.editor-tile {
-    width: 200px;
-    height: 200px;
-    object-fit: cover;
-    display: inline-block;
-    margin: 4px;
-}
-.tiptap {
-    --editor-min-height: 140px;
-}
-.ProseMirror {
-    @apply rounded-lg border p-4 text-sm leading-6 transition-colors outline-none;
-    border-color: var(--input);
-    min-height: var(--editor-min-height, 140px);
-    max-height: 600px;
-    overflow-y: auto;
-}
-.ProseMirror:focus,
-.ProseMirror-focused,
-.tiptap.is-focused .ProseMirror {
-    border-color: var(--ring);
-}
-/* Placeholder styling */
-.ProseMirror p.is-editor-empty:first-child::before {
-    content: attr(data-placeholder);
-    float: left;
-    color: #9ca3af; /* tailwind gray-400 */
-    pointer-events: none;
-    height: 0;
-}
-/* Code block base styling to make blocks stand out */
-.tiptap pre {
-    @apply bg-gray-200;
-    /*  background: #0b1021; !* dark background to contrast token colors; override with theme if desired *!
-  color: #e6e6e6;*/
-    border-radius: 0.25rem;
-    padding: 0.5rem 0.625rem;
-    margin: 1rem 0;
-    overflow-x: auto;
-}
-.tiptap pre code {
-    background: none;
-    color: inherit;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    padding: 0;
-}
-.tiptap pre code.hljs {
-    padding: 0;
-}
-</style>
+<style src="./shift-editor/editor.css"></style>

@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\ExternalUserService;
+use App\Services\TaskThreadAudienceService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +20,7 @@ class ExternalAttachmentController extends Controller
 {
     public function __construct(
         private readonly ExternalUserService $externalUserService,
+        private readonly TaskThreadAudienceService $threadAudiences,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
@@ -455,6 +457,11 @@ class ExternalAttachmentController extends Controller
             return response()->json(['error' => 'Attachment not associated with a task'], 404);
         }
 
+        if ($attachment->attachable instanceof TaskThread
+            && ! $this->threadAudiences->isVisibleToExternalUsers($attachment->attachable)) {
+            return response()->json(['error' => 'Attachment not found'], 404);
+        }
+
         // Check if this is an external user request (has project parameter and user context)
         $isExternalUserRequest = $this->isExternalUserRequest();
 
@@ -474,6 +481,7 @@ class ExternalAttachmentController extends Controller
             if (! $this->externalUserHasAccess($task, $externalUser)) {
                 return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
             }
+
         } elseif (! Task::query()->visibleTo($request->user()?->id)->whereKey($task->id)->exists()) {
             return response()->json(['error' => 'Attachment not found'], 404);
         }

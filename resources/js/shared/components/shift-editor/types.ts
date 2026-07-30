@@ -15,3 +15,13 @@ export type ProtectedFragment = {
     token: string;
     html: string;
 };
+
+export type MentionCandidate = {
+    kind: 'internal' | 'external';
+    id: number | string;
+    name: string;
+    email?: string | null;
+    isCollaborator: boolean;
+};
+
+export type MentionIdentity = Pick<MentionCandidate, 'kind' | 'id'>;

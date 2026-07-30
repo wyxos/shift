@@ -1,0 +1,61 @@
+@reference "tailwindcss";
+
+.ProseMirror img.editor-tile,
+.tiptap img.editor-tile {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    display: inline-block;
+    margin: 4px;
+}
+
+.tiptap {
+    --editor-min-height: 140px;
+}
+
+.ProseMirror {
+    @apply rounded-lg border p-4 text-sm leading-6 transition-colors outline-none;
+    border-color: var(--input);
+    min-height: var(--editor-min-height, 140px);
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.ProseMirror:focus,
+.ProseMirror-focused,
+.tiptap.is-focused .ProseMirror {
+    border-color: var(--ring);
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #9ca3af;
+    pointer-events: none;
+    height: 0;
+}
+
+.tiptap pre {
+    @apply bg-gray-200;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.625rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+}
+
+.tiptap pre code {
+    background: none;
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 0;
+}
+
+.tiptap pre code.hljs {
+    padding: 0;
+}
+
+.shift-mention {
+    @apply rounded bg-sky-100 px-1 py-0.5 font-medium text-sky-800;
+}

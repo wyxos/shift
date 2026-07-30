@@ -64,12 +64,23 @@ export function resolveTouchTap(
     };
 }
 
-export async function copyTextToClipboard(text: string): Promise<boolean> {
+export async function copyTextToClipboard(text: string, html?: string): Promise<boolean> {
     const value = text.trim();
+    const richValue = html?.trim();
     if (!value) return false;
 
     try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        if (richValue && typeof navigator !== 'undefined' && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/plain': new Blob([value], { type: 'text/plain' }),
+                    'text/html': new Blob([richValue], { type: 'text/html' }),
+                }),
+            ]);
+            return true;
+        }
+
+        if (!richValue && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(value);
             return true;
         }
@@ -85,7 +96,17 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     textarea.style.opacity = '0';
     document.body.appendChild(textarea);
     textarea.select();
-    const copied = document.execCommand('copy');
+    const onCopy = richValue
+        ? (event: ClipboardEvent) => {
+              event.preventDefault();
+              event.clipboardData?.setData('text/plain', value);
+              event.clipboardData?.setData('text/html', richValue);
+          }
+        : null;
+
+    if (onCopy) document.addEventListener('copy', onCopy);
+    const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
+    if (onCopy) document.removeEventListener('copy', onCopy);
     document.body.removeChild(textarea);
     return copied;
 }

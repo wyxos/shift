@@ -20,6 +20,7 @@ use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Models\TaskCollaborator;
 use App\Models\TaskThread;
+use App\Models\TaskThreadMention;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
 use App\Notifications\TaskThreadUpdated;
@@ -349,7 +350,7 @@ test('list task threads returns thread content for a task', function () {
         'project_id' => $project->id,
     ]);
 
-    TaskThread::query()->create([
+    $thread = TaskThread::query()->create([
         'task_id' => $task->id,
         'type' => 'internal',
         'content' => 'The reproduction is attached to this task.',
@@ -357,12 +358,17 @@ test('list task threads returns thread content for a task', function () {
         'sender_type' => User::class,
         'sender_id' => $sender->id,
     ]);
+    TaskThreadMention::query()->create([
+        'task_thread_id' => $thread->id,
+        'kind' => TaskCollaboratorKind::Internal,
+        'user_id' => $sender->id,
+    ]);
 
     ShiftServer::actingAs($sender)->tool(ListTaskThreadsTool::class, [
         'task_id' => $task->id,
     ])
         ->assertOk()
-        ->assertSee(['internal', 'The reproduction is attached to this task.', 'Thread Sender']);
+        ->assertSee(['internal', 'team', 'The reproduction is attached to this task.', 'Thread Sender']);
 });
 
 test('get task write context returns fields enums and capabilities for inline drafting', function () {
@@ -638,6 +644,76 @@ test('mcp write tools can add and edit own thread comments', function () {
         'id' => $thread->id,
         'content' => '<p>Edited Codex reply.</p>',
     ]);
+});
+
+test('mcp comment tools map All and Team without changing legacy storage values', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+        'task_id' => $task->id,
+        'content' => '<p>Shared comment.</p>',
+        'audience' => 'all',
+    ])
+        ->assertOk()
+        ->assertSee(['all', 'external', 'Shared comment.']);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+        'task_id' => $task->id,
+        'content' => '<p>Team comment.</p>',
+        'audience' => 'team',
+    ])
+        ->assertOk()
+        ->assertSee(['team', 'internal', 'Team comment.']);
+
+    expect(TaskThread::query()->where('type', 'external')->count())->toBe(1)
+        ->and(TaskThread::query()->where('type', 'internal')->count())->toBe(1);
+
+    shiftMcpAs($user)->tool(ListTaskThreadsTool::class, [
+        'task_id' => $task->id,
+        'audience' => 'all',
+    ])
+        ->assertOk()
+        ->assertSee('Shared comment.')
+        ->assertDontSee('Team comment.');
+});
+
+test('mcp cannot edit an All message to quote Team content', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create([
+        'mcp_enabled' => true,
+    ]);
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+    ]);
+    $team = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'internal',
+        'content' => '<p>Team context.</p>',
+        'sender_name' => $user->name,
+        'sender_type' => User::class,
+        'sender_id' => $user->id,
+    ]);
+    $all = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>All original.</p>',
+        'sender_name' => $user->name,
+        'sender_type' => User::class,
+        'sender_id' => $user->id,
+    ]);
+
+    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+        'thread_id' => $all->id,
+        'content' => '<blockquote class="shift-reply" data-reply-to="'.$team->id.'"><p>Team context.</p></blockquote>',
+    ])->assertHasErrors(['Remove Team reply references']);
+
+    expect($all->fresh()->content)->toBe('<p>All original.</p>');
 });
 
 test('mcp write tools cannot edit another users thread comment', function () {

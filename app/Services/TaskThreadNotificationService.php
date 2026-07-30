@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\TaskThreadAudience;
 use App\Jobs\SendTaskThreadNotification;
 use App\Models\ExternalUser;
 use App\Models\Task;
@@ -29,6 +30,7 @@ class TaskThreadNotificationService
                 $internalAudience,
                 new TaskThreadUpdated([
                     'type' => $thread->type,
+                    'audience' => TaskThreadAudience::fromStoredType((string) $thread->type)->value,
                     'task_id' => $task->id,
                     'task_title' => $task->title,
                     'thread_id' => $thread->id,
