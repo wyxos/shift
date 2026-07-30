@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use RuntimeException;
 
 class ExternalUserService
@@ -56,13 +57,14 @@ class ExternalUserService
 
     public function __construct(
         private readonly ProjectEnvironmentService $projectEnvironmentService,
+        private readonly OutboundUrlPolicy $outboundUrlPolicy,
     ) {}
 
     public function find(Project $project, mixed $externalId, ?string $environment, ?string $url): ?ExternalUser
     {
         $normalizedId = $this->normalizeExternalId($externalId);
         $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($environment);
-        $normalizedUrl = $this->projectEnvironmentService->normalizeUrl($url);
+        $normalizedUrl = $this->projectEnvironmentService->normalizeBaseUrl($url);
 
         if ($normalizedId === null || $normalizedEnvironment === null) {
             return null;
@@ -71,11 +73,22 @@ class ExternalUserService
         $projectEnvironment = $this->projectEnvironmentService->find($project, $normalizedEnvironment);
 
         if ($projectEnvironment instanceof ProjectEnvironment) {
+            if ($normalizedUrl === null || $normalizedUrl !== $projectEnvironment->url) {
+                return null;
+            }
+
             $externalUser = $this->findByProjectEnvironment($project, $projectEnvironment, $normalizedId, $normalizedUrl);
 
             if ($externalUser instanceof ExternalUser) {
                 return $externalUser;
             }
+
+            return $this->legacyIdentityQuery(
+                $project,
+                $normalizedId,
+                $normalizedEnvironment,
+                $projectEnvironment->url,
+            )->first();
         }
 
         if ($normalizedUrl === null) {
@@ -113,7 +126,7 @@ class ExternalUserService
     {
         $externalId = $this->normalizeExternalId($attributes['external_id'] ?? null);
         $environment = $this->projectEnvironmentService->normalizeEnvironment($attributes['environment'] ?? null);
-        $url = $this->projectEnvironmentService->normalizeUrl($attributes['url'] ?? null);
+        $url = $this->projectEnvironmentService->normalizeBaseUrl($attributes['url'] ?? null);
 
         if ($externalId === null || $environment === null || $url === null) {
             throw ValidationException::withMessages([
@@ -131,19 +144,33 @@ class ExternalUserService
         }
 
         return DB::transaction(function () use ($project, $externalId, $environment, $url, $values) {
-            $projectEnvironment = $this->projectEnvironmentService->register($project, $environment, $url);
-            $externalUser = $this->findByProjectEnvironment($project, $projectEnvironment, $externalId, $url)
-                ?? $this->legacyIdentityQuery($project, $externalId, $environment, $url)->first();
+            $projectEnvironment = ProjectEnvironment::query()
+                ->where('project_id', $project->id)
+                ->where('environment', $environment)
+                ->lockForUpdate()
+                ->first();
+
+            if ($projectEnvironment instanceof ProjectEnvironment && $projectEnvironment->url !== $url) {
+                throw ValidationException::withMessages([
+                    'user.url' => 'The external user URL does not match the manager-registered project environment.',
+                ]);
+            }
+
+            $trustedUrl = $projectEnvironment?->url ?? $url;
+            $externalUser = $projectEnvironment instanceof ProjectEnvironment
+                ? $this->findByProjectEnvironment($project, $projectEnvironment, $externalId, $trustedUrl)
+                    ?? $this->legacyIdentityQuery($project, $externalId, $environment, $trustedUrl)->first()
+                : $this->legacyIdentityQuery($project, $externalId, $environment, $trustedUrl)->first();
 
             if (! $externalUser instanceof ExternalUser) {
                 return ExternalUser::query()->create([
                     ...$values,
                     'project_id' => $project->id,
                     'external_contact_id' => $this->createContactId($project),
-                    'project_environment_id' => $projectEnvironment->id,
+                    'project_environment_id' => $projectEnvironment?->id,
                     'external_id' => $externalId,
                     'environment' => $environment,
-                    'url' => $url,
+                    'url' => $trustedUrl,
                 ]);
             }
 
@@ -151,9 +178,9 @@ class ExternalUserService
                 ...$values,
                 'project_id' => $project->id,
                 'external_contact_id' => $externalUser->external_contact_id ?? $this->createContactId($project),
-                'project_environment_id' => $projectEnvironment->id,
+                'project_environment_id' => $projectEnvironment?->id,
                 'environment' => $environment,
-                'url' => $url,
+                'url' => $trustedUrl,
             ])->save();
 
             return $externalUser;
@@ -263,6 +290,24 @@ class ExternalUserService
             throw new RuntimeException('External collaborators are unavailable because this environment is not registered for the selected project.');
         }
 
+        if ($registration->callback_trusted_at === null) {
+            throw new RuntimeException('External collaborators are unavailable because the registered callback destination has not been trusted.');
+        }
+
+        if (! filled($project->token)) {
+            throw new RuntimeException('External collaborators are unavailable because this project does not have a callback token.');
+        }
+
+        try {
+            $destination = $this->outboundUrlPolicy->approveRequest($registration->url);
+            $requestOptions = $this->outboundUrlPolicy->requestOptions($destination);
+        } catch (InvalidArgumentException $exception) {
+            throw new RuntimeException(
+                'External collaborators are unavailable because the registered callback destination is not trusted.',
+                previous: $exception,
+            );
+        }
+
         $query = [];
         $term = trim((string) $search);
         if ($term !== '') {
@@ -270,12 +315,19 @@ class ExternalUserService
         }
 
         try {
-            $response = Http::withToken($project->token)
+            $callbackUrl = $destination['url'].'/shift/api/collaborators/external';
+            $response = Http::withOptions($requestOptions)
+                ->withToken($project->token)
                 ->acceptJson()
+                ->connectTimeout((int) config('shift.notifications.callback_connect_timeout_seconds', 5))
                 ->timeout(10)
-                ->get(rtrim($registration->url, '/').'/shift/api/collaborators/external', $query);
+                ->get($callbackUrl, $query);
         } catch (ConnectionException $exception) {
             throw new RuntimeException('External collaborators are unavailable because the client app could not be reached.', previous: $exception);
+        }
+
+        if ($this->outboundUrlPolicy->responseWasRedirected($response, $callbackUrl)) {
+            throw new RuntimeException('External collaborators are unavailable because the callback destination attempted a redirect.');
         }
 
         if (! $response->successful()) {
@@ -286,7 +338,7 @@ class ExternalUserService
 
         $payload = $response->json();
         $returnedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($payload['environment'] ?? null);
-        $returnedUrl = $this->projectEnvironmentService->normalizeUrl($payload['url'] ?? null);
+        $returnedUrl = $this->projectEnvironmentService->normalizeBaseUrl($payload['url'] ?? null);
 
         if ($returnedEnvironment === null || $returnedUrl === null) {
             throw new RuntimeException('External collaborators are unavailable because the client app returned an invalid identity.');

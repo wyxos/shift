@@ -5,6 +5,7 @@ use App\Jobs\SendExternalNotificationFallbackEmail;
 use App\Jobs\SendTaskThreadNotification;
 use App\Models\ExternalNotificationDelivery;
 use App\Models\Project;
+use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
@@ -38,6 +39,41 @@ test('thread notification records callback success and does not send the same de
         ->and($delivery->callback_delivered_at)->not->toBeNull()
         ->and($delivery->completed_at)->not->toBeNull()
         ->and($delivery->failed_at)->toBeNull();
+});
+
+test('thread notification handles legacy queued payloads without an environment key', function () {
+    Http::fake([
+        'https://client-app.test/shift/api/notifications' => Http::response(['production' => true], 200),
+    ]);
+
+    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
+    expect($externalUserData)->not->toHaveKey('environment');
+
+    $job = unserialize(serialize(new SendTaskThreadNotification($thread->id, $externalUserData, $payload)));
+    $job->handle(app(ExternalNotificationService::class));
+
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+
+    expect($delivery->callback_delivered_at)->not->toBeNull()
+        ->and($delivery->completed_at)->not->toBeNull();
+    Http::assertSentCount(1);
+});
+
+test('thread notification records historical untrusted destinations as terminal failures', function () {
+    Http::fake();
+
+    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
+    $thread->task->project->environments()->update(['callback_trusted_at' => null]);
+
+    (new SendTaskThreadNotification($thread->id, $externalUserData, $payload))
+        ->handle(app(ExternalNotificationService::class));
+
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+
+    expect($delivery->last_failure_type)->toBe('untrusted_destination')
+        ->and($delivery->failed_at)->not->toBeNull()
+        ->and($delivery->completed_at)->toBeNull();
+    Http::assertNothingSent();
 });
 
 test('thread notification retries a transient callback and records eventual success', function () {
@@ -177,6 +213,12 @@ function threadNotificationFixture(): array
     $project = Project::factory()->create([
         'author_id' => $owner->id,
         'token' => 'external-notification-token',
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'production',
+        'url' => 'https://client-app.test',
+        'callback_trusted_at' => now(),
     ]);
     $task = Task::factory()->create([
         'project_id' => $project->id,

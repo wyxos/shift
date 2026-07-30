@@ -7,6 +7,7 @@ use App\Jobs\SendPendingTaskCollaboratorNotification;
 use App\Models\ExternalNotificationDelivery;
 use App\Models\ExternalUser;
 use App\Models\Project;
+use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Models\TaskCollaboratorNotification;
 use App\Models\User;
@@ -92,6 +93,12 @@ test('pending external collaborator notification posts to the consuming app when
         'author_id' => $owner->id,
         'token' => 'external-notification-token',
     ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'production',
+        'url' => 'https://client-app.test',
+        'callback_trusted_at' => now(),
+    ]);
 
     $externalUser = ExternalUser::query()->create([
         'external_id' => 'client-1',
@@ -163,6 +170,26 @@ test('retryable callback failure keeps collaborator notification pending until e
         ->and($delivery->callback_delivered_at)->not->toBeNull()
         ->and($delivery->completed_at)->not->toBeNull();
     Http::assertSentCount(2);
+});
+
+test('untrusted callback destinations cancel pending collaborator notifications', function () {
+    Http::fake();
+
+    ['pending' => $pending, 'task' => $task] = externalCollaboratorNotificationFixture();
+    $task->project->environments()->update(['callback_trusted_at' => null]);
+
+    (new SendPendingTaskCollaboratorNotification($pending->id))
+        ->handle(app(ExternalNotificationService::class));
+
+    $pending->refresh();
+    $delivery = ExternalNotificationDelivery::findForTaskCollaborator($pending->id);
+
+    expect($pending->sent_at)->toBeNull()
+        ->and($pending->cancelled_at)->not->toBeNull()
+        ->and($delivery->last_failure_type)->toBe('untrusted_destination')
+        ->and($delivery->failed_at)->not->toBeNull()
+        ->and($delivery->completed_at)->toBeNull();
+    Http::assertNothingSent();
 });
 
 test('connection failures remain pending and record an exhausted retry failure', function () {
@@ -364,6 +391,12 @@ function externalCollaboratorNotificationFixture(): array
     $project = Project::factory()->create([
         'author_id' => $owner->id,
         'token' => 'external-notification-token',
+    ]);
+    ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'production',
+        'url' => 'https://client-app.test',
+        'callback_trusted_at' => now(),
     ]);
     $externalUser = ExternalUser::query()->create([
         'external_id' => 'client-1',

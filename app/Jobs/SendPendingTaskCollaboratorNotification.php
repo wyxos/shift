@@ -96,7 +96,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
         $externalUser = $pending->externalUser;
         $task = $pending->task;
 
-        if (! $externalUser || ! $task || ! filled($externalUser->url)) {
+        if (! $externalUser || ! $task || ! $task->project || ! filled($externalUser->url)) {
             $pending->markCancelled();
 
             return false;
@@ -120,11 +120,11 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
 
             try {
                 $response = $notificationService->sendNotification(
+                    $task->project,
                     $externalUser->url,
                     $handler,
                     $payload,
                     [],
-                    $task->project?->token,
                     $delivery->delivery_id,
                 );
             } catch (ExternalNotificationException $exception) {
@@ -135,6 +135,10 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
                 }
 
                 $delivery->markFailed($exception->failureType, $exception->statusCode);
+
+                if ($this->isConfigurationFailure($exception)) {
+                    $pending->markCancelled();
+                }
 
                 return false;
             }
@@ -194,6 +198,15 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
                 fn ($query) => $query->where('external_user_id', $pending->external_user_id),
             )
             ->exists();
+    }
+
+    private function isConfigurationFailure(ExternalNotificationException $exception): bool
+    {
+        return in_array($exception->failureType, [
+            'untrusted_destination',
+            'missing_project_token',
+            'redirect_response',
+        ], true);
     }
 
     private function recipientIsSubmitter(TaskCollaboratorNotification $pending): bool
