@@ -2,10 +2,12 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\TaskThreadAudience;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
 use App\Models\TaskThread;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -30,6 +32,7 @@ class ListTaskThreadsTool extends Tool
         $validated = $request->validate([
             'task_id' => ['required', 'integer'],
             'type' => ['nullable', 'string', 'max:50'],
+            'audience' => ['nullable', 'string', Rule::enum(TaskThreadAudience::class)],
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
@@ -47,9 +50,13 @@ class ListTaskThreadsTool extends Tool
         $limit = (int) ($validated['limit'] ?? 20);
 
         $threads = TaskThread::query()
-            ->with(['sender', 'attachments'])
+            ->with(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
             ->where('task_id', $validated['task_id'])
             ->when($validated['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
+            ->when(
+                $validated['audience'] ?? null,
+                fn ($query, string $audience) => $query->where('type', TaskThreadAudience::from($audience)->storedType())
+            )
             ->latest()
             ->limit($limit)
             ->get()
@@ -70,8 +77,11 @@ class ListTaskThreadsTool extends Tool
             'task_id' => $schema->integer()
                 ->description('The SHIFT task ID.')
                 ->required(),
+            'audience' => $schema->string()
+                ->description('Optional message-audience filter.')
+                ->enum(['all', 'team']),
             'type' => $schema->string()
-                ->description('Optional thread type filter: internal or external.'),
+                ->description('Optional legacy storage-value filter retained for compatibility.'),
             'limit' => $schema->integer()
                 ->description('Maximum number of thread messages to return, between 1 and 50.')
                 ->default(20),

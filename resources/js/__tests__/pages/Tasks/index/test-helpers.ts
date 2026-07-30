@@ -313,62 +313,12 @@ vi.mock('@/components/ui/alert-dialog', () => ({
     },
 }));
 
-vi.mock('@/components/ShiftEditor.vue', () => ({
-    default: {
-        props: ['modelValue', 'sendable'],
-        emits: ['update:modelValue', 'send', 'uploading'],
-        render() {
-            const previewText = String(this.modelValue ?? '').replace(/<[^>]+>/g, '');
-            return h('div', { ...this.$attrs, class: 'shift-editor-stub' }, [
-                h('textarea', {
-                    'data-testid': 'stub-editor-input',
-                    value: this.modelValue,
-                    onInput: (e: Event) => this.$emit('update:modelValue', (e.target as HTMLTextAreaElement).value),
-                }),
-                h('div', { 'data-testid': 'stub-editor-preview' }, previewText),
-                this.sendable === false
-                    ? null
-                    : h(
-                          'button',
-                          {
-                              type: 'button',
-                              'data-testid': 'stub-send',
-                              onClick: () => this.$emit('send', { html: this.modelValue ?? '<p>hello</p>', attachments: [] }),
-                          },
-                          'send',
-                      ),
-            ]);
-        },
-    },
+vi.mock('@/components/ShiftEditor.vue', async () => ({
+    default: (await import('./ShiftEditorStub')).ShiftEditorStub,
 }));
 
-vi.mock('@shared/components/ShiftEditor.vue', () => ({
-    default: {
-        props: ['modelValue', 'sendable'],
-        emits: ['update:modelValue', 'send', 'uploading'],
-        render() {
-            const previewText = String(this.modelValue ?? '').replace(/<[^>]+>/g, '');
-            return h('div', { ...this.$attrs, class: 'shift-editor-stub' }, [
-                h('textarea', {
-                    'data-testid': 'stub-editor-input',
-                    value: this.modelValue,
-                    onInput: (e: Event) => this.$emit('update:modelValue', (e.target as HTMLTextAreaElement).value),
-                }),
-                h('div', { 'data-testid': 'stub-editor-preview' }, previewText),
-                this.sendable === false
-                    ? null
-                    : h(
-                          'button',
-                          {
-                              type: 'button',
-                              'data-testid': 'stub-send',
-                              onClick: () => this.$emit('send', { html: this.modelValue ?? '<p>hello</p>', attachments: [] }),
-                          },
-                          'send',
-                      ),
-            ]);
-        },
-    },
+vi.mock('@shared/components/ShiftEditor.vue', async () => ({
+    default: (await import('./ShiftEditorStub')).ShiftEditorStub,
 }));
 
 vi.mock('@/components/tasks/TaskCollaboratorField.vue', () => ({

@@ -74,6 +74,7 @@ trait FormatsShiftRecords
             'id' => $thread->id,
             'task_id' => $thread->task_id,
             'type' => $thread->type,
+            'audience' => \App\Enums\TaskThreadAudience::fromStoredType((string) $thread->type)->value,
             'content' => $thread->content,
             'sender_name' => $thread->sender_name,
             'sender' => $this->person($thread->sender),
@@ -82,6 +83,29 @@ trait FormatsShiftRecords
                     'id' => $attachment->id,
                     'original_filename' => $attachment->original_filename,
                 ])
+                ->values()
+                ->all(),
+            'mentions' => $thread->mentions
+                ->map(function ($mention): ?array {
+                    if ($mention->user instanceof User) {
+                        return [
+                            'kind' => 'internal',
+                            'id' => $mention->user->id,
+                            'name' => $mention->user->name,
+                        ];
+                    }
+
+                    if ($mention->externalUser instanceof ExternalUser) {
+                        return [
+                            'kind' => 'external',
+                            'id' => $mention->externalUser->external_id,
+                            'name' => $mention->externalUser->name,
+                        ];
+                    }
+
+                    return null;
+                })
+                ->filter()
                 ->values()
                 ->all(),
             'created_at' => $this->date($thread->created_at),
@@ -135,6 +159,7 @@ trait FormatsShiftRecords
 
         if (isset($data['type']) && is_string($data['type'])) {
             $summary['thread_type'] = $data['type'];
+            $summary['thread_audience'] = \App\Enums\TaskThreadAudience::fromStoredType($data['type'])->value;
         }
 
         if (isset($data['tasks']) && is_array($data['tasks'])) {

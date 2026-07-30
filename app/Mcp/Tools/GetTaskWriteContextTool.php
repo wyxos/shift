@@ -115,11 +115,14 @@ class GetTaskWriteContextTool extends Tool
             ],
             'thread_comment_fields' => [
                 'content' => ['type' => 'html_string', 'required' => true],
-                'type' => ['type' => 'enum', 'values' => ['internal', 'external'], 'default' => 'internal'],
+                'audience' => ['type' => 'enum', 'values' => ['all', 'team'], 'default' => 'team'],
+                'type' => ['type' => 'legacy_enum', 'values' => ['internal', 'external']],
             ],
             'unsupported_mcp_fields' => [
                 'attachments',
                 'temporary_uploads',
+                'mentions',
+                'collaborator_additions',
                 'external_collaborator_lookup',
             ],
         ];

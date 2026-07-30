@@ -30,6 +30,7 @@ const ALLOWED_TAGS = new Set([
     'p',
     'pre',
     's',
+    'span',
     'strong',
     'u',
     'ul',
@@ -263,6 +264,32 @@ function sanitizeElement(element: Element): void {
                 }
 
                 if (!/^\d+$/.test(value)) {
+                    remove();
+                }
+
+                break;
+            }
+            case 'span': {
+                if (!['class', 'data-shift-mention', 'data-mention-kind', 'data-mention-id'].includes(name)) {
+                    remove();
+                    continue;
+                }
+
+                if (name === 'class') {
+                    const normalized = normalizeAllowedClasses(value, ['shift-mention']);
+                    if (!normalized) remove();
+                    else element.setAttribute(attribute.name, normalized);
+                }
+
+                if (name === 'data-shift-mention' && value !== 'true') {
+                    remove();
+                }
+
+                if (name === 'data-mention-kind' && !['internal', 'external'].includes(value)) {
+                    remove();
+                }
+
+                if (name === 'data-mention-id' && (!value || value.length > 255 || /[\s<>"']/.test(value))) {
                     remove();
                 }
 

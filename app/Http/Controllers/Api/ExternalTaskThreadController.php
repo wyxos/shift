@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TaskThreadAudience;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
@@ -9,6 +10,8 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\ExternalUserService;
+use App\Services\TaskThreadAudienceService;
+use App\Services\TaskThreadMentionService;
 use App\Services\TaskThreadNotificationService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +22,8 @@ class ExternalTaskThreadController extends Controller
 {
     public function __construct(
         private readonly ExternalUserService $externalUserService,
+        private readonly TaskThreadAudienceService $audiences,
+        private readonly TaskThreadMentionService $mentions,
         private readonly TaskThreadNotificationService $taskThreadNotificationService,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
@@ -179,10 +184,17 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Unauthorized to comment on this task'], 403);
         }
 
+        $content = (string) $this->sanitizeRichContent($request->input('content'));
+        $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
+        $content = $this->mentions->normalizeContent($content, [
+            'user_ids' => [],
+            'external_user_ids' => [],
+        ]);
+
         $thread = new TaskThread([
             'task_id' => $task->id,
             'type' => 'external',
-            'content' => $this->sanitizeRichContent($request->input('content')),
+            'content' => $content,
             'sender_name' => $externalUser->name,
         ]);
 
@@ -320,7 +332,9 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
-        $thread = TaskThread::findOrFail($threadId);
+        $thread = TaskThread::query()
+            ->ofType('external')
+            ->findOrFail($threadId);
 
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
@@ -393,7 +407,9 @@ class ExternalTaskThreadController extends Controller
         ]);
 
         /** @var TaskThread $thread */
-        $thread = TaskThread::findOrFail($threadId);
+        $thread = TaskThread::query()
+            ->ofType('external')
+            ->findOrFail($threadId);
 
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
@@ -406,9 +422,15 @@ class ExternalTaskThreadController extends Controller
         $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
 
         // Normalize any client-proxy attachment download URLs back to the internal download route before persisting.
-        $thread->content = $this->sanitizeRichContent(
+        $content = (string) $this->sanitizeRichContent(
             $this->normalizeAttachmentUrlsToInternalDownloadRoute($request->input('content', ''))
         );
+        $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
+        $content = $this->mentions->normalizeContent($content, [
+            'user_ids' => [],
+            'external_user_ids' => [],
+        ]);
+        $thread->content = $content;
         $thread->save();
 
         // Process any temporary attachments
@@ -482,7 +504,9 @@ class ExternalTaskThreadController extends Controller
         }
 
         /** @var TaskThread $thread */
-        $thread = TaskThread::findOrFail($threadId);
+        $thread = TaskThread::query()
+            ->ofType('external')
+            ->findOrFail($threadId);
 
         if ($thread->task_id !== $task->id) {
             return response()->json(['error' => 'Thread does not belong to this task'], 403);

@@ -156,6 +156,113 @@ describe('ShiftEditor toolbar', () => {
         expect(text).toBe('');
     });
 
+    it('uses slash commands as shortcuts and removes them from the document', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                slashCommands: ['all', 'team'],
+            },
+        });
+        await nextTick();
+
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.chain().focus().insertContent('/team ').run();
+        await nextTick();
+
+        expect(wrapper.emitted('slash-command')?.[0]).toEqual(['team']);
+        expect(ed?.getText().trim()).toBe('');
+    });
+
+    it('keeps mention behavior disabled for consuming editors by default', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                mentionCandidates: [
+                    {
+                        kind: 'internal',
+                        id: 4,
+                        name: 'Alice',
+                        isCollaborator: true,
+                    },
+                ],
+            },
+        });
+        await nextTick();
+
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.chain().focus().insertContent('@ali').run();
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="mention-suggestions"]').exists()).toBe(false);
+        expect(wrapper.emitted('mention-query')).toBeUndefined();
+    });
+
+    it('persists selected collaborator mentions as structured identities', async () => {
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                enableMentions: true,
+                mentionCandidates: [
+                    {
+                        kind: 'internal',
+                        id: 4,
+                        name: 'Alice',
+                        email: 'alice@example.com',
+                        isCollaborator: true,
+                    },
+                ],
+            },
+        });
+        await nextTick();
+
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.chain().focus().insertContent('@ali').run();
+        await nextTick();
+
+        expect(wrapper.emitted('mention-query')?.at(-1)).toEqual(['ali']);
+        await wrapper.get('[data-testid="mention-candidate-internal:4"]').trigger('click');
+        await nextTick();
+        await wrapper.get('[data-testid="toolbar-send"]').trigger('click');
+
+        const payload = wrapper.emitted('send')?.[0]?.[0] as any;
+        expect(payload.html).toContain('data-shift-mention="true"');
+        expect(payload.html).toContain('data-mention-id="4"');
+        expect(payload.mentions).toEqual([{ kind: 'internal', id: 4 }]);
+        expect(payload.addCollaborators).toEqual([]);
+    });
+
+    it('requires parent confirmation before a non-collaborator is added and mentioned', async () => {
+        const candidate = {
+            kind: 'external' as const,
+            id: 'client-7',
+            name: 'Client User',
+            email: 'client@example.com',
+            isCollaborator: false,
+        };
+        const wrapper = mount(ShiftEditor, {
+            props: {
+                enableMentions: true,
+                mentionCandidates: [candidate],
+                clearOnSend: false,
+            },
+        });
+        await nextTick();
+
+        const ed: any = (wrapper.vm as any).editor;
+        ed?.chain().focus().insertContent('@cli').run();
+        await nextTick();
+        await wrapper.get('[data-testid="mention-candidate-external:client-7"]').trigger('click');
+        await nextTick();
+
+        expect(wrapper.emitted('mention-add-request')?.[0]).toEqual([candidate]);
+        expect(ed?.getHTML()).not.toContain('data-shift-mention');
+
+        (wrapper.vm as any).confirmMentionAddition(candidate);
+        await nextTick();
+        await wrapper.get('[data-testid="toolbar-send"]').trigger('click');
+
+        const payload = wrapper.emitted('send')?.[0]?.[0] as any;
+        expect(payload.mentions).toEqual([{ kind: 'external', id: 'client-7' }]);
+        expect(payload.addCollaborators).toEqual([{ kind: 'external', id: 'client-7' }]);
+    });
+
     it('submits on Enter and keeps Shift+Enter for newline', async () => {
         const wrapper = mount(ShiftEditor);
         await nextTick();

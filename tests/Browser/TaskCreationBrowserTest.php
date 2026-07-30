@@ -2,6 +2,7 @@
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskThread;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -101,4 +102,60 @@ it('opens an error intake task with tabbed comments and occurrences', function (
         ->assertSee('Widget crashed token=[Filtered]')
         ->assertSee('https://consumer.test/dashboard')
         ->assertSee('https://consumer.test/widget.js:88');
+});
+
+it('keeps the All and Team timeline controls visible across task sheet widths', function () {
+    $user = User::factory()->create();
+    $teammate = User::factory()->create(['name' => 'Delivery Teammate']);
+    $project = Project::factory()->withAuthor($user->id)->create();
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Audience browser proof',
+        'description' => '',
+    ]);
+    $task->submitter()->associate($user)->save();
+
+    TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>Shared update</p>',
+        'sender_name' => $teammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $teammate->id,
+        'created_at' => now()->subMinute(),
+        'updated_at' => now()->subMinute(),
+    ]);
+    TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'internal',
+        'content' => '<p>Team planning note</p>',
+        'sender_name' => $teammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $teammate->id,
+    ]);
+
+    $this->actingAs($user);
+
+    $page = visit("/tasks?task={$task->id}")
+        ->resize(1440, 900)
+        ->assertNoSmoke()
+        ->assertSee('Shared update')
+        ->assertSee('Team planning note')
+        ->assertVisible('[data-testid="task-comments-pane"]')
+        ->assertVisible('[data-testid="thread-audience-all"]')
+        ->assertVisible('[data-testid="thread-audience-team"]')
+        ->assertVisible('[data-testid="toolbar-send"]');
+
+    $page->resize(768, 1024)
+        ->click('[data-testid="edit-mobile-pane-comments"]')
+        ->assertVisible('[data-testid="task-comments-pane"]')
+        ->assertVisible('[data-testid="thread-audience-all"]')
+        ->assertVisible('[data-testid="thread-audience-team"]')
+        ->assertVisible('[data-testid="toolbar-send"]');
+
+    $page->resize(390, 844)
+        ->assertVisible('[data-testid="task-comments-pane"]')
+        ->assertVisible('[data-testid="thread-audience-all"]')
+        ->assertVisible('[data-testid="thread-audience-team"]')
+        ->assertVisible('[data-testid="toolbar-send"]');
 });

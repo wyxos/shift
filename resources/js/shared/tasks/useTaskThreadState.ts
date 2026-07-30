@@ -1,20 +1,18 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
-import { buildThreadAiContext } from './ai';
-import {
-    copyTextToClipboard,
-    getLightboxImageData,
-    getSelectionForMessage as getSelectionForMessageText,
-    resolveTouchTap,
-    shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent,
-    shouldShowCopySelection as shouldShowCopySelectionForContext,
-} from './interaction';
-import { buildReplyQuoteHtml, extractPlainTextFromContent, highlightRichCodeBlocks } from './rich-content';
-import { getReplyTargetFromEventTarget, mapThreadToMessage, shouldHandleImage } from './thread';
+import { nextTick, ref, watch, type Ref } from 'vue';
+import type { MentionIdentity } from '../components/shift-editor/types';
+import { resolveTouchTap, shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent } from './interaction';
+import { buildReplyQuoteHtml, highlightRichCodeBlocks } from './rich-content';
+import { mapThreadToMessage } from './thread';
 import type { TaskAttachment, ThreadMessage } from './types';
+import { useTaskThreadAudienceState, type TaskThreadMentionCandidateFetcher } from './useTaskThreadAudienceState';
+import { useTaskThreadRichInteraction } from './useTaskThreadRichInteraction';
 
 type ThreadPayload = {
     html: string;
     tempIdentifier: string;
+    audience: 'all' | 'team';
+    mentions: MentionIdentity[];
+    addCollaborators: MentionIdentity[];
 };
 
 type UseTaskThreadStateOptions<TTaskDetail> = {
@@ -25,6 +23,7 @@ type UseTaskThreadStateOptions<TTaskDetail> = {
     createThread: (taskId: number, payload: ThreadPayload) => Promise<unknown>;
     updateThread: (taskId: number, threadId: number, payload: ThreadPayload) => Promise<unknown>;
     deleteThread: (taskId: number, threadId: number) => Promise<void>;
+    fetchMentionCandidates?: TaskThreadMentionCandidateFetcher;
     optimisticAuthor?: () => string;
     onCopyMessageSuccess?: () => void;
     onCopyMessageError?: () => void;
@@ -44,21 +43,63 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     const threadSending = ref(false);
     const threadError = ref<string | null>(null);
     const threadMessages = ref<ThreadMessage[]>([]);
-    const threadAiContext = computed(() => buildThreadAiContext(threadMessages.value));
     const threadComposerRef = ref<any>(null);
     const threadComposerHtml = ref('');
     const threadComposerUploading = ref(false);
     const threadEditingId = ref<number | null>(null);
     const threadEditSaving = ref(false);
     const threadEditError = ref<string | null>(null);
-    const contextMenuMessageId = ref<number | null>(null);
-    const contextMenuSelectionText = ref('');
+    const {
+        handleMentionQuery,
+        handleSlashCommand,
+        resetThreadAudienceState,
+        setThreadAudience,
+        threadAiContext,
+        threadAudience,
+        threadAudienceError,
+        threadMentionCandidates,
+        threadMentionError,
+        threadMentionLoading,
+    } = useTaskThreadAudienceState({
+        editTask: options.editTask,
+        getTaskId: options.getTaskId,
+        fetchMentionCandidates: options.fetchMentionCandidates,
+        threadComposerHtml,
+        threadComposerRef,
+        threadEditingId,
+        threadMessages,
+    });
     const lastTouchTapAt = ref(0);
     const lastTouchTapId = ref<number | null>(null);
     const commentsScrollRef = ref<HTMLElement | null>(null);
-    const lightboxOpen = ref(false);
-    const lightboxSrc = ref('');
-    const lightboxAlt = ref('');
+    const {
+        contextMenuMessageId,
+        contextMenuSelectionText,
+        copyEntireMessage,
+        copySelectedMessage,
+        handleReplyReferenceClick,
+        lightboxAlt,
+        lightboxOpen,
+        lightboxSrc,
+        onCommentContextMenuOpen,
+        onGlobalClickCapture,
+        onGlobalDblClickCapture,
+        onGlobalKeyDownCapture,
+        onMessageCopy,
+        onRichContentClick,
+        resetRichInteractionState,
+        shouldShowCopySelection,
+    } = useTaskThreadRichInteraction({
+        cancelThreadEdit: () => cancelThreadEdit(),
+        commentsScrollRef,
+        editOpen: options.editOpen,
+        threadEditingId,
+        onCopyMessageSuccess: options.onCopyMessageSuccess,
+        onCopyMessageError: options.onCopyMessageError,
+        onCopySelectionSuccess: options.onCopySelectionSuccess,
+        onCopySelectionError: options.onCopySelectionError,
+        onCopyTeamContent: () => threadAudience.value === 'team' || setThreadAudience('team'),
+    });
 
     watch(options.editOpen, (open) => {
         if (!open) return;
@@ -82,153 +123,21 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         },
     );
 
-    onMounted(() => {
-        document.addEventListener('click', onGlobalClickCapture, true);
-        document.addEventListener('dblclick', onGlobalDblClickCapture, true);
-        document.addEventListener('keydown', onGlobalKeyDownCapture, true);
-    });
-
-    onBeforeUnmount(() => {
-        document.removeEventListener('click', onGlobalClickCapture, true);
-        document.removeEventListener('dblclick', onGlobalDblClickCapture, true);
-        document.removeEventListener('keydown', onGlobalKeyDownCapture, true);
-    });
-
     function resetThreadState() {
         threadTempIdentifier.value = Date.now().toString();
         threadLoading.value = false;
         threadSending.value = false;
         threadError.value = null;
         threadMessages.value = [];
+        resetThreadAudienceState();
         threadComposerHtml.value = '';
         threadComposerUploading.value = false;
         threadEditingId.value = null;
         threadEditSaving.value = false;
         threadEditError.value = null;
-        contextMenuMessageId.value = null;
-        contextMenuSelectionText.value = '';
+        resetRichInteractionState();
         lastTouchTapAt.value = 0;
         lastTouchTapId.value = null;
-        lightboxOpen.value = false;
-        lightboxSrc.value = '';
-        lightboxAlt.value = '';
-    }
-
-    function highlightReplyTargetBubble(target: HTMLElement) {
-        target.classList.add('shift-reply-target');
-        window.setTimeout(() => {
-            target.classList.remove('shift-reply-target');
-        }, 1800);
-    }
-
-    function scrollToReplyTarget(commentId: number): boolean {
-        const selector = `#comment-${commentId}`;
-        const withinComments = commentsScrollRef.value?.querySelector(selector) as HTMLElement | null;
-        const target = withinComments ?? (document.getElementById(`comment-${commentId}`) as HTMLElement | null);
-        if (!target) return false;
-        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-        highlightReplyTargetBubble(target);
-        return true;
-    }
-
-    function handleReplyReferenceClick(target: HTMLElement, event: MouseEvent): boolean {
-        if (!options.editOpen.value) return false;
-        if (target.closest('[contenteditable="true"]')) return false;
-        const commentId = getReplyTargetFromEventTarget(target);
-        if (!commentId) return false;
-        event.preventDefault();
-        event.stopPropagation();
-        return scrollToReplyTarget(commentId);
-    }
-
-    function openLightboxForImage(img: HTMLImageElement) {
-        const data = getLightboxImageData(img);
-        if (!data) return;
-        lightboxSrc.value = data.src;
-        lightboxAlt.value = data.alt;
-        lightboxOpen.value = true;
-    }
-
-    function onRichContentClick(event: MouseEvent) {
-        const target = event.target as HTMLElement | null;
-        if (!target) return;
-        if (handleReplyReferenceClick(target, event)) return;
-        const img = target.closest('img') as HTMLImageElement | null;
-        if (!img) return;
-        const inRich = Boolean(img.closest('.shift-rich')) || Boolean(img.closest('.tiptap')) || img.classList.contains('editor-tile');
-        if (!inRich) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openLightboxForImage(img);
-    }
-
-    function onGlobalClickCapture(event: MouseEvent) {
-        if (!options.editOpen.value) return;
-        const target = event.target as HTMLElement | null;
-        if (!target) return;
-        if (handleReplyReferenceClick(target, event)) return;
-        const img = target.closest('img') as HTMLImageElement | null;
-        if (!img) return;
-        const { ok, inEditable } = shouldHandleImage(img);
-        if (!ok || inEditable) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openLightboxForImage(img);
-    }
-
-    function onGlobalDblClickCapture(event: MouseEvent) {
-        if (!options.editOpen.value) return;
-        const target = event.target as HTMLElement | null;
-        if (!target) return;
-        const img = target.closest('img') as HTMLImageElement | null;
-        if (!img) return;
-        const { ok, inEditable } = shouldHandleImage(img);
-        if (!ok || !inEditable) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openLightboxForImage(img);
-    }
-
-    function onGlobalKeyDownCapture(event: KeyboardEvent) {
-        if (!options.editOpen.value) return;
-        if (!threadEditingId.value) return;
-        if (event.key !== 'Escape') return;
-        event.preventDefault();
-        event.stopPropagation();
-        (event as any).stopImmediatePropagation?.();
-        cancelThreadEdit();
-    }
-
-    function onCommentContextMenuOpen(message: ThreadMessage, open: boolean) {
-        if (!open) {
-            contextMenuMessageId.value = null;
-            contextMenuSelectionText.value = '';
-            return;
-        }
-        contextMenuMessageId.value = message.id ?? null;
-        contextMenuSelectionText.value = getSelectionForMessageText(message.id);
-    }
-
-    function shouldShowCopySelection(message: ThreadMessage): boolean {
-        return shouldShowCopySelectionForContext(message, contextMenuMessageId.value, contextMenuSelectionText.value);
-    }
-
-    async function copyEntireMessage(message: ThreadMessage) {
-        const copied = await copyTextToClipboard(extractPlainTextFromContent(message.content));
-        if (copied) {
-            options.onCopyMessageSuccess?.();
-            return;
-        }
-        options.onCopyMessageError?.();
-    }
-
-    async function copySelectedMessage() {
-        const copied = await copyTextToClipboard(contextMenuSelectionText.value);
-        if (copied) {
-            options.onCopySelectionSuccess?.();
-            return;
-        }
-        options.onCopySelectionError?.();
     }
 
     function scrollCommentsToBottom() {
@@ -275,7 +184,12 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         }
     }
 
-    async function handleThreadSend(payload: { html: string; attachments?: any[] }) {
+    async function handleThreadSend(payload: {
+        html: string;
+        attachments?: any[];
+        mentions?: MentionIdentity[];
+        addCollaborators?: MentionIdentity[];
+    }) {
         if (!options.editTask.value) return;
         if (threadComposerUploading.value) return;
         if (threadSending.value || threadEditSaving.value) return;
@@ -293,14 +207,24 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
                 const thread = await options.updateThread(taskId, threadEditingId.value, {
                     html,
                     tempIdentifier: threadTempIdentifier.value,
+                    audience: threadAudience.value,
+                    mentions: payload.mentions ?? [],
+                    addCollaborators: [],
                 });
                 const serverMessage = mapThreadToMessage<TaskAttachment>(thread);
                 threadMessages.value = threadMessages.value.map((message) =>
                     message.id === threadEditingId.value
-                        ? { ...message, content: serverMessage.content, attachments: serverMessage.attachments }
+                        ? {
+                              ...message,
+                              content: serverMessage.content,
+                              attachments: serverMessage.attachments,
+                              mentions: serverMessage.mentions,
+                          }
                         : message,
                 );
                 threadEditingId.value = null;
+                threadAudience.value = 'all';
+                threadAudienceError.value = null;
                 threadTempIdentifier.value = Date.now().toString();
                 threadComposerHtml.value = '';
                 threadComposerRef.value?.reset?.();
@@ -323,6 +247,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             isYou: true,
             pending: true,
             failed: false,
+            audience: threadAudience.value,
         };
         threadMessages.value = [...threadMessages.value, optimistic];
 
@@ -331,10 +256,15 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             const thread = await options.createThread(taskId, {
                 html,
                 tempIdentifier: threadTempIdentifier.value,
+                audience: threadAudience.value,
+                mentions: payload.mentions ?? [],
+                addCollaborators: payload.addCollaborators ?? [],
             });
             const serverMessage = mapThreadToMessage<TaskAttachment>(thread);
             threadMessages.value = [...threadMessages.value.filter((message) => message.clientId !== localId), serverMessage];
             threadTempIdentifier.value = Date.now().toString();
+            threadAudience.value = 'all';
+            threadAudienceError.value = null;
             threadComposerHtml.value = '';
             threadComposerRef.value?.reset?.();
             scrollCommentsToBottomSoon();
@@ -358,6 +288,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         if (!message.id || !message.isYou || message.pending) return;
         threadEditingId.value = message.id;
         threadEditError.value = null;
+        threadAudience.value = message.audience;
+        threadAudienceError.value = null;
         threadTempIdentifier.value = Date.now().toString();
         threadComposerHtml.value = message.content;
         void nextTick().then(() => {
@@ -374,6 +306,10 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         }
 
         threadEditError.value = null;
+        if (message.audience === 'team') {
+            threadAudience.value = 'team';
+            threadAudienceError.value = null;
+        }
         threadTempIdentifier.value = Date.now().toString();
         const quoteHtml = buildReplyQuoteHtml(message);
         const editor = threadComposerRef.value?.editor;
@@ -399,6 +335,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
 
     function cancelThreadEdit() {
         threadEditingId.value = null;
+        threadAudience.value = 'all';
+        threadAudienceError.value = null;
         threadComposerHtml.value = '';
         threadEditError.value = null;
         threadEditSaving.value = false;
@@ -406,6 +344,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         threadComposerRef.value?.reset?.();
         contextMenuMessageId.value = null;
         contextMenuSelectionText.value = '';
+        threadMentionCandidates.value = [];
+        threadMentionError.value = null;
     }
 
     function onMessageDblClick(message: ThreadMessage, event: MouseEvent) {
@@ -461,6 +401,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         deleteThreadMessage,
         fetchThreads,
         handleReplyReferenceClick,
+        handleMentionQuery,
+        handleSlashCommand,
         handleThreadSend,
         lastTouchTapAt,
         lastTouchTapId,
@@ -473,6 +415,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         onGlobalDblClickCapture,
         onGlobalKeyDownCapture,
         onMessageDblClick,
+        onMessageCopy,
         onMessageTouchEnd,
         onRichContentClick,
         resetThreadState,
@@ -480,6 +423,9 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         shouldShowCopySelection,
         startReplyToMessage,
         startThreadEdit,
+        setThreadAudience,
+        threadAudience,
+        threadAudienceError,
         threadAiContext,
         threadComposerHtml,
         threadComposerRef,
@@ -488,6 +434,9 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         threadEditSaving,
         threadError,
         threadLoading,
+        threadMentionCandidates,
+        threadMentionError,
+        threadMentionLoading,
         threadMessages,
         threadSending,
         threadEditingId,

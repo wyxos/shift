@@ -12,7 +12,7 @@ type UseShiftEditorAiImproveOptions = {
     onNoChange: () => void;
 };
 
-const protectedRichContentSelector = 'img, blockquote.shift-reply, blockquote[data-reply-to]';
+const protectedRichContentSelector = 'img, blockquote.shift-reply, blockquote[data-reply-to], span[data-shift-mention="true"]';
 
 export function containsAiImprovableText(html: string): boolean {
     const content = String(html ?? '');

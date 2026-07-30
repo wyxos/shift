@@ -6,6 +6,8 @@ use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
 use App\Models\TaskThread;
 use App\Models\User;
+use App\Services\TaskThreadAudienceService;
+use App\Services\TaskThreadMentionService;
 use App\Support\RichContentSanitizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -42,7 +44,7 @@ class EditTaskThreadCommentTool extends Tool
         }
 
         $thread = TaskThread::query()
-            ->with(['task.project', 'sender', 'attachments'])
+            ->with(['task.project', 'sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
             ->find($validated['thread_id']);
 
         if (! $thread instanceof TaskThread) {
@@ -57,9 +59,18 @@ class EditTaskThreadCommentTool extends Tool
             return Response::error('You can only edit your own messages.');
         }
 
-        $thread->content = app(RichContentSanitizer::class)->sanitize($validated['content']);
+        $content = (string) app(RichContentSanitizer::class)->sanitize($validated['content']);
+        app(TaskThreadAudienceService::class)->assertContentMayBeShared(
+            $thread->task,
+            \App\Enums\TaskThreadAudience::fromStoredType((string) $thread->type),
+            $content,
+        );
+        $thread->content = app(TaskThreadMentionService::class)->normalizeContent(
+            $content,
+            app(TaskThreadMentionService::class)->resolvedForThread($thread),
+        );
         $thread->save();
-        $thread->load(['sender', 'attachments']);
+        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
         return Response::structured([
             'thread' => $this->thread($thread),

@@ -29,6 +29,7 @@ class RichContentSanitizer
         'p',
         'pre',
         's',
+        'span',
         'strong',
         'u',
         'ul',
@@ -245,6 +246,35 @@ class RichContentSanitizer
                 continue;
             }
 
+            if ($tag === 'span' && $name === 'class') {
+                $normalized = $this->normalizeAllowedClasses($value, ['shift-mention']);
+                if ($normalized === '') {
+                    $element->removeAttribute($attribute->name);
+                } else {
+                    $element->setAttribute($attribute->name, $normalized);
+                }
+
+                continue;
+            }
+
+            if ($tag === 'span' && $name === 'data-shift-mention' && $value !== 'true') {
+                $element->removeAttribute($attribute->name);
+
+                continue;
+            }
+
+            if ($tag === 'span' && $name === 'data-mention-kind' && ! in_array($value, ['internal', 'external'], true)) {
+                $element->removeAttribute($attribute->name);
+
+                continue;
+            }
+
+            if ($tag === 'span' && $name === 'data-mention-id' && preg_match('/^[^\s<>"\']{1,255}$/u', $value) !== 1) {
+                $element->removeAttribute($attribute->name);
+
+                continue;
+            }
+
             if ($tag === 'code' && $name === 'class') {
                 $classes = preg_split('/\s+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
                 $allowed = array_values(array_filter($classes, fn (string $class) => $class === 'hljs' || str_starts_with($class, 'language-')));
@@ -271,6 +301,7 @@ class RichContentSanitizer
             'code' => ['class'],
             'img' => ['src', 'alt', 'title', 'class'],
             'ol' => ['start'],
+            'span' => ['class', 'data-shift-mention', 'data-mention-kind', 'data-mention-id'],
             default => [],
         };
     }

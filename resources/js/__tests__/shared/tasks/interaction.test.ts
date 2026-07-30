@@ -94,6 +94,31 @@ describe('shared/tasks/interaction', () => {
         expect(writeText).toHaveBeenCalledWith('hello');
     });
 
+    it('preserves rich provenance when copying protected context', async () => {
+        const write = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { write },
+        });
+        const OriginalClipboardItem = globalThis.ClipboardItem;
+        const ClipboardItemMock = vi.fn(function (this: any, items: Record<string, Blob>) {
+            this.items = items;
+        });
+        Object.defineProperty(globalThis, 'ClipboardItem', {
+            configurable: true,
+            value: ClipboardItemMock,
+        });
+
+        await expect(copyTextToClipboard('Team context', '<blockquote data-reply-to="7"><p>Team context</p></blockquote>')).resolves.toBe(true);
+        expect(write).toHaveBeenCalledOnce();
+        expect(ClipboardItemMock).toHaveBeenCalledOnce();
+
+        Object.defineProperty(globalThis, 'ClipboardItem', {
+            configurable: true,
+            value: OriginalClipboardItem,
+        });
+    });
+
     it('falls back to execCommand when Clipboard API fails', async () => {
         const writeText = vi.fn().mockRejectedValue(new Error('blocked'));
         Object.defineProperty(navigator, 'clipboard', {

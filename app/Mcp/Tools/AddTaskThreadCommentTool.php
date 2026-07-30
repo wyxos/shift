@@ -2,11 +2,14 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\TaskThreadAudience;
 use App\Mcp\Support\ShiftMcpAccess;
 use App\Mcp\Tools\Concerns\FormatsShiftRecords;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\ShiftPermissionService;
+use App\Services\TaskThreadAudienceService;
+use App\Services\TaskThreadMentionService;
 use App\Services\TaskThreadNotificationService;
 use App\Support\RichContentSanitizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -24,7 +27,7 @@ class AddTaskThreadCommentTool extends Tool
 
     protected string $name = 'add_task_thread_comment';
 
-    protected string $description = 'Add an internal or explicitly external thread comment to a visible SHIFT task. Requires comment permission and the mcp:write token ability.';
+    protected string $description = 'Add an All or Team comment to a visible SHIFT task. Requires comment permission and the mcp:write token ability.';
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -32,6 +35,7 @@ class AddTaskThreadCommentTool extends Tool
             'task_id' => ['required', 'integer'],
             'content' => ['required', 'string'],
             'type' => ['nullable', 'string', Rule::in(['internal', 'external'])],
+            'audience' => ['nullable', 'string', Rule::enum(TaskThreadAudience::class)],
         ]);
 
         $access = app(ShiftMcpAccess::class);
@@ -57,16 +61,32 @@ class AddTaskThreadCommentTool extends Tool
             return Response::error("You do not have permission to comment on task [{$task->id}].");
         }
 
+        $audience = isset($validated['audience'])
+            ? TaskThreadAudience::from($validated['audience'])
+            : TaskThreadAudience::fromStoredType($validated['type'] ?? 'internal');
+
+        if (isset($validated['type'])
+            && TaskThreadAudience::fromStoredType($validated['type']) !== $audience) {
+            return Response::error('The audience and legacy type values describe different audiences.');
+        }
+
+        $content = (string) app(RichContentSanitizer::class)->sanitize($validated['content']);
+        app(TaskThreadAudienceService::class)->assertContentMayBeShared($task, $audience, $content);
+        $content = app(TaskThreadMentionService::class)->normalizeContent($content, [
+            'user_ids' => [],
+            'external_user_ids' => [],
+        ]);
+
         $thread = TaskThread::query()->create([
             'task_id' => $task->id,
-            'type' => $validated['type'] ?? 'internal',
-            'content' => app(RichContentSanitizer::class)->sanitize($validated['content']),
+            'type' => $audience->storedType(),
+            'content' => $content,
             'sender_name' => $principal->user->name,
             'sender_type' => $principal->user::class,
             'sender_id' => $principal->user->id,
         ]);
 
-        $thread->load(['sender', 'attachments']);
+        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
         app(TaskThreadNotificationService::class)->send($task, $thread);
 
@@ -84,10 +104,13 @@ class AddTaskThreadCommentTool extends Tool
             'content' => $schema->string()
                 ->description('Rich-text HTML comment content. Dangerous HTML is sanitized.')
                 ->required(),
+            'audience' => $schema->string()
+                ->description('Message audience. All is shared with every authorized collaborator; Team stays in SHIFT.')
+                ->enum(['all', 'team'])
+                ->default('team'),
             'type' => $schema->string()
-                ->description('Thread type. Defaults to internal. External comments may notify external task audience.')
-                ->enum(['internal', 'external'])
-                ->default('internal'),
+                ->description('Legacy storage value accepted for backward compatibility.')
+                ->enum(['internal', 'external']),
         ];
     }
 }

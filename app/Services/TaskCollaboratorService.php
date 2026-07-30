@@ -117,6 +117,42 @@ class TaskCollaboratorService
         ];
     }
 
+    public function add(Task $task, array $internalUserIds = [], iterable $externalUsers = []): void
+    {
+        [$internalIds, $externalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
+        $now = now();
+
+        foreach ($internalIds as $userId) {
+            TaskCollaborator::query()->firstOrCreate(
+                [
+                    'task_id' => $task->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'kind' => TaskCollaboratorKind::Internal->value,
+                    'external_user_id' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
+        }
+
+        foreach ($externalIds as $externalUserId) {
+            TaskCollaborator::query()->firstOrCreate(
+                [
+                    'task_id' => $task->id,
+                    'external_user_id' => $externalUserId,
+                ],
+                [
+                    'kind' => TaskCollaboratorKind::External->value,
+                    'user_id' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
+        }
+    }
+
     public function canManageForInternalUser(Task $task, ?int $userId): bool
     {
         if ($userId === null) {
@@ -183,18 +219,16 @@ class TaskCollaboratorService
 
     public function internalReplyAudience(Task $task, ?int $excludingUserId = null): Collection
     {
-        $task->loadMissing('internalCollaborators');
-
-        return $task->internalCollaborators
+        return $task->internalCollaborators()
+            ->get()
             ->reject(fn (User $collaborator) => $collaborator->id === $excludingUserId)
             ->values();
     }
 
     public function externalReplyAudience(Task $task, ?int $excludingExternalUserId = null): Collection
     {
-        $task->loadMissing('externalCollaborators');
-
-        return $task->externalCollaborators
+        return $task->externalCollaborators()
+            ->get()
             ->reject(fn (ExternalUser $collaborator) => $collaborator->id === $excludingExternalUserId)
             ->values();
     }

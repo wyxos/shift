@@ -53,6 +53,8 @@ class TaskThreadUpdated extends CoreTaskThreadUpdated implements ShouldQueue
             'task_id' => $this->data['task_id'],
             'task_title' => $this->data['task_title'] ?? 'Task #'.$this->data['task_id'],
             'type' => $this->data['type'],
+            'audience' => $this->data['audience']
+                ?? \App\Enums\TaskThreadAudience::fromStoredType((string) $this->data['type'])->value,
             'content' => $this->data['content'],
             'url' => $this->data['url'],
             'thread_id' => $this->data['thread_id'] ?? null,
