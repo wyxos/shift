@@ -42,6 +42,7 @@ test('internal thread with 2 embedded images and 1 non-embedded PDF returns only
     $img2 = 'img_'.uniqid().'.jpg';
     $pdf1 = 'file_'.uniqid().'.pdf';
     $tempDir = 'temp_attachments/'.$tempIdentifier;
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     Storage::put($tempDir.'/'.$img1, 'fake');
     Storage::put($tempDir.'/'.$img1.'.meta', json_encode(['original_filename' => 'photo1.png']));
     Storage::put($tempDir.'/'.$img2, 'fake');

@@ -14,6 +14,7 @@ use App\Models\Task;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class ExternalRequirementController extends Controller
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -114,7 +116,7 @@ class ExternalRequirementController extends Controller
             'items' => 'required|array|min:1|max:50',
             'items.*.title' => 'required|string|max:255',
             'items.*.description' => 'required|string',
-            'items.*.temp_identifier' => 'nullable|string',
+            'items.*.temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'items.*.internal_collaborator_ids' => 'nullable|array',
             'items.*.internal_collaborator_ids.*' => 'integer',
             'items.*.external_collaborators' => 'nullable|array',
@@ -131,19 +133,20 @@ class ExternalRequirementController extends Controller
         $environment = $this->resolveEnvironment($project, $attributes);
         $sourceUrl = $this->sourceUrl($attributes);
         $externalUser = $this->currentExternalUser($project, $attributes, true);
+        $userId = $request->user()?->id;
 
         if (! $this->externalUserService->canSubmitRequirements($externalUser)) {
             return response()->json(['error' => 'Unauthorized to submit requirements for this project'], 403);
         }
 
-        $created = DB::transaction(function () use ($attributes, $project, $environment, $sourceUrl, $externalUser) {
+        $created = DB::transaction(function () use ($attributes, $project, $environment, $sourceUrl, $externalUser, $userId) {
             $batch = RequirementBatch::query()->create([
                 'project_id' => $project->id,
                 'external_user_id' => $externalUser?->id,
                 'title' => $attributes['title'] ?? null,
             ]);
 
-            $items = collect($attributes['items'])->map(function (array $item) use ($attributes, $project, $environment, $sourceUrl, $externalUser, $batch) {
+            $items = collect($attributes['items'])->map(function (array $item) use ($attributes, $project, $environment, $sourceUrl, $externalUser, $batch, $userId) {
                 $description = $this->sanitizeRichContent($item['description']);
                 $task = Task::query()->create([
                     'title' => $item['title'],
@@ -170,7 +173,7 @@ class ExternalRequirementController extends Controller
                 ]);
 
                 $this->syncCollaborators($task, $project, $this->collaboratorAttributesForItem($attributes, $item), $environment);
-                $this->persistTempAttachments($task, $item['temp_identifier'] ?? null);
+                $this->persistTempAttachments($task, $item['temp_identifier'] ?? null, $userId);
 
                 if (! empty($item['temp_identifier'])) {
                     $task->load('attachments');
@@ -235,18 +238,18 @@ class ExternalRequirementController extends Controller
         $this->taskCollaboratorService->sync($task, $internalIds, $externalUsers);
     }
 
-    private function persistTempAttachments(Task $task, ?string $tempIdentifier): void
+    private function persistTempAttachments(Task $task, ?string $tempIdentifier, ?int $userId): void
     {
         if (! filled($tempIdentifier)) {
             return;
         }
 
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (! Storage::exists($tempPath)) {
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $userId);
+        if ($tempPath === null) {
             return;
         }
 
-        $files = Storage::files($tempPath);
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $userId);
         $permanentPath = "attachments/{$task->id}";
         if (! Storage::exists($permanentPath)) {
             Storage::makeDirectory($permanentPath);
@@ -284,7 +287,7 @@ class ExternalRequirementController extends Controller
             }
         }
 
-        Storage::deleteDirectory($tempPath);
+        $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, $userId);
     }
 
     private function replaceTempUrlsInContent(string $content, string $tempIdentifier, $attachments): string

@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\ExternalUserService;
 use App\Services\TaskThreadNotificationService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +20,7 @@ class ExternalTaskThreadController extends Controller
     public function __construct(
         private readonly ExternalUserService $externalUserService,
         private readonly TaskThreadNotificationService $taskThreadNotificationService,
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
     private function resolveProjectFromRequest(): ?Project
@@ -168,7 +170,7 @@ class ExternalTaskThreadController extends Controller
         $request->validate([
             'content' => 'required|string',
             'type' => 'required|in:internal,external',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         $externalUser = $this->currentExternalUser($project, true);
@@ -189,7 +191,7 @@ class ExternalTaskThreadController extends Controller
 
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
-            $this->processTemporaryAttachments($request->temp_identifier, $thread);
+            $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
         }
 
         // After moving attachments, replace temp URLs in content with final URLs (internal download route)
@@ -242,19 +244,19 @@ class ExternalTaskThreadController extends Controller
 
     /**
      * Process temporary attachments and associate them with the thread.
-     *
-     * @param  string  $tempIdentifier
-     * @return void
      */
-    private function processTemporaryAttachments($tempIdentifier, TaskThread $thread)
+    private function processTemporaryAttachments(?string $tempIdentifier, TaskThread $thread, ?int $userId): void
     {
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-
-        if (! Storage::exists($tempPath)) {
+        if ($tempIdentifier === null) {
             return;
         }
 
-        $files = Storage::files($tempPath);
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $userId);
+        if ($tempPath === null) {
+            return;
+        }
+
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $userId);
 
         foreach ($files as $file) {
             // Skip metadata files
@@ -292,7 +294,7 @@ class ExternalTaskThreadController extends Controller
         }
 
         // Clean up temp directory
-        Storage::deleteDirectory($tempPath);
+        $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, $userId);
     }
 
     /**
@@ -387,7 +389,7 @@ class ExternalTaskThreadController extends Controller
 
         $request->validate([
             'content' => 'required|string',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         /** @var TaskThread $thread */
@@ -411,7 +413,7 @@ class ExternalTaskThreadController extends Controller
 
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
-            $this->processTemporaryAttachments($request->temp_identifier, $thread);
+            $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
         }
 
         // After moving attachments, replace temp URLs in content with final URLs (internal download route)

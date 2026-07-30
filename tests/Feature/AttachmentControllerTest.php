@@ -1,7 +1,11 @@
 <?php
 
+use App\Enums\OrganisationRole;
 use App\Models\Attachment;
+use App\Models\Organisation;
+use App\Models\OrganisationUser;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -70,6 +74,39 @@ test('upload fails without temp identifier', function () {
     $response->assertJsonValidationErrors(['temp_identifier']);
 });
 
+test('chunked uploads stay bound to their owner and complete successfully', function () {
+    $initResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload-init'), [
+            'filename' => 'chunked.txt',
+            'size' => 5,
+            'temp_identifier' => $this->tempIdentifier,
+            'mime_type' => 'text/plain',
+        ])
+        ->assertOk();
+
+    $uploadId = $initResponse->json('upload_id');
+    $otherUser = User::factory()->create();
+
+    $this->actingAs($otherUser)
+        ->get(route('attachments.upload-status', ['upload_id' => $uploadId]))
+        ->assertNotFound();
+
+    $this->actingAs($this->user)
+        ->post(route('attachments.upload-chunk'), [
+            'upload_id' => $uploadId,
+            'chunk_index' => 0,
+            'chunk' => UploadedFile::fake()->createWithContent('chunk.part', 'hello'),
+        ])
+        ->assertOk();
+
+    $completeResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload-complete'), ['upload_id' => $uploadId])
+        ->assertOk();
+
+    Storage::assertExists($completeResponse->json('path'));
+    Storage::assertExists($completeResponse->json('path').'.meta');
+});
+
 test('list temp files', function () {
     // Upload a file first
     $file = UploadedFile::fake()->create('document.pdf', 100);
@@ -124,6 +161,76 @@ test('remove temp file', function () {
 
     // Check that the file no longer exists
     Storage::assertMissing($path);
+    Storage::assertMissing($path.'.meta');
+});
+
+test('remove temp rejects arbitrary private and traversal paths', function (string $path) {
+    Storage::put('private/protected.txt', 'protected content');
+
+    $this->actingAs($this->user)
+        ->delete(route('attachments.remove-temp'), ['path' => $path])
+        ->assertBadRequest()
+        ->assertJson(['success' => false, 'message' => 'Invalid path']);
+
+    Storage::assertExists('private/protected.txt');
+})->with([
+    'arbitrary private file' => 'private/protected.txt',
+    'normalized traversal' => 'temp_attachments/allowed/../../private/protected.txt',
+    'absolute path' => '/temp_attachments/allowed/file.txt',
+]);
+
+test('temp files are private to the user who claimed the upload identifier', function () {
+    $uploadResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload'), [
+            'file' => UploadedFile::fake()->create('private.png', 10, 'image/png'),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $path = $uploadResponse->json('path');
+    $url = $uploadResponse->json('url');
+    $otherUser = User::factory()->create();
+
+    $this->actingAs($otherUser)->get($url)->assertNotFound();
+    $this->actingAs($otherUser)
+        ->delete(route('attachments.remove-temp'), ['path' => $path])
+        ->assertNotFound();
+    $this->actingAs($otherUser)
+        ->get(route('attachments.list-temp', ['temp_identifier' => $this->tempIdentifier]))
+        ->assertOk()
+        ->assertJson(['files' => []]);
+
+    Storage::assertExists($path);
+    Storage::assertExists($path.'.meta');
+});
+
+test('remove temp rejects metadata paths', function () {
+    $uploadResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload'), [
+            'file' => UploadedFile::fake()->create('document.pdf', 10),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $path = $uploadResponse->json('path');
+
+    $this->actingAs($this->user)
+        ->delete(route('attachments.remove-temp'), ['path' => $path.'.meta'])
+        ->assertBadRequest();
+
+    Storage::assertExists($path);
+    Storage::assertExists($path.'.meta');
+});
+
+test('remove temp returns not found for an owned path with no file', function () {
+    app(\App\Services\TemporaryAttachmentStorage::class)
+        ->claim($this->tempIdentifier, $this->user->id);
+    $path = "temp_attachments/{$this->tempIdentifier}/missing.pdf";
+
+    $this->actingAs($this->user)
+        ->delete(route('attachments.remove-temp'), ['path' => $path])
+        ->assertNotFound()
+        ->assertJson(['success' => false, 'message' => 'File not found']);
 });
 
 test('task creation with attachments', function () {
@@ -193,6 +300,31 @@ test('task creation without attachments', function () {
         'attachable_id' => $task->id,
         'attachable_type' => Task::class,
     ]);
+});
+
+test('another user cannot promote temporary uploads into their task', function () {
+    $uploadResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload'), [
+            'file' => UploadedFile::fake()->create('private.pdf', 10),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $otherUser = User::factory()->create();
+    $otherProject = Project::factory()->create(['author_id' => $otherUser->id]);
+
+    $this->actingAs($otherUser)
+        ->postJson(route('tasks.store'), [
+            'title' => 'Task without stolen attachment',
+            'description' => 'No attachment should be promoted.',
+            'project_id' => $otherProject->id,
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertCreated();
+
+    $task = Task::query()->where('title', 'Task without stolen attachment')->firstOrFail();
+    expect($task->attachments)->toBeEmpty();
+    Storage::assertExists($uploadResponse->json('path'));
 });
 
 test('task update with attachments', function () {
@@ -348,15 +480,93 @@ test('delete attachment', function () {
     Storage::assertMissing($attachment->path);
 });
 
-test('show temp serves image inline', function () {
-    $temp = 'temp-'.time();
-    $filename = 'image.png';
-    $path = "temp_attachments/{$temp}/{$filename}";
+test('visible collaborators without task edit permission cannot delete attachments', function () {
+    $collaborator = User::factory()->create();
+    $this->task->internalCollaborators()->attach($collaborator->id);
+    $attachment = Attachment::create([
+        'attachable_id' => $this->task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'protected.pdf',
+        'path' => "attachments/{$this->task->id}/protected.pdf",
+    ]);
+    Storage::put($attachment->path, 'protected content');
 
-    Storage::put($path, 'fake-image-content');
+    $this->actingAs($collaborator)
+        ->delete(route('attachments.delete', $attachment))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('attachments', ['id' => $attachment->id]);
+    Storage::assertExists($attachment->path);
+});
+
+test('attachments on hidden tasks remain not found when deletion is attempted', function () {
+    $hiddenUser = User::factory()->create();
+    $attachment = Attachment::create([
+        'attachable_id' => $this->task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'hidden.pdf',
+        'path' => "attachments/{$this->task->id}/hidden.pdf",
+    ]);
+    Storage::put($attachment->path, 'hidden content');
+
+    $this->actingAs($hiddenUser)
+        ->delete(route('attachments.delete', $attachment))
+        ->assertNotFound();
+
+    $this->assertDatabaseHas('attachments', ['id' => $attachment->id]);
+    Storage::assertExists($attachment->path);
+});
+
+test('task-scope editors can delete attachments', function () {
+    $editor = User::factory()->create();
+    $organisation = Organisation::factory()->create(['author_id' => $this->user->id]);
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+    OrganisationUser::query()->create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $editor->id,
+        'user_email' => $editor->email,
+        'user_name' => $editor->name,
+        'role' => OrganisationRole::LeadDeveloper->value,
+    ]);
+    ProjectUser::query()->create([
+        'project_id' => $project->id,
+        'user_id' => $editor->id,
+        'user_email' => $editor->email,
+        'user_name' => $editor->name,
+        'registration_status' => 'registered',
+    ]);
+    $task = Task::factory()->create(['project_id' => $project->id]);
+    $task->submitter()->associate($this->user)->save();
+    $attachment = Attachment::create([
+        'attachable_id' => $task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'editable.pdf',
+        'path' => "attachments/{$task->id}/editable.pdf",
+    ]);
+    Storage::put($attachment->path, 'editable content');
+
+    $this->actingAs($editor)
+        ->delete(route('attachments.delete', $attachment))
+        ->assertOk();
+
+    $this->assertDatabaseMissing('attachments', ['id' => $attachment->id]);
+    Storage::assertMissing($attachment->path);
+});
+
+test('show temp serves image inline', function () {
+    $uploadResponse = $this->actingAs($this->user)
+        ->post(route('attachments.upload'), [
+            'file' => UploadedFile::fake()->create('image.png', 10, 'image/png'),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
 
     $response = $this->actingAs($this->user)
-        ->get(route('attachments.temp', ['temp' => $temp, 'filename' => $filename]));
+        ->get($uploadResponse->json('url'));
 
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'image/png');
@@ -365,9 +575,34 @@ test('show temp serves image inline', function () {
 test('show temp returns 404 for missing file', function () {
     $temp = 'missing-temp';
     $filename = 'nope.png';
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($temp, $this->user->id);
 
     $response = $this->actingAs($this->user)
         ->get(route('attachments.temp', ['temp' => $temp, 'filename' => $filename]));
 
     $response->assertStatus(404);
 });
+
+test('show temp rejects traversal without serving private storage files', function () {
+    Storage::put('private/protected.png', 'protected image');
+
+    $this->actingAs($this->user)
+        ->get('/attachments/temp/'.$this->tempIdentifier.'/%2E%2E%2F%2E%2E%2Fprivate%2Fprotected.png')
+        ->assertNotFound();
+
+    Storage::assertExists('private/protected.png');
+});
+
+test('upload rejects invalid temp identifiers', function (string $tempIdentifier) {
+    $this->actingAs($this->user)
+        ->post(route('attachments.upload'), [
+            'file' => UploadedFile::fake()->create('document.pdf', 10),
+            'temp_identifier' => $tempIdentifier,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('temp_identifier');
+})->with([
+    'traversal' => '../private',
+    'nested path' => 'nested/path',
+    'absolute path' => '/absolute',
+]);

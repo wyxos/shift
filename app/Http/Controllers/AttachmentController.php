@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Services\ShiftPermissionService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -12,6 +14,11 @@ use Shift\Core\ChunkedUploadConfig;
 
 class AttachmentController extends Controller
 {
+    public function __construct(
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
+        private readonly ShiftPermissionService $permissions,
+    ) {}
+
     private function ensureTaskVisible(Task $task): void
     {
         if (! Task::query()->visibleTo(auth()->id())->whereKey($task->id)->exists()) {
@@ -28,7 +35,7 @@ class AttachmentController extends Controller
     {
         $validator = validator($request->all(), [
             'file' => 'required|file|max:'.ChunkedUploadConfig::MAX_UPLOAD_KB, // 40MB max
-            'temp_identifier' => 'required|string',
+            'temp_identifier' => ['required', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         if ($validator->fails()) {
@@ -39,16 +46,14 @@ class AttachmentController extends Controller
         $tempIdentifier = $request->input('temp_identifier');
         $originalFilename = $file->getClientOriginalName();
 
-        // Create temp directory if it doesn't exist
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (! Storage::exists($tempPath)) {
-            Storage::makeDirectory($tempPath);
-        }
+        $tempPath = $this->temporaryAttachments->claim($tempIdentifier, $request->user()?->id);
+        abort_if($tempPath === null, 404);
 
         // Store the file with original filename
-        $filename = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $filename = $this->storedBaseName($originalFilename);
         $extension = $file->getClientOriginalExtension();
-        $storedFilename = $filename.'_'.uniqid().'.'.$extension;
+        $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
+        $storedFilename = $filename.'_'.uniqid().$extensionSuffix;
         $path = $file->storeAs($tempPath, $storedFilename);
 
         // Store metadata about the file
@@ -75,9 +80,11 @@ class AttachmentController extends Controller
         $data = $request->validate([
             'filename' => 'required|string',
             'size' => 'required|integer|min:1|max:'.ChunkedUploadConfig::MAX_UPLOAD_BYTES,
-            'temp_identifier' => 'required|string',
+            'temp_identifier' => ['required', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'mime_type' => 'nullable|string',
         ]);
+
+        abort_if($this->temporaryAttachments->claim($data['temp_identifier'], $request->user()?->id) === null, 404);
 
         $uploadId = (string) Str::uuid();
         $dir = "temp_chunks/{$uploadId}";
@@ -94,6 +101,7 @@ class AttachmentController extends Controller
             'chunk_size' => ChunkedUploadConfig::CHUNK_SIZE_BYTES,
             'total_chunks' => $totalChunks,
             'created_at' => now()->toIso8601String(),
+            'user_id' => $request->user()?->id,
         ];
 
         Storage::put("{$dir}/meta.json", json_encode($meta));
@@ -120,12 +128,11 @@ class AttachmentController extends Controller
             return response()->json(['error' => 'Upload not found'], 404);
         }
 
-        $metaPath = $this->chunkMetaPath($uploadId);
-        if (! Storage::exists($metaPath)) {
+        $meta = $this->readChunkMeta($uploadId);
+        if (! $meta) {
             return response()->json(['error' => 'Upload not found'], 404);
         }
 
-        $meta = json_decode(Storage::get($metaPath), true) ?: [];
         $dir = $this->chunkDir($uploadId);
         $files = Storage::files($dir);
         $uploaded = [];
@@ -218,19 +225,16 @@ class AttachmentController extends Controller
         }
 
         $tempIdentifier = (string) ($meta['temp_identifier'] ?? '');
-        if ($tempIdentifier === '') {
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $request->user()?->id);
+        if ($tempPath === null) {
             return response()->json(['error' => 'Missing temp identifier'], 422);
         }
 
         $originalFilename = (string) ($meta['original_filename'] ?? 'upload.bin');
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-        if (! Storage::exists($tempPath)) {
-            Storage::makeDirectory($tempPath);
-        }
-
-        $baseName = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $baseName = $this->storedBaseName($originalFilename);
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-        $storedFilename = $baseName.'_'.uniqid().($extension ? '.'.$extension : '');
+        $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
+        $storedFilename = $baseName.'_'.uniqid().$extensionSuffix;
         $finalPath = "{$tempPath}/{$storedFilename}";
 
         $finalAbs = Storage::path($finalPath);
@@ -275,7 +279,7 @@ class AttachmentController extends Controller
     public function listTempFiles(Request $request)
     {
         $validator = validator($request->all(), [
-            'temp_identifier' => 'required|string',
+            'temp_identifier' => ['required', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         if ($validator->fails()) {
@@ -283,13 +287,7 @@ class AttachmentController extends Controller
         }
 
         $tempIdentifier = $request->input('temp_identifier');
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-
-        if (! Storage::exists($tempPath)) {
-            return response()->json(['files' => []]);
-        }
-
-        $files = Storage::files($tempPath);
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $request->user()?->id);
         $fileData = [];
 
         foreach ($files as $file) {
@@ -348,7 +346,14 @@ class AttachmentController extends Controller
             return null;
         }
 
-        return json_decode(Storage::get($metaPath), true) ?: null;
+        $metadata = json_decode(Storage::get($metaPath), true) ?: null;
+        if (! is_array($metadata)
+            || ! isset($metadata['user_id'])
+            || ! hash_equals((string) auth()->id(), (string) $metadata['user_id'])) {
+            return null;
+        }
+
+        return $metadata;
     }
 
     /**
@@ -356,14 +361,8 @@ class AttachmentController extends Controller
      */
     public function showTemp(string $temp, string $filename)
     {
-        // basic sanitization on temp segment
-        $safeTemp = preg_replace('/[^a-zA-Z0-9_\-]/', '', $temp);
-        if ($safeTemp !== $temp) {
-            abort(404);
-        }
-
-        $path = "temp_attachments/{$safeTemp}/{$filename}";
-        if (! Storage::exists($path)) {
+        $path = $this->temporaryAttachments->ownedRouteFilePath($temp, $filename, auth()->id());
+        if ($path === null || ! Storage::exists($path)) {
             abort(404, 'File not found');
         }
 
@@ -387,10 +386,14 @@ class AttachmentController extends Controller
             'path' => 'required|string',
         ]);
 
-        $path = $request->input('path');
+        $clientPath = $request->string('path')->toString();
+        if ($this->temporaryAttachments->canonicalFilePath($clientPath) === null) {
+            return response()->json(['success' => false, 'message' => 'Invalid path'], 400);
+        }
 
-        if (Storage::exists($path)) {
-            Storage::delete($path);
+        $path = $this->temporaryAttachments->ownedFilePath($clientPath, $request->user()?->id);
+        if ($path !== null && Storage::exists($path)) {
+            Storage::delete([$path, $path.'.meta']);
 
             return response()->json(['success' => true]);
         }
@@ -464,9 +467,10 @@ class AttachmentController extends Controller
     public function deleteAttachment(Attachment $attachment)
     {
         $task = $this->getTaskFromAttachment($attachment);
-        if ($task instanceof Task) {
-            $this->ensureTaskVisible($task);
-        }
+        abort_unless($task instanceof Task, 404);
+
+        $this->ensureTaskVisible($task);
+        abort_unless($this->permissions->canEditTask($task, auth()->id()), 403);
 
         // Check if the file exists
         if (Storage::exists($attachment->path)) {
@@ -546,6 +550,14 @@ class AttachmentController extends Controller
         }
 
         return null;
+    }
+
+    private function storedBaseName(string $filename): string
+    {
+        $baseName = pathinfo($filename, PATHINFO_FILENAME);
+        $baseName = preg_replace('/[\/\\\\\x00-\x1F\x7F]/u', '-', $baseName) ?? '';
+
+        return $baseName !== '' ? $baseName : 'upload';
     }
 
     /**

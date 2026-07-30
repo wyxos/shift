@@ -103,6 +103,42 @@ test('upload validates file size', function () {
     $response->assertJsonValidationErrors(['file']);
 });
 
+test('chunked API uploads stay bound to their token owner and complete successfully', function () {
+    $initResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload-init'), [
+            'filename' => 'chunked.txt',
+            'size' => 5,
+            'temp_identifier' => $this->tempIdentifier,
+            'mime_type' => 'text/plain',
+        ])
+        ->assertOk();
+
+    $uploadId = $initResponse->json('upload_id');
+    $otherUser = User::factory()->create();
+    $otherToken = $otherUser->createToken('other-chunk-token')->plainTextToken;
+    app('auth')->forgetGuards();
+
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->get(route('api.attachments.upload-status', ['upload_id' => $uploadId]))
+        ->assertNotFound();
+
+    app('auth')->forgetGuards();
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload-chunk'), [
+            'upload_id' => $uploadId,
+            'chunk_index' => 0,
+            'chunk' => UploadedFile::fake()->createWithContent('chunk.part', 'hello'),
+        ])
+        ->assertOk();
+
+    $completeResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload-complete'), ['upload_id' => $uploadId])
+        ->assertOk();
+
+    Storage::assertExists($completeResponse->json('path'));
+    Storage::assertExists($completeResponse->json('path').'.meta');
+});
+
 test('upload multiple stores files successfully', function () {
     $file1 = UploadedFile::fake()->create('document1.pdf', 1000);
     $file2 = UploadedFile::fake()->create('document2.pdf', 1000);
@@ -197,7 +233,74 @@ test('remove temp validates path', function () {
     $response->assertJson(['error' => 'Invalid path']);
 });
 
+test('remove temp rejects arbitrary private and traversal paths', function (string $path) {
+    Storage::put('private/protected.txt', 'protected content');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->delete(route('api.attachments.remove-temp'), ['path' => $path])
+        ->assertBadRequest()
+        ->assertJson(['error' => 'Invalid path']);
+
+    Storage::assertExists('private/protected.txt');
+})->with([
+    'arbitrary private file' => 'private/protected.txt',
+    'normalized traversal' => 'temp_attachments/allowed/../../private/protected.txt',
+    'absolute path' => '/temp_attachments/allowed/file.txt',
+]);
+
+test('temporary API attachments are private to the authenticated uploader', function () {
+    $uploadResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload'), [
+            'file' => UploadedFile::fake()->create('private.png', 10, 'image/png'),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $path = $uploadResponse->json('path');
+    $filename = basename($path);
+    $otherUser = User::factory()->create();
+    $otherToken = $otherUser->createToken('other-temp-token')->plainTextToken;
+    app('auth')->forgetGuards();
+
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->get(route('api.attachments.temp', [
+            'temp' => $this->tempIdentifier,
+            'filename' => $filename,
+        ]))
+        ->assertNotFound();
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->delete(route('api.attachments.remove-temp'), ['path' => $path])
+        ->assertNotFound();
+    $this->withHeader('Authorization', 'Bearer '.$otherToken)
+        ->get(route('api.attachments.list-temp', ['temp_identifier' => $this->tempIdentifier]))
+        ->assertOk()
+        ->assertJson(['files' => []]);
+
+    Storage::assertExists($path);
+    Storage::assertExists($path.'.meta');
+});
+
+test('remove temp rejects metadata paths', function () {
+    $uploadResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload'), [
+            'file' => UploadedFile::fake()->create('document.pdf', 10),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $path = $uploadResponse->json('path');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->delete(route('api.attachments.remove-temp'), ['path' => $path.'.meta'])
+        ->assertBadRequest();
+
+    Storage::assertExists($path);
+    Storage::assertExists($path.'.meta');
+});
+
 test('remove temp handles missing file', function () {
+    app(\App\Services\TemporaryAttachmentStorage::class)
+        ->claim($this->tempIdentifier, $this->user->id);
     $nonExistentPath = "temp_attachments/{$this->tempIdentifier}/non-existent-file.pdf";
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -259,6 +362,48 @@ test('list temp returns empty array for nonexistent directory', function () {
     $response->assertStatus(200);
     $response->assertJson(['files' => []]);
 });
+
+test('show temp serves an owned API attachment', function () {
+    $uploadResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post(route('api.attachments.upload'), [
+            'file' => UploadedFile::fake()->create('image.png', 10, 'image/png'),
+            'temp_identifier' => $this->tempIdentifier,
+        ])
+        ->assertOk();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->get(route('api.attachments.temp', [
+            'temp' => $this->tempIdentifier,
+            'filename' => basename($uploadResponse->json('path')),
+        ]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/png');
+});
+
+test('show temp rejects traversal without serving private storage files', function () {
+    Storage::put('private/protected.png', 'protected image');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->get('/api/attachments/temp/'.$this->tempIdentifier.'/%2E%2E%2F%2E%2E%2Fprivate%2Fprotected.png')
+        ->assertNotFound();
+
+    Storage::assertExists('private/protected.png');
+});
+
+test('API uploads reject invalid temp identifiers', function (string $tempIdentifier) {
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->withHeader('Accept', 'application/json')
+        ->post(route('api.attachments.upload'), [
+            'file' => UploadedFile::fake()->create('document.pdf', 10),
+            'temp_identifier' => $tempIdentifier,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('temp_identifier');
+})->with([
+    'traversal' => '../private',
+    'nested path' => 'nested/path',
+    'absolute path' => '/absolute',
+]);
 
 test('download returns file for valid attachment', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)

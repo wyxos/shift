@@ -14,6 +14,7 @@ use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorNotificationScheduler;
 use App\Services\TaskCollaboratorService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class ExternalTaskController extends Controller
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly TaskCollaboratorNotificationScheduler $collaboratorNotifications,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
     private function resolveProjectFromRequest(): ?Project
@@ -421,7 +423,7 @@ class ExternalTaskController extends Controller
             'user.url' => 'nullable|url',
             'metadata.url' => 'nullable|url',
             'metadata.environment' => 'nullable|string|max:255',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'internal_collaborator_ids' => 'nullable|array',
             'internal_collaborator_ids.*' => 'integer',
             'external_collaborators' => 'nullable|array',
@@ -476,10 +478,11 @@ class ExternalTaskController extends Controller
 
         if (isset($attributes['temp_identifier'])) {
             $tempIdentifier = $attributes['temp_identifier'];
-            $tempPath = "temp_attachments/{$tempIdentifier}";
+            $userId = $request->user()?->id;
+            $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $userId);
 
-            if (Storage::exists($tempPath)) {
-                $files = Storage::files($tempPath);
+            if ($tempPath !== null) {
+                $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $userId);
 
                 $permanentPath = "attachments/{$task->id}";
                 if (! Storage::exists($permanentPath)) {
@@ -518,7 +521,7 @@ class ExternalTaskController extends Controller
                     }
                 }
 
-                Storage::deleteDirectory($tempPath);
+                $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, $userId);
             }
         }
 
@@ -658,7 +661,7 @@ class ExternalTaskController extends Controller
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
         ]);
@@ -702,12 +705,13 @@ class ExternalTaskController extends Controller
         // Handle new attachments if temp_identifier is provided
         if (isset($attributes['temp_identifier'])) {
             $tempIdentifier = $attributes['temp_identifier'];
-            $tempPath = "temp_attachments/{$tempIdentifier}";
+            $userId = $request->user()?->id;
+            $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $userId);
 
             // Check if temp directory exists
-            if (Storage::exists($tempPath)) {
+            if ($tempPath !== null) {
                 // Get all files in the temp directory
-                $files = Storage::files($tempPath);
+                $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $userId);
 
                 // Create permanent directory if it doesn't exist
                 $permanentPath = "attachments/{$task->id}";
@@ -755,7 +759,7 @@ class ExternalTaskController extends Controller
                 }
 
                 // Remove the temp directory
-                Storage::deleteDirectory($tempPath);
+                $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, $userId);
             }
         }
 

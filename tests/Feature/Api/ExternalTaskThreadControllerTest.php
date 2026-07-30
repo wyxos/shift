@@ -55,6 +55,7 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
     $img2 = 'img_'.uniqid().'.jpg';
     $pdf1 = 'file_'.uniqid().'.pdf';
     $tempDir = 'temp_attachments/'.$tempIdentifier;
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     Storage::put($tempDir.'/'.$img1, 'fake');
     Storage::put($tempDir.'/'.$img1.'.meta', json_encode(['original_filename' => 'photo1.png']));
     Storage::put($tempDir.'/'.$img2, 'fake');
@@ -184,6 +185,7 @@ test('external API thread replaces temp URLs in content with final download URLs
     // Create a temp file and metadata
     $storedFilename = 'img_'.uniqid().'.png';
     $tempDir = 'temp_attachments/'.$tempIdentifier;
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     Storage::put($tempDir.'/'.$storedFilename, 'fake');
     Storage::put($tempDir.'/'.$storedFilename.'.meta', json_encode(['original_filename' => 'photo.png']));
 
@@ -221,6 +223,7 @@ test('external API thread replaces encoded-space temp URLs with final API downlo
     // Create a temp file whose basename contains spaces
     $storedFilename = 'Proof of Address 20252707_'.uniqid().'.jpg';
     $tempDir = 'temp_attachments/'.$tempIdentifier;
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     Storage::put($tempDir.'/'.$storedFilename, 'fake');
     Storage::put($tempDir.'/'.$storedFilename.'.meta', json_encode(['original_filename' => 'Proof of Address 20252707.jpg']));
 
