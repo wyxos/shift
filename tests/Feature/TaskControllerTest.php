@@ -1143,6 +1143,7 @@ test('store persists temp attachments and rewrites editor temp urls', function (
     $tempIdentifier = 'task-create-temp';
     $tempPath = "temp_attachments/{$tempIdentifier}/task-screenshot.png";
 
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     \Illuminate\Support\Facades\Storage::put($tempPath, 'image-bytes');
     \Illuminate\Support\Facades\Storage::put(
         "{$tempPath}.meta",
@@ -2034,6 +2035,7 @@ test('store sanitizes dangerous description html without breaking inline uploads
     $tempIdentifier = 'task-sanitize-temp';
     $tempPath = "temp_attachments/{$tempIdentifier}/task-screenshot.png";
 
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim($tempIdentifier, $this->user->id);
     \Illuminate\Support\Facades\Storage::put($tempPath, 'image-bytes');
     \Illuminate\Support\Facades\Storage::put(
         "{$tempPath}.meta",

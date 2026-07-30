@@ -6,6 +6,7 @@ use App\Models\Attachment;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\TaskThreadNotificationService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class TaskThreadController extends Controller
 {
     public function __construct(
         private readonly TaskThreadNotificationService $taskThreadNotificationService,
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
     private function ensureTaskVisible(Task $task): void
@@ -107,7 +109,7 @@ class TaskThreadController extends Controller
         $request->validate([
             'content' => 'required|string',
             'type' => 'required|in:internal,external',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         $user = Auth::user();
@@ -181,13 +183,12 @@ class TaskThreadController extends Controller
             return;
         }
 
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-
-        if (! Storage::exists($tempPath)) {
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, Auth::id());
+        if ($tempPath === null) {
             return;
         }
 
-        $files = Storage::files($tempPath);
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, Auth::id());
 
         foreach ($files as $file) {
             // Skip metadata files
@@ -225,7 +226,7 @@ class TaskThreadController extends Controller
         }
 
         // Clean up temp directory
-        Storage::deleteDirectory($tempPath);
+        $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, Auth::id());
     }
 
     /**
@@ -312,7 +313,7 @@ class TaskThreadController extends Controller
 
         $request->validate([
             'content' => 'required|string',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
         $thread->content = $this->sanitizeRichContent($request->input('content'));

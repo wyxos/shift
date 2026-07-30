@@ -21,6 +21,7 @@ use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
 use App\Services\TaskCollaboratorNotificationScheduler;
 use App\Services\TaskCollaboratorService;
+use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ class TaskController extends Controller
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly ShiftPermissionService $permissions,
+        private readonly TemporaryAttachmentStorage $temporaryAttachments,
     ) {}
 
     private function visibleTasksQuery(): Builder
@@ -249,7 +251,7 @@ class TaskController extends Controller
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'phase' => ['nullable', Rule::in(['task', 'requirement'])],
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'internal_collaborator_ids' => 'nullable|array',
             'internal_collaborator_ids.*' => 'integer',
             'external_collaborators' => 'nullable|array',
@@ -401,13 +403,12 @@ class TaskController extends Controller
      */
     private function persistTempAttachmentsForTask(Task $task, string $tempIdentifier)
     {
-        $tempPath = "temp_attachments/{$tempIdentifier}";
-
-        if (! Storage::exists($tempPath)) {
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, auth()->id());
+        if ($tempPath === null) {
             return collect();
         }
 
-        $files = Storage::files($tempPath);
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, auth()->id());
         $created = collect();
 
         $permanentPath = "attachments/{$task->id}";
@@ -443,7 +444,7 @@ class TaskController extends Controller
             ]));
         }
 
-        Storage::deleteDirectory($tempPath);
+        $this->temporaryAttachments->deleteOwnedDirectory($tempIdentifier, auth()->id());
 
         return $created;
     }
@@ -974,7 +975,7 @@ class TaskController extends Controller
             'status' => ['required', Rule::enum(TaskStatus::class)],
             'requirement_status' => ['nullable', Rule::enum(RequirementStatus::class)],
             'environment' => 'nullable|string|max:255',
-            'temp_identifier' => 'nullable|string',
+            'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'deleted_attachment_ids' => 'nullable|array',
             'deleted_attachment_ids.*' => 'integer|exists:attachments,id',
             'internal_collaborator_ids' => 'nullable|array',

@@ -174,6 +174,7 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
         ]);
     }
 
+    app(\App\Services\TemporaryAttachmentStorage::class)->claim('requirement-temp-1', $this->user->id);
     Storage::put('temp_attachments/requirement-temp-1/screenshot.png', 'image-bytes');
     Storage::put('temp_attachments/requirement-temp-1/screenshot.png.meta', json_encode([
         'original_filename' => 'screenshot.png',
