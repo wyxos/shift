@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\OrganisationRole;
 use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
@@ -18,9 +19,31 @@ test('global projects index is not available', function () {
 });
 
 test('organisation projects index includes scoped projects with ownership context', function () {
+    $this->user->update([
+        'name' => 'Avery Owner',
+        'email' => 'avery-owner@example.com',
+    ]);
+
     $ownedOrganisation = Organisation::factory()->create([
         'author_id' => $this->user->id,
         'name' => 'Acme Org',
+    ]);
+
+    $tenantMember = User::factory()->create([
+        'name' => 'Morgan Member',
+        'email' => 'morgan-member@example.com',
+    ]);
+    OrganisationUser::create([
+        'organisation_id' => $ownedOrganisation->id,
+        'user_id' => $tenantMember->id,
+        'user_email' => $tenantMember->email,
+        'user_name' => $tenantMember->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    User::factory()->create([
+        'name' => 'Zara Unrelated',
+        'email' => 'zara-unrelated@example.com',
     ]);
 
     $ownedClient = Client::factory()->create([
@@ -70,6 +93,9 @@ test('organisation projects index includes scoped projects with ownership contex
         ->where('canCreateProject', true)
         ->has('clients', 1)
         ->has('organisations', 1)
+        ->has('accessUsers', 2)
+        ->where('accessUsers.0.email', 'avery-owner@example.com')
+        ->where('accessUsers.1.email', 'morgan-member@example.com')
     );
 });
 
@@ -172,6 +198,24 @@ test('organisation members only see projects with explicit project access', func
         'user_id' => $this->user->id,
         'user_email' => $this->user->email,
         'user_name' => $this->user->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    $tenantPeer = User::factory()->create([
+        'name' => 'Tenant Peer',
+        'email' => 'tenant-peer@example.com',
+    ]);
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $tenantPeer->id,
+        'user_email' => $tenantPeer->email,
+        'user_name' => $tenantPeer->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    User::factory()->create([
+        'name' => 'Unrelated Directory Entry',
+        'email' => 'unrelated-directory-entry@example.com',
     ]);
 
     $visibleProject = Project::factory()->create([
@@ -203,8 +247,181 @@ test('organisation members only see projects with explicit project access', func
         ->component('Projects')
         ->has('projects.data', 1)
         ->where('projects.data.0.id', $visibleProject->id)
+        ->where('projects.data.0.can_manage_project_access', false)
         ->where('canCreateProject', false)
+        ->has('accessUsers', 0)
+        ->reloadOnly('projects', fn ($reload) => $reload
+            ->has('projects.data', 1)
+            ->has('accessUsers', 0)
+        )
     );
+});
+
+test('project managers receive only organisation members as access candidates', function () {
+    $this->user->update([
+        'name' => 'Morgan Project Manager',
+        'email' => 'morgan-manager@example.com',
+    ]);
+    $owner = User::factory()->create([
+        'name' => 'Avery Organisation Owner',
+        'email' => 'avery-organisation-owner@example.com',
+    ]);
+    $tenantMember = User::factory()->create([
+        'name' => 'Taylor Tenant Member',
+        'email' => 'taylor-tenant-member@example.com',
+    ]);
+    User::factory()->create([
+        'name' => 'Zara Unrelated User',
+        'email' => 'zara-unrelated-user@example.com',
+    ]);
+
+    $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
+    $project = Project::factory()->create([
+        'name' => 'Managed Project',
+        'organisation_id' => $organisation->id,
+        'client_id' => null,
+        'author_id' => $owner->id,
+    ]);
+
+    foreach ([[$this->user, OrganisationRole::ClientProjectManager], [$tenantMember, OrganisationRole::Developer]] as [$user, $role]) {
+        OrganisationUser::create([
+            'organisation_id' => $organisation->id,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+            'role' => $role->value,
+        ]);
+    }
+
+    ProjectUser::create([
+        'project_id' => $project->id,
+        'user_id' => $this->user->id,
+        'user_email' => $this->user->email,
+        'user_name' => $this->user->name,
+        'registration_status' => 'registered',
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.projects', [
+            'organisation' => $organisation,
+            'search' => 'Managed',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Projects')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.can_manage_project_access', true)
+            ->has('accessUsers', 3)
+            ->where('accessUsers.0.email', 'avery-organisation-owner@example.com')
+            ->where('accessUsers.1.email', 'morgan-manager@example.com')
+            ->where('accessUsers.2.email', 'taylor-tenant-member@example.com')
+            ->reloadOnly('projects', fn ($reload) => $reload
+                ->has('projects.data', 1)
+                ->has('accessUsers', 3)
+                ->where('accessUsers.0.email', 'avery-organisation-owner@example.com')
+                ->where('accessUsers.1.email', 'morgan-manager@example.com')
+                ->where('accessUsers.2.email', 'taylor-tenant-member@example.com')
+            )
+        );
+});
+
+test('organisation administrators receive only organisation members as project access candidates', function () {
+    $this->user->update([
+        'name' => 'Morgan Organisation Administrator',
+        'email' => 'morgan-administrator@example.com',
+    ]);
+    $owner = User::factory()->create([
+        'name' => 'Avery Organisation Owner',
+        'email' => 'avery-admin-owner@example.com',
+    ]);
+    $tenantMember = User::factory()->create([
+        'name' => 'Taylor Organisation Member',
+        'email' => 'taylor-organisation-member@example.com',
+    ]);
+    User::factory()->create([
+        'name' => 'Zara Outside Tenant',
+        'email' => 'zara-outside-tenant@example.com',
+    ]);
+
+    $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
+    $project = Project::factory()->create([
+        'organisation_id' => $organisation->id,
+        'client_id' => null,
+        'author_id' => $owner->id,
+    ]);
+
+    foreach ([[$this->user, OrganisationRole::Administrator], [$tenantMember, OrganisationRole::Developer]] as [$user, $role]) {
+        OrganisationUser::create([
+            'organisation_id' => $organisation->id,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+            'role' => $role->value,
+        ]);
+    }
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.projects', $organisation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Projects')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.id', $project->id)
+            ->where('projects.data.0.can_manage_project_access', true)
+            ->has('accessUsers', 3)
+            ->where('accessUsers.0.email', 'avery-admin-owner@example.com')
+            ->where('accessUsers.1.email', 'morgan-administrator@example.com')
+            ->where('accessUsers.2.email', 'taylor-organisation-member@example.com')
+        );
+});
+
+test('project access candidates stay tenant scoped across search and pagination queries', function () {
+    $this->user->update([
+        'name' => 'Avery Paged Owner',
+        'email' => 'avery-paged-owner@example.com',
+    ]);
+    $organisation = Organisation::factory()->create(['author_id' => $this->user->id]);
+    $tenantMember = User::factory()->create([
+        'name' => 'Morgan Paged Member',
+        'email' => 'morgan-paged-member@example.com',
+    ]);
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => $tenantMember->id,
+        'user_email' => $tenantMember->email,
+        'user_name' => $tenantMember->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+    User::factory()->create([
+        'name' => 'Zara Paged Unrelated',
+        'email' => 'zara-paged-unrelated@example.com',
+    ]);
+
+    foreach (range(1, 11) as $number) {
+        Project::factory()->create([
+            'name' => sprintf('Paged Project %02d', $number),
+            'organisation_id' => $organisation->id,
+            'client_id' => null,
+            'author_id' => $this->user->id,
+        ]);
+    }
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.projects', [
+            'organisation' => $organisation,
+            'search' => 'Paged Project',
+            'sort_by' => 'name',
+            'page' => 2,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Projects')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.name', 'Paged Project 11')
+            ->has('accessUsers', 2)
+            ->where('accessUsers.0.email', 'avery-paged-owner@example.com')
+            ->where('accessUsers.1.email', 'morgan-paged-member@example.com')
+        );
 });
 
 test('projects can be created inside a manageable organisation and redirect back to its projects list', function () {

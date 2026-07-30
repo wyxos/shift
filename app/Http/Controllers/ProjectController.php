@@ -11,7 +11,9 @@ use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class ProjectController extends Controller
 {
@@ -22,14 +24,16 @@ class ProjectController extends Controller
 
     public function index(?Organisation $organisation = null)
     {
-        if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
+        $userId = auth()->id();
+
+        if ($organisation && ! $organisation->isVisibleToUser($userId)) {
             abort(404);
         }
 
         $sortBy = request('sort_by');
         $organisationId = $organisation?->id ?? request('organisation_id');
         $canCreateProject = $organisation instanceof Organisation
-            && $this->permissions->canManageOrganisation($organisation, auth()->id());
+            && $this->permissions->canManageOrganisation($organisation, $userId);
 
         $projects = Project::query()
             ->with([
@@ -38,7 +42,7 @@ class ProjectController extends Controller
                 'environments:id,project_id,environment,url,external_widget_enabled,external_widget_guest_submissions_enabled',
                 'organisation:id,name,author_id',
             ])
-            ->visibleTo(auth()->id())
+            ->visibleTo($userId)
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                 $query->where(function (Builder $subQuery) use ($organisationId) {
                     $subQuery
@@ -65,6 +69,8 @@ class ProjectController extends Controller
                 break;
         }
 
+        $accessUserProjects = clone $projects;
+
         return inertia('Projects')
             ->with([
                 'filters' => [
@@ -82,8 +88,8 @@ class ProjectController extends Controller
                             ->sortBy('environment')
                             ->map(fn ($environment) => $this->environmentPayload($environment))
                             ->values(),
-                        'isOwner' => $project->isManagedByUser(auth()->id()),
-                        ...$this->permissions->projectCapabilities($project, auth()->id()),
+                        'isOwner' => $project->isManagedByUser($userId),
+                        ...$this->permissions->projectCapabilities($project, $userId),
                     ]),
                 'clients' => $canCreateProject
                     ? Client::query()
@@ -102,9 +108,7 @@ class ProjectController extends Controller
                     'name' => $organisation->name,
                 ] : null,
                 'canCreateProject' => $canCreateProject,
-                'accessUsers' => User::query()
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'email']),
+                'accessUsers' => Inertia::always(fn () => $this->projectAccessUsers($organisation, $accessUserProjects, $userId)),
             ]);
     }
 
@@ -310,6 +314,30 @@ class ProjectController extends Controller
                             ->where('role', OrganisationRole::Administrator->value);
                     });
             });
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function projectAccessUsers(?Organisation $organisation, Builder $projects, ?int $userId): Collection
+    {
+        if (
+            ! $organisation
+            || ! $this->permissions->restrictProjectsToManagedAccess(clone $projects, $userId)->exists()
+        ) {
+            return collect();
+        }
+
+        return User::query()
+            ->where(function (Builder $query) use ($organisation) {
+                $query
+                    ->whereKey($organisation->author_id)
+                    ->orWhereHas('organisationUsers', function (Builder $membershipQuery) use ($organisation) {
+                        $membershipQuery->where('organisation_id', $organisation->id);
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
     }
 
     private function environmentPayload($environment): array

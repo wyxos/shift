@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\OrganisationRole;
 use App\Models\Client;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
@@ -96,6 +97,11 @@ test('organisations index exposes team users for the selected owner organisation
         'last_login_at' => $memberLastLoginAt,
     ]);
 
+    User::factory()->create([
+        'name' => 'Unrelated Tenant User',
+        'email' => 'unrelated-tenant@example.com',
+    ]);
+
     $organisation = Organisation::factory()->create([
         'author_id' => $owner->id,
         'name' => 'Acme Labs',
@@ -184,6 +190,7 @@ test('organisations index exposes team users for the selected owner organisation
         ->where('panelOrganisation.teamUsers.2.createdAt', $pendingCreatedAt->toISOString())
         ->where('panelOrganisation.teamUsers.2.verifiedAt', null)
         ->where('panelOrganisation.teamUsers.2.lastLoginAt', null)
+        ->has('accessUsers', 0)
     );
 });
 
@@ -200,6 +207,12 @@ test('shared organisation users cannot load owner panel data', function () {
         'user_id' => $sharedUser->id,
         'user_email' => $sharedUser->email,
         'user_name' => $sharedUser->name,
+        'role' => OrganisationRole::Developer->value,
+    ]);
+
+    User::factory()->create([
+        'name' => 'Unrelated Directory User',
+        'email' => 'unrelated-directory@example.com',
     ]);
 
     $response = $this->actingAs($sharedUser)
@@ -210,7 +223,99 @@ test('shared organisation users cannot load owner panel data', function () {
         ->component('Organisations/Index')
         ->where('panel.team', $organisation->id)
         ->where('panelOrganisation', null)
+        ->has('accessUsers', 0)
+        ->reloadOnly('panelOrganisation', fn ($reload) => $reload
+            ->where('panelOrganisation', null)
+            ->has('accessUsers', 0)
+        )
     );
+});
+
+test('organisation access managers only receive identities from the selected organisation panel', function (OrganisationRole $role) {
+    $owner = User::factory()->create([
+        'name' => 'Organisation Owner',
+        'email' => 'organisation-owner@example.com',
+    ]);
+    $manager = User::factory()->create([
+        'name' => 'Organisation Manager',
+        'email' => 'organisation-manager@example.com',
+    ]);
+    $member = User::factory()->create([
+        'name' => 'Organisation Member',
+        'email' => 'organisation-member@example.com',
+    ]);
+    User::factory()->create([
+        'name' => 'Unrelated Platform User',
+        'email' => 'unrelated-platform@example.com',
+    ]);
+
+    $organisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+        'name' => 'Selected Organisation',
+    ]);
+
+    foreach ([[$manager, $role], [$member, OrganisationRole::Developer]] as [$user, $organisationRole]) {
+        OrganisationUser::create([
+            'organisation_id' => $organisation->id,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'user_name' => $user->name,
+            'role' => $organisationRole->value,
+        ]);
+    }
+
+    $this->actingAs($manager)
+        ->get(route('organisation.team', $organisation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Organisations/Index')
+            ->where('panelOrganisation.id', $organisation->id)
+            ->has('panelOrganisation.teamUsers', 3)
+            ->where('panelOrganisation.teamUsers.0.email', 'organisation-owner@example.com')
+            ->where('panelOrganisation.teamUsers.1.email', 'organisation-manager@example.com')
+            ->where('panelOrganisation.teamUsers.2.email', 'organisation-member@example.com')
+            ->has('accessUsers', 0)
+        );
+})->with([
+    'organisation administrator' => OrganisationRole::Administrator,
+    'project manager' => OrganisationRole::ClientProjectManager,
+]);
+
+test('organisation panel query cannot expose an unrelated tenant directory', function () {
+    $owner = User::factory()->create();
+    $unrelatedOwner = User::factory()->create([
+        'name' => 'Unrelated Organisation Owner',
+        'email' => 'unrelated-owner@example.com',
+    ]);
+
+    $visibleOrganisation = Organisation::factory()->create([
+        'author_id' => $owner->id,
+        'name' => 'Visible Organisation',
+    ]);
+    $unrelatedOrganisation = Organisation::factory()->create([
+        'author_id' => $unrelatedOwner->id,
+        'name' => 'Unrelated Organisation',
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('organisations.index', [
+            'search' => 'Visible',
+            'page' => 1,
+            'team' => $unrelatedOrganisation->id,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Organisations/Index')
+            ->has('organisations.data', 1)
+            ->where('organisations.data.0.id', $visibleOrganisation->id)
+            ->where('panel.team', $unrelatedOrganisation->id)
+            ->where('panelOrganisation', null)
+            ->has('accessUsers', 0)
+            ->reloadOnly('panelOrganisation', fn ($reload) => $reload
+                ->where('panelOrganisation', null)
+                ->has('accessUsers', 0)
+            )
+        );
 });
 
 test('unrelated users cannot load organisation-scoped routes', function () {
@@ -228,6 +333,15 @@ test('unrelated users cannot load organisation-scoped routes', function () {
     $this->actingAs($unrelatedUser)
         ->get(route('organisation.settings', $organisation))
         ->assertNotFound();
+
+    $this->actingAs($unrelatedUser)
+        ->get(route('organisations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Organisations/Index')
+            ->has('organisations.data', 0)
+            ->has('accessUsers', 0)
+        );
 });
 
 test('only organisation owners can update or delete organisations', function () {
