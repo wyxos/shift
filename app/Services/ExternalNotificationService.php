@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use App\Exceptions\ExternalNotificationException;
+use App\Models\Project;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 class ExternalNotificationService
@@ -16,17 +17,64 @@ class ExternalNotificationService
 
     public const TIMESTAMP_HEADER = 'X-Shift-Timestamp';
 
+    public function __construct(
+        private readonly ProjectEnvironmentService $projectEnvironmentService,
+        private readonly OutboundUrlPolicy $outboundUrlPolicy,
+    ) {}
+
     /**
      * Send a notification to an external API endpoint.
      */
     public function sendNotification(
+        Project $project,
         string $url,
         string $handler,
         array $payload,
         array $source = [],
-        ?string $signingSecret = null,
         ?string $deliveryId = null,
     ): Response {
+        $registration = $this->projectEnvironmentService->findTrustedByUrl($project, $url);
+
+        if (! $registration) {
+            Log::warning('External notification callback destination is not trusted.', [
+                'project_id' => $project->id,
+                'handler' => $handler,
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'untrusted_destination',
+                retryable: false,
+            );
+        }
+
+        if (! filled($project->token)) {
+            Log::warning('External notification project token is unavailable.', [
+                'project_id' => $project->id,
+                'handler' => $handler,
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'missing_project_token',
+                retryable: false,
+            );
+        }
+
+        try {
+            $destination = $this->outboundUrlPolicy->approveRequest($registration->url);
+            $requestOptions = $this->outboundUrlPolicy->requestOptions($destination);
+        } catch (InvalidArgumentException $exception) {
+            Log::warning('External notification callback destination failed outbound validation.', [
+                'project_id' => $project->id,
+                'handler' => $handler,
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'untrusted_destination',
+                retryable: false,
+                previous: $exception,
+            );
+        }
+
         $data = [
             'handler' => $handler,
             'payload' => $payload,
@@ -44,28 +92,24 @@ class ExternalNotificationService
             ];
 
         $body = json_encode($data, JSON_THROW_ON_ERROR);
-        $request = Http::acceptJson()
+        $request = Http::withOptions($requestOptions)
+            ->acceptJson()
             ->connectTimeout((int) config('shift.notifications.callback_connect_timeout_seconds', 5))
             ->timeout((int) config('shift.notifications.callback_timeout_seconds', 15))
             ->withBody($body, 'application/json');
+        $timestamp = (string) now()->timestamp;
 
-        if (filled($signingSecret)) {
-            $timestamp = (string) now()->timestamp;
-
-            $request = $request->withHeaders([
-                self::TIMESTAMP_HEADER => $timestamp,
-                self::SIGNATURE_HEADER => $this->signature($timestamp, $body, $signingSecret),
-            ]);
-        }
-
-        if ($this->isLocalOrPrivateUrl($url)) {
-            $request = $request->withoutVerifying();
-        }
+        $request = $request->withHeaders([
+            self::TIMESTAMP_HEADER => $timestamp,
+            self::SIGNATURE_HEADER => $this->signature($timestamp, $body, $project->token),
+        ]);
+        $callbackUrl = $destination['url'].'/shift/api/notifications';
 
         try {
-            $response = $request->post($url.'/shift/api/notifications');
+            $response = $request->post($callbackUrl);
         } catch (Throwable $exception) {
             Log::warning('External notification callback could not be reached', [
+                'project_id' => $project->id,
                 'handler' => $handler,
                 'failure_type' => 'connection',
             ]);
@@ -77,8 +121,23 @@ class ExternalNotificationService
             );
         }
 
+        if ($this->outboundUrlPolicy->responseWasRedirected($response, $callbackUrl)) {
+            Log::warning('External notification callback refused a redirect.', [
+                'project_id' => $project->id,
+                'handler' => $handler,
+                'status' => $response->status(),
+            ]);
+
+            throw new ExternalNotificationException(
+                failureType: 'redirect_response',
+                retryable: false,
+                statusCode: $response->status(),
+            );
+        }
+
         if ($response->serverError() || in_array($response->status(), [408, 425, 429], true)) {
             Log::warning('External notification callback returned a retryable failure', [
+                'project_id' => $project->id,
                 'handler' => $handler,
                 'status' => $response->status(),
             ]);
@@ -92,6 +151,7 @@ class ExternalNotificationService
 
         if (! $response->successful()) {
             Log::warning('External notification callback returned a permanent failure', [
+                'project_id' => $project->id,
                 'handler' => $handler,
                 'status' => $response->status(),
             ]);
@@ -105,6 +165,7 @@ class ExternalNotificationService
 
         if (! is_bool($response->json('production'))) {
             Log::warning('External notification callback returned an invalid success response', [
+                'project_id' => $project->id,
                 'handler' => $handler,
                 'status' => $response->status(),
             ]);
@@ -117,6 +178,7 @@ class ExternalNotificationService
         }
 
         Log::info("Notification sent to external API: {$handler}", [
+            'project_id' => $project->id,
             'status' => $response->status(),
         ]);
 
@@ -142,29 +204,6 @@ class ExternalNotificationService
             });
 
             return true;
-        }
-
-        return false;
-    }
-
-    private function isLocalOrPrivateUrl(string $url): bool
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! is_string($host) || $host === '') {
-            return true;
-        }
-
-        if (in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
-            return true;
-        }
-
-        if (Str::endsWith($host, ['.test', '.local'])) {
-            return true;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         }
 
         return false;

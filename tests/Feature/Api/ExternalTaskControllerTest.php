@@ -20,6 +20,7 @@ beforeEach(function () {
     $this->project->environments()->create([
         'environment' => 'testing',
         'url' => 'https://example.com',
+        'callback_trusted_at' => now(),
     ]);
 
     // External user data
@@ -203,7 +204,7 @@ test('linked external contacts can view tasks submitted by or assigned to linked
         ->assertJsonPath('id', $submittedBySecondary->id);
 });
 
-test('project environment identity resolves an external account when the request url changes', function () {
+test('project environment identity rejects an external account when the request url changes', function () {
     $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
     $this->externalUser->forceFill([
         'project_environment_id' => $testingEnvironment->id,
@@ -221,8 +222,58 @@ test('project environment identity resolves an external account when the request
             'project' => $this->project->token,
             'user' => $payload,
         ]))
-        ->assertOk()
-        ->assertJsonPath('id', $task->id);
+        ->assertNotFound();
+
+    $this->assertDatabaseHas('project_environments', [
+        'id' => $testingEnvironment->id,
+        'url' => 'https://example.com',
+    ]);
+});
+
+test('ordinary external traffic cannot overwrite a registered environment url', function () {
+    $payload = $this->externalUserData;
+    $payload['url'] = 'https://attacker.example';
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $payload,
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['user.url']);
+
+    $this->assertDatabaseHas('project_environments', [
+        'project_id' => $this->project->id,
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+    ]);
+});
+
+test('partially configured clients cannot promote request metadata into callback trust', function () {
+    $payload = [
+        ...$this->externalUserData,
+        'id' => 'unregistered-environment-user',
+        'environment' => 'manual',
+        'url' => 'http://127.0.0.1:8080',
+    ];
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $payload,
+        ]))
+        ->assertOk();
+
+    $this->assertDatabaseMissing('project_environments', [
+        'project_id' => $this->project->id,
+        'environment' => 'manual',
+    ]);
+
+    $this->assertDatabaseHas('external_users', [
+        'project_id' => $this->project->id,
+        'external_id' => 'unregistered-environment-user',
+        'project_environment_id' => null,
+    ]);
 });
 
 test('index returns tasks for external user', function () {
@@ -504,6 +555,29 @@ test('store creates new task', function () {
     $this->assertDatabaseHas('task_metadata', [
         'url' => 'https://example.com/task/new',
         'environment' => 'testing',
+    ]);
+});
+
+test('store rejects a changed external user destination before creating a task', function () {
+    $payload = $this->externalUserData;
+    $payload['url'] = 'https://attacker.example';
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', [
+            'title' => 'Must not persist',
+            'project' => $this->project->token,
+            'user' => $payload,
+            'metadata' => [
+                'url' => 'https://attacker.example/task/new',
+                'environment' => 'testing',
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['user.url']);
+
+    $this->assertDatabaseMissing('tasks', [
+        'project_id' => $this->project->id,
+        'title' => 'Must not persist',
     ]);
 });
 

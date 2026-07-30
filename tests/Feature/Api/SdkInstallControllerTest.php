@@ -4,6 +4,7 @@ use App\Events\SdkInstallSessionApproved;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
+use App\Services\OutboundUrlPolicy;
 use App\Services\SdkInstallSessionService;
 use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -330,6 +331,44 @@ test('finalize reuses an existing project token', function () {
         ->assertJsonPath('project_token', 'existing-project-token');
 
     expect($project->fresh()->token)->toBe('existing-project-token');
+});
+
+test('hosted finalize refuses private callback destinations before issuing credentials', function () {
+    $this->app->instance(
+        OutboundUrlPolicy::class,
+        new OutboundUrlPolicy(fn (): array => ['10.0.0.8']),
+    );
+    $manager = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $manager->id,
+        'client_id' => null,
+        'organisation_id' => null,
+        'token' => null,
+    ]);
+    $session = $this->postJson(route('api.sdk-install.store'), [
+        'environment' => 'production',
+        'url' => 'https://private-client.example',
+    ])->json();
+
+    $this->actingAs($manager)->post(route('sdk-install.approve', absolute: false), [
+        'user_code' => $session['user_code'],
+    ])->assertRedirect();
+
+    $this->app->detectEnvironment(fn (): string => 'production');
+
+    $this->postJson(route('api.sdk-install.finalize'), [
+        'device_code' => $session['device_code'],
+        'project_id' => $project->id,
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['url']);
+
+    expect($project->fresh()->token)->toBeNull();
+    expect(PersonalAccessToken::query()->where('tokenable_id', $manager->id)->count())->toBe(0);
+    $this->assertDatabaseMissing('project_environments', [
+        'project_id' => $project->id,
+        'environment' => 'production',
+    ]);
 });
 
 test('create project returns conflict after credentials are issued', function () {

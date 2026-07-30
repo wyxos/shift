@@ -1051,6 +1051,7 @@ test('store syncs grouped collaborators and returns them in the response', funct
     $project->environments()->create([
         'environment' => 'production',
         'url' => 'https://client-app.test',
+        'callback_trusted_at' => now(),
     ]);
 
     $internalCollaborator = User::factory()->create();
@@ -1287,6 +1288,7 @@ test('collaborator candidate endpoint uses the selected environment registration
     $project->environments()->create([
         'environment' => 'staging',
         'url' => 'https://staging-client.test',
+        'callback_trusted_at' => now(),
     ]);
 
     $response = $this->actingAs($this->user)
@@ -1715,6 +1717,7 @@ test('store schedules create notification jobs for tagged external collaborators
     $project->environments()->create([
         'environment' => 'local',
         'url' => 'https://client-app.test',
+        'callback_trusted_at' => now(),
     ]);
 
     $response = $this->actingAs($this->user)

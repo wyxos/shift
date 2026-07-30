@@ -23,6 +23,7 @@ beforeEach(function () {
     $this->project->environments()->create([
         'environment' => 'testing',
         'url' => 'https://consumer.test',
+        'callback_trusted_at' => now(),
     ]);
 });
 

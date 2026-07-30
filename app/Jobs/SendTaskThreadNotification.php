@@ -69,17 +69,24 @@ class SendTaskThreadNotification implements ShouldQueue
             $this->recipientKey(),
             'thread.update',
         );
+        $project = $thread->task?->project;
+
+        if (! $project) {
+            $delivery->markFailed('missing_project');
+
+            return;
+        }
 
         if (! $delivery->callback_delivered_at) {
             $delivery->recordAttempt();
 
             try {
                 $response = $notificationService->sendNotification(
+                    $project,
                     (string) $this->externalUserData['url'],
                     'thread.update',
                     $this->payload,
                     [],
-                    $thread->task?->project?->token,
                     $delivery->delivery_id,
                 );
             } catch (ExternalNotificationException $exception) {

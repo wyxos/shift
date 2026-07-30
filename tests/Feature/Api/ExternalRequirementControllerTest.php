@@ -21,6 +21,7 @@ beforeEach(function () {
     $this->project->environments()->create([
         'environment' => 'testing',
         'url' => 'https://example.com',
+        'callback_trusted_at' => now(),
     ]);
 
     $this->externalUserData = [

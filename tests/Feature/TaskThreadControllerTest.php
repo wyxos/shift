@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
+use App\Services\OutboundUrlPolicy;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -16,7 +17,20 @@ beforeEach(function () {
     // Create a user
     $this->user = User::factory()->create();
 
-    $this->project = Project::factory()->withAuthor($this->user->id)->create();
+    $this->project = Project::factory()->withAuthor($this->user->id)->create([
+        'token' => 'thread-project-token',
+    ]);
+
+    $this->app->instance(
+        OutboundUrlPolicy::class,
+        new OutboundUrlPolicy(fn (): array => ['93.184.216.34']),
+    );
+
+    $this->project->environments()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'callback_trusted_at' => now(),
+    ]);
 
     // Create an external user
     $this->externalUser = ExternalUser::factory()->create([
@@ -197,6 +211,12 @@ test('external thread creation with non external submitter sends notification to
 
 test('external thread creation sends notification to multiple external users', function () {
     Notification::fake();
+
+    $this->project->environments()->create([
+        'environment' => 'staging',
+        'url' => 'https://another-example.com',
+        'callback_trusted_at' => now(),
+    ]);
 
     // Create another external user
     $anotherExternalUser = ExternalUser::factory()->create([

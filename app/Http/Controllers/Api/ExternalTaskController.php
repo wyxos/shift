@@ -446,13 +446,6 @@ class ExternalTaskController extends Controller
         $project->load('environments');
         $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes);
 
-        $task = Task::create([
-            ...$attributes,
-            'project_id' => $project->id,
-            'status' => $attributes['status'] ?? 'pending',
-            'priority' => $attributes['priority'] ?? 'medium',
-        ]);
-
         $externalUser = null;
 
         if (isset($attributes['user'])) {
@@ -463,7 +456,16 @@ class ExternalTaskController extends Controller
                 'name' => $attributes['user']['name'] ?? null,
                 'email' => $attributes['user']['email'] ?? null,
             ]);
+        }
 
+        $task = Task::create([
+            ...$attributes,
+            'project_id' => $project->id,
+            'status' => $attributes['status'] ?? 'pending',
+            'priority' => $attributes['priority'] ?? 'medium',
+        ]);
+
+        if ($externalUser instanceof ExternalUser) {
             $task->submitter()->associate($externalUser)->save();
         }
 

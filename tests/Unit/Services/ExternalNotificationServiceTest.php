@@ -1,10 +1,18 @@
 <?php
 
-// Uses configured globally in tests/Pest.php for Unit suite
-
 use App\Exceptions\ExternalNotificationException;
+use App\Models\Project;
+use App\Models\ProjectEnvironment;
 use App\Services\ExternalNotificationService;
+use App\Services\OutboundUrlPolicy;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Response;
 use Illuminate\Notifications\Notification as BaseNotification;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+
+uses(RefreshDatabase::class);
 
 class TestNotification extends BaseNotification
 {
@@ -13,18 +21,32 @@ class TestNotification extends BaseNotification
         return ['mail'];
     }
 }
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     Notification::fake();
     Log::spy();
+
+    $this->app->instance(OutboundUrlPolicy::class, new OutboundUrlPolicy(
+        fn (string $host): array => match ($host) {
+            'callback.internal.example' => ['10.0.0.5'],
+            'shift-sdk-package.test' => ['127.0.0.1'],
+            default => ['93.184.216.34'],
+        },
+    ));
+
+    $this->project = Project::factory()->create([
+        'token' => 'project-secret',
+    ]);
+    $this->environment = ProjectEnvironment::query()->create([
+        'project_id' => $this->project->id,
+        'environment' => 'production',
+        'url' => 'https://example.com',
+        'callback_trusted_at' => now(),
+    ]);
+    $this->service = app(ExternalNotificationService::class);
 });
 
 test('send notification successful', function () {
-    // Arrange
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
@@ -32,21 +54,23 @@ test('send notification successful', function () {
         ], 200),
     ]);
 
-    $service = new ExternalNotificationService;
     $url = 'https://example.com';
     $handler = 'test.handler';
     $payload = ['key' => 'value'];
-    $signingSecret = 'project-secret';
     $deliveryId = 'f74cc3ba-4b0d-4794-aeeb-8b1ba5037e96';
 
-    // Act
-    $response = $service->sendNotification($url, $handler, $payload, [], $signingSecret, $deliveryId);
+    $response = $this->service->sendNotification(
+        $this->project,
+        $url,
+        $handler,
+        $payload,
+        [],
+        $deliveryId,
+    );
 
-    // Assert
-    expect($response)->not->toBeNull();
     expect($response->successful())->toBeTrue();
 
-    Http::assertSent(function ($request) use ($url, $handler, $payload, $signingSecret, $deliveryId) {
+    Http::assertSent(function ($request) use ($url, $handler, $payload, $deliveryId) {
         $timestamp = $request->header(ExternalNotificationService::TIMESTAMP_HEADER)[0] ?? null;
         $signature = $request->header(ExternalNotificationService::SIGNATURE_HEADER)[0] ?? null;
         $body = $request->body();
@@ -59,12 +83,11 @@ test('send notification successful', function () {
             $request['source']['url'] === config('app.url') &&
             $request['source']['environment'] === app()->environment() &&
             is_string($timestamp) && $timestamp !== '' &&
-            $signature === hash_hmac('sha256', $timestamp.'.'.$body, $signingSecret);
+            $signature === hash_hmac('sha256', $timestamp.'.'.$body, 'project-secret');
     });
 });
 
 test('send notification with custom source', function () {
-    // Arrange
     Http::fake([
         'https://example.com/shift/api/notifications' => Http::response([
             'success' => true,
@@ -72,24 +95,25 @@ test('send notification with custom source', function () {
         ], 200),
     ]);
 
-    $service = new ExternalNotificationService;
-    $url = 'https://example.com';
-    $handler = 'test.handler';
-    $payload = ['key' => 'value'];
     $source = ['custom' => 'source'];
-    $signingSecret = 'project-secret';
 
-    // Act
-    $response = $service->sendNotification($url, $handler, $payload, $source, $signingSecret);
+    $this->service->sendNotification(
+        $this->project,
+        'https://example.com',
+        'test.handler',
+        ['key' => 'value'],
+        $source,
+    );
 
-    // Assert
-    Http::assertSent(function ($request) use ($url, $source) {
-        return $request->url() === $url.'/shift/api/notifications' &&
-            $request['source'] === $source;
-    });
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://example.com/shift/api/notifications'
+        && $request['source'] === $source);
 });
 
 test('send notification skips ssl verification for local consumer apps', function () {
+    $this->environment->update([
+        'environment' => 'local',
+        'url' => 'https://shift-sdk-package.test',
+    ]);
     $capturedOptions = null;
 
     Http::fake(function ($request, $options) use (&$capturedOptions) {
@@ -101,14 +125,18 @@ test('send notification skips ssl verification for local consumer apps', functio
         ], 200);
     });
 
-    $service = new ExternalNotificationService;
+    $response = $this->service->sendNotification(
+        $this->project,
+        'https://shift-sdk-package.test',
+        'test.handler',
+        ['key' => 'value'],
+    );
 
-    $response = $service->sendNotification('https://shift-sdk-package.test', 'test.handler', ['key' => 'value'], [], 'project-secret');
-
-    expect($response)->not->toBeNull();
-    expect($capturedOptions)->toBeArray();
-    expect($capturedOptions['verify'] ?? null)->toBeFalse();
-    expect($capturedOptions['connect_timeout'] ?? null)->toBe(5)
+    expect($response->successful())->toBeTrue()
+        ->and($capturedOptions)->toBeArray()
+        ->and($capturedOptions['verify'] ?? null)->toBeFalse()
+        ->and($capturedOptions['allow_redirects'] ?? null)->toBeFalse()
+        ->and($capturedOptions['connect_timeout'] ?? null)->toBe(5)
         ->and($capturedOptions['timeout'] ?? null)->toBe(15);
 });
 
@@ -124,27 +152,141 @@ test('send notification keeps ssl verification for public hosts', function () {
         ], 200);
     });
 
-    $service = new ExternalNotificationService;
+    $response = $this->service->sendNotification(
+        $this->project,
+        'https://example.com',
+        'test.handler',
+        ['key' => 'value'],
+    );
 
-    $response = $service->sendNotification('https://example.com', 'test.handler', ['key' => 'value'], [], 'project-secret');
-
-    expect($response)->not->toBeNull();
-    expect($capturedOptions)->toBeArray();
-    expect($capturedOptions['verify'] ?? true)->not->toBeFalse();
+    expect($response->successful())->toBeTrue()
+        ->and($capturedOptions)->toBeArray()
+        ->and($capturedOptions['verify'] ?? true)->not->toBeFalse()
+        ->and($capturedOptions['allow_redirects'] ?? null)->toBeFalse()
+        ->and($capturedOptions['curl'][CURLOPT_RESOLVE] ?? null)
+        ->toBe(['example.com:443:93.184.216.34']);
 });
 
-test('connection failures are retryable', function () {
-    // Arrange
-    Http::fake(function () {
-        throw new \Exception('Test exception');
-    });
-
-    $service = new ExternalNotificationService;
+test('historical callback registrations remain untrusted until re-registered', function () {
+    $this->environment->update(['callback_trusted_at' => null]);
+    Http::fake();
 
     $exception = null;
 
     try {
-        $service->sendNotification('https://example.com', 'test.handler', [], [], 'project-secret');
+        $this->service->sendNotification(
+            $this->project,
+            'https://example.com',
+            'test.handler',
+            ['sensitive' => 'payload'],
+        );
+    } catch (ExternalNotificationException $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(ExternalNotificationException::class)
+        ->and($exception->failureType)->toBe('untrusted_destination')
+        ->and($exception->retryable)->toBeFalse();
+    Http::assertNothingSent();
+});
+
+test('send notification refuses a changed callback url before signing or sending', function () {
+    Http::fake();
+
+    expect(fn () => $this->service->sendNotification(
+        $this->project,
+        'https://changed.example',
+        'test.handler',
+        ['sensitive' => 'payload'],
+    ))->toThrow(ExternalNotificationException::class);
+
+    Http::assertNothingSent();
+});
+
+test('send notification refuses private dns destinations in hosted production', function () {
+    $this->app->detectEnvironment(fn (): string => 'production');
+    $this->environment->update(['url' => 'https://callback.internal.example']);
+    Http::fake();
+
+    $exception = null;
+
+    try {
+        $this->service->sendNotification(
+            $this->project,
+            'https://callback.internal.example',
+            'test.handler',
+            ['sensitive' => 'payload'],
+        );
+    } catch (ExternalNotificationException $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(ExternalNotificationException::class)
+        ->and($exception->failureType)->toBe('untrusted_destination')
+        ->and($exception->retryable)->toBeFalse();
+    Http::assertNothingSent();
+});
+
+test('send notification requires a project callback token', function () {
+    $this->project->update(['token' => null]);
+    Http::fake();
+
+    $exception = null;
+
+    try {
+        $this->service->sendNotification(
+            $this->project->fresh(),
+            'https://example.com',
+            'test.handler',
+            ['sensitive' => 'payload'],
+        );
+    } catch (ExternalNotificationException $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(ExternalNotificationException::class)
+        ->and($exception->failureType)->toBe('missing_project_token')
+        ->and($exception->retryable)->toBeFalse();
+    Http::assertNothingSent();
+});
+
+test('send notification refuses redirects without forwarding its signed payload', function () {
+    Http::fake([
+        'https://example.com/shift/api/notifications' => Http::response('', 302, [
+            'Location' => 'http://127.0.0.1/internal',
+        ]),
+        'http://127.0.0.1/*' => Http::response(['unexpected' => true]),
+    ]);
+
+    $exception = null;
+
+    try {
+        $this->service->sendNotification(
+            $this->project,
+            'https://example.com',
+            'test.handler',
+            ['sensitive' => 'payload'],
+        );
+    } catch (ExternalNotificationException $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(ExternalNotificationException::class)
+        ->and($exception->failureType)->toBe('redirect_response')
+        ->and($exception->retryable)->toBeFalse();
+    Http::assertSentCount(1);
+    Http::assertNotSent(fn ($request): bool => str_starts_with($request->url(), 'http://127.0.0.1'));
+});
+
+test('connection failures are retryable', function () {
+    Http::fake(function () {
+        throw new \Exception('Test exception');
+    });
+
+    $exception = null;
+
+    try {
+        $this->service->sendNotification($this->project, 'https://example.com', 'test.handler', []);
     } catch (ExternalNotificationException $caught) {
         $exception = $caught;
     }
@@ -163,12 +305,11 @@ test('server failures are retryable', function () {
     $exception = null;
 
     try {
-        (new ExternalNotificationService)->sendNotification(
+        $this->service->sendNotification(
+            $this->project,
             'https://example.com',
             'test.handler',
             [],
-            [],
-            'project-secret',
         );
     } catch (ExternalNotificationException $caught) {
         $exception = $caught;
@@ -188,12 +329,11 @@ test('client failures are permanent', function () {
     $exception = null;
 
     try {
-        (new ExternalNotificationService)->sendNotification(
+        $this->service->sendNotification(
+            $this->project,
             'https://example.com',
             'test.handler',
             [],
-            [],
-            'project-secret',
         );
     } catch (ExternalNotificationException $caught) {
         $exception = $caught;
@@ -213,12 +353,11 @@ test('malformed success responses are permanent failures', function () {
     $exception = null;
 
     try {
-        (new ExternalNotificationService)->sendNotification(
+        $this->service->sendNotification(
+            $this->project,
             'https://example.com',
             'test.handler',
             [],
-            [],
-            'project-secret',
         );
     } catch (ExternalNotificationException $caught) {
         $exception = $caught;
@@ -231,18 +370,14 @@ test('malformed success responses are permanent failures', function () {
 });
 
 test('send fallback email when not production', function () {
-    // Arrange
     $mockResponse = $this->createStub(Response::class);
     $mockResponse->method('json')->with('production')->willReturn(false);
 
-    $service = new ExternalNotificationService;
     $email = 'test@example.com';
     $notification = new TestNotification;
 
-    // Act
-    $result = $service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
+    $result = $this->service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
 
-    // Assert
     expect($result)->toBeTrue();
     Notification::assertSentOnDemand(
         TestNotification::class,
@@ -253,32 +388,24 @@ test('send fallback email when not production', function () {
 });
 
 test('do not send fallback email when production', function () {
-    // Arrange
     $mockResponse = $this->createStub(Response::class);
     $mockResponse->method('json')->with('production')->willReturn(true);
 
-    $service = new ExternalNotificationService;
     $email = 'test@example.com';
     $notification = new TestNotification;
 
-    // Act
-    $result = $service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
+    $result = $this->service->sendFallbackEmailIfNeeded($mockResponse, $email, $notification);
 
-    // Assert
     expect($result)->toBeFalse();
     Notification::assertNothingSent();
 });
 
 test('do not send fallback email when response is null', function () {
-    // Arrange
-    $service = new ExternalNotificationService;
     $email = 'test@example.com';
     $notification = new TestNotification;
 
-    // Act
-    $result = $service->sendFallbackEmailIfNeeded(null, $email, $notification);
+    $result = $this->service->sendFallbackEmailIfNeeded(null, $email, $notification);
 
-    // Assert
     expect($result)->toBeFalse();
     Notification::assertNothingSent();
 });

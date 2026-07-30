@@ -2,6 +2,7 @@
 
 use App\Models\ExternalUser;
 use App\Models\Project;
+use App\Models\ProjectEnvironment;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -132,4 +133,22 @@ test('external account identity migration backfills contacts and environment ref
             ['production', 'https://client-production.test'],
             ['staging', 'https://client-staging.test'],
         ]);
+});
+
+test('callback trust migration leaves historical project environments untrusted', function () {
+    $migration = require database_path('migrations/2026_07_30_070000_add_callback_trusted_at_to_project_environments_table.php');
+    $migration->down();
+
+    $project = Project::factory()->create();
+    $registration = ProjectEnvironment::query()->create([
+        'project_id' => $project->id,
+        'environment' => 'production',
+        'url' => 'https://historical-client.example',
+    ]);
+
+    $migration->up();
+
+    expect(Schema::hasColumn('project_environments', 'callback_trusted_at'))->toBeTrue()
+        ->and(DB::table('project_environments')->where('id', $registration->id)->value('callback_trusted_at'))
+        ->toBeNull();
 });
