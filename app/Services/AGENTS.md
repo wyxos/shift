@@ -4,7 +4,7 @@ Applies inside `app/Services/**` in addition to the repo root and `app/AGENTS.md
 
 ## Service Rules
 - Use this folder for outbound integrations and service-layer behavior that should stay out of controllers.
-- The external notification contract currently posts to `<client app>/shift/api/notifications`. Do not change that path without updating `../shift-sdk-package/packages/shift-php`.
+- The external notification contract currently posts to `<client app>/shift/api/notifications`. Do not change that path without updating `../shift-sdk/packages/shift-php`.
 - Notification bodies currently include `handler`, `payload`, and `source`. Keep that shape aligned with the SDK receiver if it changes.
 - Notification requests may include signed headers. When a signing secret exists, preserve `X-Shift-Timestamp` and `X-Shift-Signature`.
 - Keep the signature format aligned with the SDK receiver before changing it.

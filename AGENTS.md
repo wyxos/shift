@@ -4,7 +4,7 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 
 ## Scope
 - This file applies repo-wide unless a deeper `AGENTS.md` overrides it.
-- SHIFT is the source-of-truth portal and external API for `../shift-sdk-package/` and `../shift-sdk-package/packages/shift-php`.
+- SHIFT is the source-of-truth portal and external API for `../shift-sdk/` and `../shift-sdk/packages/shift-php`.
 
 ## Repo Rules
 - If a user correction proves a SHIFT Knowledge note or local planning artifact is stale, update the durable source in the same task when write access is allowed. Do not just patch the local note or repeat the corrected answer in chat; remove or reframe the stale guidance so future agents stop rediscovering it.

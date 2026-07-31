@@ -29,7 +29,7 @@ beforeEach(function () {
     $this->app->instance(OutboundUrlPolicy::class, new OutboundUrlPolicy(
         fn (string $host): array => match ($host) {
             'callback.internal.example' => ['10.0.0.5'],
-            'shift-sdk-package.test' => ['127.0.0.1'],
+            'shift-sdk.test' => ['127.0.0.1'],
             default => ['93.184.216.34'],
         },
     ));
@@ -112,7 +112,7 @@ test('send notification with custom source', function () {
 test('send notification skips ssl verification for local consumer apps', function () {
     $this->environment->update([
         'environment' => 'local',
-        'url' => 'https://shift-sdk-package.test',
+        'url' => 'https://shift-sdk.test',
     ]);
     $capturedOptions = null;
 
@@ -127,7 +127,7 @@ test('send notification skips ssl verification for local consumer apps', functio
 
     $response = $this->service->sendNotification(
         $this->project,
-        'https://shift-sdk-package.test',
+        'https://shift-sdk.test',
         'test.handler',
         ['key' => 'value'],
     );

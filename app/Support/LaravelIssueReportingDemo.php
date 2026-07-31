@@ -16,7 +16,7 @@ final class LaravelIssueReportingDemo
                 'accent' => 'teal',
                 'title' => 'Issue report form',
                 'subtitle' => 'A Laravel user reports an issue from the page where it happened.',
-                'demo_url' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
+                'demo_url' => 'https://shift-sdk.test/billing/invoices/INV-1047',
                 'location' => 'Laravel app',
                 'task' => [
                     'id' => 'SH-4187',
@@ -38,7 +38,7 @@ final class LaravelIssueReportingDemo
                 ],
                 'details' => [
                     'Environment' => 'local',
-                    'App URL' => 'https://shift-sdk-package.test',
+                    'App URL' => 'https://shift-sdk.test',
                     'Route' => 'billing.invoices.show',
                     'User ID' => 'demo-user-24',
                     'Browser' => 'Chrome 126 on macOS',
@@ -66,7 +66,7 @@ final class LaravelIssueReportingDemo
                     'role' => 'Finance reviewer',
                 ],
                 'details' => [
-                    'Submitted from' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
+                    'Submitted from' => 'https://shift-sdk.test/billing/invoices/INV-1047',
                     'Environment' => 'local',
                     'Route' => 'billing.invoices.show',
                     'App user' => 'Maya Thompson <maya.thompson@example.test>',
@@ -85,7 +85,7 @@ final class LaravelIssueReportingDemo
                 'accent' => 'rose',
                 'title' => 'Laravel error report',
                 'subtitle' => 'Cleaned Laravel exception details can create or update the matching task.',
-                'demo_url' => 'https://shift-sdk-package.test/admin/reports/month-end',
+                'demo_url' => 'https://shift-sdk.test/admin/reports/month-end',
                 'location' => 'Laravel exception reporter',
                 'task' => [
                     'id' => 'SH-4192',
@@ -159,7 +159,7 @@ final class LaravelIssueReportingDemo
                     ],
                 ],
                 'details' => [
-                    'Original page' => 'https://shift-sdk-package.test/billing/invoices/INV-1047',
+                    'Original page' => 'https://shift-sdk.test/billing/invoices/INV-1047',
                     'Environment' => 'local',
                     'Reporter' => 'Maya Thompson',
                     'Follow-up owner' => 'Daniel Reed',

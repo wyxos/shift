@@ -16,7 +16,7 @@ it('renders local Laravel issue reporting demo screens with deterministic dummy 
     'report form' => [
         'report-form',
         'Issue report form',
-        'https://shift-sdk-package.test/billing/invoices/INV-1047',
+        'https://shift-sdk.test/billing/invoices/INV-1047',
     ],
     'created task' => [
         'created-task',
@@ -26,7 +26,7 @@ it('renders local Laravel issue reporting demo screens with deterministic dummy 
     'error report' => [
         'error-report',
         'Laravel error report',
-        'https://shift-sdk-package.test/admin/reports/month-end',
+        'https://shift-sdk.test/admin/reports/month-end',
     ],
     'task thread' => [
         'task-thread',
