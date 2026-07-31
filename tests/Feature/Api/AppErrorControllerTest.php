@@ -343,7 +343,7 @@ it('notifies configured visible app error recipients when a grouped error task i
         'task_title' => $task->title,
         'project_id' => $project->id,
         'project_name' => $project->name,
-        'url' => route('tasks.index', ['task' => $task->id]),
+        'url' => route('app-errors.index', ['task' => $task->id]),
         'reason' => 'created',
     ]);
 
@@ -446,7 +446,7 @@ it('notifies configured recipients when a completed grouped error task reopens b
             'task_title' => $task->fresh()->title,
             'project_id' => $project->id,
             'project_name' => $project->name,
-            'url' => route('tasks.index', ['task' => $task->id]),
+            'url' => route('app-errors.index', ['task' => $task->id]),
             'reason' => 'reopened',
         ])
         ->and($task->fresh()->status)->toBe(TaskStatus::Pending->value);

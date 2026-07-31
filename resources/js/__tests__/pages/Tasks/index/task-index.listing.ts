@@ -188,4 +188,50 @@ describe('Tasks/Index.vue', () => {
 
         wrapper.unmount();
     });
+
+    it('keeps app error filters on the dedicated route when paginating', async () => {
+        axiosGetMock.mockReset();
+        (router.get as any).mockClear();
+
+        const wrapper = mount(Index, {
+            props: {
+                surface: 'app-errors',
+                tasks: makeTasksPage([{ id: 1, title: 'Checkout failed', status: 'pending', priority: 'high', type: 'app_error' }], {
+                    current_page: 1,
+                    last_page: 2,
+                    total: 11,
+                    from: 1,
+                    to: 10,
+                }),
+                projects: [{ id: 10, name: 'Portal', environments: [] }],
+                filters: {
+                    status: ['pending'],
+                    priority: ['high'],
+                    search: 'Checkout',
+                    environment: 'staging',
+                    project_id: 10,
+                },
+            },
+        });
+
+        const nextButton = wrapper.findAll('button').find((button) => button.text() === 'Next');
+        expect(nextButton).toBeDefined();
+        await nextButton!.trigger('click');
+
+        expect(router.get).toHaveBeenCalledWith(
+            '/app-errors',
+            expect.objectContaining({
+                status: ['pending'],
+                priority: ['high'],
+                search: 'Checkout',
+                environment: 'staging',
+                project_id: '10',
+                page: 2,
+            }),
+            expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true }),
+        );
+        expect((router.get as any).mock.calls.at(-1)?.[1]).not.toHaveProperty('type');
+
+        wrapper.unmount();
+    });
 });

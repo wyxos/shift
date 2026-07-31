@@ -80,6 +80,12 @@ function getTaskNotificationsUrl(taskId?: NotificationData['task_id']): string |
     return route('tasks.index', { task: taskId });
 }
 
+function getAppErrorNotificationsUrl(taskId?: NotificationData['task_id']): string | null {
+    if (!hasRouteHelper || taskId === undefined || taskId === null) return null;
+
+    return route('app-errors.index', { task: taskId });
+}
+
 const fetchNotifications = async () => {
     if (!unreadUrl.value) {
         notifications.value = [];
@@ -214,8 +220,9 @@ const getNotificationUrl = (notification: NotificationItem) => {
 
     switch (notification.type) {
         case 'TaskCreationNotification':
-        case 'AppErrorReportedNotification':
             return getTaskNotificationsUrl(data.task_id) ?? '#';
+        case 'AppErrorReportedNotification':
+            return getAppErrorNotificationsUrl(data.task_id) ?? '#';
         case 'TaskThreadUpdated':
             return data.url ?? '#';
         case 'ProjectInvitationNotification':

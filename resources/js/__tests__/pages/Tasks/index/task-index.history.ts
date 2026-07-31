@@ -84,9 +84,9 @@ describe('Tasks/Index.vue', () => {
         pushStateSpy.mockRestore();
     });
 
-    it('auto-opens the edit sheet from task URL query', async () => {
+    it('auto-opens an app error sheet and occurrences from the dedicated deep link', async () => {
         axiosGetMock.mockReset();
-        window.history.replaceState({}, '', '/tasks?task=1');
+        window.history.replaceState({}, '', '/app-errors?task=1');
 
         axiosGetMock
             .mockResolvedValueOnce({
@@ -100,12 +100,20 @@ describe('Tasks/Index.vue', () => {
                     is_owner: false,
                     submitter: { email: 'someone@example.com' },
                     attachments: [],
+                    error_signature: 'error-signature',
                 },
             })
-            .mockResolvedValueOnce({ data: { external: [] } });
+            .mockResolvedValueOnce({ data: { external: [] } })
+            .mockResolvedValueOnce({
+                data: {
+                    data: [],
+                    pagination: { current_page: 1, last_page: 1, per_page: 15, total: 0 },
+                },
+            });
 
         const wrapper = mount(Index, {
             props: {
+                surface: 'app-errors',
                 tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
                 filters: { status: ['pending', 'in-progress', 'awaiting-feedback'], priority: ['low', 'medium', 'high'], search: '' },
             },
@@ -115,6 +123,7 @@ describe('Tasks/Index.vue', () => {
 
         expect(axiosGetMock).toHaveBeenCalledWith('/tasks.show');
         expect(axiosGetMock).toHaveBeenCalledWith('/task-threads.index');
+        expect(axiosGetMock).toHaveBeenCalledWith('/task-error-occurrences.index', { params: { page: 1 } });
 
         wrapper.unmount();
     });

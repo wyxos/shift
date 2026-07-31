@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+/* eslint-disable max-lines */
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData, type SidebarOrganisation } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ArrowLeft, Briefcase, Folder, Inbox, LayoutGrid, ListTodo, LoaderCircle, Network, Plus, Settings, Users } from 'lucide-vue-next';
+import { ArrowLeft, Briefcase, Bug, Folder, Inbox, LayoutGrid, ListTodo, LoaderCircle, Network, Plus, Settings, Users } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -36,6 +37,11 @@ const mainNavItems: NavItem[] = [
         title: 'Tasks',
         href: '/tasks',
         icon: Folder,
+    },
+    {
+        title: 'App errors',
+        href: '/app-errors',
+        icon: Bug,
     },
     {
         title: 'Requirements',
@@ -139,6 +145,12 @@ const organisationNavItems = computed(() => {
             title: 'Tasks',
             href: organisationPageHref(organisation, 'tasks'),
             icon: ListTodo,
+            isVisible: true,
+        },
+        {
+            title: 'App errors',
+            href: organisationPageHref(organisation, 'app-errors'),
+            icon: Bug,
             isVisible: true,
         },
         {
@@ -299,7 +311,7 @@ function organisationIdFromScopedPath(url: URL) {
 }
 
 function organisationRouteState(url: URL) {
-    const scopedMatch = url.pathname.match(/^\/organisation\/(\d+)\/(dashboard|tasks|requirements|clients|projects|team|settings)$/);
+    const scopedMatch = url.pathname.match(/^\/organisation\/(\d+)\/(dashboard|tasks|app-errors|requirements|clients|projects|team|settings)$/);
 
     if (scopedMatch) {
         return `${scopedMatch[2]}:${scopedMatch[1]}`;

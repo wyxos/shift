@@ -1,19 +1,19 @@
 import { getRequirementStatusOptions } from '@/shared/tasks/presentation';
-import type { TaskIndexFilters } from '@/shared/tasks/types';
+import type { TaskIndexFilters, TaskIndexSurface } from '@/shared/tasks/types';
 import { useTaskFilterState } from '@/shared/tasks/useTaskFilterState';
 import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 
 type UseTaskIndexFiltersOptions = {
     filters: TaskIndexFilters;
-    surface?: 'tasks' | 'requirements';
+    surface?: TaskIndexSurface;
 };
 
 export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     const page = usePage<SharedData>();
     const state = useTaskFilterState({
         filters: options.filters,
-        includeTypeFilter: options.surface !== 'requirements',
+        includeTypeFilter: false,
         includeClosed: false,
         completedStatuses: options.surface === 'requirements' ? [] : ['completed'],
         statusOptions: options.surface === 'requirements' ? getRequirementStatusOptions() : undefined,
@@ -27,7 +27,7 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
         if (!providedOrganisationId) return false;
 
         const current = new URL(page.url, 'https://shift.test');
-        const surfacePath = options.surface === 'requirements' ? 'requirements' : 'tasks';
+        const surfacePath = options.surface ?? 'tasks';
 
         return current.pathname === `/organisation/${providedOrganisationId}/${surfacePath}`;
     }
@@ -37,11 +37,9 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     }
 
     function indexPath() {
-        if (options.surface === 'requirements') {
-            return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/requirements` : '/requirements';
-        }
+        const surfacePath = options.surface ?? 'tasks';
 
-        return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/tasks` : '/tasks';
+        return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/${surfacePath}` : `/${surfacePath}`;
     }
 
     function buildListQuery(page: number) {

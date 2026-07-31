@@ -24,12 +24,14 @@ use App\Services\TaskCollaboratorService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Response;
 
 class TaskController extends Controller
 {
@@ -639,12 +641,43 @@ class TaskController extends Controller
         return $payload;
     }
 
-    public function index(?Organisation $organisation = null)
+    public function index(?Organisation $organisation = null): Response|RedirectResponse
+    {
+        $this->authorizeOrganisationSurface($organisation);
+
+        if (request()->query('type') === 'app_errors') {
+            $parameters = request()->query();
+            unset($parameters['type']);
+
+            if ($organisation) {
+                $parameters['organisation'] = $organisation;
+            }
+
+            return redirect()->route(
+                $organisation ? 'organisation.app-errors' : 'app-errors.index',
+                $parameters,
+            );
+        }
+
+        return $this->renderIndex($organisation, 'tasks');
+    }
+
+    public function appErrors(?Organisation $organisation = null): Response
+    {
+        $this->authorizeOrganisationSurface($organisation);
+
+        return $this->renderIndex($organisation, 'app-errors');
+    }
+
+    private function authorizeOrganisationSurface(?Organisation $organisation): void
     {
         if ($organisation && ! $organisation->isVisibleToUser(auth()->id())) {
             abort(404);
         }
+    }
 
+    private function renderIndex(?Organisation $organisation, string $surface): Response
+    {
         $defaultStatuses = TaskStatus::defaultOpenValues();
         $allPriorities = ['low', 'medium', 'high'];
         $allowedSortBy = ['updated_at', 'created_at', 'priority'];
@@ -664,7 +697,7 @@ class TaskController extends Controller
         $projectId = request('project_id');
         $search = trim((string) request('search', ''));
         $environment = trim((string) request('environment', ''));
-        $type = in_array((string) request('type'), ['all', 'tasks', 'app_errors'], true) ? (string) request('type') : 'all';
+        $type = $surface === 'app-errors' ? 'app_errors' : 'tasks';
         $sortBy = in_array((string) request('sort_by'), $allowedSortBy, true) ? (string) request('sort_by') : $defaultSortBy;
 
         $query = $this->visibleTasksQuery()
@@ -704,10 +737,10 @@ class TaskController extends Controller
             });
         }
 
-        if ($type === 'tasks') {
-            $query->whereNull('error_signature');
-        } elseif ($type === 'app_errors') {
+        if ($surface === 'app-errors') {
             $query->errorIntake();
+        } else {
+            $query->whereNull('error_signature');
         }
 
         if ($sortBy === 'priority') {
@@ -760,7 +793,7 @@ class TaskController extends Controller
                     'sort_by' => $sortBy,
                 ],
                 'tasks' => $tasks,
-                'surface' => 'tasks',
+                'surface' => $surface,
                 'projects' => $this->visibleProjectsQuery()
                     ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
                         $this->applyProjectOrganisationFilter($query, $organisationId);

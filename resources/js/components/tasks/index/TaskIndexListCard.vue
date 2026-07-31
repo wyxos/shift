@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
 import type { TaskProjectOption } from '@/shared/tasks/projects';
-import type { RequirementBatchSummary } from '@/shared/tasks/types';
+import type { RequirementBatchSummary, TaskIndexSurface } from '@/shared/tasks/types';
 import ConfirmRequestDialog from '@shared/components/ConfirmRequestDialog.vue';
 import TaskListOverviewPanel from '@shared/components/tasks/TaskListOverviewPanel.vue';
 import { getTaskEnvironment } from '@shared/tasks/metadata';
@@ -11,7 +11,7 @@ const props = defineProps<{
     filters: any;
     projects?: TaskProjectOption[];
     state: any;
-    surface?: 'tasks' | 'requirements';
+    surface?: TaskIndexSurface;
 }>();
 
 type PendingDelete = {
@@ -51,6 +51,30 @@ const taskRows = computed(() => {
 const createProjects = computed(() => (props.projects ?? []).filter((project) => project.can_create_task !== false));
 const projectFilterOptions = computed(() => (props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })));
 const deleteNoun = computed(() => (props.surface === 'requirements' ? 'requirement' : 'task'));
+const listTitle = computed(() => {
+    if (props.surface === 'app-errors') return 'App errors';
+    if (props.surface === 'requirements') return 'Requirements';
+
+    return 'Tasks';
+});
+const listDescription = computed(() => {
+    if (props.surface === 'app-errors') return 'Grouped application errors from connected projects, excluding completed and closed items.';
+    if (props.surface === 'requirements') return 'Review submitted requirement items before they become active tasks.';
+
+    return 'Default view hides completed and closed tasks.';
+});
+const emptyLabel = computed(() => {
+    if (props.surface === 'app-errors') return 'No app errors found';
+    if (props.surface === 'requirements') return 'No requirements found';
+
+    return 'No tasks found';
+});
+const itemLabel = computed(() => {
+    if (props.surface === 'app-errors') return 'app errors';
+    if (props.surface === 'requirements') return 'requirements';
+
+    return 'tasks';
+});
 const pendingRequirementBatchTitle = computed(() => pendingRequirementBatch.value?.title || 'these requirements');
 const pendingRequirementBatchCount = computed(
     () => pendingRequirementBatch.value?.ready_items ?? pendingRequirementBatch.value?.requirement_items ?? 0,
@@ -149,14 +173,10 @@ async function confirmRequirementBatchFinalize() {
 <template>
     <TaskListOverviewPanel
         :tasks="state.taskRows"
-        :title="surface === 'requirements' ? 'Requirements' : 'Tasks'"
-        :description="
-            surface === 'requirements'
-                ? 'Review submitted requirement items before they become active tasks.'
-                : 'Default view hides completed and closed tasks.'
-        "
-        :empty-label="surface === 'requirements' ? 'No requirements found' : 'No tasks found'"
-        :item-label="surface === 'requirements' ? 'requirements' : 'tasks'"
+        :title="listTitle"
+        :description="listDescription"
+        :empty-label="emptyLabel"
+        :item-label="itemLabel"
         :total-tasks="state.tasksPage.total"
         :loading="state.loading"
         :error="state.error"
@@ -201,7 +221,12 @@ async function confirmRequirementBatchFinalize() {
         :go-to-page="state.goToPage"
     >
         <template #actions>
-            <TaskCreateSheet v-if="createProjects.length > 0" :projects="createProjects" :surface="surface" @created="state.handleTaskCreated" />
+            <TaskCreateSheet
+                v-if="surface !== 'app-errors' && createProjects.length > 0"
+                :projects="createProjects"
+                :surface="surface === 'requirements' ? 'requirements' : 'tasks'"
+                @created="state.handleTaskCreated"
+            />
         </template>
     </TaskListOverviewPanel>
 

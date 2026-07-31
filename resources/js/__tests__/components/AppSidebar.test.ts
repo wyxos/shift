@@ -188,11 +188,13 @@ describe('AppSidebar', () => {
         const wrapper = mountSidebar();
 
         expect(wrapper.text()).toContain('Dashboard');
+        expect(wrapper.text()).toContain('App errors');
         expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Northwind Studio');
         expect(wrapper.text()).toContain('shared');
         expect(wrapper.find('a[href="/requirements"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/app-errors"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
     });
@@ -209,6 +211,17 @@ describe('AppSidebar', () => {
 
         await wrapper.get('a[href="/organisation/3/dashboard"]').trigger('click');
         expect(sidebarMocks.setOpenMobile).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps root task and app error active states distinct', () => {
+        mockPage.url = '/app-errors?task=72';
+        const wrapper = mountSidebar();
+
+        const tasksLink = wrapper.get('a[href="/tasks"]');
+        const appErrorsLink = wrapper.get('a[href="/app-errors"]');
+
+        expect(tasksLink.element.parentElement?.getAttribute('data-active')).toBe('false');
+        expect(appErrorsLink.element.parentElement?.getAttribute('data-active')).toBe('true');
     });
 
     it('hides the organisation show more link when the sidebar list is complete', () => {
@@ -293,6 +306,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Northwind Organisation');
         expect(wrapper.text()).toContain('Dashboard');
         expect(wrapper.text()).toContain('Tasks');
+        expect(wrapper.text()).toContain('App errors');
         expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Clients');
         expect(wrapper.text()).toContain('Projects');
@@ -303,6 +317,7 @@ describe('AppSidebar', () => {
         expect(wrapper.find('a[href="/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/3/app-errors"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/clients"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/projects"]').exists()).toBe(true);
@@ -330,6 +345,17 @@ describe('AppSidebar', () => {
         expect(activeSettingsLink.element.parentElement?.getAttribute('data-active')).toBe('true');
     });
 
+    it('keeps organisation task and app error active states distinct', () => {
+        mockPage.url = '/organisation/3/app-errors?task=72';
+        const wrapper = mountSidebar();
+
+        const tasksLink = wrapper.get('a[href="/organisation/3/tasks"]');
+        const appErrorsLink = wrapper.get('a[href="/organisation/3/app-errors"]');
+
+        expect(tasksLink.element.parentElement?.getAttribute('data-active')).toBe('false');
+        expect(appErrorsLink.element.parentElement?.getAttribute('data-active')).toBe('true');
+    });
+
     it('shows only shared organisation links available to non-owners', () => {
         mockPage.url = '/organisation/4/dashboard';
         const wrapper = mountSidebar();
@@ -337,6 +363,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('shared');
         expect(wrapper.text()).toContain('Dashboard');
         expect(wrapper.text()).toContain('Tasks');
+        expect(wrapper.text()).toContain('App errors');
         expect(wrapper.text()).toContain('Requirements');
         expect(wrapper.text()).toContain('Projects');
         expect(wrapper.text()).not.toContain('Clients');
@@ -344,6 +371,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).not.toContain('Settings');
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/tasks"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/organisation/4/app-errors"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/requirements"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/projects"]').exists()).toBe(true);
     });

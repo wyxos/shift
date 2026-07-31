@@ -186,13 +186,15 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                 v-else
                 :empty="tasks.length === 0"
                 :empty-label="emptyLabel"
-                :label="itemLabel === 'requirements' ? 'Requirements' : 'Tasks'"
+                :label="itemLabel === 'requirements' ? 'Requirements' : itemLabel === 'app errors' ? 'App errors' : 'Tasks'"
             >
                 <template #desktop>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>{{ itemLabel === 'requirements' ? 'Requirement' : 'Task' }}</TableHead>
+                                <TableHead>{{
+                                    itemLabel === 'requirements' ? 'Requirement' : itemLabel === 'app errors' ? 'Error' : 'Task'
+                                }}</TableHead>
                                 <TableHead>{{ itemLabel === 'requirements' ? 'State' : 'Status' }}</TableHead>
                                 <TableHead>Priority</TableHead>
                                 <TableHead>Environment</TableHead>

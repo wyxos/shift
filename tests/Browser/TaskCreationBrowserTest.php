@@ -92,7 +92,8 @@ it('opens an error intake task with tabbed comments and occurrences', function (
 
     $this->actingAs($user);
 
-    visit("/tasks?task={$task->id}")
+    visit("/app-errors?task={$task->id}")
+        ->assertPathIs('/app-errors')
         ->assertSee('UI error: Widget crashed')
         ->assertSee('Occurrences')
         ->assertSee('Comments')

@@ -44,7 +44,7 @@ test('index displays tasks', function () {
     );
 });
 
-test('tasks index can distinguish and filter tasks from app errors', function () {
+test('tasks and app errors use dedicated list surfaces', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -72,33 +72,44 @@ test('tasks index can distinguish and filter tasks from app errors', function ()
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Tasks/Index')
-            ->has('tasks.data', 2)
-            ->where('filters.type', 'all')
-            ->where('tasks.data.0.type', 'app_error')
-            ->where('tasks.data.0.type_label', 'App error')
-        );
-
-    $this->actingAs($this->user)
-        ->get(route('tasks.index', ['type' => 'tasks']))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('Tasks/Index')
             ->has('tasks.data', 1)
-            ->where('filters.type', 'tasks')
             ->where('tasks.data.0.id', $task->id)
             ->where('tasks.data.0.type', 'task')
+            ->where('filters.type', 'tasks')
+            ->where('surface', 'tasks')
         );
 
     $this->actingAs($this->user)
-        ->get(route('tasks.index', ['type' => 'app_errors']))
+        ->get(route('app-errors.index'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Tasks/Index')
             ->has('tasks.data', 1)
-            ->where('filters.type', 'app_errors')
             ->where('tasks.data.0.id', $errorTask->id)
             ->where('tasks.data.0.type', 'app_error')
+            ->where('tasks.data.0.type_label', 'App error')
+            ->where('filters.type', 'app_errors')
+            ->where('surface', 'app-errors')
         );
+});
+
+test('legacy app error task filters redirect to the dedicated surface with the remaining query intact', function () {
+    $response = $this->actingAs($this->user)->get(route('tasks.index', [
+        'type' => 'app_errors',
+        'status' => ['pending', 'in-progress'],
+        'search' => 'Checkout failed',
+        'project_id' => 14,
+        'task' => 72,
+        'page' => 2,
+    ]));
+
+    $response->assertRedirect(route('app-errors.index', [
+        'status' => ['pending', 'in-progress'],
+        'search' => 'Checkout failed',
+        'project_id' => 14,
+        'task' => 72,
+        'page' => 2,
+    ]));
 });
 
 test('tasks index can be scoped by organisation route', function () {
@@ -148,6 +159,81 @@ test('tasks organisation route is hidden from users without organisation access'
 
     $this->actingAs($this->user)
         ->get(route('organisation.tasks', $otherOrganisation))
+        ->assertNotFound();
+});
+
+test('organisation app errors are scoped and hidden from users without organisation access', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $otherOrganisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+        'client_id' => null,
+        'organisation_id' => $otherOrganisation->id,
+    ]);
+    $errorTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'error_signature' => hash('sha256', 'scoped-error'),
+    ]);
+    Task::factory()->create([
+        'project_id' => $project->id,
+        'status' => 'pending',
+        'error_signature' => null,
+    ]);
+    Task::factory()->create([
+        'project_id' => $otherProject->id,
+        'status' => 'pending',
+        'error_signature' => hash('sha256', 'other-error'),
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.app-errors', $organisation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tasks/Index')
+            ->has('tasks.data', 1)
+            ->where('tasks.data.0.id', $errorTask->id)
+            ->where('filters.organisation_id', $organisation->id)
+            ->where('surface', 'app-errors')
+        );
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('organisation.app-errors', $organisation))
+        ->assertNotFound();
+});
+
+test('legacy organisation app error filters redirect to the scoped dedicated surface', function () {
+    $organisation = Organisation::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('organisation.tasks', [
+            'organisation' => $organisation,
+            'type' => 'app_errors',
+            'status' => ['pending'],
+            'task' => 91,
+        ]))
+        ->assertRedirect(route('organisation.app-errors', [
+            'organisation' => $organisation,
+            'status' => ['pending'],
+            'task' => 91,
+        ]));
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('organisation.tasks', [
+            'organisation' => $organisation,
+            'type' => 'app_errors',
+        ]))
         ->assertNotFound();
 });
 
@@ -862,6 +948,90 @@ test('tasks can filter tasks by environment', function () {
         ->where('tasks.data.0.id', $stagingTask->id)
         ->where('tasks.data.0.environment', 'staging')
         ->where('filters.environment', 'staging')
+    );
+});
+
+test('app errors preserve shared filters across pagination', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+
+    foreach (range(1, 11) as $index) {
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'title' => "Checkout failure {$index}",
+            'status' => 'pending',
+            'priority' => 'high',
+            'error_signature' => hash('sha256', "checkout-failure-{$index}"),
+        ]);
+        $task->metadata()->create([
+            'environment' => 'staging',
+            'url' => 'https://example.test/checkout',
+        ]);
+    }
+
+    $productionError = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Checkout failure production',
+        'status' => 'pending',
+        'priority' => 'high',
+        'error_signature' => hash('sha256', 'checkout-failure-production'),
+    ]);
+    $productionError->metadata()->create([
+        'environment' => 'production',
+        'url' => 'https://example.test/checkout',
+    ]);
+
+    $normalTask = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Checkout failure normal task',
+        'status' => 'pending',
+        'priority' => 'high',
+        'error_signature' => null,
+    ]);
+    $normalTask->metadata()->create([
+        'environment' => 'staging',
+        'url' => 'https://example.test/checkout',
+    ]);
+
+    $otherProjectError = Task::factory()->create([
+        'project_id' => $otherProject->id,
+        'title' => 'Checkout failure other project',
+        'status' => 'pending',
+        'priority' => 'high',
+        'error_signature' => hash('sha256', 'checkout-failure-other-project'),
+    ]);
+    $otherProjectError->metadata()->create([
+        'environment' => 'staging',
+        'url' => 'https://example.test/checkout',
+    ]);
+
+    $response = $this->actingAs($this->user)->get(route('app-errors.index', [
+        'status' => ['pending'],
+        'priority' => ['high'],
+        'search' => 'Checkout failure',
+        'environment' => 'staging',
+        'project_id' => $project->id,
+        'page' => 2,
+    ]));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tasks/Index')
+        ->has('tasks.data', 1)
+        ->where('tasks.current_page', 2)
+        ->where('tasks.last_page', 2)
+        ->where('tasks.total', 11)
+        ->where('filters.status', ['pending'])
+        ->where('filters.priority', ['high'])
+        ->where('filters.search', 'Checkout failure')
+        ->where('filters.environment', 'staging')
+        ->where('filters.project_id', $project->id)
+        ->where('filters.type', 'app_errors')
+        ->where('surface', 'app-errors')
     );
 });
 

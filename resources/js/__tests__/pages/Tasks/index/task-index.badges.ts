@@ -81,9 +81,11 @@ describe('Tasks/Index.vue', () => {
 
     it('distinguishes app error rows and keeps row badges under the title', async () => {
         axiosGetMock.mockReset();
+        (router.get as any).mockClear();
 
         const wrapper = mount(Index, {
             props: {
+                surface: 'app-errors',
                 tasks: makeTasksPage([
                     { id: 1, title: 'Investigate checkout', status: 'pending', priority: 'medium', type: 'task', type_label: 'Task' },
                     {
@@ -115,15 +117,17 @@ describe('Tasks/Index.vue', () => {
 
         expect(titleCell.classes()).toContain('flex-col');
         expect(titleButton.element.compareDocumentPosition(badges.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(wrapper.text()).toContain('App errors');
 
         await wrapper.get('[data-testid="filters-trigger"]').trigger('click');
-        await wrapper.get('[data-testid="filter-type-app_errors"]').trigger('click');
+        expect(wrapper.find('[data-testid="filter-type-app_errors"]').exists()).toBe(false);
+        await wrapper.get('[data-testid="filter-search"]').setValue('Checkout');
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(router.get).toHaveBeenCalledWith(
-            '/tasks',
+            '/app-errors',
             expect.objectContaining({
-                type: 'app_errors',
+                search: 'Checkout',
                 page: 1,
             }),
             expect.objectContaining({
@@ -132,6 +136,7 @@ describe('Tasks/Index.vue', () => {
                 replace: true,
             }),
         );
+        expect((router.get as any).mock.calls.at(-1)?.[1]).not.toHaveProperty('type');
 
         wrapper.unmount();
     });
