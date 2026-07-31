@@ -7,7 +7,7 @@ import { useTaskIndexFilters } from '@/composables/useTaskIndexFilters';
 import { useTaskIndexListState } from '@/composables/useTaskIndexListState';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { TaskProjectOption } from '@/shared/tasks/projects';
-import type { TaskIndexFilters, TaskPaginator } from '@/shared/tasks/types';
+import type { TaskIndexFilters, TaskIndexSurface, TaskPaginator } from '@/shared/tasks/types';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, toRef, toRefs } from 'vue';
@@ -17,7 +17,7 @@ const props = withDefaults(
         tasks: TaskPaginator;
         projects?: TaskProjectOption[];
         filters: TaskIndexFilters;
-        surface?: 'tasks' | 'requirements';
+        surface?: TaskIndexSurface;
     }>(),
     {
         projects: () => [],
@@ -27,16 +27,19 @@ const props = withDefaults(
 
 const indexHref = computed(() => {
     const organisationId = props.filters.organisation_id;
+    const surfacePath = props.surface;
 
-    if (props.surface === 'requirements') {
-        return organisationId ? `/organisation/${organisationId}/requirements` : '/requirements';
-    }
+    return organisationId ? `/organisation/${organisationId}/${surfacePath}` : `/${surfacePath}`;
+});
+const surfaceLabel = computed(() => {
+    if (props.surface === 'app-errors') return 'App errors';
+    if (props.surface === 'requirements') return 'Requirements';
 
-    return organisationId ? `/organisation/${organisationId}/tasks` : '/tasks';
+    return 'Tasks';
 });
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [
-    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
-    { title: props.surface === 'requirements' ? 'Requirements' : 'Tasks', href: indexHref.value },
+    { title: surfaceLabel.value, href: indexHref.value },
+    { title: surfaceLabel.value, href: indexHref.value },
 ]);
 
 const filtersState = useTaskIndexFilters({ filters: props.filters, surface: props.surface });
@@ -229,7 +232,7 @@ const {
 </script>
 
 <template>
-    <Head title="Tasks" />
+    <Head :title="surfaceLabel" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">

@@ -169,8 +169,9 @@ const getNotificationUrl = (notification: Notification): string => {
 
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
-        case 'App\\Notifications\\AppErrorReportedNotification':
             return route('tasks.index', { task: data.task_id });
+        case 'App\\Notifications\\AppErrorReportedNotification':
+            return route('app-errors.index', { task: data.task_id });
         case 'App\\Notifications\\TaskThreadUpdated':
             return data.url ?? '#';
         case 'App\\Notifications\\ProjectInvitationNotification':

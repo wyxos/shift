@@ -1,5 +1,7 @@
 import type { CollaboratorOption, TaskCollaboratorSelection } from './collaborators';
 
+export type TaskIndexSurface = 'tasks' | 'app-errors' | 'requirements';
+
 export type Task = {
     id: number;
     project_id?: number | null;

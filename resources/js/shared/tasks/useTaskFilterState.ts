@@ -137,7 +137,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
             environment: appliedEnvironmentTerm.value || undefined,
             organisation_id: providedOrganisationId || undefined,
             project_id: appliedProjectId.value || undefined,
-            type: includeTypeFilter && appliedType.value !== DEFAULT_TASK_TYPE_FILTER ? appliedType.value : undefined,
+            ...(includeTypeFilter && appliedType.value !== DEFAULT_TASK_TYPE_FILTER ? { type: appliedType.value } : {}),
             sort_by: appliedSortBy.value,
             page,
         };

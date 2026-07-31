@@ -127,6 +127,8 @@ describe('NotificationBadge', () => {
                     return `/notifications/${params?.id}/mark-as-read`;
                 case 'tasks.index':
                     return `/tasks?task=${params?.task}`;
+                case 'app-errors.index':
+                    return `/app-errors?task=${params?.task}`;
                 case 'organisation.projects':
                     return `/organisation/${params?.organisation}/projects`;
                 case 'organisations.index':
@@ -170,7 +172,7 @@ describe('NotificationBadge', () => {
         expect(axiosGetMock).toHaveBeenCalledWith('/notifications/unread');
         expect(setIntervalSpy).not.toHaveBeenCalled();
         expect(wrapper.get('a[href="/tasks?task=42"]').text()).toContain('New Task: Broken footer');
-        expect(wrapper.get('a[href="/tasks?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/app-errors?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
         expect(wrapper.get('a[href="/notifications"]').text()).toContain('View all notifications');
     });
 

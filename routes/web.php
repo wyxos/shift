@@ -45,6 +45,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('organisation/{organisation}')->name('organisation.')->group(function () {
         Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
         Route::get('tasks', [TaskController::class, 'index'])->name('tasks');
+        Route::get('app-errors', [TaskController::class, 'appErrors'])->name('app-errors');
         Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements');
         Route::get('clients', [ClientController::class, 'index'])->name('clients');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects');
@@ -90,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // tasks
     Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('app-errors', [TaskController::class, 'appErrors'])->name('app-errors.index');
     Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements.index');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');
