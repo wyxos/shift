@@ -210,10 +210,16 @@ test('external role options use consuming app labels without changing role value
         ->assertOk()
         ->assertJsonPath('roles.0.value', ExternalUserRole::Owner->value)
         ->assertJsonPath('roles.0.label', 'Owner')
+        ->assertJsonPath('roles.0.group', 'App roles')
         ->assertJsonPath('roles.1.value', ExternalUserRole::ClientDeveloper->value)
         ->assertJsonPath('roles.1.label', 'Developer')
-        ->assertJsonPath('roles.2.label', 'SHIFT Lead Developer')
-        ->assertJsonPath('roles.3.label', 'SHIFT Developer');
+        ->assertJsonPath('roles.1.group', 'App roles')
+        ->assertJsonPath('roles.2.label', 'User')
+        ->assertJsonPath('roles.3.label', 'Guest')
+        ->assertJsonPath('roles.4.label', 'SHIFT Lead Developer')
+        ->assertJsonPath('roles.4.group', 'SHIFT roles')
+        ->assertJsonPath('roles.5.label', 'SHIFT Developer')
+        ->assertJsonPath('roles.5.group', 'SHIFT roles');
 
     expect(ExternalUserRole::Owner->label())->toBe('Client Owner')
         ->and(ExternalUserRole::ClientDeveloper->label())->toBe('Client Developer');
@@ -254,4 +260,89 @@ test('external role index returns collaborator candidates with stored roles', fu
         ->assertJsonPath('capabilities.can_manage_external_roles', true)
         ->assertJsonPath('users.0.id', 'client-owner-1')
         ->assertJsonPath('users.0.role', ExternalUserRole::Owner->value);
+});
+
+test('external role index forwards requested pagination and preserves callback totals', function () {
+    Http::fake([
+        'https://consumer.test/shift/api/collaborators/external*' => Http::response([
+            'environment' => 'testing',
+            'url' => 'https://consumer.test',
+            'users' => [
+                ['id' => 'client-11', 'name' => 'Client Eleven', 'email' => 'eleven@example.com'],
+            ],
+            'pagination' => [
+                'current_page' => 2,
+                'last_page' => 3,
+                'per_page' => 10,
+                'total' => 21,
+                'from' => 11,
+                'to' => 20,
+            ],
+        ]),
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/external-roles?'.http_build_query([
+            'project' => $this->project->token,
+            'environment' => 'testing',
+            'search' => 'client',
+            'paginate' => true,
+            'page' => 2,
+            'per_page' => 10,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('users.0.id', 'client-11')
+        ->assertJsonPath('pagination.current_page', 2)
+        ->assertJsonPath('pagination.total', 21);
+
+    Http::assertSent(function ($request) {
+        $query = [];
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return ($query['search'] ?? null) === 'client'
+            && ($query['paginate'] ?? null) === '1'
+            && ($query['page'] ?? null) === '2'
+            && ($query['per_page'] ?? null) === '10';
+    });
+});
+
+test('external role pagination falls back for older callback packages without truncating legacy requests', function () {
+    $users = collect(range(1, 23))
+        ->map(fn (int $index) => [
+            'id' => 'client-'.$index,
+            'name' => 'Client '.$index,
+            'email' => "client-{$index}@example.com",
+        ])
+        ->all();
+
+    Http::fake([
+        'https://consumer.test/shift/api/collaborators/external*' => Http::response([
+            'environment' => 'testing',
+            'url' => 'https://consumer.test',
+            'users' => $users,
+        ]),
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/external-roles?'.http_build_query([
+            'project' => $this->project->token,
+            'environment' => 'testing',
+            'paginate' => true,
+            'page' => 2,
+            'per_page' => 10,
+        ]))
+        ->assertOk()
+        ->assertJsonCount(10, 'users')
+        ->assertJsonPath('users.0.id', 'client-11')
+        ->assertJsonPath('pagination.total', 23)
+        ->assertJsonPath('pagination.last_page', 3);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/external-roles?'.http_build_query([
+            'project' => $this->project->token,
+            'environment' => 'testing',
+        ]))
+        ->assertOk()
+        ->assertJsonCount(23, 'users')
+        ->assertJsonMissingPath('pagination');
 });

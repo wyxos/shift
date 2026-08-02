@@ -347,6 +347,27 @@ test('requirement visibility follows the external role matrix', function () {
     expect($idsFor($guest))->toBe([$guestRequirement->id, $assignedRequirement->id]);
 });
 
+test('requirement index exposes registered project environment keys and labels without urls', function () {
+    $externalUser = ($this->createRoleExternalUser)('environment-reader', 'client_developer');
+    $this->project->environments()->create([
+        'environment' => 'pre-production',
+        'url' => 'https://pre-production.example.com',
+        'callback_trusted_at' => now(),
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/requirements?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => ($this->externalPayload)($externalUser),
+        ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('project_environments.0.key', 'pre-production')
+        ->assertJsonPath('project_environments.0.label', 'Pre Production')
+        ->assertJsonMissingPath('project_environments.0.url');
+});
+
 test('requirement submission is restricted to external requirement contributor roles', function (string $role, int $status) {
     $externalUser = ($this->createRoleExternalUser)('submission-'.$role, $role);
 

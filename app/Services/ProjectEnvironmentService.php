@@ -15,6 +15,22 @@ class ProjectEnvironmentService
         private readonly OutboundUrlPolicy $outboundUrlPolicy,
     ) {}
 
+    /**
+     * @return array<int, array{key: string, label: string}>
+     */
+    public function options(Project $project): array
+    {
+        return $project->environments()
+            ->select(['environment'])
+            ->orderBy('environment')
+            ->get()
+            ->map(fn (ProjectEnvironment $environment) => [
+                'key' => $environment->environment,
+                'label' => $this->label($environment->environment),
+            ])
+            ->all();
+    }
+
     public function register(Project $project, ?string $environment, ?string $url): ProjectEnvironment
     {
         $normalizedEnvironment = $this->normalizeEnvironment($environment);

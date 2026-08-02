@@ -369,7 +369,10 @@ class ExternalTaskController extends Controller
             return $task;
         });
 
-        return response()->json($tasks);
+        return response()->json([
+            ...$tasks->toArray(),
+            'project_environments' => $this->projectEnvironmentService->options($project),
+        ]);
     }
 
     /**

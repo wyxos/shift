@@ -436,6 +436,26 @@ test('index supports environment filtering and priority sorting', function () {
     $response->assertJsonPath('data.1.environment', 'staging');
 });
 
+test('index exposes registered project environment keys and labels without urls', function () {
+    $this->project->environments()->create([
+        'environment' => 'pre-production',
+        'url' => 'https://pre-production.example.com',
+        'callback_trusted_at' => now(),
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/tasks?'.http_build_query([
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+        ]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('project_environments.0.key', 'pre-production')
+        ->assertJsonPath('project_environments.0.label', 'Pre Production')
+        ->assertJsonMissingPath('project_environments.0.url');
+});
+
 test('show returns task details', function () {
     // Create a task submitted by the external user
     $task = Task::factory()->create([

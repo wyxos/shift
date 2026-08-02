@@ -56,6 +56,9 @@ class ExternalRoleController extends Controller
             'metadata.url' => 'nullable|url',
             'search' => 'nullable|string|max:255',
             'environment' => 'nullable|string|max:255',
+            'paginate' => 'nullable|boolean',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
         $project = $this->project($attributes['project']);
@@ -70,9 +73,12 @@ class ExternalRoleController extends Controller
             $project,
             $environment,
             $attributes['search'] ?? null,
+            (bool) ($attributes['paginate'] ?? false),
+            (int) ($attributes['page'] ?? 1),
+            (int) ($attributes['per_page'] ?? 15),
         );
 
-        return response()->json([
+        $payload = [
             'capabilities' => [
                 'can_manage_external_roles' => true,
             ],
@@ -81,7 +87,13 @@ class ExternalRoleController extends Controller
                 ->map(fn (array $user) => $this->serializeCandidate($project, $lookup['environment'], $lookup['url'], $user))
                 ->values()
                 ->all(),
-        ]);
+        ];
+
+        if (isset($lookup['pagination'])) {
+            $payload['pagination'] = $lookup['pagination'];
+        }
+
+        return response()->json($payload);
     }
 
     public function update(Request $request): JsonResponse
@@ -190,14 +202,15 @@ class ExternalRoleController extends Controller
     }
 
     /**
-     * @return array<int, array{value: string, label: string}>
+     * @return array<int, array{value: string, label: string, group: string}>
      */
     private function roles(): array
     {
-        return collect(ExternalUserRole::cases())
+        return collect(ExternalUserRole::consumingAppCases())
             ->map(fn (ExternalUserRole $role) => [
                 'value' => $role->value,
                 'label' => $role->consumingAppLabel(),
+                'group' => $role->consumingAppGroup(),
             ])
             ->values()
             ->all();

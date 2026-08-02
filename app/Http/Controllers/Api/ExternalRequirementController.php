@@ -63,6 +63,7 @@ class ExternalRequirementController extends Controller
                 'total' => 0,
                 'from' => null,
                 'to' => null,
+                'project_environments' => $this->projectEnvironmentService->options($project),
             ]);
         }
 
@@ -92,7 +93,10 @@ class ExternalRequirementController extends Controller
 
         $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser, $clientUrl));
 
-        return response()->json($requirements);
+        return response()->json([
+            ...$requirements->toArray(),
+            'project_environments' => $this->projectEnvironmentService->options($project),
+        ]);
     }
 
     public function storeBatch(Request $request): JsonResponse
