@@ -32,6 +32,29 @@ enum ExternalUserRole: string
         };
     }
 
+    public function consumingAppGroup(): string
+    {
+        return match ($this) {
+            self::Owner, self::ClientDeveloper, self::User, self::Guest => 'App roles',
+            self::ShiftLeadDeveloper, self::ShiftDeveloper => 'SHIFT roles',
+        };
+    }
+
+    /**
+     * @return array<int, self>
+     */
+    public static function consumingAppCases(): array
+    {
+        return [
+            self::Owner,
+            self::ClientDeveloper,
+            self::User,
+            self::Guest,
+            self::ShiftLeadDeveloper,
+            self::ShiftDeveloper,
+        ];
+    }
+
     public function canSubmitRequirements(): bool
     {
         return in_array($this, [

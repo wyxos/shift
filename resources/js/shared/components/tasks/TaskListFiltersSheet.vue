@@ -14,6 +14,7 @@ type Option = {
     label: string;
     selectedClass?: string;
     unselectedClass?: string;
+    testId?: string;
 };
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
     draftPriorities: string[];
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
+    environmentOptions?: Option[];
     draftProjectId?: string;
     draftType?: string;
     draftSortBy: string;
@@ -58,6 +60,8 @@ const props = withDefaults(defineProps<Props>(), {
     setDraftType: () => {},
 });
 
+const allEnvironmentsValue = '__all__';
+
 const openModel = computed({
     get: () => props.open,
     set: (value: boolean) => props.setOpen(value),
@@ -72,6 +76,13 @@ const environmentModel = computed({
     get: () => props.draftEnvironmentTerm,
     set: (value: string) => props.setDraftEnvironmentTerm(value),
 });
+
+const environmentButtonModel = computed({
+    get: () => props.draftEnvironmentTerm || allEnvironmentsValue,
+    set: (value: string) => props.setDraftEnvironmentTerm(value === allEnvironmentsValue ? '' : value),
+});
+
+const environmentFilterOptions = computed(() => [{ value: allEnvironmentsValue, label: 'All', testId: 'all' }, ...(props.environmentOptions ?? [])]);
 
 const projectModel = computed({
     get: () => props.draftProjectId ?? '',
@@ -121,13 +132,13 @@ const sortByModel = computed({
                 </div>
             </SheetHeader>
 
-            <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
-                <div class="space-y-2">
+            <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6">
+                <div class="flex flex-col gap-2">
                     <Label class="text-muted-foreground">Search</Label>
                     <Input v-model="searchModel" data-testid="filter-search" placeholder="Search by title" />
                 </div>
 
-                <div v-if="projectOptions.length" class="space-y-2">
+                <div v-if="projectOptions.length" class="flex flex-col gap-2">
                     <Label class="text-muted-foreground">Project</Label>
                     <Select
                         v-model="projectModel"
@@ -140,7 +151,7 @@ const sortByModel = computed({
                     />
                 </div>
 
-                <div v-if="includeTypeFilter" class="space-y-2">
+                <div v-if="includeTypeFilter" class="flex flex-col gap-2">
                     <Label class="text-muted-foreground">Type</Label>
                     <ButtonGroup
                         v-model="typeModel"
@@ -151,12 +162,19 @@ const sortByModel = computed({
                     />
                 </div>
 
-                <div class="space-y-2">
+                <div class="flex flex-col gap-2">
                     <Label class="text-muted-foreground">Environment</Label>
-                    <Input v-model="environmentModel" data-testid="filter-environment" placeholder="e.g. Production" />
+                    <ButtonGroup
+                        v-if="environmentOptions !== undefined"
+                        v-model="environmentButtonModel"
+                        aria-label="Filter tasks by environment"
+                        :options="environmentFilterOptions"
+                        test-id-prefix="filter-environment"
+                    />
+                    <Input v-else v-model="environmentModel" data-testid="filter-environment" placeholder="e.g. Production" />
                 </div>
 
-                <div class="space-y-2">
+                <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
                         <Label class="text-muted-foreground">{{ statusLabel }}</Label>
                         <Button size="sm" variant="ghost" @click="selectAllStatuses">All</Button>
@@ -170,7 +188,7 @@ const sortByModel = computed({
                     </div>
                 </div>
 
-                <div class="space-y-2">
+                <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
                         <Label class="text-muted-foreground">Priority</Label>
                         <Button size="sm" variant="ghost" @click="selectAllPriorities">All</Button>
@@ -184,7 +202,7 @@ const sortByModel = computed({
                     </div>
                 </div>
 
-                <div class="space-y-2">
+                <div class="flex flex-col gap-2">
                     <Label class="text-muted-foreground">Sort By</Label>
                     <ButtonGroup v-model="sortByModel" test-id-prefix="sort-by" aria-label="Sort tasks" :options="sortByOptions" :columns="3" />
                 </div>

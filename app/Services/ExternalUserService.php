@@ -282,8 +282,14 @@ class ExternalUserService
         ];
     }
 
-    public function searchCollaborators(Project $project, ?string $environment, ?string $search = null): array
-    {
+    public function searchCollaborators(
+        Project $project,
+        ?string $environment,
+        ?string $search = null,
+        bool $paginate = false,
+        int $page = 1,
+        int $perPage = 15,
+    ): array {
         $registration = $this->environmentRegistration($project, $environment);
 
         if ($registration === null) {
@@ -312,6 +318,12 @@ class ExternalUserService
         $term = trim((string) $search);
         if ($term !== '') {
             $query['search'] = $term;
+        }
+
+        if ($paginate) {
+            $query['paginate'] = 1;
+            $query['page'] = $page;
+            $query['per_page'] = $perPage;
         }
 
         try {
@@ -361,10 +373,67 @@ class ExternalUserService
             ->values()
             ->all();
 
-        return [
+        $result = [
             'environment' => $registration->environment,
             'url' => $registration->url,
             'users' => $users,
+        ];
+
+        if (! $paginate) {
+            return $result;
+        }
+
+        $pagination = $this->normalizeCollaboratorPagination($payload['pagination'] ?? null);
+
+        if ($pagination === null) {
+            $total = count($users);
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $page = min($page, $lastPage);
+            $result['users'] = array_slice($users, ($page - 1) * $perPage, $perPage);
+            $pagination = [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+                'from' => $total === 0 ? null : (($page - 1) * $perPage) + 1,
+                'to' => $total === 0 ? null : min($page * $perPage, $total),
+            ];
+        }
+
+        $result['pagination'] = $pagination;
+
+        return $result;
+    }
+
+    /**
+     * @return array{current_page: int, last_page: int, per_page: int, total: int, from: int|null, to: int|null}|null
+     */
+    private function normalizeCollaboratorPagination(mixed $pagination): ?array
+    {
+        if (! is_array($pagination)) {
+            return null;
+        }
+
+        $currentPage = filter_var($pagination['current_page'] ?? null, FILTER_VALIDATE_INT);
+        $lastPage = filter_var($pagination['last_page'] ?? null, FILTER_VALIDATE_INT);
+        $perPage = filter_var($pagination['per_page'] ?? null, FILTER_VALIDATE_INT);
+        $total = filter_var($pagination['total'] ?? null, FILTER_VALIDATE_INT);
+
+        if ($currentPage === false || $lastPage === false || $perPage === false || $total === false) {
+            return null;
+        }
+
+        if ($currentPage < 1 || $lastPage < 1 || $perPage < 1 || $total < 0) {
+            return null;
+        }
+
+        return [
+            'current_page' => $currentPage,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $total,
+            'from' => is_numeric($pagination['from'] ?? null) ? (int) $pagination['from'] : null,
+            'to' => is_numeric($pagination['to'] ?? null) ? (int) $pagination['to'] : null,
         ];
     }
 

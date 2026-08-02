@@ -53,6 +53,7 @@ interface Props {
     draftPriorities: string[];
     draftSearchTerm: string;
     draftEnvironmentTerm: string;
+    environmentOptions?: Option[];
     draftProjectId?: string;
     draftType?: string;
     draftSortBy: string;
@@ -146,6 +147,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                     :draft-priorities="draftPriorities"
                     :draft-search-term="draftSearchTerm"
                     :draft-environment-term="draftEnvironmentTerm"
+                    :environment-options="environmentOptions"
                     :draft-project-id="draftProjectId"
                     :draft-type="draftType"
                     :draft-sort-by="draftSortBy"
