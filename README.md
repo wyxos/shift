@@ -49,7 +49,7 @@ npm ci
 cp .env.example .env
 php artisan key:generate
 
-# Configure your database in .env then run:
+# Configure your database in .env then create the local development fixtures:
 php artisan migrate --seed
 
 # Build assets
@@ -59,7 +59,36 @@ npm run build
 composer dev
 ```
 
-Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded admin account.
+Visit [http://localhost:8000](http://localhost:8000) and log in with the seeded development account.
+
+### Production deployment
+
+Set `APP_ENV=production`, disable debug mode, and choose a registration policy before exposing the application:
+
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+REGISTRATION_POLICY=invite_only
+```
+
+`REGISTRATION_POLICY` accepts `open`, `invite_only`, or `closed`. Invite-only installations accept registrations only through signed links for pending project or organisation invitations. Closed installations disable all registration, including invitation links.
+
+Install dependencies, build the frontend, and migrate without development seed data:
+
+```bash
+composer install --no-dev --optimize-autoloader
+npm ci
+npm run build
+php artisan migrate --force
+```
+
+On a new database, create the first user once from an interactive shell:
+
+```bash
+php artisan shift:bootstrap-user
+```
+
+The command accepts the password only through a hidden prompt, marks the initial user as verified, and refuses to run after any user exists. Do not pass passwords through command arguments, environment variables, deployment logs, or seeders. After the first user signs in, they can create an organisation and invite the rest of the team.
 
 ---
 

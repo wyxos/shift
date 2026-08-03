@@ -5,6 +5,7 @@ use App\Models\OrganisationUser;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 
 test('registration screen can be rendered', function () {
     $response = $this->get('/register');
@@ -34,8 +35,54 @@ test('new users can register and must verify their email', function () {
         ->assertRedirect(route('verification.notice', absolute: false));
 });
 
+test('invite only registration denies direct registration', function () {
+    config(['shift.registration_policy' => 'invite_only']);
+
+    $this->get('/register')->assertForbidden();
+
+    $this->post('/register', [
+        'name' => 'Direct User',
+        'email' => 'direct@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertForbidden();
+
+    $this->assertGuest();
+    $this->assertDatabaseMissing('users', ['email' => 'direct@example.com']);
+});
+
+test('closed registration denies invited users', function () {
+    config(['shift.registration_policy' => 'closed']);
+
+    $owner = User::factory()->create();
+    $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
+    OrganisationUser::create([
+        'organisation_id' => $organisation->id,
+        'user_id' => null,
+        'user_email' => 'closed-invite@example.com',
+        'user_name' => 'Closed Invite',
+    ]);
+    $registrationUrl = URL::signedRoute('register', [
+        'email' => 'closed-invite@example.com',
+        'name' => 'Closed Invite',
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $this->get($registrationUrl)->assertForbidden();
+    $this->post('/register', [
+        'name' => 'Closed Invite',
+        'email' => 'closed-invite@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        'organisation_id' => $organisation->id,
+    ])->assertForbidden();
+
+    $this->assertDatabaseMissing('users', ['email' => 'closed-invite@example.com']);
+});
+
 test('invited organisation users can register and must verify their email', function () {
     Notification::fake();
+    config(['shift.registration_policy' => 'invite_only']);
 
     $owner = User::factory()->create();
     $organisation = Organisation::factory()->create([
@@ -47,6 +94,14 @@ test('invited organisation users can register and must verify their email', func
         'user_email' => 'org-invited@example.com',
         'user_name' => 'Org Invited',
     ]);
+
+    $registrationUrl = URL::signedRoute('register', [
+        'email' => 'org-invited@example.com',
+        'name' => 'Org Invited',
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $this->get($registrationUrl)->assertOk();
 
     $response = $this->post('/register', [
         'name' => 'Org Invited',
