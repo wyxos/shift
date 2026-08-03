@@ -68,10 +68,10 @@ Set `APP_ENV=production`, disable debug mode, and choose a registration policy b
 ```dotenv
 APP_ENV=production
 APP_DEBUG=false
-REGISTRATION_POLICY=invite_only
+REGISTRATION_MODE=invite_only
 ```
 
-`REGISTRATION_POLICY` accepts `open`, `invite_only`, or `closed`. Invite-only installations accept registrations only through signed links for pending project or organisation invitations. Closed installations disable all registration, including invitation links.
+`REGISTRATION_MODE` accepts `open`, `invite_only`, or `closed`. Invite-only installations accept registrations only through signed links for pending project or organisation invitations. Closed installations disable all registration, including invitation links.
 
 Install dependencies, build the frontend, and migrate without development seed data:
 

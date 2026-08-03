@@ -36,7 +36,7 @@ test('new users can register and must verify their email', function () {
 });
 
 test('invite only registration denies direct registration', function () {
-    config(['shift.registration_policy' => 'invite_only']);
+    config(['shift.registration_mode' => 'invite_only']);
 
     $this->get('/register')->assertForbidden();
 
@@ -52,7 +52,7 @@ test('invite only registration denies direct registration', function () {
 });
 
 test('closed registration denies invited users', function () {
-    config(['shift.registration_policy' => 'closed']);
+    config(['shift.registration_mode' => 'closed']);
 
     $owner = User::factory()->create();
     $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
@@ -82,7 +82,7 @@ test('closed registration denies invited users', function () {
 
 test('invited organisation users can register and must verify their email', function () {
     Notification::fake();
-    config(['shift.registration_policy' => 'invite_only']);
+    config(['shift.registration_mode' => 'invite_only']);
 
     $owner = User::factory()->create();
     $organisation = Organisation::factory()->create([

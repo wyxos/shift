@@ -13,7 +13,7 @@ class RegistrationGate
 
     public function authorize(Request $request): void
     {
-        $policy = RegistrationPolicy::tryFrom((string) config('shift.registration_policy'));
+        $policy = RegistrationPolicy::tryFrom((string) config('shift.registration_mode'));
 
         abort_if($policy === null || $policy === RegistrationPolicy::Closed, 403);
 

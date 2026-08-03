@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\URL;
 
 test('invited project users can register and must verify their email', function () {
     Notification::fake();
-    config(['shift.registration_policy' => 'invite_only']);
+    config(['shift.registration_mode' => 'invite_only']);
 
     // Create a project owner
     $projectOwner = User::factory()->create();
@@ -116,7 +116,7 @@ test('registration cannot use an invitation context without opening its signed i
 });
 
 test('an invitation session cannot be reused for a different pending invitation', function () {
-    config(['shift.registration_policy' => 'invite_only']);
+    config(['shift.registration_mode' => 'invite_only']);
 
     $projectOwner = User::factory()->create();
     $organisation = Organisation::factory()->create(['author_id' => $projectOwner->id]);
