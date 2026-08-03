@@ -154,6 +154,7 @@ export type ThreadMessage = {
     clientId: string;
     id?: number;
     author: string;
+    createdAt?: string | null;
     time: string;
     content: string;
     isYou?: boolean;
