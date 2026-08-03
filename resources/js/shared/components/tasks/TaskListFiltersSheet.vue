@@ -5,7 +5,7 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Filter } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -128,7 +128,6 @@ const sortByModel = computed({
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle>Filters</SheetTitle>
-                    <SheetDescription class="text-muted-foreground mt-1 text-sm">Refine your task list in real time.</SheetDescription>
                 </div>
             </SheetHeader>
 
