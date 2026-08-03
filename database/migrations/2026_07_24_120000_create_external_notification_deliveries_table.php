@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('handler');
             $table->foreignId('task_collaborator_notification_id')
                 ->nullable()
-                ->constrained()
+                ->constrained(indexName: 'external_deliveries_notification_fk')
                 ->nullOnDelete();
             $table->foreignId('task_thread_id')
                 ->nullable()
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['source_type', 'source_key']);
-            $table->index(['completed_at', 'failed_at', 'cancelled_at']);
+            $table->index(['completed_at', 'failed_at', 'cancelled_at'], 'external_deliveries_status_idx');
         });
     }
 
