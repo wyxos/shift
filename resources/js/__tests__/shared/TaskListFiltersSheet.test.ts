@@ -39,6 +39,15 @@ const sheetStubs = {
 };
 
 describe('TaskListFiltersSheet', () => {
+    it('does not render redundant helper copy beneath the filter title', () => {
+        const wrapper = mount(TaskListFiltersSheet, {
+            props: props(),
+            global: { stubs: sheetStubs },
+        });
+
+        expect(wrapper.text()).not.toContain('Refine your task list in real time.');
+    });
+
     it('renders registered environment buttons and maps All back to the empty filter', async () => {
         const setDraftEnvironmentTerm = vi.fn();
         const wrapper = mount(TaskListFiltersSheet, {
