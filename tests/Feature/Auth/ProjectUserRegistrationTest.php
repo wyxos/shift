@@ -7,9 +7,11 @@ use App\Models\User;
 use App\Notifications\ProjectUserRegisteredNotification;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 
 test('invited project users can register and must verify their email', function () {
     Notification::fake();
+    config(['shift.registration_policy' => 'invite_only']);
 
     // Create a project owner
     $projectOwner = User::factory()->create();
@@ -36,6 +38,15 @@ test('invited project users can register and must verify their email', function 
         'registration_status' => 'pending',
     ]);
 
+    $registrationUrl = URL::signedRoute('register', [
+        'email' => $invitedUserEmail,
+        'name' => $invitedUserName,
+        'project_id' => $project->id,
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $this->get($registrationUrl)->assertOk();
+
     // Register via the invitation
     $response = $this->post('/register', [
         'name' => $invitedUserName,
@@ -43,6 +54,7 @@ test('invited project users can register and must verify their email', function 
         'password' => 'password',
         'password_confirmation' => 'password',
         'project_id' => $project->id,
+        'organisation_id' => $organisation->id,
     ]);
 
     $registeredUser = User::where('email', 'invited@example.com')->firstOrFail();
@@ -74,4 +86,74 @@ test('invited project users can register and must verify their email', function 
 
     $this->get(route('organisation.projects', $organisation, absolute: false))
         ->assertRedirect(route('verification.notice', absolute: false));
+});
+
+test('registration cannot use an invitation context without opening its signed invitation link', function () {
+    $projectOwner = User::factory()->create();
+    $organisation = Organisation::factory()->create(['author_id' => $projectOwner->id]);
+    $project = Project::factory()->create([
+        'author_id' => $projectOwner->id,
+        'client_id' => null,
+        'organisation_id' => $organisation->id,
+    ]);
+    ProjectUser::factory()->create([
+        'project_id' => $project->id,
+        'user_id' => null,
+        'user_email' => 'pending@example.com',
+        'user_name' => 'Pending User',
+        'registration_status' => 'pending',
+    ]);
+
+    $this->post('/register', [
+        'name' => 'Pending User',
+        'email' => 'pending@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        'project_id' => $project->id,
+    ])->assertForbidden();
+
+    $this->assertDatabaseMissing('users', ['email' => 'pending@example.com']);
+});
+
+test('an invitation session cannot be reused for a different pending invitation', function () {
+    config(['shift.registration_policy' => 'invite_only']);
+
+    $projectOwner = User::factory()->create();
+    $organisation = Organisation::factory()->create(['author_id' => $projectOwner->id]);
+    $projects = Project::factory()
+        ->count(2)
+        ->create([
+            'author_id' => $projectOwner->id,
+            'client_id' => null,
+            'organisation_id' => $organisation->id,
+        ]);
+
+    foreach ($projects as $project) {
+        ProjectUser::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => null,
+            'user_email' => 'shared-invitee@example.com',
+            'user_name' => 'Shared Invitee',
+            'registration_status' => 'pending',
+        ]);
+    }
+
+    $registrationUrl = URL::signedRoute('register', [
+        'email' => 'shared-invitee@example.com',
+        'name' => 'Shared Invitee',
+        'project_id' => $projects[0]->id,
+        'organisation_id' => $organisation->id,
+    ]);
+
+    $this->get($registrationUrl)->assertOk();
+    $this->post('/register', [
+        'name' => 'Shared Invitee',
+        'email' => 'shared-invitee@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        'project_id' => $projects[1]->id,
+        'organisation_id' => $organisation->id,
+    ])->assertForbidden();
+
+    $this->assertDatabaseMissing('users', ['email' => 'shared-invitee@example.com']);
 });

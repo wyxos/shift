@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
 use App\Notifications\ProjectUserRegisteredNotification;
+use App\Services\RegistrationGate;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,11 +20,15 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
+    public function __construct(private readonly RegistrationGate $registrationGate) {}
+
     /**
      * Show the registration page.
      */
     public function create(Request $request): Response
     {
+        $this->registrationGate->authorize($request);
+
         return Inertia::render('auth/Register', [
             'email' => $request->email,
             'name' => $request->name,
@@ -39,6 +44,8 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->registrationGate->authorize($request);
+
         $request->merge([
             'email' => strtolower((string) $request->email),
         ]);
@@ -60,6 +67,8 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
 
         Auth::login($user);
+
+        $this->registrationGate->forgetInvitation($request);
 
         // If the user was invited to a project, update the project_user record and redirect to the project
         if ($request->project_id) {
