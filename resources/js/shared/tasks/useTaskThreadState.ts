@@ -239,9 +239,11 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         }
 
         const localId = `local-${Date.now()}`;
+        const createdAt = new Date().toISOString();
         const optimistic: ThreadMessage = {
             clientId: localId,
             author: options.optimisticAuthor?.() || 'You',
+            createdAt,
             time: 'Sending...',
             content: html,
             isYou: true,

@@ -2,6 +2,7 @@ export type MappedThreadMessage<TAttachment = unknown> = {
     clientId: string;
     id?: number;
     author: string;
+    createdAt: string | null;
     time: string;
     content: string;
     isYou: boolean;
@@ -13,6 +14,8 @@ export type MappedThreadMessage<TAttachment = unknown> = {
         name: string;
     }>;
 };
+
+export const THREAD_MESSAGE_META_REPEAT_THRESHOLD_MS = 5 * 60 * 1000;
 
 export function formatThreadTime(value: any): string {
     if (!value) return '';
@@ -38,12 +41,50 @@ export function formatThreadTime(value: any): string {
     return `${day} ${month} ${time}`;
 }
 
+type ThreadMessageMeta = {
+    author: string;
+    createdAt?: string | null;
+    isYou?: boolean;
+    audience: 'all' | 'team';
+};
+
+export function shouldShowThreadMessageMeta(
+    messages: ThreadMessageMeta[],
+    index: number,
+    thresholdMs = THREAD_MESSAGE_META_REPEAT_THRESHOLD_MS,
+): boolean {
+    if (index <= 0 || index >= messages.length) return true;
+
+    const message = messages[index];
+    const previousMessage = messages[index - 1];
+    const isSameCurrentUser = Boolean(message.isYou) && Boolean(previousMessage.isYou);
+    const isSameSender =
+        isSameCurrentUser || (Boolean(message.isYou) === Boolean(previousMessage.isYou) && message.author === previousMessage.author);
+
+    if (!isSameSender || message.audience !== previousMessage.audience) return true;
+
+    const createdAt = new Date(String(message.createdAt ?? ''));
+    const previousCreatedAt = new Date(String(previousMessage.createdAt ?? ''));
+
+    if (Number.isNaN(createdAt.getTime()) || Number.isNaN(previousCreatedAt.getTime())) return true;
+
+    const isSameDay =
+        createdAt.getFullYear() === previousCreatedAt.getFullYear() &&
+        createdAt.getMonth() === previousCreatedAt.getMonth() &&
+        createdAt.getDate() === previousCreatedAt.getDate();
+    const gapMs = createdAt.getTime() - previousCreatedAt.getTime();
+
+    return !isSameDay || gapMs < 0 || gapMs > thresholdMs;
+}
+
 export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedThreadMessage<TAttachment> {
     const id = typeof thread?.id === 'number' ? (thread.id as number) : undefined;
     const author = String(thread?.sender_name ?? thread?.author ?? 'Unknown');
     const isYou = Boolean(thread?.is_current_user ?? thread?.isYou);
     const content = String(thread?.content ?? '');
-    const time = formatThreadTime(thread?.created_at);
+    const createdAtValue = thread?.created_at ?? thread?.createdAt ?? null;
+    const createdAt = createdAtValue instanceof Date ? createdAtValue.toISOString() : createdAtValue ? String(createdAtValue) : null;
+    const time = formatThreadTime(createdAtValue);
     const attachments = Array.isArray(thread?.attachments) ? (thread.attachments as TAttachment[]) : [];
     const audience = thread?.audience === 'team' || thread?.type === 'internal' ? 'team' : 'all';
     const mentions = Array.isArray(thread?.mentions) ? thread.mentions : [];
@@ -52,6 +93,7 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
         clientId: id ? `thread-${id}` : `thread-${Date.now()}`,
         id,
         author,
+        createdAt,
         time,
         content,
         isYou,

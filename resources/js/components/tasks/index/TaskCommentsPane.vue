@@ -5,6 +5,7 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
 import { renderRichContent } from '@/shared/tasks/rich-content';
+import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
 import { Paperclip } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
@@ -104,6 +105,10 @@ const assignThreadComposerRef = (value: Element | ComponentPublicInstance | null
     state.threadComposerRef = value;
 };
 
+const shouldShowMessageMeta = (index: string | number) => {
+    return shouldShowThreadMessageMeta(state.threadMessages, Number(index));
+};
+
 const showOccurrences = computed(() => state.isErrorIntakeTask && state.activeErrorThreadTab === 'occurrences');
 const occurrenceCount = computed(() => {
     const total = state.errorOccurrencesPagination?.total;
@@ -175,17 +180,30 @@ watch(deleteDialogOpen, (open) => {
 
         <TaskErrorOccurrencesPane v-if="showOccurrences" :state="state" />
 
-        <div v-else :ref="assignCommentsScrollRef" class="flex-1 space-y-3 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+        <div v-else :ref="assignCommentsScrollRef" class="flex-1 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
             <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
             <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
             <div
-                v-for="message in state.threadMessages"
+                v-for="(message, messageIndex) in state.threadMessages"
                 :key="message.clientId"
-                :class="message.isYou ? 'justify-end' : 'justify-start'"
+                :class="[
+                    message.isYou ? 'justify-end' : 'justify-start',
+                    messageIndex === 0 ? '' : shouldShowMessageMeta(messageIndex) ? 'mt-3' : 'mt-1',
+                ]"
                 class="flex"
             >
-                <div class="max-w-[86%]">
+                <div :class="message.isYou ? 'items-end' : 'items-start'" class="flex max-w-[86%] min-w-0 flex-col">
+                    <div
+                        v-if="shouldShowMessageMeta(messageIndex)"
+                        :data-testid="message.id ? `comment-meta-${message.id}` : undefined"
+                        :class="message.isYou ? 'justify-end' : 'justify-start'"
+                        class="text-muted-foreground mb-1 flex max-w-full items-center gap-1 text-[10px]"
+                    >
+                        <span v-if="!message.isYou" class="text-foreground/80 font-medium">{{ message.author }}</span>
+                        <span v-if="!message.isYou" aria-hidden="true">–</span>
+                        <span>{{ message.time }}</span>
+                    </div>
                     <ContextMenuRoot @update:open="(open) => state.onCommentContextMenuOpen(message, open)">
                         <ContextMenuTrigger as-child>
                             <div
@@ -196,21 +214,16 @@ watch(deleteDialogOpen, (open) => {
                                         ? 'rounded-br-md bg-sky-600 text-white'
                                         : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
                                 "
-                                class="rounded-lg px-3 py-2 text-sm shadow-sm"
+                                class="w-fit max-w-full rounded-lg px-3 py-2 text-sm shadow-sm"
                                 @copy="state.onMessageCopy(message, $event)"
                                 @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                                 @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
-                                <div
-                                    v-if="!message.isYou || message.audience === 'team'"
-                                    class="mb-1 flex items-center justify-between gap-2 text-[11px] font-semibold"
-                                >
-                                    <span v-if="!message.isYou" class="text-foreground/80">{{ message.author }}</span>
+                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end text-[11px] font-semibold">
                                     <Badge
-                                        v-if="message.audience === 'team'"
                                         variant="secondary"
                                         :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
-                                        class="ml-auto px-1.5 py-0 text-[10px]"
+                                        class="px-1.5 py-0 text-[10px]"
                                     >
                                         Team
                                     </Badge>
@@ -291,9 +304,6 @@ watch(deleteDialogOpen, (open) => {
                             </ContextMenuContent>
                         </ContextMenuPortal>
                     </ContextMenuRoot>
-                    <div :class="message.isYou ? 'text-right' : 'text-left'" class="text-muted-foreground mt-1 text-[11px]">
-                        {{ message.time }}
-                    </div>
                 </div>
             </div>
         </div>

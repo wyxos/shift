@@ -52,6 +52,16 @@ describe('Tasks/Index.vue All and Team comments', () => {
                             attachments: [],
                             mentions: [],
                         },
+                        {
+                            id: 14,
+                            sender_name: 'Alice',
+                            is_current_user: false,
+                            audience: 'all',
+                            content: '<p>All follow-up</p>',
+                            created_at: '2026-07-30T10:01:30Z',
+                            attachments: [],
+                            mentions: [],
+                        },
                     ],
                     threads: [
                         {
@@ -61,6 +71,16 @@ describe('Tasks/Index.vue All and Team comments', () => {
                             audience: 'all',
                             content: '<p>All first</p>',
                             created_at: '2026-07-30T10:01:00Z',
+                            attachments: [],
+                            mentions: [],
+                        },
+                        {
+                            id: 14,
+                            sender_name: 'Alice',
+                            is_current_user: false,
+                            audience: 'all',
+                            content: '<p>All follow-up</p>',
+                            created_at: '2026-07-30T10:01:30Z',
                             attachments: [],
                             mentions: [],
                         },
@@ -103,9 +123,19 @@ describe('Tasks/Index.vue All and Team comments', () => {
         await flushPromises();
 
         const bubbles = wrapper.findAll('[data-testid^="comment-bubble-"]');
-        expect(bubbles.map((bubble) => bubble.text())).toEqual([expect.stringContaining('All first'), expect.stringContaining('Team second')]);
+        expect(bubbles.map((bubble) => bubble.text())).toEqual([
+            expect.stringContaining('All first'),
+            expect.stringContaining('All follow-up'),
+            expect.stringContaining('Team second'),
+        ]);
+        expect(wrapper.get('[data-testid="comment-meta-11"]').text()).toContain('Alice–');
+        expect(wrapper.find('[data-testid="comment-meta-14"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="comment-meta-12"]').text()).toContain('Bob–');
+        expect(wrapper.get('[data-testid="comment-meta-11"]').classes()).toContain('text-[10px]');
+        expect(bubbles[0].text()).not.toContain('Alice');
+        expect(bubbles[2].text()).not.toContain('Bob');
         expect(bubbles[0].text()).not.toContain('Team');
-        expect(bubbles[1].text()).toContain('Team');
+        expect(bubbles[2].text()).toContain('Team');
         expect(wrapper.get('[data-testid="thread-audience-all"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="thread-audience-team"]').exists()).toBe(true);
 
@@ -122,6 +152,10 @@ describe('Tasks/Index.vue All and Team comments', () => {
             add_collaborators: [],
         });
         expect((wrapper.vm as any).threadAudience).toBe('all');
+        expect(wrapper.get('[data-testid="comment-meta-13"]').text()).toBe(
+            (wrapper.vm as any).threadMessages.find((message: any) => message.id === 13).time,
+        );
+        expect(wrapper.get('[data-testid="comment-bubble-13"]').text()).not.toContain('You');
 
         wrapper.unmount();
     });

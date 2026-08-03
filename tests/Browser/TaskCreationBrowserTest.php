@@ -105,9 +105,10 @@ it('opens an error intake task with tabbed comments and occurrences', function (
         ->assertSee('https://consumer.test/widget.js:88');
 });
 
-it('keeps the All and Team timeline controls visible across task sheet widths', function () {
+it('groups nearby messages and keeps the timeline controls visible across task sheet widths', function () {
     $user = User::factory()->create();
-    $teammate = User::factory()->create(['name' => 'Delivery Teammate']);
+    $teammate = User::factory()->create(['name' => 'Alexandria Catherine Montgomery-Smythe']);
+    $otherTeammate = User::factory()->create(['name' => 'Bob Mercer']);
     $project = Project::factory()->withAuthor($user->id)->create();
     $task = Task::factory()->create([
         'project_id' => $project->id,
@@ -115,24 +116,87 @@ it('keeps the All and Team timeline controls visible across task sheet widths', 
         'description' => '',
     ]);
     $task->submitter()->associate($user)->save();
+    $conversationStartedAt = now()->startOfMinute()->subMinutes(15);
 
-    TaskThread::query()->create([
+    $sharedMessage = TaskThread::query()->create([
         'task_id' => $task->id,
         'type' => 'external',
         'content' => '<p>Shared update</p>',
         'sender_name' => $teammate->name,
         'sender_type' => User::class,
         'sender_id' => $teammate->id,
-        'created_at' => now()->subMinute(),
-        'updated_at' => now()->subMinute(),
+        'created_at' => $conversationStartedAt,
+        'updated_at' => $conversationStartedAt,
     ]);
-    TaskThread::query()->create([
+    $groupedMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>One more detail</p>',
+        'sender_name' => $teammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $teammate->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(2),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(2),
+    ]);
+    $otherSenderMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>I’ll take a look</p>',
+        'sender_name' => $otherTeammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $otherTeammate->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(3),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(3),
+    ]);
+    $returnedSenderMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>Thanks, that helps</p>',
+        'sender_name' => $teammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $teammate->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(4),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(4),
+    ]);
+    $thresholdMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>Follow-up after pause</p>',
+        'sender_name' => $teammate->name,
+        'sender_type' => User::class,
+        'sender_id' => $teammate->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(10),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(10),
+    ]);
+    $sentMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>My follow-up</p>',
+        'sender_name' => $user->name,
+        'sender_type' => User::class,
+        'sender_id' => $user->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(11),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(11),
+    ]);
+    $groupedSentMessage = TaskThread::query()->create([
+        'task_id' => $task->id,
+        'type' => 'external',
+        'content' => '<p>One last thing</p>',
+        'sender_name' => $user->name,
+        'sender_type' => User::class,
+        'sender_id' => $user->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(12),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(12),
+    ]);
+    $teamMessage = TaskThread::query()->create([
         'task_id' => $task->id,
         'type' => 'internal',
         'content' => '<p>Team planning note</p>',
         'sender_name' => $teammate->name,
         'sender_type' => User::class,
         'sender_id' => $teammate->id,
+        'created_at' => $conversationStartedAt->copy()->addMinutes(13),
+        'updated_at' => $conversationStartedAt->copy()->addMinutes(13),
     ]);
 
     $this->actingAs($user);
@@ -141,11 +205,29 @@ it('keeps the All and Team timeline controls visible across task sheet widths', 
         ->resize(1440, 900)
         ->assertNoSmoke()
         ->assertSee('Shared update')
+        ->assertSee('One more detail')
+        ->assertSee('I’ll take a look')
+        ->assertSee('Thanks, that helps')
+        ->assertSee('Follow-up after pause')
         ->assertSee('Team planning note')
+        ->assertSee('My follow-up')
+        ->assertSee('One last thing')
+        ->assertSee('Alexandria Catherine Montgomery-Smythe')
         ->assertVisible('[data-testid="task-comments-pane"]')
+        ->assertVisible("[data-testid=\"comment-meta-{$sharedMessage->id}\"]")
+        ->assertNotPresent("[data-testid=\"comment-meta-{$groupedMessage->id}\"]")
+        ->assertVisible("[data-testid=\"comment-meta-{$otherSenderMessage->id}\"]")
+        ->assertVisible("[data-testid=\"comment-meta-{$returnedSenderMessage->id}\"]")
+        ->assertVisible("[data-testid=\"comment-meta-{$thresholdMessage->id}\"]")
+        ->assertVisible("[data-testid=\"comment-meta-{$teamMessage->id}\"]")
+        ->assertVisible("[data-testid=\"comment-meta-{$sentMessage->id}\"]")
+        ->assertNotPresent("[data-testid=\"comment-meta-{$groupedSentMessage->id}\"]")
         ->assertVisible('[data-testid="thread-audience-all"]')
         ->assertVisible('[data-testid="thread-audience-team"]')
-        ->assertVisible('[data-testid="toolbar-send"]');
+        ->assertVisible('[data-testid="toolbar-send"]')
+        ->assertScript(
+            "document.querySelector('[data-testid=\"comment-meta-{$sharedMessage->id}\"]').getBoundingClientRect().width > document.querySelector('[data-testid=\"comment-bubble-{$sharedMessage->id}\"]').getBoundingClientRect().width",
+        );
 
     $page->resize(768, 1024)
         ->click('[data-testid="edit-mobile-pane-comments"]')
