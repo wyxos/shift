@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'registration_policy' => env('REGISTRATION_POLICY', 'open'),
+    'registration_mode' => env('REGISTRATION_MODE', 'open'),
 
     'notifications' => [
         'collaborator_grace_period_seconds' => (int) env('SHIFT_COLLABORATOR_NOTIFICATION_DELAY_SECONDS', 300),
