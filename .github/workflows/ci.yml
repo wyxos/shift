@@ -64,7 +64,7 @@ jobs:
       - name: Verify fresh MariaDB installation
         env:
           APP_ENV: testing
-          DB_CONNECTION: mysql
+          DB_CONNECTION: mariadb
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_DATABASE: shift_ci
