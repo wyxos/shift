@@ -26,6 +26,8 @@ afterEach(function () {
 });
 
 test('an organisation transfer round trips only public tenant data and attachment files', function () {
+    $longTaskDescription = str_repeat('Task detail ', 8000);
+    $longThreadContent = str_repeat('Thread detail ', 45000);
     $lawUser = User::factory()->create([
         'name' => 'Law Maintainer',
         'email' => 'law@example.com',
@@ -73,6 +75,7 @@ test('an organisation transfer round trips only public tenant data and attachmen
         'project_id' => $lawProject->id,
         'submitter_type' => User::class,
         'submitter_id' => $lawUser->id,
+        'description' => $longTaskDescription,
     ]);
     $personalTask = Task::factory()->create([
         'project_id' => $personalProject->id,
@@ -82,7 +85,7 @@ test('an organisation transfer round trips only public tenant data and attachmen
     $lawThread = TaskThread::query()->create([
         'task_id' => $lawTask->id,
         'type' => 'internal',
-        'content' => 'Law thread',
+        'content' => $longThreadContent,
         'sender_name' => $lawMember->name,
         'sender_type' => User::class,
         'sender_id' => $lawMember->id,
@@ -153,7 +156,8 @@ test('an organisation transfer round trips only public tenant data and attachmen
     expect(User::query()->pluck('email')->sort()->values()->all())->toBe(['law@example.com', 'member@example.com'])
         ->and(Organisation::query()->sole()->name)->toBe('LawCreative')
         ->and(Project::query()->sole()->token)->toBe('preserved-project-token')
-        ->and(Task::query()->count())->toBe(1)
+        ->and(Task::query()->sole()->description)->toBe($longTaskDescription)
+        ->and(TaskThread::query()->sole()->content)->toBe($longThreadContent)
         ->and(DB::table('activity_log')->count())->toBe(1)
         ->and(DB::table('notifications')->count())->toBe(2)
         ->and(DB::table('notifications')->where('data', 'like', '%shift.lawcreative.dev%')->count())->toBe(1)
