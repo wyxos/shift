@@ -136,6 +136,9 @@ test('an organisation transfer round trips only public tenant data and attachmen
         ->and($manifest['tables']['activity_log']['rows'])->toBe(1)
         ->and($manifest['tables']['notifications']['rows'])->toBe(2)
         ->and($manifest['attachments']['count'])->toBe(2)
+        ->and($manifest['attachments']['available_count'])->toBe(2)
+        ->and($manifest['attachments']['missing_count'])->toBe(0)
+        ->and(collect($manifest['attachments']['files'])->pluck('availability')->unique()->all())->toBe(['available'])
         ->and($manifest['hosted_only_tables'] ?? null)->toBeNull();
 
     Storage::deleteDirectory('attachments');
@@ -185,13 +188,13 @@ test('import requires an explicit confirmation and an empty target', function ()
     ])->expectsOutputToContain('The target is not empty')->assertFailed();
 });
 
-test('export aborts cleanly when a selected attachment file is missing', function () {
+test('a transfer preserves an attachment record whose source file is already missing', function () {
     $user = User::factory()->create();
     $organisation = Organisation::factory()->create(['author_id' => $user->id]);
     $client = Client::factory()->create(['organisation_id' => $organisation->id]);
     $project = Project::factory()->create(['client_id' => $client->id, 'author_id' => $user->id]);
     $task = Task::factory()->create(['project_id' => $project->id]);
-    Attachment::query()->create([
+    $attachment = Attachment::query()->create([
         'attachable_type' => Task::class,
         'attachable_id' => $task->id,
         'original_filename' => 'missing.txt',
@@ -202,9 +205,32 @@ test('export aborts cleanly when a selected attachment file is missing', functio
     $this->artisan('shift:organisation-transfer:export', [
         'organisation' => (string) $organisation->id,
         '--output' => $this->transferDirectory,
-    ])->expectsOutputToContain('is missing from storage')->assertFailed();
+    ])->expectsOutputToContain('1 missing at source')->assertSuccessful();
 
-    expect(File::exists($this->transferDirectory))->toBeFalse();
+    $manifest = json_decode(File::get($this->transferDirectory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    expect($manifest['attachments']['count'])->toBe(1)
+        ->and($manifest['attachments']['available_count'])->toBe(0)
+        ->and($manifest['attachments']['missing_count'])->toBe(1)
+        ->and($manifest['attachments']['bytes'])->toBe(0)
+        ->and($manifest['attachments']['files'])->toBe([[
+            'id' => $attachment->id,
+            'path' => $attachment->path,
+            'availability' => 'missing_at_source',
+        ]]);
+
+    clearTransferTables();
+
+    $this->artisan('shift:organisation-transfer:import', [
+        'directory' => $this->transferDirectory,
+        '--confirm' => 'IMPORT',
+    ])->expectsOutputToContain('1 missing at source')->assertSuccessful();
+
+    expect(Attachment::query()->sole()->path)->toBe($attachment->path)
+        ->and(Storage::exists($attachment->path))->toBeFalse();
+
+    $this->artisan('shift:organisation-transfer:verify', [
+        'directory' => $this->transferDirectory,
+    ])->expectsOutputToContain('1 missing at source')->assertSuccessful();
 });
 
 test('import rejects a transfer whose table data was changed after export', function () {

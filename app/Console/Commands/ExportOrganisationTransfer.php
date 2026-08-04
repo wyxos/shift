@@ -43,7 +43,7 @@ class ExportOrganisationTransfer extends Command
                 ['Table', 'Rows'],
                 collect($manifest['tables'])->map(fn (array $details, string $table): array => [$table, $details['rows']])->values()->all(),
             );
-            $this->line("Attachments: {$manifest['attachments']['count']} files / {$manifest['attachments']['bytes']} bytes");
+            $this->line($this->attachmentSummary($manifest));
             $this->components->warn('The transfer contains password hashes and access tokens. Keep the directory mode-private and delete it after signed-off migration cleanup.');
 
             return self::SUCCESS;
@@ -78,5 +78,13 @@ class ExportOrganisationTransfer extends Command
         $slug = Str::slug((string) $organisation->name) ?: 'organisation-'.$organisation->getKey();
 
         return storage_path('app/private/organisation-transfers/'.$slug.'-'.now()->utc()->format('YmdHis'));
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function attachmentSummary(array $manifest): string
+    {
+        $attachments = $manifest['attachments'];
+
+        return "Attachments: {$attachments['count']} records / {$attachments['available_count']} files / {$attachments['missing_count']} missing at source / {$attachments['bytes']} bytes";
     }
 }
