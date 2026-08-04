@@ -50,6 +50,11 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
 
+      - name: Install MariaDB client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes mariadb-client
+
       - name: Install Node dependencies
         run: npm ci
 
