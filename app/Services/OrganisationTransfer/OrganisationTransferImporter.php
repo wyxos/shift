@@ -49,7 +49,7 @@ class OrganisationTransferImporter
         $committed = false;
 
         try {
-            foreach ($manifest['attachments']['files'] as $file) {
+            foreach ($this->availableAttachmentFiles($manifest) as $file) {
                 $source = fopen("{$directory}/{$file['transfer_file']}", 'rb');
                 if ($source === false) {
                     throw new RuntimeException("Unable to open transfer attachment [{$file['id']}].");
@@ -119,7 +119,7 @@ class OrganisationTransferImporter
 
     /**
      * @param  array<string, mixed>  $manifest
-     * @return array{tables: array<string, int>, attachments: array{count: int, bytes: int}}
+     * @return array{tables: array<string, int>, attachments: array{count: int, available_count: int, missing_count: int, bytes: int}}
      */
     public function verifyImported(array $manifest): array
     {
@@ -135,7 +135,19 @@ class OrganisationTransferImporter
         }
 
         $bytes = 0;
+        $availableCount = 0;
+        $missingCount = 0;
         foreach ($manifest['attachments']['files'] as $file) {
+            if ($file['availability'] === 'missing_at_source') {
+                if (Storage::exists($file['path'])) {
+                    throw new RuntimeException("Attachment [{$file['id']}] was missing at the source but unexpectedly exists on the target.");
+                }
+
+                $missingCount++;
+
+                continue;
+            }
+
             if (! Storage::exists($file['path'])) {
                 throw new RuntimeException("Imported attachment [{$file['id']}] is missing at [{$file['path']}].");
             }
@@ -151,12 +163,15 @@ class OrganisationTransferImporter
             }
 
             $bytes += $actualBytes;
+            $availableCount++;
         }
 
         return [
             'tables' => $counts,
             'attachments' => [
                 'count' => count($manifest['attachments']['files']),
+                'available_count' => $availableCount,
+                'missing_count' => $missingCount,
                 'bytes' => $bytes,
             ],
         ];
@@ -201,8 +216,11 @@ class OrganisationTransferImporter
 
         $seenIds = [];
         $seenPaths = [];
+        $availableCount = 0;
+        $missingCount = 0;
+        $availableBytes = 0;
         foreach ($manifest['attachments']['files'] as $file) {
-            if (! isset($file['id'], $file['path'], $file['transfer_file'], $file['bytes'], $file['sha256'])) {
+            if (! isset($file['id'], $file['path'], $file['availability'])) {
                 throw new RuntimeException('Transfer attachment manifest entry is incomplete.');
             }
 
@@ -214,16 +232,27 @@ class OrganisationTransferImporter
             $seenIds[$file['id']] = true;
             $seenPaths[$file['path']] = true;
 
+            if ($file['availability'] === 'missing_at_source') {
+                $missingCount++;
+
+                continue;
+            }
+
             $path = "{$directory}/{$file['transfer_file']}";
             if (! File::isFile($path)
                 || File::size($path) !== (int) $file['bytes']
                 || ! hash_equals((string) $file['sha256'], hash_file('sha256', $path))) {
                 throw new RuntimeException("Transfer attachment [{$file['id']}] failed file verification.");
             }
+
+            $availableCount++;
+            $availableBytes += (int) $file['bytes'];
         }
 
         if (count($seenIds) !== (int) ($manifest['attachments']['count'] ?? -1)
-            || array_sum(array_map(fn (array $file): int => (int) $file['bytes'], $manifest['attachments']['files'])) !== (int) ($manifest['attachments']['bytes'] ?? -1)) {
+            || $availableCount !== (int) ($manifest['attachments']['available_count'] ?? -1)
+            || $missingCount !== (int) ($manifest['attachments']['missing_count'] ?? -1)
+            || $availableBytes !== (int) ($manifest['attachments']['bytes'] ?? -1)) {
             throw new RuntimeException('Transfer attachment totals do not match the manifest.');
         }
 
@@ -272,7 +301,7 @@ class OrganisationTransferImporter
     {
         $id = (int) $file['id'];
         $path = (string) $file['path'];
-        $transferFile = (string) $file['transfer_file'];
+        $availability = (string) $file['availability'];
 
         if ($id < 1
             || $path === ''
@@ -280,9 +309,36 @@ class OrganisationTransferImporter
             || str_contains($path, '\\')
             || in_array('..', explode('/', $path), true)
             || ! str_starts_with($path, 'attachments/')
-            || $transferFile !== "files/{$id}") {
+            || ! in_array($availability, ['available', 'missing_at_source'], true)) {
             throw new RuntimeException("Transfer attachment [{$id}] contains an unsafe path.");
         }
+
+        if ($availability === 'available') {
+            if (! isset($file['transfer_file'], $file['bytes'], $file['sha256'])
+                || (string) $file['transfer_file'] !== "files/{$id}"
+                || (int) $file['bytes'] < 0
+                || preg_match('/^[a-f0-9]{64}$/', (string) $file['sha256']) !== 1) {
+                throw new RuntimeException("Transfer attachment [{$id}] contains invalid available-file metadata.");
+            }
+
+            return;
+        }
+
+        if (array_intersect(['transfer_file', 'bytes', 'sha256'], array_keys($file)) !== []) {
+            throw new RuntimeException("Transfer attachment [{$id}] contains file metadata despite being missing at the source.");
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return list<array<string, mixed>>
+     */
+    private function availableAttachmentFiles(array $manifest): array
+    {
+        return array_values(array_filter(
+            $manifest['attachments']['files'],
+            fn (array $file): bool => ($file['availability'] ?? null) === 'available',
+        ));
     }
 
     private function hashStorageFile(string $path): string

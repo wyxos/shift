@@ -12,7 +12,7 @@ class OrganisationTransferExporter
 {
     public const FORMAT = 'shift-public-organisation-transfer';
 
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /**
      * @return array<string, mixed>
@@ -80,7 +80,9 @@ class OrganisationTransferExporter
                 'tables' => $tables,
                 'attachments' => [
                     'count' => count($attachments),
-                    'bytes' => array_sum(array_column($attachments, 'bytes')),
+                    'available_count' => collect($attachments)->where('availability', 'available')->count(),
+                    'missing_count' => collect($attachments)->where('availability', 'missing_at_source')->count(),
+                    'bytes' => collect($attachments)->where('availability', 'available')->sum('bytes'),
                     'files' => $attachments,
                 ],
                 'exclusions' => [
@@ -106,7 +108,7 @@ class OrganisationTransferExporter
     }
 
     /**
-     * @return list<array{id: int, path: string, transfer_file: string, bytes: int, sha256: string}>
+     * @return list<array{id: int, path: string, availability: string, transfer_file?: string, bytes?: int, sha256?: string}>
      */
     private function exportAttachments(OrganisationTransferSelection $selection, string $directory): array
     {
@@ -124,7 +126,13 @@ class OrganisationTransferExporter
             $seenPaths[$path] = $id;
 
             if (! Storage::exists($path)) {
-                throw new RuntimeException("Attachment [{$id}] is missing from storage at [{$path}].");
+                $files[] = [
+                    'id' => $id,
+                    'path' => $path,
+                    'availability' => 'missing_at_source',
+                ];
+
+                continue;
             }
 
             $transferFile = "files/{$id}";
@@ -156,6 +164,7 @@ class OrganisationTransferExporter
             $files[] = [
                 'id' => $id,
                 'path' => $path,
+                'availability' => 'available',
                 'transfer_file' => $transferFile,
                 'bytes' => File::size($target),
                 'sha256' => hash_file('sha256', $target),

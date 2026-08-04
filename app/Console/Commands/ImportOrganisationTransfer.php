@@ -45,7 +45,7 @@ class ImportOrganisationTransfer extends Command
                 ['Table', 'Rows'],
                 collect($receipt['verification']['tables'])->map(fn (int $count, string $table): array => [$table, $count])->values()->all(),
             );
-            $this->line("Attachments: {$receipt['verification']['attachments']['count']} files / {$receipt['verification']['attachments']['bytes']} bytes");
+            $this->line($this->attachmentSummary($receipt['verification']));
             $this->line("Receipt: {$directory}/import-receipt.json");
 
             return self::SUCCESS;
@@ -59,5 +59,13 @@ class ImportOrganisationTransfer extends Command
     private function resolveDirectory(string $directory): string
     {
         return str_starts_with($directory, '/') ? $directory : base_path($directory);
+    }
+
+    /** @param array<string, mixed> $verification */
+    private function attachmentSummary(array $verification): string
+    {
+        $attachments = $verification['attachments'];
+
+        return "Attachments: {$attachments['count']} records / {$attachments['available_count']} files / {$attachments['missing_count']} missing at source / {$attachments['bytes']} bytes";
     }
 }

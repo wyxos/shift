@@ -39,7 +39,7 @@ class VerifyOrganisationTransfer extends Command
                 ['Table', 'Rows'],
                 collect($verification['tables'])->map(fn (int $count, string $table): array => [$table, $count])->values()->all(),
             );
-            $this->line("Attachments: {$verification['attachments']['count']} files / {$verification['attachments']['bytes']} bytes");
+            $this->line($this->attachmentSummary($verification));
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
@@ -47,5 +47,13 @@ class VerifyOrganisationTransfer extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /** @param array<string, mixed> $verification */
+    private function attachmentSummary(array $verification): string
+    {
+        $attachments = $verification['attachments'];
+
+        return "Attachments: {$attachments['count']} records / {$attachments['available_count']} files / {$attachments['missing_count']} missing at source / {$attachments['bytes']} bytes";
     }
 }
