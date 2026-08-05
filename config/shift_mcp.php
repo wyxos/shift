@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'web_enabled' => (bool) env('SHIFT_MCP_WEB_ENABLED', false),
+    'web_enabled' => (bool) env('MCP_WEB_ENABLED', false),
 ];
