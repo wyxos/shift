@@ -24,7 +24,7 @@ class ShiftServer extends Server
         Access to the SHIFT portal, scoped to the authenticated SHIFT user.
         Use read tools to inspect visible projects, tasks, task threads, collaborators,
         writable fields, capabilities, and the user's own notification records. Mutation
-        tools require the authenticated token to include mcp:write and should only be
+        tools require the authenticated OAuth grant to include mcp:write and should only be
         used after the user approves the specific task or thread change.
     MARKDOWN;
 

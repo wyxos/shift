@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
-use App\Mcp\Support\ShiftMcpAccess;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,15 +11,6 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiController extends Controller
 {
-    private const MCP_TOKEN_NAME = 'shift-mcp';
-
-    private const MCP_TOKEN_ABILITY = ShiftMcpAccess::READ_ABILITY;
-
-    private const MCP_TOKEN_ABILITIES = [
-        ShiftMcpAccess::READ_ABILITY,
-        ShiftMcpAccess::WRITE_ABILITY,
-    ];
-
     private const SDK_INSTALL_TOKEN_PREFIX = 'shift-sdk-install:';
 
     public function edit(Request $request)
@@ -33,10 +23,6 @@ class ApiController extends Controller
         return Inertia::render('settings/Api')
             ->with([
                 'token' => session('token', ''),
-                'mcpTokens' => $tokens
-                    ->filter(fn (PersonalAccessToken $token) => $this->isMcpToken($token))
-                    ->map(fn (PersonalAccessToken $token) => $this->tokenRecord($token))
-                    ->values(),
                 'sdkTokens' => $tokens
                     ->filter(fn (PersonalAccessToken $token) => $this->isSdkInstallToken($token))
                     ->map(fn (PersonalAccessToken $token) => $this->tokenRecord($token, includeProject: true))
@@ -56,22 +42,6 @@ class ApiController extends Controller
             'success' => 'API token created successfully.',
             'token' => $token->plainTextToken,
         ]);
-    }
-
-    public function resetMcpToken(Request $request)
-    {
-        $request->user()
-            ->tokens()
-            ->get()
-            ->each(function (PersonalAccessToken $token): void {
-                if ($this->isMcpToken($token)) {
-                    $token->delete();
-                }
-            });
-
-        $token = $request->user()->createToken(self::MCP_TOKEN_NAME, self::MCP_TOKEN_ABILITIES);
-
-        return response()->json($this->tokenResponse($token));
     }
 
     public function resetSdkToken(Request $request, PersonalAccessToken $token)
@@ -124,11 +94,6 @@ class ApiController extends Controller
         }
 
         return $record;
-    }
-
-    private function isMcpToken(PersonalAccessToken $token): bool
-    {
-        return in_array(self::MCP_TOKEN_ABILITY, $token->abilities ?? [], true);
     }
 
     private function isSdkInstallToken(PersonalAccessToken $token): bool

@@ -7,13 +7,12 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
-use Laravel\Sanctum\PersonalAccessToken;
 
 class ShiftMcpAccess
 {
-    public const READ_ABILITY = 'mcp:use';
+    public const READ_SCOPE = 'mcp:read';
 
-    public const WRITE_ABILITY = 'mcp:write';
+    public const WRITE_SCOPE = 'mcp:write';
 
     public function principal(Request $request): ?ShiftMcpPrincipal
     {
@@ -28,21 +27,17 @@ class ShiftMcpAccess
 
     public function canWrite(ShiftMcpPrincipal $principal): bool
     {
-        return $this->tokenHasExplicitAbility(
+        return $this->tokenHasExplicitScope(
             $principal->user->currentAccessToken(),
-            self::WRITE_ABILITY,
+            self::WRITE_SCOPE,
         );
     }
 
-    public function tokenHasExplicitAbility(mixed $token, string $ability): bool
+    public function tokenHasExplicitScope(mixed $token, string $scope): bool
     {
-        if ($token instanceof PersonalAccessToken) {
-            return in_array($ability, $token->abilities ?? [], true);
-        }
-
         return is_object($token)
             && method_exists($token, 'can')
-            && $token->can($ability) === true;
+            && $token->can($scope) === true;
     }
 
     public function projectsFor(ShiftMcpPrincipal $principal): Builder

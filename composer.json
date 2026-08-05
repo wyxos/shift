@@ -16,6 +16,7 @@
         "laravel/ai": "^0.8.1",
         "laravel/framework": "^12.0",
         "laravel/mcp": "^0.5",
+        "laravel/passport": "^13.7",
         "laravel/reverb": "^1.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
