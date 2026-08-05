@@ -106,14 +106,6 @@ describe('settings/Api.vue', () => {
         return mount(Api, {
             props: {
                 token: '',
-                mcpTokens: [
-                    {
-                        id: 1,
-                        name: 'old-mcp',
-                        created_at: '2026-06-01T10:00:00.000000Z',
-                        last_used_at: null,
-                    },
-                ],
                 sdkTokens: [
                     {
                         id: 2,
@@ -130,23 +122,12 @@ describe('settings/Api.vue', () => {
         });
     }
 
-    it('renders and resets personal MCP and SDK tokens', async () => {
+    it('renders and resets SHIFT SDK tokens without exposing legacy MCP token controls', async () => {
         const wrapper = mountPage();
 
-        expect(wrapper.text()).toContain('MCP token');
-        expect(wrapper.text()).toContain('old-mcp');
+        expect(wrapper.text()).not.toContain('MCP token');
         expect(wrapper.text()).toContain('SHIFT SDK tokens');
         expect(wrapper.text()).toContain('Portal Integration');
-
-        await wrapper.get('[data-testid="reset-mcp-token"]').trigger('click');
-        await flushPromises();
-
-        expect(apiMocks.axiosPost).toHaveBeenCalledWith(
-            '/settings/api/tokens/mcp/reset',
-            {},
-            expect.objectContaining({ headers: { Accept: 'application/json' } }),
-        );
-        expect(wrapper.text()).toContain('new-visible-token');
 
         await wrapper.get('[data-testid="reset-sdk-token-2"]').trigger('click');
         await flushPromises();

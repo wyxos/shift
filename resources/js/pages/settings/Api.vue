@@ -30,12 +30,10 @@ type SdkTokenRecord = TokenRecord & {
 const props = withDefaults(
     defineProps<{
         token?: string;
-        mcpTokens?: TokenRecord[];
         sdkTokens?: SdkTokenRecord[];
     }>(),
     {
         token: '',
-        mcpTokens: () => [],
         sdkTokens: () => [],
     },
 );
@@ -51,9 +49,7 @@ const form = useForm({
     name: '',
 });
 const issuedToken = ref(props.token);
-const mcpTokens = ref<TokenRecord[]>([...props.mcpTokens]);
 const sdkTokens = ref<SdkTokenRecord[]>([...props.sdkTokens]);
-const mcpResetting = ref(false);
 const sdkResetting = ref<number | null>(null);
 const resetError = ref<string | null>(null);
 
@@ -65,31 +61,6 @@ const createApiToken = () => {
         },
     });
 };
-
-async function resetMcpToken() {
-    mcpResetting.value = true;
-    resetError.value = null;
-
-    try {
-        const response = await axios.post(
-            '/settings/api/tokens/mcp/reset',
-            {},
-            {
-                headers: {
-                    Accept: 'application/json',
-                },
-            },
-        );
-
-        issuedToken.value = response.data.token;
-        mcpTokens.value = [response.data.record];
-    } catch (error) {
-        console.error('Error resetting MCP token:', error);
-        resetError.value = 'Unable to reset the MCP token right now.';
-    } finally {
-        mcpResetting.value = false;
-    }
-}
 
 async function resetSdkToken(token: SdkTokenRecord) {
     sdkResetting.value = token.id;
@@ -131,31 +102,6 @@ async function resetSdkToken(token: SdkTokenRecord) {
                 </div>
 
                 <div v-if="resetError" class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ resetError }}</div>
-
-                <section class="space-y-3 rounded border p-4">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="text-base font-semibold">MCP token</h2>
-                            <p class="text-muted-foreground text-sm">Used by Codex MCP connections for read and approved write tools.</p>
-                        </div>
-                        <Button type="button" :disabled="mcpResetting" data-testid="reset-mcp-token" @click="resetMcpToken">
-                            <RefreshCw class="mr-2 h-4 w-4" />
-                            Reset
-                        </Button>
-                    </div>
-
-                    <div class="space-y-2">
-                        <div
-                            v-for="tokenRecord in mcpTokens"
-                            :key="tokenRecord.id"
-                            class="flex items-center justify-between gap-4 rounded border p-3 text-sm"
-                        >
-                            <span class="font-medium">{{ tokenRecord.name }}</span>
-                            <span class="text-muted-foreground">ID {{ tokenRecord.id }}</span>
-                        </div>
-                        <p v-if="!mcpTokens.length" class="text-muted-foreground text-sm">No MCP token has been issued.</p>
-                    </div>
-                </section>
 
                 <section class="space-y-3 rounded border p-4">
                     <div>

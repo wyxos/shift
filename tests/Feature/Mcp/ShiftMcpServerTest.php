@@ -27,10 +27,14 @@ use App\Notifications\TaskThreadUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Server\Registrar;
+use Laravel\Passport\AccessToken;
 
-function shiftMcpAs(User $user, array $abilities = ['mcp:use']): \Laravel\Mcp\Server\Testing\PendingTestResponse
+function shiftMcpAs(User $user, array $scopes = ['mcp:read']): \Laravel\Mcp\Server\Testing\PendingTestResponse
 {
-    $token = $user->createToken('shift-mcp-test', $abilities)->accessToken;
+    $token = new AccessToken([
+        'oauth_user_id' => $user->getAuthIdentifier(),
+        'oauth_scopes' => $scopes,
+    ]);
     $user->withAccessToken($token);
 
     return ShiftServer::actingAs($user);
@@ -45,10 +49,12 @@ test('mcp tools fail closed without an authenticated user', function () {
         ->assertHasErrors(['authenticated user']);
 });
 
-test('web mcp route requires sanctum authentication', function () {
+test('web mcp route advertises OAuth authentication', function () {
+    $challenge = 'Bearer resource_metadata="'.route('mcp.oauth.protected-resource').'", scope="mcp:read mcp:write"';
+
     $this->getJson('/mcp/shift')
         ->assertUnauthorized()
-        ->assertHeader('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"');
+        ->assertHeader('WWW-Authenticate', $challenge);
 
     $this->postJson('/mcp/shift', [
         'jsonrpc' => '2.0',
@@ -64,25 +70,14 @@ test('web mcp route requires sanctum authentication', function () {
         ],
     ])
         ->assertUnauthorized()
-        ->assertHeader('WWW-Authenticate', 'Bearer realm="mcp", error="invalid_token"');
+        ->assertHeader('WWW-Authenticate', $challenge);
 });
 
-test('web mcp route uses the authenticated sanctum user to scope tools', function () {
+test('web mcp route rejects legacy sanctum tokens without fallback', function () {
     $user = User::factory()->create();
-    $visibleProject = Project::factory()->withAuthor($user->id)->create([
-        'mcp_enabled' => true,
-    ]);
-    Task::factory()->create([
-        'project_id' => $visibleProject->id,
-        'title' => 'Visible web MCP task',
-    ]);
-    Task::factory()->create([
-        'title' => 'Hidden web MCP task',
-    ]);
-
     $token = $user->createToken('mcp-web-test', ['mcp:use'])->plainTextToken;
 
-    $initializeResponse = $this
+    $this
         ->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/mcp/shift', [
             'jsonrpc' => '2.0',
@@ -97,28 +92,7 @@ test('web mcp route uses the authenticated sanctum user to scope tools', functio
                 ],
             ],
         ])
-        ->assertOk()
-        ->assertHeader('MCP-Session-Id');
-
-    $this
-        ->withHeaders([
-            'Authorization' => 'Bearer '.$token,
-            'MCP-Session-Id' => $initializeResponse->headers->get('MCP-Session-Id'),
-        ])
-        ->postJson('/mcp/shift', [
-            'jsonrpc' => '2.0',
-            'id' => 2,
-            'method' => 'tools/call',
-            'params' => [
-                'name' => 'search_tasks',
-                'arguments' => [
-                    'query' => 'web MCP task',
-                ],
-            ],
-        ])
-        ->assertOk()
-        ->assertSee('Visible web MCP task')
-        ->assertDontSee('Hidden web MCP task');
+        ->assertUnauthorized();
 });
 
 test('web mcp tools only expose projects with mcp enabled', function () {
@@ -164,7 +138,7 @@ test('web mcp tools only expose projects with mcp enabled', function () {
         ->assertDontSee('Hidden disabled MCP task');
 });
 
-test('web mcp route rejects sanctum tokens without the mcp ability', function () {
+test('web mcp route rejects ordinary sanctum tokens', function () {
     $user = User::factory()->create();
     $token = $user->createToken('regular-api-token')->plainTextToken;
 
@@ -183,7 +157,7 @@ test('web mcp route rejects sanctum tokens without the mcp ability', function ()
                 ],
             ],
         ])
-        ->assertForbidden();
+        ->assertUnauthorized();
 });
 
 test('shift mcp server is not registered as a local server', function () {
@@ -405,7 +379,7 @@ test('get task write context returns fields enums and capabilities for inline dr
         ]);
 });
 
-test('mcp write tools require the mcp write ability', function () {
+test('mcp write tools require the mcp write scope', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create([
         'mcp_enabled' => true,
@@ -418,13 +392,13 @@ test('mcp write tools require the mcp write ability', function () {
         ->assertHasErrors(['mcp:write']);
 });
 
-test('mcp write tools can create and edit tasks with write ability', function () {
+test('mcp write tools can create and edit tasks with write scope', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create([
         'mcp_enabled' => true,
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(CreateTaskTool::class, [
         'project_id' => $project->id,
         'title' => 'MCP created task',
         'description' => '<p>Created from Codex.</p>',
@@ -438,7 +412,7 @@ test('mcp write tools can create and edit tasks with write ability', function ()
     expect($task->submitter_id)->toBe($user->id);
     expect($task->submitter_type)->toBe(User::class);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskTool::class, [
         'task_id' => $task->id,
         'title' => 'MCP edited task',
         'status' => TaskStatus::Completed->value,
@@ -466,7 +440,7 @@ test('mcp create task stores registered project environment metadata', function 
         'url' => 'https://portal.example.test',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(CreateTaskTool::class, [
         'project_id' => $project->id,
         'title' => 'MCP task with environment',
         'environment' => 'Development',
@@ -494,7 +468,7 @@ test('mcp create task rejects unregistered project environment metadata', functi
         'url' => 'https://portal.example.test',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(CreateTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(CreateTaskTool::class, [
         'project_id' => $project->id,
         'title' => 'MCP task with bad environment',
         'environment' => 'production',
@@ -521,7 +495,7 @@ test('mcp edit task can set and clear registered project environment metadata', 
         'title' => 'MCP environment edit task',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskTool::class, [
         'task_id' => $task->id,
         'environment' => 'development',
     ])
@@ -534,7 +508,7 @@ test('mcp edit task can set and clear registered project environment metadata', 
         'url' => 'https://portal.example.test',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskTool::class, [
         'task_id' => $task->id,
         'environment' => '',
     ])
@@ -565,7 +539,7 @@ test('mcp edit task preserves environment metadata when environment is omitted',
         'url' => 'https://portal.example.test',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskTool::class, [
         'task_id' => $task->id,
         'status' => 'awaiting-feedback',
     ])
@@ -597,7 +571,7 @@ test('mcp task edit tool does not edit requirement phase items', function () {
         'submitted_description' => 'Original requirement details.',
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskTool::class, [
         'task_id' => $task->id,
         'title' => 'Edited requirement',
     ])
@@ -620,7 +594,7 @@ test('mcp write tools can add and edit own thread comments', function () {
         'project_id' => $project->id,
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
         'task_id' => $task->id,
         'content' => '<p>Initial Codex reply.</p><script>alert("x")</script>',
     ])
@@ -633,7 +607,7 @@ test('mcp write tools can add and edit own thread comments', function () {
     expect($thread->sender_id)->toBe($user->id);
     expect($thread->sender_type)->toBe(User::class);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
         'thread_id' => $thread->id,
         'content' => '<p>Edited Codex reply.</p>',
     ])
@@ -655,7 +629,7 @@ test('mcp comment tools map All and Team without changing legacy storage values'
         'project_id' => $project->id,
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
         'task_id' => $task->id,
         'content' => '<p>Shared comment.</p>',
         'audience' => 'all',
@@ -663,7 +637,7 @@ test('mcp comment tools map All and Team without changing legacy storage values'
         ->assertOk()
         ->assertSee(['all', 'external', 'Shared comment.']);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(AddTaskThreadCommentTool::class, [
         'task_id' => $task->id,
         'content' => '<p>Team comment.</p>',
         'audience' => 'team',
@@ -708,7 +682,7 @@ test('mcp cannot edit an All message to quote Team content', function () {
         'sender_id' => $user->id,
     ]);
 
-    shiftMcpAs($user, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+    shiftMcpAs($user, ['mcp:read', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
         'thread_id' => $all->id,
         'content' => '<blockquote class="shift-reply" data-reply-to="'.$team->id.'"><p>Team context.</p></blockquote>',
     ])->assertHasErrors(['Remove Team reply references']);
@@ -735,7 +709,7 @@ test('mcp write tools cannot edit another users thread comment', function () {
     ]);
     $task->internalCollaborators()->attach($other->id);
 
-    shiftMcpAs($other, ['mcp:use', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
+    shiftMcpAs($other, ['mcp:read', 'mcp:write'])->tool(EditTaskThreadCommentTool::class, [
         'thread_id' => $thread->id,
         'content' => '<p>Unauthorized edit.</p>',
     ])
@@ -878,25 +852,4 @@ test('list notifications omits task notifications for projects without mcp enabl
         ->assertSee($enabledNotificationId)
         ->assertDontSee($disabledNotificationId)
         ->assertDontSee('Disabled notification task');
-});
-
-test('configured mcp credentials do not authenticate tool calls without a request user', function () {
-    $user = User::factory()->create();
-    $project = Project::factory()->withAuthor($user->id)->create();
-    Task::factory()->create([
-        'project_id' => $project->id,
-        'title' => 'Task behind configured MCP credentials',
-    ]);
-
-    config([
-        'shift_mcp.auth_token' => $user->createToken('mcp-test', ['mcp:use'])->plainTextToken,
-        'shift_mcp.user_email' => $user->email,
-        'shift_mcp.project_token' => $project->token,
-    ]);
-
-    ShiftServer::tool(SearchTasksTool::class, [
-        'query' => 'configured MCP credentials',
-    ])
-        ->assertHasErrors(['authenticated user'])
-        ->assertDontSee('Task behind configured MCP credentials');
 });

@@ -27,7 +27,7 @@ class AddTaskThreadCommentTool extends Tool
 
     protected string $name = 'add_task_thread_comment';
 
-    protected string $description = 'Add an All or Team comment to a visible SHIFT task. Requires comment permission and the mcp:write token ability.';
+    protected string $description = 'Add an All or Team comment to a visible SHIFT task. Requires comment permission and the mcp:write OAuth scope.';
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -46,7 +46,7 @@ class AddTaskThreadCommentTool extends Tool
         }
 
         if (! $access->canWrite($principal)) {
-            return Response::error('This SHIFT MCP tool requires a token with the mcp:write ability.');
+            return Response::error('This SHIFT MCP tool requires the mcp:write OAuth scope.');
         }
 
         $task = $access->tasksFor($principal)

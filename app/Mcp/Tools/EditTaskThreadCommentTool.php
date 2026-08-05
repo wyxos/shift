@@ -23,7 +23,7 @@ class EditTaskThreadCommentTool extends Tool
 
     protected string $name = 'edit_task_thread_comment';
 
-    protected string $description = 'Edit a SHIFT task thread comment created by the authenticated MCP user. Requires the mcp:write token ability.';
+    protected string $description = 'Edit a SHIFT task thread comment created by the authenticated MCP user. Requires the mcp:write OAuth scope.';
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -40,7 +40,7 @@ class EditTaskThreadCommentTool extends Tool
         }
 
         if (! $access->canWrite($principal)) {
-            return Response::error('This SHIFT MCP tool requires a token with the mcp:write ability.');
+            return Response::error('This SHIFT MCP tool requires the mcp:write OAuth scope.');
         }
 
         $thread = TaskThread::query()

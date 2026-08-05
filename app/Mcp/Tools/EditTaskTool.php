@@ -26,7 +26,7 @@ class EditTaskTool extends Tool
 
     protected string $name = 'edit_task';
 
-    protected string $description = 'Partially edit a visible SHIFT task. Requires task-scope edit permission and the mcp:write token ability.';
+    protected string $description = 'Partially edit a visible SHIFT task. Requires task-scope edit permission and the mcp:write OAuth scope.';
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -47,7 +47,7 @@ class EditTaskTool extends Tool
         }
 
         if (! $access->canWrite($principal)) {
-            return Response::error('This SHIFT MCP tool requires a token with the mcp:write ability.');
+            return Response::error('This SHIFT MCP tool requires the mcp:write OAuth scope.');
         }
 
         $task = $access->tasksFor($principal)
