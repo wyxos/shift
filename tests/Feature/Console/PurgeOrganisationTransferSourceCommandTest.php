@@ -104,6 +104,18 @@ test('purge source deletes only the transferred tenant files and exclusive users
         'payload' => 'payload',
         'last_activity' => now()->timestamp,
     ]);
+    DB::table('activity_log')->insert([
+        'log_name' => 'task',
+        'description' => 'updated',
+        'subject_type' => Task::class,
+        'subject_id' => 999999,
+        'causer_type' => User::class,
+        'causer_id' => $exclusiveUser->id,
+        'properties' => '{}',
+        'event' => 'updated',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
     $oauthClientId = (string) Str::uuid();
     DB::table('oauth_clients')->insert([
         'id' => $oauthClientId,
@@ -160,6 +172,7 @@ test('purge source deletes only the transferred tenant files and exclusive users
         ->and(Storage::exists($tenantAttachment->path))->toBeFalse()
         ->and(User::query()->whereKey($exclusiveUser->id)->exists())->toBeFalse()
         ->and(DB::table('sessions')->where('user_id', $exclusiveUser->id)->exists())->toBeFalse()
+        ->and(DB::table('activity_log')->where('causer_id', $exclusiveUser->id)->exists())->toBeFalse()
         ->and(DB::table('oauth_clients')->where('id', $oauthClientId)->exists())->toBeFalse()
         ->and(DB::table('oauth_access_tokens')->where('id', 'exclusive-access-token')->exists())->toBeFalse()
         ->and(DB::table('oauth_refresh_tokens')->where('id', 'exclusive-refresh-token')->exists())->toBeFalse()

@@ -169,7 +169,6 @@ class OrganisationTransferPurger
             ['task_thread_mentions', 'user_id', null, null],
             ['tasks', 'submitter_id', 'submitter_type', User::class],
             ['task_threads', 'sender_id', 'sender_type', User::class],
-            ['activity_log', 'causer_id', 'causer_type', User::class],
         ];
         $preserved = [];
 
@@ -263,6 +262,13 @@ class OrganisationTransferPurger
             DB::table('notifications')
                 ->where('notifiable_type', User::class)
                 ->where('notifiable_id', $userId)
+                ->delete();
+        }
+
+        if (Schema::hasTable('activity_log')) {
+            DB::table('activity_log')
+                ->where('causer_type', User::class)
+                ->where('causer_id', $userId)
                 ->delete();
         }
 
