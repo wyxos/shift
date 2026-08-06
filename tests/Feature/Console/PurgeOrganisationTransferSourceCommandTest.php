@@ -46,6 +46,7 @@ test('purge source deletes only the transferred tenant files and exclusive users
     $exclusiveUser = User::factory()->create();
     $sharedUser = User::factory()->create();
     $personalUser = User::factory()->create();
+    $orphanUser = User::factory()->create();
     $organisation = Organisation::factory()->create(['author_id' => $exclusiveUser->id]);
     DB::table('organisation_users')->insert([
         'organisation_id' => $organisation->id,
@@ -116,6 +117,15 @@ test('purge source deletes only the transferred tenant files and exclusive users
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+    DB::table('notifications')->insert([
+        'id' => (string) Str::uuid(),
+        'type' => 'App\\Notifications\\TaskCreationNotification',
+        'notifiable_type' => User::class,
+        'notifiable_id' => $orphanUser->id,
+        'data' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
     $oauthClientId = (string) Str::uuid();
     DB::table('oauth_clients')->insert([
         'id' => $oauthClientId,
@@ -149,18 +159,20 @@ test('purge source deletes only the transferred tenant files and exclusive users
     ]);
 
     $purger = app(OrganisationTransferPurger::class);
-    $report = $purger->inspect($organisation, true);
+    $report = $purger->inspect($organisation, true, [$orphanUser->id]);
 
     expect($report['attachments'])->toBe([
         'count' => 2,
         'available_count' => 1,
         'missing_count' => 1,
-    ])->and($report['users']['delete_ids'])->toBe([$exclusiveUser->id])
+    ])->and($report['users']['delete_ids'])->toBe([$exclusiveUser->id, $orphanUser->id])
+        ->and($report['users']['additional_ids'])->toBe([$orphanUser->id])
         ->and($report['users']['preserved'])->toHaveKey($sharedUser->id);
 
     $this->artisan('shift:organisation-transfer:purge-source', [
         'organisation' => (string) $organisation->id,
         '--delete-users' => true,
+        '--delete-user' => [$orphanUser->id],
         '--confirm' => 'PURGE',
         '--expected-fingerprint' => $report['fingerprint'],
     ])->expectsOutputToContain('Purged organisation')->assertSuccessful();
@@ -171,6 +183,7 @@ test('purge source deletes only the transferred tenant files and exclusive users
         ->and(Attachment::query()->whereKey($missingAttachment->id)->exists())->toBeFalse()
         ->and(Storage::exists($tenantAttachment->path))->toBeFalse()
         ->and(User::query()->whereKey($exclusiveUser->id)->exists())->toBeFalse()
+        ->and(User::query()->whereKey($orphanUser->id)->exists())->toBeFalse()
         ->and(DB::table('sessions')->where('user_id', $exclusiveUser->id)->exists())->toBeFalse()
         ->and(DB::table('activity_log')->where('causer_id', $exclusiveUser->id)->exists())->toBeFalse()
         ->and(DB::table('oauth_clients')->where('id', $oauthClientId)->exists())->toBeFalse()

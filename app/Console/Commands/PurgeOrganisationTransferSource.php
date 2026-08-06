@@ -14,6 +14,7 @@ class PurgeOrganisationTransferSource extends Command
     protected $signature = 'shift:organisation-transfer:purge-source
         {organisation : Organisation ID or exact name}
         {--delete-users : Delete transferred users that have no remaining domain references}
+        {--delete-user=* : Additional orphan user ID to evaluate and delete with the transferred users}
         {--expected-fingerprint= : Exact fingerprint emitted by the reviewed dry run}
         {--confirm= : Must be PURGE to perform the deletion}';
 
@@ -25,7 +26,12 @@ class PurgeOrganisationTransferSource extends Command
         try {
             $organisation = $this->resolveOrganisation((string) $this->argument('organisation'));
             $deleteUsers = (bool) $this->option('delete-users');
-            $report = $purger->inspect($organisation, $deleteUsers);
+            $additionalUserIds = (array) $this->option('delete-user');
+            if (! $deleteUsers && $additionalUserIds !== []) {
+                throw new RuntimeException('--delete-user requires --delete-users.');
+            }
+
+            $report = $purger->inspect($organisation, $deleteUsers, $additionalUserIds);
             $this->displayReport($report);
 
             if ($this->option('confirm') !== 'PURGE') {
@@ -40,7 +46,7 @@ class PurgeOrganisationTransferSource extends Command
                 throw new RuntimeException('Purge refused. --expected-fingerprint must match a reviewed dry run.');
             }
 
-            $purger->purge($organisation, $deleteUsers, $expectedFingerprint);
+            $purger->purge($organisation, $deleteUsers, $expectedFingerprint, $additionalUserIds);
             $this->components->info("Purged organisation [{$organisation->name}] from this SHIFT installation.");
 
             return self::SUCCESS;
@@ -87,6 +93,9 @@ class PurgeOrganisationTransferSource extends Command
 
         $deleteIds = implode(', ', $report['users']['delete_ids']) ?: 'none';
         $this->line("Exclusive transferred user IDs to delete: {$deleteIds}");
+        if ($report['users']['additional_ids'] !== []) {
+            $this->line('Explicit additional user IDs in scope: '.implode(', ', $report['users']['additional_ids']));
+        }
         foreach ($report['users']['preserved'] as $userId => $references) {
             $this->line("User ID {$userId} will be preserved; remaining references: ".implode(', ', $references));
         }
