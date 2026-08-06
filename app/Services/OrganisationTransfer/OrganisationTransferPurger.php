@@ -20,12 +20,12 @@ class OrganisationTransferPurger
      *     organisation: array{id: int, name: string},
      *     tables: array<string, int>,
      *     attachments: array{count: int, available_count: int, missing_count: int},
-     *     users: array{requested: bool, candidate_ids: list<int>, delete_ids: list<int>, preserved: array<int, list<string>>},
+     *     users: array{requested: bool, candidate_ids: list<int>, additional_ids: list<int>, delete_ids: list<int>, preserved: array<int, list<string>>},
      *     row_ids: array<string, list<int>>,
      *     attachment_files: list<array{id: int, path: string, available: bool}>
      * }
      */
-    public function inspect(Organisation $organisation, bool $deleteUsers): array
+    public function inspect(Organisation $organisation, bool $deleteUsers, array $additionalUserIds = []): array
     {
         $selection = new OrganisationTransferSelection($organisation);
         $rowIds = [];
@@ -58,7 +58,13 @@ class OrganisationTransferPurger
             ->values()
             ->all();
 
-        $candidateUserIds = $selection->userIds();
+        $additionalUserIds = $this->normaliseAdditionalUserIds($additionalUserIds);
+        $candidateUserIds = collect($selection->userIds())
+            ->merge($additionalUserIds)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
         $preservedUsers = $deleteUsers
             ? $this->remainingDomainReferences($candidateUserIds, $rowIds)
             : [];
@@ -80,6 +86,7 @@ class OrganisationTransferPurger
             'users' => [
                 'requested' => $deleteUsers,
                 'candidate_ids' => $candidateUserIds,
+                'additional_ids' => $additionalUserIds,
                 'delete_ids' => $deleteUserIds,
                 'preserved' => $preservedUsers,
             ],
@@ -94,9 +101,13 @@ class OrganisationTransferPurger
     /**
      * @return array<string, mixed>
      */
-    public function purge(Organisation $organisation, bool $deleteUsers, string $expectedFingerprint): array
-    {
-        $report = $this->inspect($organisation, $deleteUsers);
+    public function purge(
+        Organisation $organisation,
+        bool $deleteUsers,
+        string $expectedFingerprint,
+        array $additionalUserIds = [],
+    ): array {
+        $report = $this->inspect($organisation, $deleteUsers, $additionalUserIds);
         if (! hash_equals($expectedFingerprint, $report['fingerprint'])) {
             throw new RuntimeException('Purge refused because the source scope changed after review. Run the dry run again and review its new fingerprint.');
         }
@@ -148,6 +159,40 @@ class OrganisationTransferPurger
         }
 
         return $report;
+    }
+
+    /**
+     * @param  array<int, mixed>  $userIds
+     * @return list<int>
+     */
+    private function normaliseAdditionalUserIds(array $userIds): array
+    {
+        $normalised = collect($userIds)
+            ->map(function (mixed $userId): int {
+                if ((! is_int($userId) && ! (is_string($userId) && ctype_digit($userId))) || (int) $userId < 1) {
+                    throw new RuntimeException('Every additional purge user must be a positive integer ID.');
+                }
+
+                return (int) $userId;
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($normalised !== []) {
+            $existing = DB::table('users')
+                ->whereIn('id', $normalised)
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+            $missing = array_diff($normalised, $existing);
+            if ($missing !== []) {
+                throw new RuntimeException('Additional purge user IDs were not found: '.implode(', ', $missing).'.');
+            }
+        }
+
+        return $normalised;
     }
 
     /**
