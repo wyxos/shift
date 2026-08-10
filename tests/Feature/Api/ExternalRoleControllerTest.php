@@ -262,6 +262,27 @@ test('external role index returns collaborator candidates with stored roles', fu
         ->assertJsonPath('users.0.role', ExternalUserRole::Owner->value);
 });
 
+test('external role index preserves a consumer resolver configuration message', function () {
+    Http::fake([
+        'https://consumer.test/shift/api/collaborators/external*' => Http::response([
+            'message' => 'SHIFT collaborator resolver is not configured for the production environment. '
+                .'Set shift.collaborators.resolver to an application resolver.',
+        ], 503),
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/external-roles?'.http_build_query([
+            'project' => $this->project->token,
+            'environment' => 'testing',
+        ]))
+        ->assertServiceUnavailable()
+        ->assertJsonPath(
+            'message',
+            'SHIFT collaborator resolver is not configured for the production environment. '
+            .'Set shift.collaborators.resolver to an application resolver.'
+        );
+});
+
 test('external role index forwards requested pagination and preserves callback totals', function () {
     Http::fake([
         'https://consumer.test/shift/api/collaborators/external*' => Http::response([
