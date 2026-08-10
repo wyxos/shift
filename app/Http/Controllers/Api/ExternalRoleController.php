@@ -12,6 +12,7 @@ use App\Services\ShiftPermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class ExternalRoleController extends Controller
 {
@@ -69,14 +70,18 @@ class ExternalRoleController extends Controller
         abort_unless($this->canManageExternalRoles($project, $request), 403);
 
         $environment = $this->environment($attributes);
-        $lookup = $this->externalUserService->searchCollaborators(
-            $project,
-            $environment,
-            $attributes['search'] ?? null,
-            (bool) ($attributes['paginate'] ?? false),
-            (int) ($attributes['page'] ?? 1),
-            (int) ($attributes['per_page'] ?? 15),
-        );
+        try {
+            $lookup = $this->externalUserService->searchCollaborators(
+                $project,
+                $environment,
+                $attributes['search'] ?? null,
+                (bool) ($attributes['paginate'] ?? false),
+                (int) ($attributes['page'] ?? 1),
+                (int) ($attributes['per_page'] ?? 15),
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 503);
+        }
 
         $payload = [
             'capabilities' => [
