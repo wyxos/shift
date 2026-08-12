@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
+use Symfony\Component\Mime\MimeTypes;
 
 class ExternalAttachmentController extends Controller
 {
@@ -486,7 +487,25 @@ class ExternalAttachmentController extends Controller
             return response()->json(['error' => 'Attachment not found'], 404);
         }
 
-        return Storage::response($attachment->path, $attachment->original_filename);
+        $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
+        $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
+
+        if ($isImage) {
+            $response = response()->file(
+                Storage::path($attachment->path),
+                ['Content-Type' => $this->getMimeType($extension)]
+            );
+
+            $response->setContentDisposition('inline', $attachment->original_filename);
+
+            return $response;
+        }
+
+        return response()->download(
+            Storage::path($attachment->path),
+            $attachment->original_filename,
+            ['Content-Type' => $this->getMimeType($extension)]
+        );
     }
 
     /**
@@ -516,23 +535,12 @@ class ExternalAttachmentController extends Controller
 
     /**
      * Get the MIME type for a file extension.
-     *
-     * @param  string  $extension
-     * @return string
      */
-    private function getMimeType($extension)
+    private function getMimeType(string $extension): string
     {
-        $mimeTypes = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'bmp' => 'image/bmp',
-            'svg' => 'image/svg+xml',
-            'webp' => 'image/webp',
-        ];
+        $mimeTypes = MimeTypes::getDefault()->getMimeTypes(strtolower($extension));
 
-        return $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+        return $mimeTypes[0] ?? 'application/octet-stream';
     }
 
     private function sanitizeUploadId(string $uploadId): ?string

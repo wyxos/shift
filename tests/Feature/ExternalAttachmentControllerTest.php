@@ -10,6 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 beforeEach(function () {
     // Create a fake disk for testing
@@ -409,9 +410,11 @@ test('download returns file for valid attachment', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.download', $this->attachment));
 
-    $response->assertStatus(200);
-    // Storage::response returns the file's actual MIME type
-    $response->assertHeader('Content-Type', 'application/pdf');
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf')
+        ->assertDownload('test-document.pdf');
+
+    expect($response->baseResponse)->toBeInstanceOf(BinaryFileResponse::class);
 });
 
 test('download returns error for missing file', function () {
@@ -440,8 +443,11 @@ test('download returns image inline for image files', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.download', $imageAttachment));
 
-    $response->assertStatus(200);
-    $response->assertHeader('Content-Type', 'image/jpeg');
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'image/jpeg')
+        ->assertHeader('Content-Disposition', 'inline; filename=test-image.jpg');
+
+    expect($response->baseResponse)->toBeInstanceOf(BinaryFileResponse::class);
 });
 
 test('external role-visible users can download task attachments', function () {
