@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Mime\MimeTypes;
 
 class ExternalAttachmentController extends Controller
@@ -443,7 +445,7 @@ class ExternalAttachmentController extends Controller
     /**
      * Download an attachment.
      *
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
+     * @return StreamedResponse|\Illuminate\Http\Response
      */
     public function download(Request $request, Attachment $attachment)
     {
@@ -490,22 +492,45 @@ class ExternalAttachmentController extends Controller
         $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
         $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
 
-        if ($isImage) {
-            $response = response()->file(
-                Storage::path($attachment->path),
-                ['Content-Type' => $this->getMimeType($extension)]
-            );
-
-            $response->setContentDisposition('inline', $attachment->original_filename);
-
-            return $response;
-        }
-
-        return response()->download(
-            Storage::path($attachment->path),
-            $attachment->original_filename,
-            ['Content-Type' => $this->getMimeType($extension)]
+        return $this->streamAttachment(
+            $attachment,
+            $this->getMimeType($extension),
+            $isImage ? 'inline' : 'attachment',
         );
+    }
+
+    private function streamAttachment(Attachment $attachment, string $mimeType, string $disposition): StreamedResponse
+    {
+        $path = Storage::path($attachment->path);
+        $fallbackName = str_replace(['%', '/', '\\'], '-', Str::ascii($attachment->original_filename));
+
+        return response()->stream(function () use ($path): void {
+            $stream = fopen($path, 'rb');
+
+            abort_if($stream === false, 404, 'File not found');
+
+            try {
+                while (! feof($stream)) {
+                    $chunk = fread($stream, 8192);
+
+                    if ($chunk === false) {
+                        break;
+                    }
+
+                    echo $chunk;
+                }
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => (string) Storage::size($attachment->path),
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                $disposition,
+                $attachment->original_filename,
+                $fallbackName !== '' ? $fallbackName : 'download',
+            ),
+        ]);
     }
 
     /**

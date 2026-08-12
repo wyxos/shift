@@ -10,7 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     // Create a fake disk for testing
@@ -412,9 +412,11 @@ test('download returns file for valid attachment', function () {
 
     $response->assertOk()
         ->assertHeader('Content-Type', 'application/pdf')
+        ->assertHeader('Content-Length', (string) strlen('test content'))
         ->assertDownload('test-document.pdf');
 
-    expect($response->baseResponse)->toBeInstanceOf(BinaryFileResponse::class);
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe('test content');
 });
 
 test('download returns error for missing file', function () {
@@ -445,9 +447,11 @@ test('download returns image inline for image files', function () {
 
     $response->assertOk()
         ->assertHeader('Content-Type', 'image/jpeg')
+        ->assertHeader('Content-Length', (string) strlen('fake image content'))
         ->assertHeader('Content-Disposition', 'inline; filename=test-image.jpg');
 
-    expect($response->baseResponse)->toBeInstanceOf(BinaryFileResponse::class);
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe('fake image content');
 });
 
 test('external role-visible users can download task attachments', function () {
