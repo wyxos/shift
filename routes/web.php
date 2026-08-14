@@ -14,6 +14,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEmailImportController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Support\LaravelIssueReportingDemo;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -91,7 +92,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // tasks
     Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
-    Route::get('app-errors', [TaskController::class, 'appErrors'])->name('app-errors.index');
+    Route::get('error-reports', [TaskController::class, 'appErrors'])->name('app-errors.index');
+    Route::get('app-errors', fn (Request $request) => redirect()->route('app-errors.index', $request->query()))
+        ->name('app-errors.legacy');
     Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements.index');
     Route::get('tasks/create', fn () => redirect()->route('tasks.index'))->name('tasks.create');
     Route::get('tasks/{task}/edit', fn ($task) => redirect()->route('tasks.index', ['task' => $task]))->name('tasks.edit');

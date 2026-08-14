@@ -86,7 +86,7 @@ describe('Tasks/Index.vue', () => {
 
     it('auto-opens an app error sheet and occurrences from the dedicated deep link', async () => {
         axiosGetMock.mockReset();
-        window.history.replaceState({}, '', '/app-errors?task=1');
+        window.history.replaceState({}, '', '/error-reports?task=1');
 
         axiosGetMock
             .mockResolvedValueOnce({

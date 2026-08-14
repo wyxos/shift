@@ -37,9 +37,10 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     }
 
     function indexPath() {
-        const surfacePath = options.surface ?? 'tasks';
+        const organisationScoped = isScopedOrganisationRoute();
+        const surfacePath = options.surface === 'app-errors' && !organisationScoped ? 'error-reports' : (options.surface ?? 'tasks');
 
-        return isScopedOrganisationRoute() ? `/organisation/${providedOrganisationId}/${surfacePath}` : `/${surfacePath}`;
+        return organisationScoped ? `/organisation/${providedOrganisationId}/${surfacePath}` : `/${surfacePath}`;
     }
 
     function buildListQuery(page: number) {

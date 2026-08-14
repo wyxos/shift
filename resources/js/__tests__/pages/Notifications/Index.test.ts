@@ -248,7 +248,7 @@ describe('Notifications/Index.vue', () => {
                 case 'tasks.index':
                     return `/tasks?task=${params?.task}`;
                 case 'app-errors.index':
-                    return `/app-errors?task=${params?.task}`;
+                    return `/error-reports?task=${params?.task}`;
                 case 'organisation.projects':
                     return `/organisation/${params?.organisation}/projects`;
                 default:
@@ -286,7 +286,7 @@ describe('Notifications/Index.vue', () => {
             }),
         ]);
 
-        expect(wrapper.get('a[href="/app-errors?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
         expect(wrapper.text()).toContain('App error reported in project: Portal Refresh');
     });
 
