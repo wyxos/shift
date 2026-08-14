@@ -27,7 +27,7 @@ const props = withDefaults(
 
 const indexHref = computed(() => {
     const organisationId = props.filters.organisation_id;
-    const surfacePath = props.surface;
+    const surfacePath = props.surface === 'app-errors' && !organisationId ? 'error-reports' : props.surface;
 
     return organisationId ? `/organisation/${organisationId}/${surfacePath}` : `/${surfacePath}`;
 });

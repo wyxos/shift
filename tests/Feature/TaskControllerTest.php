@@ -93,6 +93,20 @@ test('tasks and app errors use dedicated list surfaces', function () {
         );
 });
 
+test('global app error links use the server-safe route and preserve legacy URLs', function () {
+    expect(route('app-errors.index'))->toBe(url('/error-reports'));
+
+    $this->actingAs($this->user)
+        ->get(route('app-errors.legacy', [
+            'status' => ['pending'],
+            'task' => 72,
+        ]))
+        ->assertRedirect(route('app-errors.index', [
+            'status' => ['pending'],
+            'task' => 72,
+        ]));
+});
+
 test('legacy app error task filters redirect to the dedicated surface with the remaining query intact', function () {
     $response = $this->actingAs($this->user)->get(route('tasks.index', [
         'type' => 'app_errors',

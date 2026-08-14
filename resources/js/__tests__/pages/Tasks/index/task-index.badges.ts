@@ -125,7 +125,7 @@ describe('Tasks/Index.vue', () => {
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(router.get).toHaveBeenCalledWith(
-            '/app-errors',
+            '/error-reports',
             expect.objectContaining({
                 search: 'Checkout',
                 page: 1,

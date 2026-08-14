@@ -194,7 +194,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Northwind Studio');
         expect(wrapper.text()).toContain('shared');
         expect(wrapper.find('a[href="/requirements"]').exists()).toBe(true);
-        expect(wrapper.find('a[href="/app-errors"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/error-reports"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);
     });
@@ -214,11 +214,11 @@ describe('AppSidebar', () => {
     });
 
     it('keeps root task and app error active states distinct', () => {
-        mockPage.url = '/app-errors?task=72';
+        mockPage.url = '/error-reports?task=72';
         const wrapper = mountSidebar();
 
         const tasksLink = wrapper.get('a[href="/tasks"]');
-        const appErrorsLink = wrapper.get('a[href="/app-errors"]');
+        const appErrorsLink = wrapper.get('a[href="/error-reports"]');
 
         expect(tasksLink.element.parentElement?.getAttribute('data-active')).toBe('false');
         expect(appErrorsLink.element.parentElement?.getAttribute('data-active')).toBe('true');

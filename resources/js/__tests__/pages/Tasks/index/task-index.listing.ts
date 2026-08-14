@@ -219,7 +219,7 @@ describe('Tasks/Index.vue', () => {
         await nextButton!.trigger('click');
 
         expect(router.get).toHaveBeenCalledWith(
-            '/app-errors',
+            '/error-reports',
             expect.objectContaining({
                 status: ['pending'],
                 priority: ['high'],

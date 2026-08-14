@@ -40,7 +40,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'App errors',
-        href: '/app-errors',
+        href: '/error-reports',
         icon: Bug,
     },
     {
