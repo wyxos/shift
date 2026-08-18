@@ -372,13 +372,17 @@ test('show temp serves an owned API attachment', function () {
         ])
         ->assertOk();
 
-    $this->withHeader('Authorization', 'Bearer '.$this->token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->get(route('api.attachments.temp', [
             'temp' => $this->tempIdentifier,
             'filename' => basename($uploadResponse->json('path')),
         ]))
         ->assertOk()
-        ->assertHeader('Content-Type', 'image/png');
+        ->assertHeader('Content-Type', 'image/png')
+        ->assertHeader('Content-Length', (string) Storage::size($uploadResponse->json('path')));
+
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe(Storage::get($uploadResponse->json('path')));
 });
 
 test('show temp rejects traversal without serving private storage files', function () {
