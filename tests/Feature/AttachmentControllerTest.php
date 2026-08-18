@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     // Create a fake disk for testing
@@ -568,8 +569,54 @@ test('show temp serves image inline', function () {
     $response = $this->actingAs($this->user)
         ->get($uploadResponse->json('url'));
 
-    $response->assertStatus(200);
-    $response->assertHeader('Content-Type', 'image/png');
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'image/png')
+        ->assertHeader('Content-Length', (string) Storage::size($uploadResponse->json('path')));
+
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe(Storage::get($uploadResponse->json('path')));
+});
+
+test('download streams files without using a binary file response', function () {
+    $attachment = Attachment::create([
+        'attachable_id' => $this->task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'document.pdf',
+        'path' => "attachments/{$this->task->id}/document.pdf",
+    ]);
+    Storage::put($attachment->path, 'document content');
+
+    $response = $this->actingAs($this->user)
+        ->get(route('attachments.download', $attachment));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf')
+        ->assertHeader('Content-Length', (string) strlen('document content'))
+        ->assertDownload('document.pdf');
+
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe('document content');
+});
+
+test('download streams images inline without using a binary file response', function () {
+    $attachment = Attachment::create([
+        'attachable_id' => $this->task->id,
+        'attachable_type' => Task::class,
+        'original_filename' => 'image.png',
+        'path' => "attachments/{$this->task->id}/image.png",
+    ]);
+    Storage::put($attachment->path, 'image content');
+
+    $response = $this->actingAs($this->user)
+        ->get(route('attachments.download', $attachment));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'image/png')
+        ->assertHeader('Content-Length', (string) strlen('image content'))
+        ->assertHeader('Content-Disposition', 'inline; filename=image.png');
+
+    expect($response->baseResponse)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->streamedContent())->toBe('image content');
 });
 
 test('show temp returns 404 for missing file', function () {

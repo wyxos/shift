@@ -5,18 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Services\AttachmentResponseFactory;
 use App\Services\ShiftPermissionService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
+use Symfony\Component\Mime\MimeTypes;
 
 class AttachmentController extends Controller
 {
     public function __construct(
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
         private readonly ShiftPermissionService $permissions,
+        private readonly AttachmentResponseFactory $attachmentResponses,
     ) {}
 
     private function ensureTaskVisible(Task $task): void
@@ -369,10 +372,7 @@ class AttachmentController extends Controller
         $extension = pathinfo($filename, PATHINFO_EXTENSION);
         $mime = $this->getMimeType($extension);
 
-        return response()->file(
-            Storage::path($path),
-            ['Content-Type' => $mime]
-        );
+        return $this->attachmentResponses->preview($path, $mime);
     }
 
     /**
@@ -503,8 +503,6 @@ class AttachmentController extends Controller
 
     /**
      * Download an attachment.
-     *
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\Response
      */
     public function downloadAttachment(Attachment $attachment)
     {
@@ -521,20 +519,21 @@ class AttachmentController extends Controller
         // Check if the file is an image
         $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
         $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
+        $mimeType = $this->getMimeType($extension);
 
         if ($isImage) {
-            // For images, return an inline response
-            return response()->file(
-                Storage::path($attachment->path),
-                ['Content-Type' => $this->getMimeType($extension)]
-            );
-        } else {
-            // For non-images, return a download response
-            return response()->download(
-                Storage::path($attachment->path),
-                $attachment->original_filename
+            return $this->attachmentResponses->inline(
+                $attachment->path,
+                $attachment->original_filename,
+                $mimeType,
             );
         }
+
+        return $this->attachmentResponses->download(
+            $attachment->path,
+            $attachment->original_filename,
+            $mimeType,
+        );
     }
 
     private function getTaskFromAttachment(Attachment $attachment): ?Task
@@ -562,22 +561,11 @@ class AttachmentController extends Controller
 
     /**
      * Get the MIME type for a file extension.
-     *
-     * @param  string  $extension
-     * @return string
      */
-    private function getMimeType($extension)
+    private function getMimeType(string $extension): string
     {
-        $mimeTypes = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'bmp' => 'image/bmp',
-            'svg' => 'image/svg+xml',
-            'webp' => 'image/webp',
-        ];
+        $mimeTypes = MimeTypes::getDefault()->getMimeTypes(strtolower($extension));
 
-        return $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+        return $mimeTypes[0] ?? 'application/octet-stream';
     }
 }

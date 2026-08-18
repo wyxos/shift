@@ -8,6 +8,7 @@ use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Services\AttachmentResponseFactory;
 use App\Services\ExternalUserService;
 use App\Services\TaskThreadAudienceService;
 use App\Services\TemporaryAttachmentStorage;
@@ -15,8 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Shift\Core\ChunkedUploadConfig;
-use Symfony\Component\HttpFoundation\HeaderUtils;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Mime\MimeTypes;
 
 class ExternalAttachmentController extends Controller
@@ -25,6 +24,7 @@ class ExternalAttachmentController extends Controller
         private readonly ExternalUserService $externalUserService,
         private readonly TaskThreadAudienceService $threadAudiences,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
+        private readonly AttachmentResponseFactory $attachmentResponses,
     ) {}
 
     private function resolveProjectFromRequest(): ?Project
@@ -436,16 +436,11 @@ class ExternalAttachmentController extends Controller
         $extension = pathinfo($filename, PATHINFO_EXTENSION);
         $mime = $this->getMimeType($extension);
 
-        return response()->file(
-            Storage::path($path),
-            ['Content-Type' => $mime]
-        );
+        return $this->attachmentResponses->preview($path, $mime);
     }
 
     /**
      * Download an attachment.
-     *
-     * @return StreamedResponse|\Illuminate\Http\Response
      */
     public function download(Request $request, Attachment $attachment)
     {
@@ -492,45 +487,21 @@ class ExternalAttachmentController extends Controller
         $extension = pathinfo($attachment->original_filename, PATHINFO_EXTENSION);
         $isImage = in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']);
 
-        return $this->streamAttachment(
-            $attachment,
-            $this->getMimeType($extension),
-            $isImage ? 'inline' : 'attachment',
-        );
-    }
+        $mimeType = $this->getMimeType($extension);
 
-    private function streamAttachment(Attachment $attachment, string $mimeType, string $disposition): StreamedResponse
-    {
-        $path = Storage::path($attachment->path);
-        $fallbackName = str_replace(['%', '/', '\\'], '-', Str::ascii($attachment->original_filename));
-
-        return response()->stream(function () use ($path): void {
-            $stream = fopen($path, 'rb');
-
-            abort_if($stream === false, 404, 'File not found');
-
-            try {
-                while (! feof($stream)) {
-                    $chunk = fread($stream, 8192);
-
-                    if ($chunk === false) {
-                        break;
-                    }
-
-                    echo $chunk;
-                }
-            } finally {
-                fclose($stream);
-            }
-        }, 200, [
-            'Content-Type' => $mimeType,
-            'Content-Length' => (string) Storage::size($attachment->path),
-            'Content-Disposition' => HeaderUtils::makeDisposition(
-                $disposition,
+        if ($isImage) {
+            return $this->attachmentResponses->inline(
+                $attachment->path,
                 $attachment->original_filename,
-                $fallbackName !== '' ? $fallbackName : 'download',
-            ),
-        ]);
+                $mimeType,
+            );
+        }
+
+        return $this->attachmentResponses->download(
+            $attachment->path,
+            $attachment->original_filename,
+            $mimeType,
+        );
     }
 
     /**
