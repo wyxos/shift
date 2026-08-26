@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -18,6 +19,42 @@ it('redirects legacy create route to the tasks list', function () {
     visit('/tasks/create')
         ->assertPathIs('/tasks')
         ->assertSee('Tasks');
+});
+
+it('lets a task manager remove an external submitter from follow up collaborators', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withAuthor($user->id)->create();
+    $externalSubmitter = ExternalUser::factory()->create([
+        'project_id' => $project->id,
+        'name' => 'External Submitter',
+        'email' => 'external-submitter@example.com',
+    ]);
+    $project->environments()->create([
+        'environment' => $externalSubmitter->environment,
+        'url' => $externalSubmitter->url,
+    ]);
+    $task = Task::factory()->for($project)->create([
+        'title' => 'Submitter follow up preference',
+    ]);
+    $task->submitter()->associate($externalSubmitter)->save();
+    $task->externalCollaborators()->attach($externalSubmitter->id);
+
+    $this->actingAs($user);
+
+    visit("/tasks?task={$task->id}")
+        ->assertNoSmoke()
+        ->assertSee('External Submitter')
+        ->assertPresent('[aria-label="Remove External Submitter"]')
+        ->click('[aria-label="Remove External Submitter"]')
+        ->waitForText('Task changes saved')
+        ->assertNotPresent('[aria-label="Remove External Submitter"]')
+        ->assertNoSmoke();
+
+    expect($task->refresh()->submitter_id)->toBe($externalSubmitter->id);
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $externalSubmitter->id,
+    ]);
 });
 
 it('renders email import independently from editor rewriting', function () {

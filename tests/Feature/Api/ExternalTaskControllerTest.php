@@ -540,6 +540,15 @@ test('show returns 404 for task in different project', function () {
 });
 
 test('store creates new task', function () {
+    $sameUserInAnotherEnvironment = ExternalUser::create([
+        'external_id' => $this->externalUser->external_id,
+        'name' => $this->externalUser->name,
+        'email' => $this->externalUser->email,
+        'environment' => 'production',
+        'url' => 'https://production.example.com',
+        'project_id' => $this->project->id,
+    ]);
+
     $taskData = [
         'title' => 'New External Task',
         'description' => 'Task created via API',
@@ -575,6 +584,49 @@ test('store creates new task', function () {
     $this->assertDatabaseHas('task_metadata', [
         'url' => 'https://example.com/task/new',
         'environment' => 'testing',
+    ]);
+
+    $task = Task::query()->where('title', 'New External Task')->firstOrFail();
+
+    $response
+        ->assertJsonPath('external_collaborators.0.id', $this->externalUser->external_id)
+        ->assertJsonPath('external_collaborators.0.email', $this->externalUser->email);
+
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $this->externalUser->id,
+        'kind' => 'external',
+    ]);
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $sameUserInAnotherEnvironment->id,
+    ]);
+});
+
+test('store respects a submitter opting out before task creation', function () {
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/tasks', [
+            'title' => 'No submitter follow ups',
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'metadata' => [
+                'url' => 'https://example.com/task/new',
+                'environment' => 'testing',
+            ],
+            'external_collaborators' => [],
+            'include_submitter_as_collaborator' => false,
+        ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('submitter.email', $this->externalUser->email)
+        ->assertJsonCount(0, 'external_collaborators');
+
+    $task = Task::query()->where('title', 'No submitter follow ups')->firstOrFail();
+
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $this->externalUser->id,
     ]);
 });
 
@@ -1440,6 +1492,43 @@ test('external submitter can explicitly remain a collaborator without self notif
         'kind' => 'external',
         'external_user_id' => $this->externalUser->id,
     ]);
+});
+
+test('external submitter can remove their default collaboration to opt out of follow ups', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $task = Task::factory()->create([
+        'project_id' => $this->project->id,
+        'title' => 'External submitter opt out',
+    ]);
+    $task->submitter()->associate($this->externalUser)->save();
+    $task->externalCollaborators()->attach($this->externalUser->id);
+    $task->metadata()->create([
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->patchJson("/api/tasks/{$task->id}/collaborators", [
+            'project' => $this->project->token,
+            'user' => $this->externalUserData,
+            'environment' => 'testing',
+            'internal_collaborator_ids' => [],
+            'external_collaborators' => [],
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonCount(0, 'external_collaborators')
+        ->assertJsonPath('submitter.email', $this->externalUser->email)
+        ->assertJsonPath('can_manage_collaborators', true);
+
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $this->externalUser->id,
+    ]);
+
+    \Illuminate\Support\Facades\Queue::assertNothingPushed();
 });
 
 test('non submitter external collaborator cannot update collaborators', function () {

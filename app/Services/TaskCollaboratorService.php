@@ -117,6 +117,23 @@ class TaskCollaboratorService
         ];
     }
 
+    public function initialize(
+        Task $task,
+        array $internalUserIds = [],
+        iterable $externalUsers = [],
+        bool $includeSubmitter = true,
+    ): array {
+        $task->loadMissing('submitter');
+
+        $initialExternalUsers = collect($externalUsers);
+
+        if ($includeSubmitter && $task->submitter instanceof ExternalUser) {
+            $initialExternalUsers->push($task->submitter);
+        }
+
+        return $this->syncWithResult($task, $internalUserIds, $initialExternalUsers);
+    }
+
     public function add(Task $task, array $internalUserIds = [], iterable $externalUsers = []): void
     {
         [$internalIds, $externalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
@@ -227,16 +244,8 @@ class TaskCollaboratorService
 
     public function externalReplyAudience(Task $task, ?int $excludingExternalUserId = null): Collection
     {
-        $task->loadMissing('submitter');
-
-        $externalUsers = $task->externalCollaborators()->get();
-
-        if ($task->submitter instanceof ExternalUser) {
-            $externalUsers->push($task->submitter);
-        }
-
-        return $externalUsers
-            ->unique('id')
+        return $task->externalCollaborators()
+            ->get()
             ->reject(fn (ExternalUser $collaborator) => $collaborator->id === $excludingExternalUserId)
             ->values();
     }
@@ -274,6 +283,9 @@ class TaskCollaboratorService
                 TaskCollaborator::query()->insert($records);
             }
         });
+
+        $task->unsetRelation('internalCollaborators');
+        $task->unsetRelation('externalCollaborators');
     }
 
     private function normalizedSelection(Task $task, array $internalUserIds, iterable $externalUsers): array

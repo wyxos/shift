@@ -90,16 +90,8 @@ test('external replies from an external collaborator notify only the other task 
         ->toBe([$this->externalCollaborator->id]);
 });
 
-test('client-visible replies notify the external submitter through the environment used to submit the task', function () {
+test('client-visible replies do not notify an external submitter after they leave the collaborator list', function () {
     $this->task->externalCollaborators()->detach($this->externalSender->id);
-
-    $sameUserInAnotherEnvironment = ExternalUser::factory()->create([
-        'project_id' => $this->project->id,
-        'external_id' => $this->externalSender->external_id,
-        'environment' => 'production',
-        'url' => 'https://production.example.com',
-        'email' => $this->externalSender->email,
-    ]);
 
     $thread = new TaskThread([
         'task_id' => $this->task->id,
@@ -116,22 +108,17 @@ test('client-visible replies notify the external submitter through the environme
         ->externalReplyAudience($this->task)
         ->pluck('id')
         ->all())
-        ->toBe([$this->externalCollaborator->id, $this->externalSender->id])
-        ->not->toContain($sameUserInAnotherEnvironment->id);
+        ->toBe([$this->externalCollaborator->id]);
 
-    Queue::assertPushed(SendTaskThreadNotification::class, 2);
-    Queue::assertPushed(
+    Queue::assertPushed(SendTaskThreadNotification::class, 1);
+    Queue::assertNotPushed(
         SendTaskThreadNotification::class,
         function (SendTaskThreadNotification $job): bool {
             $externalUserData = (function (): array {
                 return $this->externalUserData;
             })->call($job);
 
-            return $externalUserData === [
-                'url' => $this->externalSender->url,
-                'email' => $this->externalSender->email,
-                'external_id' => $this->externalSender->external_id,
-            ];
+            return $externalUserData['external_id'] === $this->externalSender->external_id;
         },
     );
 });

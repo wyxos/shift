@@ -497,26 +497,6 @@ class TaskController extends Controller
 
     private function serializeCollaborators(Task $task): array
     {
-        $externalCollaborators = $task->externalCollaborators
-            ->map(fn (ExternalUser $user) => [
-                'id' => $user->external_id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ]);
-
-        if ($task->submitter instanceof ExternalUser) {
-            $submitterAlreadyListed = $externalCollaborators
-                ->contains(fn (array $collaborator) => (string) $collaborator['id'] === (string) $task->submitter->external_id);
-
-            if (! $submitterAlreadyListed) {
-                $externalCollaborators->prepend([
-                    'id' => $task->submitter->external_id,
-                    'name' => $task->submitter->name,
-                    'email' => $task->submitter->email,
-                ]);
-            }
-        }
-
         return [
             'internal_collaborators' => $task->internalCollaborators
                 ->map(fn (User $user) => [
@@ -526,7 +506,12 @@ class TaskController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'external_collaborators' => $externalCollaborators
+            'external_collaborators' => $task->externalCollaborators
+                ->map(fn (ExternalUser $user) => [
+                    'id' => $user->external_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
                 ->values()
                 ->all(),
         ];
