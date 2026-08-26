@@ -90,6 +90,52 @@ test('external replies from an external collaborator notify only the other task 
         ->toBe([$this->externalCollaborator->id]);
 });
 
+test('client-visible replies notify the external submitter through the environment used to submit the task', function () {
+    $this->task->externalCollaborators()->detach($this->externalSender->id);
+
+    $sameUserInAnotherEnvironment = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
+        'external_id' => $this->externalSender->external_id,
+        'environment' => 'production',
+        'url' => 'https://production.example.com',
+        'email' => $this->externalSender->email,
+    ]);
+
+    $thread = new TaskThread([
+        'task_id' => $this->task->id,
+        'type' => 'external',
+        'content' => 'Internal collaborator external reply',
+        'sender_name' => $this->internalSender->name,
+    ]);
+    $thread->sender()->associate($this->internalSender);
+    $thread->save();
+
+    app(TaskThreadNotificationService::class)->send($this->task, $thread);
+
+    expect(app(TaskCollaboratorService::class)
+        ->externalReplyAudience($this->task)
+        ->pluck('id')
+        ->all())
+        ->toBe([$this->externalCollaborator->id, $this->externalSender->id])
+        ->not->toContain($sameUserInAnotherEnvironment->id);
+
+    Queue::assertPushed(SendTaskThreadNotification::class, 2);
+    Queue::assertPushed(
+        SendTaskThreadNotification::class,
+        function (SendTaskThreadNotification $job): bool {
+            $externalUserData = (function (): array {
+                return $this->externalUserData;
+            })->call($job);
+
+            return $externalUserData === [
+                'url' => $this->externalSender->url,
+                'email' => $this->externalSender->email,
+                'external_id' => $this->externalSender->external_id,
+            ];
+        },
+    );
+});
+
 test('internal replies notify only internal task collaborators except the author', function () {
     $thread = new TaskThread([
         'task_id' => $this->task->id,
