@@ -117,6 +117,7 @@ class ExternalRequirementController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'include_submitter_as_collaborator' => 'sometimes|boolean',
             'items' => 'required|array|min:1|max:50',
             'items.*.title' => 'required|string|max:255',
             'items.*.description' => 'required|string',
@@ -127,6 +128,7 @@ class ExternalRequirementController extends Controller
             'items.*.external_collaborators.*.id' => 'required',
             'items.*.external_collaborators.*.name' => 'required|string|max:255',
             'items.*.external_collaborators.*.email' => 'required|email',
+            'items.*.include_submitter_as_collaborator' => 'sometimes|boolean',
         ]);
 
         $project = Project::query()
@@ -176,7 +178,13 @@ class ExternalRequirementController extends Controller
                     'submitted_description' => $description,
                 ]);
 
-                $this->syncCollaborators($task, $project, $this->collaboratorAttributesForItem($attributes, $item), $environment);
+                $this->syncCollaborators(
+                    $task,
+                    $project,
+                    $this->collaboratorAttributesForItem($attributes, $item),
+                    $environment,
+                    initialize: true,
+                );
                 $this->persistTempAttachments($task, $item['temp_identifier'] ?? null, $userId);
 
                 if (! empty($item['temp_identifier'])) {
@@ -217,11 +225,19 @@ class ExternalRequirementController extends Controller
         return [
             'internal_collaborator_ids' => $item['internal_collaborator_ids'] ?? $batchAttributes['internal_collaborator_ids'] ?? [],
             'external_collaborators' => $item['external_collaborators'] ?? $batchAttributes['external_collaborators'] ?? [],
+            'include_submitter_as_collaborator' => $item['include_submitter_as_collaborator']
+                ?? $batchAttributes['include_submitter_as_collaborator']
+                ?? true,
         ];
     }
 
-    private function syncCollaborators(Task $task, Project $project, array $attributes, ?string $environment): void
-    {
+    private function syncCollaborators(
+        Task $task,
+        Project $project,
+        array $attributes,
+        ?string $environment,
+        bool $initialize = false,
+    ): void {
         $internalIds = $this->taskCollaboratorService->validateInternalCollaboratorIds(
             $project,
             $attributes['internal_collaborator_ids'] ?? [],
@@ -237,6 +253,17 @@ class ExternalRequirementController extends Controller
             throw ValidationException::withMessages([
                 'external_collaborators' => $exception->getMessage(),
             ]);
+        }
+
+        if ($initialize) {
+            $this->taskCollaboratorService->initialize(
+                $task,
+                $internalIds,
+                $externalUsers,
+                (bool) ($attributes['include_submitter_as_collaborator'] ?? true),
+            );
+
+            return;
         }
 
         $this->taskCollaboratorService->sync($task, $internalIds, $externalUsers);

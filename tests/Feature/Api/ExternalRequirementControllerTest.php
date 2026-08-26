@@ -134,7 +134,49 @@ test('permitted external roles can create a requirement batch with multiple task
             'source' => 'embedded_requirement_pack',
             'intake_type' => 'requirement',
         ]);
+
+        $this->assertDatabaseHas('task_collaborators', [
+            'task_id' => $item['id'],
+            'external_user_id' => $externalUser->id,
+            'kind' => 'external',
+        ]);
     }
+});
+
+test('requirement submitter can opt out of follow ups before submitting a batch', function () {
+    $externalUser = ($this->createRoleExternalUser)('client-opt-out', 'client_developer', [
+        'name' => 'Opted Out Client',
+        'email' => 'opted-out@example.com',
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/requirements/batches', [
+            'project' => $this->project->token,
+            'title' => 'No follow ups',
+            'user' => ($this->externalPayload)($externalUser),
+            'metadata' => [
+                'environment' => 'testing',
+                'url' => 'https://example.com/portal',
+            ],
+            'include_submitter_as_collaborator' => false,
+            'items' => [
+                [
+                    'title' => 'Quiet requirement',
+                    'description' => 'A teammate will follow this up.',
+                ],
+            ],
+        ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonCount(1, 'items');
+
+    $requirement = Task::query()->where('title', 'Quiet requirement')->firstOrFail();
+
+    $this->assertDatabaseMissing('task_collaborators', [
+        'task_id' => $requirement->id,
+        'external_user_id' => $externalUser->id,
+    ]);
 });
 
 test('requirement batch submission syncs collaborators and rich editor temp attachments', function () {
@@ -243,6 +285,11 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
         'kind' => 'external',
     ]);
     $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $globalRequirement->id,
+        'external_user_id' => $externalUser->id,
+        'kind' => 'external',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $itemRequirement->id,
         'user_id' => $itemInternalCollaborator->id,
         'kind' => 'internal',
@@ -250,6 +297,11 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $itemRequirement->id,
         'external_user_id' => $itemExternalCollaborator->id,
+        'kind' => 'external',
+    ]);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $itemRequirement->id,
+        'external_user_id' => $externalUser->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseMissing('task_collaborators', [
@@ -515,6 +567,7 @@ test('normal external task index excludes requirement phase items', function () 
         'status' => 'pending',
     ]);
     $requirement->submitter()->associate($externalUser)->save();
+    $requirement->externalCollaborators()->attach($externalUser->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -559,6 +612,7 @@ test('external submitter can open a requirement item through the task detail end
         'status' => 'pending',
     ]);
     $requirement->submitter()->associate($externalUser)->save();
+    $requirement->externalCollaborators()->attach($externalUser->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',

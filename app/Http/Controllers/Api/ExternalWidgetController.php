@@ -11,6 +11,7 @@ use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
+use App\Services\TaskCollaboratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class ExternalWidgetController extends Controller
     public function __construct(
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
+        private readonly TaskCollaboratorService $taskCollaboratorService,
     ) {}
 
     public function config(Request $request): JsonResponse
@@ -120,6 +122,7 @@ class ExternalWidgetController extends Controller
 
         if ($submitter instanceof ExternalUser) {
             $task->submitter()->associate($submitter)->save();
+            $this->taskCollaboratorService->initialize($task);
         }
 
         $task->metadata()->create([

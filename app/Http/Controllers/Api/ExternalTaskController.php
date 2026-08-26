@@ -130,8 +130,13 @@ class ExternalTaskController extends Controller
         );
     }
 
-    private function syncCollaborators(Task $task, Project $project, array $attributes, ?string $environment): array
-    {
+    private function syncCollaborators(
+        Task $task,
+        Project $project,
+        array $attributes,
+        ?string $environment,
+        bool $initialize = false,
+    ): array {
         $internalIds = $this->taskCollaboratorService->validateInternalCollaboratorIds(
             $project,
             $attributes['internal_collaborator_ids'] ?? [],
@@ -145,31 +150,18 @@ class ExternalTaskController extends Controller
             ]);
         }
 
-        return $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalUsers);
+        return $initialize
+            ? $this->taskCollaboratorService->initialize(
+                $task,
+                $internalIds,
+                $externalUsers,
+                (bool) ($attributes['include_submitter_as_collaborator'] ?? true),
+            )
+            : $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalUsers);
     }
 
     private function serializeCollaborators(Task $task): array
     {
-        $externalCollaborators = $task->externalCollaborators
-            ->map(fn (ExternalUser $user) => [
-                'id' => $user->external_id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ]);
-
-        if ($task->submitter instanceof ExternalUser) {
-            $submitterAlreadyListed = $externalCollaborators
-                ->contains(fn (array $collaborator) => (string) $collaborator['id'] === (string) $task->submitter->external_id);
-
-            if (! $submitterAlreadyListed) {
-                $externalCollaborators->prepend([
-                    'id' => $task->submitter->external_id,
-                    'name' => $task->submitter->name,
-                    'email' => $task->submitter->email,
-                ]);
-            }
-        }
-
         return [
             'internal_collaborators' => $task->internalCollaborators
                 ->map(fn (\App\Models\User $user) => [
@@ -179,7 +171,12 @@ class ExternalTaskController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'external_collaborators' => $externalCollaborators
+            'external_collaborators' => $task->externalCollaborators
+                ->map(fn (ExternalUser $user) => [
+                    'id' => $user->external_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
                 ->values()
                 ->all(),
         ];
@@ -433,6 +430,7 @@ class ExternalTaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'include_submitter_as_collaborator' => 'sometimes|boolean',
         ]);
 
         if (isset($attributes['description'])) {
@@ -477,7 +475,7 @@ class ExternalTaskController extends Controller
             $this->syncTaskEnvironment($task, $selectedEnvironment, $environmentUrl);
         }
 
-        $this->syncCollaborators($task, $project, $attributes, $selectedEnvironment);
+        $this->syncCollaborators($task, $project, $attributes, $selectedEnvironment, initialize: true);
 
         $this->sendTaskCreationNotifications($task);
 

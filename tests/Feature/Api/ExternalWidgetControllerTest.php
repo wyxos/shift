@@ -275,6 +275,11 @@ test('authenticated consuming app users can submit when guest submissions are di
     $task = Task::query()->firstOrFail();
     expect($task->submitter_id)->toBe($externalUser->id);
     expect($task->submitter_type)->toBe(ExternalUser::class);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $externalUser->id,
+        'kind' => 'external',
+    ]);
 });
 
 test('manual guest submissions create or update external users', function () {
@@ -319,4 +324,9 @@ test('manual guest submissions create or update external users', function () {
     $task = Task::query()->firstOrFail();
     expect($task->submitter_id)->toBe($externalUser->id);
     expect($task->submitter_type)->toBe(ExternalUser::class);
+    $this->assertDatabaseHas('task_collaborators', [
+        'task_id' => $task->id,
+        'external_user_id' => $externalUser->id,
+        'kind' => 'external',
+    ]);
 });

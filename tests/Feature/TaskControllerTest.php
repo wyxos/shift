@@ -732,7 +732,7 @@ test('requirements index can filter requirement intake items by project', functi
     );
 });
 
-test('task detail includes external requirement submitter in collaborator list', function () {
+test('task detail includes an external requirement submitter when they are a collaborator', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -751,6 +751,7 @@ test('task detail includes external requirement submitter in collaborator list',
         'status' => 'pending',
     ]);
     $requirement->submitter()->associate($externalUser)->save();
+    $requirement->externalCollaborators()->attach($externalUser->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -768,6 +769,32 @@ test('task detail includes external requirement submitter in collaborator list',
         ->assertJsonPath('external_collaborators.0.id', 'client-123')
         ->assertJsonPath('external_collaborators.0.name', 'Client User')
         ->assertJsonPath('external_collaborators.0.email', 'client@example.com');
+});
+
+test('task detail does not synthesize an external submitter after they leave the collaborator list', function () {
+    $project = Project::factory()->create([
+        'author_id' => $this->user->id,
+    ]);
+    $externalUser = ExternalUser::query()->create([
+        'external_id' => 'client-opted-out',
+        'name' => 'Opted Out Client',
+        'email' => 'opted-out@example.com',
+        'environment' => 'testing',
+        'url' => 'https://example.com',
+        'project_id' => $project->id,
+    ]);
+
+    $task = Task::factory()->create([
+        'project_id' => $project->id,
+        'title' => 'Opted out task',
+    ]);
+    $task->submitter()->associate($externalUser)->save();
+
+    $this->actingAs($this->user)
+        ->getJson(route('tasks.show', $task))
+        ->assertOk()
+        ->assertJsonPath('submitter.email', 'opted-out@example.com')
+        ->assertJsonCount(0, 'external_collaborators');
 });
 
 test('tasks show includes created and updated timestamps', function () {
