@@ -227,8 +227,16 @@ class TaskCollaboratorService
 
     public function externalReplyAudience(Task $task, ?int $excludingExternalUserId = null): Collection
     {
-        return $task->externalCollaborators()
-            ->get()
+        $task->loadMissing('submitter');
+
+        $externalUsers = $task->externalCollaborators()->get();
+
+        if ($task->submitter instanceof ExternalUser) {
+            $externalUsers->push($task->submitter);
+        }
+
+        return $externalUsers
+            ->unique('id')
             ->reject(fn (ExternalUser $collaborator) => $collaborator->id === $excludingExternalUserId)
             ->values();
     }
