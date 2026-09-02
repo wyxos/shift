@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TaskCreateSheet from '@/components/tasks/TaskCreateSheet.vue';
-import type { TaskProjectOption } from '@/shared/tasks/projects';
+import { projectEnvironmentOptions, type TaskProjectOption } from '@/shared/tasks/projects';
 import type { RequirementBatchSummary, TaskIndexSurface } from '@/shared/tasks/types';
 import ConfirmRequestDialog from '@shared/components/ConfirmRequestDialog.vue';
 import TaskListOverviewPanel from '@shared/components/tasks/TaskListOverviewPanel.vue';
@@ -50,6 +50,16 @@ const taskRows = computed(() => {
 });
 const createProjects = computed(() => (props.projects ?? []).filter((project) => project.can_create_task !== false));
 const projectFilterOptions = computed(() => (props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })));
+const environmentFilterOptions = computed(() => {
+    const projectId = Number(unref(props.filters.draftProjectId));
+
+    if (!Number.isFinite(projectId) || projectId <= 0) return undefined;
+
+    return projectEnvironmentOptions(props.projects ?? [], projectId).map((environment) => ({
+        value: environment.key,
+        label: environment.label,
+    }));
+});
 const deleteNoun = computed(() => (props.surface === 'requirements' ? 'requirement' : 'task'));
 const listTitle = computed(() => {
     if (props.surface === 'app-errors') return 'App errors';
@@ -193,6 +203,7 @@ async function confirmRequirementBatchFinalize() {
         :draft-priorities="filters.draftPriorities"
         :draft-search-term="filters.draftSearchTerm"
         :draft-environment-term="filters.draftEnvironmentTerm"
+        :environment-options="environmentFilterOptions"
         :draft-project-id="filters.draftProjectId"
         :draft-type="filters.draftType"
         :draft-sort-by="filters.draftSortBy"

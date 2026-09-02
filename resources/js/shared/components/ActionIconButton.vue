@@ -3,6 +3,7 @@ import { LoaderCircle } from 'lucide-vue-next';
 import { computed, type HTMLAttributes } from 'vue';
 import type { ButtonVariants } from '../../components/ui/button';
 import { Button } from '../../components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
 
 defineOptions({
@@ -42,20 +43,26 @@ const toneClass = computed(() => {
 </script>
 
 <template>
-    <Button
-        :variant="variant === 'destructive' ? 'destructive' : 'outline'"
-        size="icon"
-        :as-child="asChild"
-        :type="buttonType"
-        :title="buttonTitle"
-        :aria-label="label"
-        :aria-busy="loading || undefined"
-        :disabled="disabled || loading"
-        :class="cn('size-8 shrink-0 rounded-md border backdrop-blur-sm transition-colors', toneClass, props.class)"
-        v-bind="$attrs"
-    >
-        <LoaderCircle v-if="loading" class="size-4 animate-spin" />
-        <slot v-else />
-        <span class="sr-only">{{ label }}</span>
-    </Button>
+    <TooltipProvider :delay-duration="0">
+        <Tooltip>
+            <TooltipTrigger as-child>
+                <Button
+                    :variant="variant === 'destructive' ? 'destructive' : 'outline'"
+                    size="icon"
+                    :as-child="asChild"
+                    :type="buttonType"
+                    :aria-label="label"
+                    :aria-busy="loading || undefined"
+                    :disabled="disabled || loading"
+                    :class="cn('size-8 shrink-0 rounded-md border backdrop-blur-sm transition-colors', toneClass, props.class)"
+                    v-bind="$attrs"
+                >
+                    <LoaderCircle v-if="loading" class="size-4 animate-spin" />
+                    <slot v-else />
+                    <span class="sr-only">{{ label }}</span>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{{ buttonTitle }}</TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
 </template>

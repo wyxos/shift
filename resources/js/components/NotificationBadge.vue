@@ -2,6 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import { Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Bell, ListChecks, ListRestart } from 'lucide-vue-next';
@@ -221,7 +222,7 @@ const getNotificationTitle = (notification: NotificationItem) => {
         case 'TaskCreationNotification':
             return `New Task: ${data.task_title}`;
         case 'AppErrorReportedNotification':
-            return `App Error: ${data.task_title}`;
+            return data.task_title ?? 'Application error';
         case 'TaskThreadUpdated':
             return `New reply in ${data.type} thread for ${data.task_title}`;
         case 'ProjectInvitationNotification':
@@ -236,6 +237,8 @@ const getNotificationTitle = (notification: NotificationItem) => {
             return 'New notification';
     }
 };
+
+const isAppErrorNotification = (notification: NotificationItem) => notification.type === 'AppErrorReportedNotification';
 
 const getNotificationUrl = (notification: NotificationItem) => {
     const data = getNotificationData(notification);
@@ -321,7 +324,11 @@ const getNotificationUrl = (notification: NotificationItem) => {
                     class="group hover:bg-accent relative flex cursor-pointer items-center gap-2 border-b px-6 py-3"
                 >
                     <div class="flex min-w-0 flex-1 flex-col gap-1">
-                        <Link :href="getNotificationUrl(notification)" class="flex-1 text-sm font-medium" @click="markAsRead(notification.id)">
+                        <Link
+                            :href="getNotificationUrl(notification)"
+                            :class="cn('flex-1 text-sm font-medium', isAppErrorNotification(notification) && 'text-destructive')"
+                            @click="markAsRead(notification.id)"
+                        >
                             {{ getNotificationTitle(notification) }}
                         </Link>
                         <p class="text-muted-foreground text-left text-xs">{{ notification.created_at }}</p>

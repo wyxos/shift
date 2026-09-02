@@ -144,7 +144,7 @@ describe('Tasks/Index.vue', () => {
 
         expect(wrapper.find('[data-testid="requirement-pack-finalize-7"]').exists()).toBe(false);
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.find('[data-testid="finalize-requirement"]').exists()).toBe(false);
@@ -306,7 +306,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.text()).toContain('Clarifications');
@@ -380,7 +380,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.text()).toContain('Requirement state');
@@ -439,7 +439,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         await wrapper.get('[data-testid="comment-bubble-11"]').trigger('contextmenu');

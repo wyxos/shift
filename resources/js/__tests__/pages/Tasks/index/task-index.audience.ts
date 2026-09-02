@@ -119,7 +119,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         const bubbles = wrapper.findAll('[data-testid^="comment-bubble-"]');
@@ -200,7 +200,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
         const message = (wrapper.vm as any).threadMessages[0];
 
@@ -243,7 +243,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
         await wrapper.get('[data-testid="stub-mention-add-request"]').trigger('click');
 
@@ -286,7 +286,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await loadingWrapper.find('button[title="Open details"]').trigger('click');
+        await loadingWrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
         expect(loadingWrapper.text()).toContain('Loading comments...');
 
@@ -320,7 +320,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await permissionWrapper.find('button[title="Open details"]').trigger('click');
+        await permissionWrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
         expect(permissionWrapper.text()).toContain('Commenting is unavailable for this task.');
         expect(permissionWrapper.find('[data-testid="stub-send"]').exists()).toBe(false);
@@ -357,7 +357,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             },
         });
 
-        await disabledWrapper.find('button[title="Open details"]').trigger('click');
+        await disabledWrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
         await disabledWrapper.get('[data-testid="stub-editor-input"]').setValue('<p>Sending</p>');
         await disabledWrapper.get('[data-testid="stub-send"]').trigger('click');

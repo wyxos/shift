@@ -33,7 +33,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.text()).toContain('Created');
@@ -73,7 +73,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.find('.sheet-header [data-testid="task-edit-title"]').exists()).toBe(true);
@@ -117,7 +117,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         const metadataGrid = wrapper.get('[data-testid="edit-task-meta"]');
@@ -182,7 +182,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         const description = wrapper.get('[data-testid="task-edit-description"]');
@@ -228,7 +228,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
@@ -283,7 +283,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(true);

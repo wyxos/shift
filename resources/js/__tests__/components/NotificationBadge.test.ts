@@ -197,7 +197,8 @@ describe('NotificationBadge', () => {
         expect(wrapper.get('a[href="/tasks?task=42"]').classes()).toContain('text-sm');
         expect(wrapper.get('a[href="/tasks?task=42"]').text()).toContain('New Task: Broken footer');
         expect(wrapper.get('p.text-muted-foreground').classes()).toEqual(expect.arrayContaining(['text-left', 'text-xs']));
-        expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toBe('Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/error-reports?task=84"]').classes()).toContain('text-destructive');
         expect(wrapper.get('a[href="/notifications"]').text()).toContain('View all notifications');
         expect(wrapper.get('a[href="/notifications"]').classes()).toContain('rounded-none');
         expect(wrapper.get('[data-testid="notification-footer"]').classes()).toContain('p-0');
