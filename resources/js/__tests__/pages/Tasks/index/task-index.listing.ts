@@ -63,8 +63,8 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.get('[data-testid="task-updated-at-1"]').text()).toContain('11:45');
 
         for (const row of rows) {
-            expect(row.find('button[title="Open details"]').exists()).toBe(true);
-            expect(row.find('button[title="Delete"]').exists()).toBe(true);
+            expect(row.find('button[data-testid^="task-open-"]').exists()).toBe(true);
+            expect(row.find('button[data-testid^="task-delete-"]').exists()).toBe(true);
         }
 
         expect(compactRows[0].text()).toContain('Pending');
@@ -151,20 +151,28 @@ describe('Tasks/Index.vue', () => {
         const wrapper = mount(Index, {
             props: {
                 tasks: makeTasksPage([{ id: 1, title: 'Auth issue', status: 'pending', priority: 'high' }]),
-                projects: [{ id: 10, name: 'Portal', environments: [] }],
+                projects: [
+                    {
+                        id: 10,
+                        name: 'Portal',
+                        environments: [{ key: 'production', label: 'Production', url: 'https://portal.example.com' }],
+                    },
+                ],
                 filters: {
                     status: ['pending', 'in-progress', 'awaiting-feedback'],
                     priority: ['low', 'medium', 'high'],
                     search: '',
+                    project_id: 10,
                 },
             },
         });
 
         expect(wrapper.find('[data-testid="filter-search"]').exists()).toBe(true);
-        expect(wrapper.findAll('input[data-testid^="status-"]').length).toBeGreaterThanOrEqual(4);
-        expect(wrapper.findAll('input[data-testid^="priority-"]').length).toBeGreaterThanOrEqual(3);
+        expect(wrapper.findAll('button[data-testid^="status-"]').length).toBeGreaterThanOrEqual(4);
+        expect(wrapper.findAll('button[data-testid^="priority-"]').length).toBeGreaterThanOrEqual(3);
         expect(wrapper.find('[data-testid="filter-project"]').exists()).toBe(true);
-        expect(wrapper.find('[data-testid="filter-environment"]').exists()).toBe(true);
+        expect(wrapper.find('input[data-testid="filter-environment"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="filter-environment-production"]').exists()).toBe(true);
 
         wrapper.unmount();
     });

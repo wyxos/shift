@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
+import { cn } from '@/lib/utils';
 import RequestButton from '@/shared/components/RequestButton.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
@@ -142,7 +143,7 @@ const getNotificationTitle = (notification: Notification): string => {
         case 'App\\Notifications\\TaskCreationNotification':
             return `New Task: ${data.task_title}`;
         case 'App\\Notifications\\AppErrorReportedNotification':
-            return `App Error: ${data.task_title}`;
+            return data.task_title ?? 'Application error';
         case 'App\\Notifications\\TaskThreadUpdated':
             return `New reply in ${data.type} thread for ${data.task_title}`;
         case 'App\\Notifications\\ProjectInvitationNotification':
@@ -157,6 +158,8 @@ const getNotificationTitle = (notification: Notification): string => {
             return 'New notification';
     }
 };
+
+const isAppErrorNotification = (notification: Notification): boolean => notification.type === 'App\\Notifications\\AppErrorReportedNotification';
 
 const getNotificationUrl = (notification: Notification): string => {
     const data = getNotificationData(notification);
@@ -259,8 +262,13 @@ const getNotificationDescription = (notification: Notification): string => {
                                 <div class="mb-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <Link
                                         :href="getNotificationUrl(notification)"
-                                        class="min-w-0 text-lg font-medium break-words"
-                                        :class="{ 'font-bold': !notification.read_at }"
+                                        :class="
+                                            cn(
+                                                'min-w-0 text-lg font-medium break-words',
+                                                !notification.read_at && 'font-bold',
+                                                isAppErrorNotification(notification) && 'text-destructive',
+                                            )
+                                        "
                                         @click="!notification.read_at && markAsRead(notification.id)"
                                     >
                                         {{ getNotificationTitle(notification) }}

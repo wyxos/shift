@@ -52,7 +52,7 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        await wrapper.find('button[title="Open details"]').trigger('click');
+        await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
         const originBubble = wrapper.get('[data-testid="comment-bubble-10"]').element as HTMLElement;

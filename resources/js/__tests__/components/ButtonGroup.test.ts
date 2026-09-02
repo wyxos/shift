@@ -29,4 +29,29 @@ describe('ButtonGroup', () => {
 
         wrapper.unmount();
     });
+
+    it('supports independently toggled multi-select buttons', async () => {
+        const wrapper = mount(ButtonGroup, {
+            props: {
+                modelValue: ['pending'],
+                multiple: true,
+                ariaLabel: 'Status',
+                options: [
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'completed', label: 'Completed' },
+                ],
+            },
+        });
+
+        const buttons = wrapper.findAll('button');
+        expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Status');
+        expect(buttons[0].attributes('aria-pressed')).toBe('true');
+        expect(buttons[1].attributes('aria-pressed')).toBe('false');
+
+        await buttons[1].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([['pending', 'completed']]);
+
+        await buttons[0].trigger('click');
+        expect(wrapper.emitted('update:modelValue')?.[1]).toEqual([[]]);
+    });
 });

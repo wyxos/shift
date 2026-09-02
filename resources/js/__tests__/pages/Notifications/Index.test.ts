@@ -286,7 +286,8 @@ describe('Notifications/Index.vue', () => {
             }),
         ]);
 
-        expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toBe('Backend error: RuntimeException');
+        expect(wrapper.get('a[href="/error-reports?task=84"]').classes()).toContain('text-destructive');
         expect(wrapper.text()).toContain('App error reported in project: Portal Refresh');
     });
 

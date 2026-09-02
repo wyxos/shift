@@ -78,4 +78,35 @@ describe('TaskListFiltersSheet', () => {
         expect(wrapper.find('input[data-testid="filter-environment"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="filter-environment-all"]').exists()).toBe(false);
     });
+
+    it('renders status and priority filters as multi-select buttons', async () => {
+        const setDraftStatuses = vi.fn();
+        const setDraftPriorities = vi.fn();
+        const wrapper = mount(TaskListFiltersSheet, {
+            props: props({
+                statusOptions: [
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'completed', label: 'Completed' },
+                ],
+                priorityOptions: [
+                    { value: 'high', label: 'High' },
+                    { value: 'low', label: 'Low' },
+                ],
+                setDraftStatuses,
+                setDraftPriorities,
+            }),
+            global: { stubs: sheetStubs },
+        });
+
+        expect(wrapper.find('input[data-testid^="status-"]').exists()).toBe(false);
+        expect(wrapper.find('input[data-testid^="priority-"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="status-pending"]').attributes('aria-pressed')).toBe('true');
+        expect(wrapper.get('[data-testid="priority-high"]').attributes('aria-pressed')).toBe('true');
+
+        await wrapper.get('[data-testid="status-completed"]').trigger('click');
+        await wrapper.get('[data-testid="priority-low"]').trigger('click');
+
+        expect(setDraftStatuses).toHaveBeenLastCalledWith(['pending', 'completed']);
+        expect(setDraftPriorities).toHaveBeenLastCalledWith(['high', 'low']);
+    });
 });

@@ -106,6 +106,14 @@ const prioritiesModel = computed({
     set: (value: string[]) => props.setDraftPriorities(value),
 });
 
+const allStatusesSelected = computed(
+    () => props.statusOptions.length > 0 && props.statusOptions.every((option) => props.draftStatuses.includes(option.value)),
+);
+
+const allPrioritiesSelected = computed(
+    () => props.priorityOptions.length > 0 && props.priorityOptions.every((option) => props.draftPriorities.includes(option.value)),
+);
+
 const sortByModel = computed({
     get: () => props.draftSortBy,
     set: (value: string) => props.setDraftSortBy(value),
@@ -176,29 +184,45 @@ const sortByModel = computed({
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
                         <Label class="text-muted-foreground">{{ statusLabel }}</Label>
-                        <Button size="sm" variant="ghost" @click="selectAllStatuses">All</Button>
+                        <Button
+                            data-testid="status-all"
+                            size="sm"
+                            type="button"
+                            :variant="allStatusesSelected ? 'default' : 'outline'"
+                            @click="selectAllStatuses"
+                        >
+                            All
+                        </Button>
                     </div>
-
-                    <div class="grid gap-2">
-                        <label v-for="option in statusOptions" :key="option.value" class="flex items-center gap-2 text-sm">
-                            <input v-model="statusesModel" :data-testid="`status-${option.value}`" :value="option.value" type="checkbox" />
-                            <span>{{ option.label }}</span>
-                        </label>
-                    </div>
+                    <ButtonGroup
+                        v-model="statusesModel"
+                        multiple
+                        :aria-label="`Filter tasks by ${statusLabel.toLowerCase()}`"
+                        :options="statusOptions"
+                        test-id-prefix="status"
+                    />
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
                         <Label class="text-muted-foreground">Priority</Label>
-                        <Button size="sm" variant="ghost" @click="selectAllPriorities">All</Button>
+                        <Button
+                            data-testid="priority-all"
+                            size="sm"
+                            type="button"
+                            :variant="allPrioritiesSelected ? 'default' : 'outline'"
+                            @click="selectAllPriorities"
+                        >
+                            All
+                        </Button>
                     </div>
-
-                    <div class="grid gap-2">
-                        <label v-for="option in priorityOptions" :key="option.value" class="flex items-center gap-2 text-sm">
-                            <input v-model="prioritiesModel" :data-testid="`priority-${option.value}`" :value="option.value" type="checkbox" />
-                            <span>{{ option.label }}</span>
-                        </label>
-                    </div>
+                    <ButtonGroup
+                        v-model="prioritiesModel"
+                        multiple
+                        aria-label="Filter tasks by priority"
+                        :options="priorityOptions"
+                        test-id-prefix="priority"
+                    />
                 </div>
 
                 <div class="flex flex-col gap-2">

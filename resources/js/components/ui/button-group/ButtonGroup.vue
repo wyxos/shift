@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends string | string[] = string">
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -12,8 +12,9 @@ type Option = {
 
 const props = withDefaults(
     defineProps<{
-        modelValue?: string;
+        modelValue?: T;
         options: Option[];
+        multiple?: boolean;
         disabled?: boolean;
         columns?: 2 | 3 | 4;
         class?: string;
@@ -26,11 +27,28 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-    'update:modelValue': [value: string];
+    'update:modelValue': [value: T];
 }>();
 
+function isSelected(option: Option): boolean {
+    return Array.isArray(props.modelValue) ? props.modelValue.includes(option.value) : props.modelValue === option.value;
+}
+
+function selectOption(option: Option): void {
+    if (!props.multiple) {
+        emit('update:modelValue', option.value as T);
+        return;
+    }
+
+    const selectedValues = Array.isArray(props.modelValue) ? props.modelValue : [];
+    emit(
+        'update:modelValue',
+        (isSelected(option) ? selectedValues.filter((value) => value !== option.value) : [...selectedValues, option.value]) as T,
+    );
+}
+
 function optionButtonClass(option: Option): string {
-    const selected = props.modelValue === option.value;
+    const selected = isSelected(option);
     if (selected) return option.selectedClass ?? '';
     return option.unselectedClass ?? '';
 }
@@ -39,10 +57,11 @@ function optionButtonVariant(option: Option): 'default' | 'outline' {
     if (option.selectedClass || option.unselectedClass) {
         return 'outline';
     }
-    return props.modelValue === option.value ? 'default' : 'outline';
+    return isSelected(option) ? 'default' : 'outline';
 }
 
 function optionTabIndex(option: Option, index: number): number {
+    if (props.multiple) return 0;
     if (props.modelValue === option.value) return 0;
     if (!props.options.some((candidate) => candidate.value === props.modelValue) && index === 0) return 0;
 
@@ -67,27 +86,30 @@ function handleKeydown(event: KeyboardEvent, index: number): void {
     const nextOption = props.options[nextIndex];
     if (!nextOption) return;
 
-    emit('update:modelValue', nextOption.value);
-    const buttons = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="radio"]');
+    if (!props.multiple) {
+        emit('update:modelValue', nextOption.value as T);
+    }
+    const buttons = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('button');
     buttons?.[nextIndex]?.focus();
 }
 </script>
 
 <template>
-    <div role="radiogroup" :aria-label="ariaLabel" :class="cn('flex flex-wrap items-center gap-2', props.class)">
+    <div :role="multiple ? 'group' : 'radiogroup'" :aria-label="ariaLabel" :class="cn('flex flex-wrap items-center gap-2', props.class)">
         <Button
             v-for="(option, index) in options"
             :key="option.value"
-            role="radio"
+            :role="multiple ? undefined : 'radio'"
             type="button"
             size="sm"
             :disabled="disabled"
-            :aria-checked="modelValue === option.value"
+            :aria-checked="multiple ? undefined : isSelected(option)"
+            :aria-pressed="multiple ? isSelected(option) : undefined"
             :tabindex="optionTabIndex(option, index)"
             :variant="optionButtonVariant(option)"
             :class="cn('w-auto flex-none', optionButtonClass(option))"
             :data-testid="testIdPrefix ? `${testIdPrefix}-${option.testId ?? option.value}` : undefined"
-            @click="emit('update:modelValue', option.value)"
+            @click="selectOption(option)"
             @keydown="handleKeydown($event, index)"
         >
             {{ option.label }}
