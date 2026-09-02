@@ -17,6 +17,9 @@ describe('Tasks/Index.vue', () => {
                         priority: 'high',
                         can_delete: true,
                         project: { id: 10, name: 'Portal' },
+                        environment: 'staging',
+                        created_at: '2024-01-01T09:15:00',
+                        updated_at: '2024-01-02T11:45:00',
                     },
                     {
                         id: 2,
@@ -51,6 +54,13 @@ describe('Tasks/Index.vue', () => {
         expect(wrapper.text()).toContain('UI polish');
         expect(wrapper.find('[data-testid="task-project-badge-1"]').text()).toContain('Portal');
         expect(wrapper.find('[data-testid="task-project-badge-2"]').text()).toContain('Console');
+        expect(wrapper.get('[data-testid="task-status-badge-1"]').text()).toContain('Pending');
+        expect(wrapper.get('[data-testid="task-priority-badge-1"]').text()).toContain('High');
+        expect(wrapper.get('[data-testid="task-environment-badge-1"]').text()).toContain('Staging');
+        expect(wrapper.get('[data-testid="task-created-at-1"]').text()).toContain('1 Jan 2024');
+        expect(wrapper.get('[data-testid="task-created-at-1"]').text()).toContain('09:15');
+        expect(wrapper.get('[data-testid="task-updated-at-1"]').text()).toContain('2 Jan 2024');
+        expect(wrapper.get('[data-testid="task-updated-at-1"]').text()).toContain('11:45');
 
         for (const row of rows) {
             expect(row.find('button[title="Open details"]').exists()).toBe(true);
@@ -59,6 +69,10 @@ describe('Tasks/Index.vue', () => {
 
         expect(compactRows[0].text()).toContain('Pending');
         expect(compactRows[0].text()).toContain('High');
+        expect(compactRows[0].text()).toContain('Created');
+        expect(compactRows[0].text()).toContain('1 Jan 2024');
+        expect(compactRows[0].text()).toContain('Updated');
+        expect(compactRows[0].text()).toContain('2 Jan 2024');
         expect(compactRows[0].get('button[aria-label="Open task details for Auth issue"]').classes()).toContain('[overflow-wrap:anywhere]');
         expect(compactRows[0].find('[data-slot="responsive-record-item-actions"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="task-compact-open-1"]').exists()).toBe(true);

@@ -26,6 +26,8 @@ export type TaskListRow = {
     finalized?: boolean | null;
     finalized_at?: string | null;
     environment?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
     batch_id?: number | null;
     batch_title?: string | null;
     batch?: TaskListBatch | null;
