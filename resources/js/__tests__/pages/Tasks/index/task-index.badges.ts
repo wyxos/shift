@@ -79,7 +79,7 @@ describe('Tasks/Index.vue', () => {
         wrapper.unmount();
     });
 
-    it('distinguishes app error rows and keeps row badges under the title', async () => {
+    it('removes redundant type badges and keeps row metadata under the title', async () => {
         axiosGetMock.mockReset();
         (router.get as any).mockClear();
 
@@ -107,8 +107,8 @@ describe('Tasks/Index.vue', () => {
             },
         });
 
-        expect(wrapper.get('[data-testid="task-type-badge-1"]').text()).toContain('Task');
-        expect(wrapper.get('[data-testid="task-type-badge-2"]').text()).toBe('error');
+        expect(wrapper.find('[data-testid="task-type-badge-1"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="task-type-badge-2"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="task-project-badge-2"]').text()).toBe('Pack QA');
 
         const titleCell = wrapper.get('[data-testid="task-title-cell-2"]');
@@ -117,6 +117,9 @@ describe('Tasks/Index.vue', () => {
 
         expect(titleCell.classes()).toContain('flex-col');
         expect(titleButton.element.compareDocumentPosition(badges.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(badges.find('[data-testid="task-status-badge-2"]').exists()).toBe(true);
+        expect(badges.find('[data-testid="task-priority-badge-2"]').exists()).toBe(true);
+        expect(badges.find('[data-testid="task-environment-badge-2"]').exists()).toBe(true);
         expect(wrapper.text()).toContain('App errors');
 
         await wrapper.get('[data-testid="filters-trigger"]').trigger('click');

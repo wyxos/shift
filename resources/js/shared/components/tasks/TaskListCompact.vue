@@ -10,11 +10,10 @@ import {
     getRequirementStatusLabel,
     getStatusBadgeClass,
     getStatusLabel,
-    getTaskTypeBadgeClass,
-    getTaskTypeLabel,
 } from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
+import TaskListTimestamp from './TaskListTimestamp.vue';
 import {
     canDeleteTask,
     canFinalizeRequirementPack,
@@ -185,9 +184,6 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                 </button>
                 <div class="flex flex-wrap items-center gap-2">
                     <Badge v-if="taskProjectLabel(task)" variant="secondary">{{ taskProjectLabel(task) }}</Badge>
-                    <Badge :class="getTaskTypeBadgeClass(task.type)" variant="outline">
-                        {{ getTaskTypeLabel(task.type, task.type_label) }}
-                    </Badge>
                 </div>
                 <dl class="grid grid-cols-2 gap-3">
                     <div class="flex min-w-0 flex-col gap-1">
@@ -207,6 +203,14 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                         <dd>
                             <Badge variant="outline">{{ getTaskEnvironmentLabel(task) }}</Badge>
                         </dd>
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Created</dt>
+                        <dd><TaskListTimestamp :value="task.created_at" /></dd>
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-1">
+                        <dt class="text-muted-foreground text-xs">Updated</dt>
+                        <dd><TaskListTimestamp :value="task.updated_at" /></dd>
                     </div>
                 </dl>
 

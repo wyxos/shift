@@ -11,13 +11,12 @@ import {
     getRequirementStatusLabel,
     getStatusBadgeClass,
     getStatusLabel,
-    getTaskTypeBadgeClass,
-    getTaskTypeLabel,
 } from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import TaskListCompact from './TaskListCompact.vue';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
+import TaskListTimestamp from './TaskListTimestamp.vue';
 import {
     canDeleteTask,
     canFinalizeRequirementPack,
@@ -197,14 +196,20 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                                 <TableHead>{{
                                     itemLabel === 'requirements' ? 'Requirement' : itemLabel === 'app errors' ? 'Error' : 'Task'
                                 }}</TableHead>
-                                <TableHead>{{ itemLabel === 'requirements' ? 'State' : 'Status' }}</TableHead>
-                                <TableHead>Priority</TableHead>
-                                <TableHead>Environment</TableHead>
+                                <template v-if="itemLabel === 'requirements'">
+                                    <TableHead>State</TableHead>
+                                    <TableHead>Priority</TableHead>
+                                    <TableHead>Environment</TableHead>
+                                </template>
+                                <template v-else>
+                                    <TableHead>Created</TableHead>
+                                    <TableHead>Updated</TableHead>
+                                </template>
                                 <TableHead class="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableEmpty v-if="tasks.length === 0" :colspan="5">{{ emptyLabel }}</TableEmpty>
+                            <TableEmpty v-if="tasks.length === 0" :colspan="itemLabel === 'requirements' ? 5 : 4">{{ emptyLabel }}</TableEmpty>
                             <template v-else-if="itemLabel === 'requirements'">
                                 <template v-for="group in groupedRequirements" :key="group.key">
                                     <TableRow data-testid="requirement-pack-row" class="bg-muted/30 hover:bg-muted/40">
@@ -330,37 +335,30 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                                                     {{ taskProjectLabel(task) }}
                                                 </Badge>
                                                 <Badge
-                                                    :class="getTaskTypeBadgeClass(task.type)"
-                                                    :data-testid="`task-type-badge-${task.id}`"
+                                                    :class="getStatusBadgeClass(task.status)"
+                                                    :data-testid="`task-status-badge-${task.id}`"
                                                     variant="outline"
                                                 >
-                                                    {{ getTaskTypeLabel(task.type, task.type_label) }}
+                                                    {{ getStatusLabel(task.status) }}
+                                                </Badge>
+                                                <Badge
+                                                    :class="getPriorityBadgeClass(task.priority)"
+                                                    :data-testid="`task-priority-badge-${task.id}`"
+                                                    variant="outline"
+                                                >
+                                                    {{ getPriorityLabel(task.priority) }}
+                                                </Badge>
+                                                <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
+                                                    {{ getTaskEnvironmentLabel(task) }}
                                                 </Badge>
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge
-                                            :class="getStatusBadgeClass(task.status)"
-                                            :data-testid="`task-status-badge-${task.id}`"
-                                            variant="outline"
-                                        >
-                                            {{ getStatusLabel(task.status) }}
-                                        </Badge>
+                                        <TaskListTimestamp :value="task.created_at" :data-testid="`task-created-at-${task.id}`" />
                                     </TableCell>
                                     <TableCell>
-                                        <Badge
-                                            :class="getPriorityBadgeClass(task.priority)"
-                                            :data-testid="`task-priority-badge-${task.id}`"
-                                            variant="outline"
-                                        >
-                                            {{ getPriorityLabel(task.priority) }}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
-                                            {{ getTaskEnvironmentLabel(task) }}
-                                        </Badge>
+                                        <TaskListTimestamp :value="task.updated_at" :data-testid="`task-updated-at-${task.id}`" />
                                     </TableCell>
                                     <TableCell>
                                         <div class="flex justify-end gap-2">
