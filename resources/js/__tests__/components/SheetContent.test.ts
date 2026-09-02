@@ -97,4 +97,16 @@ describe('SheetContent', () => {
         expect(wrapper.find('.dialog-close-stub').exists()).toBe(true);
         expect(wrapper.text()).toContain('Close');
     });
+
+    it('can omit the close control when the sheet has other dismissal paths', () => {
+        const wrapper = mount(SheetContent, {
+            props: {
+                showClose: false,
+            },
+        });
+
+        expect(wrapper.find('.dialog-close-stub').exists()).toBe(false);
+        expect(wrapper.get('[data-slot="sheet-content"]').attributes()).not.toHaveProperty('showclose');
+        expect(wrapper.get('[data-slot="sheet-content"]').attributes()).not.toHaveProperty('show-close');
+    });
 });

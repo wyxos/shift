@@ -22,9 +22,11 @@ test('notification endpoints return correct data', function () {
     $response->assertJsonStructure([
         'notifications',
         'count',
+        'total_count',
     ]);
     $response->assertJson([
         'count' => 1,
+        'total_count' => 1,
     ]);
 
     // Get the notification ID from the response
@@ -55,6 +57,13 @@ test('notification endpoints return correct data', function () {
 
     // Verify all notifications are marked as read
     expect($user->unreadNotifications()->count())->toEqual(0);
+
+    $markAllAsUnreadResponse = $this->post(route('notifications.mark-all-as-unread'));
+    $markAllAsUnreadResponse->assertOk()->assertJson([
+        'success' => true,
+    ]);
+
+    expect($user->unreadNotifications()->count())->toEqual(2);
 });
 
 test('notifications index page loads', function () {

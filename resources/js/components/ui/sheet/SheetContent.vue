@@ -16,6 +16,7 @@ import SheetOverlay from './SheetOverlay.vue'
 
 interface SheetContentProps extends DialogContentProps {
   class?: HTMLAttributes['class']
+  showClose?: boolean
   side?: 'top' | 'right' | 'bottom' | 'left'
   widthPreset?: 'default' | 'task'
 }
@@ -25,12 +26,13 @@ defineOptions({
 })
 
 const props = withDefaults(defineProps<SheetContentProps>(), {
+  showClose: true,
   side: 'right',
   widthPreset: 'default',
 })
 const emits = defineEmits<DialogContentEmits>()
 
-const delegatedProps = reactiveOmit(props, 'class', 'side', 'widthPreset')
+const delegatedProps = reactiveOmit(props, 'class', 'showClose', 'side', 'widthPreset')
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
@@ -79,6 +81,7 @@ const horizontalSheetWidthPreset = computed(() => horizontalSheetWidthPresets[pr
     >
       <slot />
       <SheetClose
+        v-if="showClose"
         aria-label="Close sheet"
         class="ring-offset-background focus:ring-ring absolute top-4 right-4 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none"
         data-testid="sheet-close"

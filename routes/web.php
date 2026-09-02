@@ -150,6 +150,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/{id}/mark-as-unread', [NotificationController::class, 'markAsUnread'])->name('notifications.mark-as-unread');
     Route::post('notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
+    Route::post('notifications/mark-all-as-unread', [NotificationController::class, 'markAllAsUnread'])->name('notifications.mark-all-as-unread');
 
     Route::inertia('/components', 'Components');
 });

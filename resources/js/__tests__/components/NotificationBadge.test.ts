@@ -37,20 +37,30 @@ vi.mock('@/components/ui/button', () => ({
     },
 }));
 
-vi.mock('@/components/ui/dropdown-menu', () => ({
-    DropdownMenu: {
+vi.mock('@/components/ui/sheet', () => ({
+    Sheet: {
         render() {
-            return h('div', { class: 'dropdown-menu-stub' }, this.$slots.default?.());
+            return h('div', { class: 'sheet-stub' }, this.$slots.default?.());
         },
     },
-    DropdownMenuTrigger: {
+    SheetTrigger: {
         render() {
-            return h('div', { class: 'dropdown-menu-trigger-stub' }, this.$slots.default?.());
+            return h('div', { class: 'sheet-trigger-stub' }, this.$slots.default?.());
         },
     },
-    DropdownMenuContent: {
+    SheetContent: {
         render() {
-            return h('div', { class: 'dropdown-menu-content-stub' }, this.$slots.default?.());
+            return h('aside', { class: 'sheet-content-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetHeader: {
+        render() {
+            return h('header', { class: 'sheet-header-stub' }, this.$slots.default?.());
+        },
+    },
+    SheetTitle: {
+        render() {
+            return h('h2', { class: 'sheet-title-stub' }, this.$slots.default?.());
         },
     },
 }));
@@ -123,6 +133,8 @@ describe('NotificationBadge', () => {
                     return '/notifications';
                 case 'notifications.mark-all-as-read':
                     return '/notifications/mark-all-as-read';
+                case 'notifications.mark-all-as-unread':
+                    return '/notifications/mark-all-as-unread';
                 case 'notifications.mark-as-read':
                     return `/notifications/${params?.id}/mark-as-read`;
                 case 'tasks.index':
@@ -163,6 +175,7 @@ describe('NotificationBadge', () => {
                     },
                 ],
                 count: 2,
+                total_count: 3,
             },
         });
 
@@ -171,9 +184,87 @@ describe('NotificationBadge', () => {
 
         expect(axiosGetMock).toHaveBeenCalledWith('/notifications/unread');
         expect(setIntervalSpy).not.toHaveBeenCalled();
+        expect(wrapper.find('.sheet-content-stub').exists()).toBe(true);
+        wrapper.get('[aria-label="Open notifications"]');
+        expect(wrapper.get('button[aria-label="Mark all notifications as read"]').attributes('title')).toBe('Mark all as read');
+        expect(wrapper.get('button[aria-label="Mark all notifications as unread"]').attributes('title')).toBe('Mark all as unread');
+        expect(wrapper.get('[data-testid="notification-bulk-actions"]').classes()).toContain('items-center');
+        expect(wrapper.get('[data-testid="notification-bulk-actions"]').classes()).not.toContain('flex-col');
+        expect(wrapper.get('.sheet-header-stub').classes()).toContain('flex-row');
+        expect(wrapper.get('.shift-scrollbar').classes()).toContain('overflow-y-auto');
+        expect(wrapper.get('.sheet-title-stub').text()).toBe('Notifications');
+        expect(wrapper.get('.group.relative').classes()).toContain('py-3');
+        expect(wrapper.get('a[href="/tasks?task=42"]').classes()).toContain('text-sm');
         expect(wrapper.get('a[href="/tasks?task=42"]').text()).toContain('New Task: Broken footer');
+        expect(wrapper.get('p.text-muted-foreground').classes()).toEqual(expect.arrayContaining(['text-left', 'text-xs']));
         expect(wrapper.get('a[href="/error-reports?task=84"]').text()).toContain('App Error: Backend error: RuntimeException');
         expect(wrapper.get('a[href="/notifications"]').text()).toContain('View all notifications');
+        expect(wrapper.get('a[href="/notifications"]').classes()).toContain('rounded-none');
+        expect(wrapper.get('[data-testid="notification-footer"]').classes()).toContain('p-0');
+    });
+
+    it('toggles the bulk read controls between enabled and disabled states', async () => {
+        (globalThis as any).route = vi.fn((name: string, params?: Record<string, unknown>) => {
+            switch (name) {
+                case 'notifications.unread':
+                    return '/notifications/unread';
+                case 'notifications.index':
+                    return '/notifications';
+                case 'notifications.mark-all-as-read':
+                    return '/notifications/mark-all-as-read';
+                case 'notifications.mark-all-as-unread':
+                    return '/notifications/mark-all-as-unread';
+                case 'notifications.mark-as-read':
+                    return `/notifications/${params?.id}/mark-as-read`;
+                case 'tasks.index':
+                    return `/tasks?task=${params?.task}`;
+                default:
+                    return `/${name}`;
+            }
+        });
+
+        axiosGetMock.mockResolvedValue({
+            data: {
+                notifications: [
+                    {
+                        id: 'notification-1',
+                        type: 'TaskCreationNotification',
+                        data: {
+                            task_title: 'Review release notes',
+                            task_id: 42,
+                        },
+                        created_at: 'just now',
+                    },
+                ],
+                count: 1,
+                total_count: 1,
+            },
+        });
+        axiosPostMock.mockResolvedValue({ data: { success: true } });
+
+        const wrapper = mount(NotificationBadge);
+        await flushPromises();
+
+        const markAllRead = wrapper.get('button[aria-label="Mark all notifications as read"]');
+        const markAllUnread = wrapper.get('button[aria-label="Mark all notifications as unread"]');
+
+        expect(markAllRead.attributes('disabled')).toBeUndefined();
+        expect(markAllUnread.attributes('disabled')).toBeDefined();
+
+        await markAllRead.trigger('click');
+        await flushPromises();
+
+        expect(axiosPostMock).toHaveBeenCalledWith('/notifications/mark-all-as-read');
+        expect(markAllRead.attributes('disabled')).toBeDefined();
+        expect(markAllUnread.attributes('disabled')).toBeUndefined();
+
+        await markAllUnread.trigger('click');
+        await flushPromises();
+
+        expect(axiosPostMock).toHaveBeenCalledWith('/notifications/mark-all-as-unread');
+        expect(axiosGetMock).toHaveBeenCalledTimes(2);
+        expect(markAllRead.attributes('disabled')).toBeUndefined();
+        expect(markAllUnread.attributes('disabled')).toBeDefined();
     });
 
     it('prepends realtime notifications from Echo and leaves the channel on unmount', async () => {

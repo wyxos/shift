@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Bell } from 'lucide-vue-next';
+import { Bell, ListChecks, ListRestart } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 type NotificationData = {
@@ -42,15 +42,21 @@ type PageProps = {
 
 const page = usePage<PageProps>();
 const unreadCount = ref(0);
+const totalCount = ref(0);
 const notifications = ref<NotificationItem[]>([]);
 const loading = ref(true);
+const notificationSheetOpen = ref(false);
+const bulkActionPending = ref<'read' | 'unread' | null>(null);
 const hasRouteHelper = typeof route === 'function';
 let channelName: string | null = null;
 
 const unreadUrl = computed(() => (hasRouteHelper ? route('notifications.unread') : null));
 const notificationsIndexUrl = computed(() => (hasRouteHelper ? route('notifications.index') : null));
 const markAllAsReadUrl = computed(() => (hasRouteHelper ? route('notifications.mark-all-as-read') : null));
-const notificationsEnabled = computed(() => Boolean(unreadUrl.value && markAllAsReadUrl.value && hasRouteHelper));
+const markAllAsUnreadUrl = computed(() => (hasRouteHelper ? route('notifications.mark-all-as-unread') : null));
+const notificationsEnabled = computed(() => Boolean(unreadUrl.value && markAllAsReadUrl.value && markAllAsUnreadUrl.value && hasRouteHelper));
+const canMarkAllAsRead = computed(() => unreadCount.value > 0 && bulkActionPending.value === null);
+const canMarkAllAsUnread = computed(() => totalCount.value > unreadCount.value && bulkActionPending.value === null);
 
 function getNotificationData(notification: NotificationItem): NotificationData {
     return typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
@@ -90,6 +96,7 @@ const fetchNotifications = async () => {
     if (!unreadUrl.value) {
         notifications.value = [];
         unreadCount.value = 0;
+        totalCount.value = 0;
         loading.value = false;
         return;
     }
@@ -99,6 +106,7 @@ const fetchNotifications = async () => {
         const response = await axios.get(unreadUrl.value);
         notifications.value = response.data.notifications;
         unreadCount.value = response.data.count;
+        totalCount.value = response.data.total_count ?? response.data.count;
     } catch (error) {
         console.error('Error fetching notifications:', error);
     } finally {
@@ -130,6 +138,7 @@ function prependRealtimeNotification(notification: RealtimeNotification) {
 
     notifications.value = [item, ...notifications.value].slice(0, 15);
     unreadCount.value += 1;
+    totalCount.value += 1;
 }
 
 function subscribeToRealtimeNotifications() {
@@ -160,14 +169,31 @@ const markAsRead = async (id: NotificationItem['id']) => {
 };
 
 const markAllAsRead = async () => {
-    if (!markAllAsReadUrl.value) return;
+    if (!markAllAsReadUrl.value || !canMarkAllAsRead.value) return;
 
+    bulkActionPending.value = 'read';
     try {
         await axios.post(markAllAsReadUrl.value);
         notifications.value = [];
         unreadCount.value = 0;
     } catch (error) {
         console.error('Error marking all notifications as read:', error);
+    } finally {
+        bulkActionPending.value = null;
+    }
+};
+
+const markAllAsUnread = async () => {
+    if (!markAllAsUnreadUrl.value || !canMarkAllAsUnread.value) return;
+
+    bulkActionPending.value = 'unread';
+    try {
+        await axios.post(markAllAsUnreadUrl.value);
+        await fetchNotifications();
+    } catch (error) {
+        console.error('Error marking all notifications as unread:', error);
+    } finally {
+        bulkActionPending.value = null;
     }
 };
 
@@ -238,67 +264,101 @@ const getNotificationUrl = (notification: NotificationItem) => {
 </script>
 
 <template>
-    <DropdownMenu v-if="notificationsEnabled">
-        <DropdownMenuTrigger :as-child="true">
-            <Button variant="ghost" size="icon" class="relative h-9 w-9">
-                <Bell class="h-5 w-5" />
-                <Badge v-if="unreadCount > 0" class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
-                    {{ unreadCount > 99 ? '99+' : unreadCount }}
-                </Badge>
-            </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="w-80">
-            <div class="flex items-center justify-between p-4 pb-2">
-                <h3 class="font-medium">Notifications</h3>
-                <Button v-if="unreadCount > 0" variant="ghost" size="sm" @click="markAllAsRead"> Mark all as read </Button>
+    <Sheet v-if="notificationsEnabled" v-model:open="notificationSheetOpen">
+        <Button
+            variant="ghost"
+            size="icon"
+            class="relative h-9 w-9 focus-visible:ring-0 focus-visible:ring-offset-0"
+            aria-label="Open notifications"
+            @click="notificationSheetOpen = true"
+        >
+            <Bell class="h-5 w-5" />
+            <Badge v-if="unreadCount > 0" class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
+                {{ unreadCount > 99 ? '99+' : unreadCount }}
+            </Badge>
+        </Button>
+        <SheetContent :show-close="false" side="right" class="gap-0 p-0">
+            <SheetHeader class="flex-row items-center justify-between gap-2 border-b px-6 py-3 text-left">
+                <SheetTitle>Notifications</SheetTitle>
+                <div class="flex items-center gap-1" data-testid="notification-bulk-actions">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="focus-visible:bg-accent h-8 w-8 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        :disabled="!canMarkAllAsRead"
+                        aria-label="Mark all notifications as read"
+                        title="Mark all as read"
+                        @click="markAllAsRead"
+                    >
+                        <ListChecks class="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="focus-visible:bg-accent h-8 w-8 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        :disabled="!canMarkAllAsUnread"
+                        aria-label="Mark all notifications as unread"
+                        title="Mark all as unread"
+                        @click="markAllAsUnread"
+                    >
+                        <ListRestart class="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                </div>
+            </SheetHeader>
+
+            <div v-if="loading" class="text-muted-foreground flex flex-1 items-center justify-center p-6 text-center text-sm">
+                Loading notifications...
             </div>
 
-            <div v-if="loading" class="text-muted-foreground p-4 text-center text-sm">Loading notifications...</div>
+            <div v-else-if="notifications.length === 0" class="text-muted-foreground flex flex-1 items-center justify-center p-6 text-center text-sm">
+                No new notifications
+            </div>
 
-            <div v-else-if="notifications.length === 0" class="text-muted-foreground p-4 text-center text-sm">No new notifications</div>
-
-            <div v-else class="max-h-[400px] overflow-y-auto">
+            <div v-else class="shift-scrollbar min-h-0 flex-1 overflow-y-auto">
                 <div
                     v-for="notification in notifications"
                     :key="notification.id"
-                    class="group hover:bg-accent relative flex cursor-pointer flex-col gap-1 border-b p-4"
+                    class="group hover:bg-accent relative flex cursor-pointer items-center gap-2 border-b px-6 py-3"
                 >
-                    <div class="flex items-start justify-between gap-2">
-                        <Link :href="getNotificationUrl(notification)" class="flex-1 font-medium" @click="markAsRead(notification.id)">
+                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                        <Link :href="getNotificationUrl(notification)" class="flex-1 text-sm font-medium" @click="markAsRead(notification.id)">
                             {{ getNotificationTitle(notification) }}
                         </Link>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            class="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-                            @click="markAsRead(notification.id)"
-                        >
-                            <span class="sr-only">Mark as read</span>
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                class="lucide lucide-check"
-                            >
-                                <path d="M20 6 9 17l-5-5" />
-                            </svg>
-                        </Button>
+                        <p class="text-muted-foreground text-left text-xs">{{ notification.created_at }}</p>
                     </div>
-                    <p class="text-muted-foreground text-sm">{{ notification.created_at }}</p>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="focus-visible:bg-accent h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        @click="markAsRead(notification.id)"
+                    >
+                        <span class="sr-only">Mark as read</span>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-check"
+                        >
+                            <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                    </Button>
                 </div>
             </div>
 
-            <div v-if="notificationsIndexUrl" class="border-t p-2">
-                <Link :href="notificationsIndexUrl" class="hover:bg-accent block rounded-md p-2 text-center text-sm font-medium">
+            <div v-if="notificationsIndexUrl" class="shrink-0 border-t p-0" data-testid="notification-footer">
+                <Link
+                    :href="notificationsIndexUrl"
+                    class="hover:bg-accent focus-visible:bg-accent block rounded-none p-3 text-center text-sm font-medium focus-visible:outline-none"
+                >
                     View all notifications
                 </Link>
             </div>
-        </DropdownMenuContent>
-    </DropdownMenu>
+        </SheetContent>
+    </Sheet>
 </template>
