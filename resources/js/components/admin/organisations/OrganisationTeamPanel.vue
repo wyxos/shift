@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import OrganisationTeamIdentity from '@/components/admin/organisations/OrganisationTeamIdentity.vue';
 import DeleteDialog from '@/components/DeleteDialog.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ResponsiveRecordItem, ResponsiveRecordList } from '@/components/ui/record-list';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -112,18 +113,6 @@ watch(
     { immediate: true, deep: true },
 );
 
-function statusBadgeClass(status: OrganisationTeamUser['status']) {
-    if (status === 'owner') {
-        return 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200';
-    }
-
-    if (status === 'pending') {
-        return 'border-transparent bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200';
-    }
-
-    return '';
-}
-
 function formatDate(value: string | null | undefined, fallback: string) {
     if (!value) {
         return fallback;
@@ -144,7 +133,9 @@ function formatProjectCount(teamUser: OrganisationTeamUser) {
     return `${count} ${count === 1 ? 'project' : 'projects'}`;
 }
 
-function roleLabelForValue(value: string | null | undefined) {
+function roleLabel(teamUser: OrganisationTeamUser) {
+    const value = teamUser.roleLabel?.trim() || teamUser.role;
+
     if (!value) {
         return 'Role not assigned';
     }
@@ -157,10 +148,6 @@ function roleLabelForValue(value: string | null | undefined) {
             .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
             .join(' ')
     );
-}
-
-function roleLabel(teamUser: OrganisationTeamUser) {
-    return teamUser.roleLabel?.trim() || roleLabelForValue(teamUser.role);
 }
 
 function openAccessSheet(teamUser: OrganisationTeamUser) {
@@ -190,9 +177,7 @@ function openRemoveConfirmation(teamUser: OrganisationTeamUser) {
 }
 
 function closeRemoveConfirmation() {
-    if (removingUserProcessing.value) return;
-
-    removingUser.value = null;
+    if (!removingUserProcessing.value) removingUser.value = null;
 }
 
 function hasProject(projectId: number) {
@@ -287,75 +272,141 @@ function confirmRemoveOrganisationAccess() {
             </Button>
         </div>
 
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Last logged in</TableHead>
-                    <TableHead>Created on</TableHead>
-                    <TableHead>Verified on</TableHead>
-                    <TableHead>Project access</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead class="text-right">Actions</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                <TableEmpty v-if="organisation.teamUsers.length === 0" :colspan="8">No users have access to this organisation.</TableEmpty>
+        <ResponsiveRecordList
+            :empty="organisation.teamUsers.length === 0"
+            empty-label="No users have access to this organisation."
+            label="Team members"
+        >
+            <template #desktop>
+                <Table data-testid="organisation-team-table">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Last logged in</TableHead>
+                            <TableHead>Created on</TableHead>
+                            <TableHead>Verified on</TableHead>
+                            <TableHead>Project access</TableHead>
+                            <TableHead class="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableEmpty v-if="organisation.teamUsers.length === 0" :colspan="6"> No users have access to this organisation. </TableEmpty>
 
-                <TableRow v-for="teamUser in organisation.teamUsers" v-else :key="teamUser.id" :data-testid="`organisation-team-user-${teamUser.id}`">
-                    <TableCell class="min-w-[15rem] whitespace-normal">
-                        <div class="min-w-0">
-                            <div class="truncate font-medium">
-                                {{ teamUser.name }}
-                                <span class="text-muted-foreground font-normal">({{ teamUser.email }})</span>
-                            </div>
+                        <TableRow
+                            v-for="teamUser in organisation.teamUsers"
+                            v-else
+                            :key="teamUser.id"
+                            :data-testid="`organisation-team-user-${teamUser.id}`"
+                        >
+                            <TableCell class="min-w-[18rem] whitespace-normal">
+                                <OrganisationTeamIdentity
+                                    :email="teamUser.email"
+                                    :email-test-id="`organisation-team-email-${teamUser.id}`"
+                                    :identity-test-id="`organisation-team-identity-${teamUser.id}`"
+                                    :name="teamUser.name"
+                                    :role-label="roleLabel(teamUser)"
+                                    :role-test-id="`organisation-team-role-${teamUser.id}`"
+                                    :status="teamUser.status"
+                                    :status-label="teamUser.statusLabel"
+                                    :status-test-id="`organisation-team-status-${teamUser.id}`"
+                                />
+                            </TableCell>
+                            <TableCell class="text-muted-foreground" :data-testid="`organisation-team-last-login-${teamUser.id}`">
+                                {{ formatDate(teamUser.lastLoginAt, 'Never') }}
+                            </TableCell>
+                            <TableCell class="text-muted-foreground" :data-testid="`organisation-team-created-${teamUser.id}`">
+                                {{ formatDate(teamUser.createdAt, 'Unknown') }}
+                            </TableCell>
+                            <TableCell class="text-muted-foreground" :data-testid="`organisation-team-verified-${teamUser.id}`">
+                                {{ formatDate(teamUser.verifiedAt, 'Unverified') }}
+                            </TableCell>
+                            <TableCell class="text-muted-foreground" :data-testid="`organisation-team-project-count-${teamUser.id}`">
+                                {{ formatProjectCount(teamUser) }}
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex justify-end gap-2">
+                                    <ActionIconButton
+                                        v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
+                                        label="Edit project access"
+                                        title="Edit access"
+                                        :data-testid="`organisation-team-edit-${teamUser.organisationUserId}`"
+                                        @click="openAccessSheet(teamUser)"
+                                    >
+                                        <Pencil class="h-4 w-4" />
+                                    </ActionIconButton>
+                                    <ActionIconButton
+                                        v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
+                                        label="Remove organisation access"
+                                        title="Remove from organisation"
+                                        variant="destructive"
+                                        :data-testid="`organisation-team-remove-${teamUser.organisationUserId}`"
+                                        @click="openRemoveConfirmation(teamUser)"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </ActionIconButton>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </template>
+
+            <template #compact>
+                <ResponsiveRecordItem
+                    v-for="teamUser in organisation.teamUsers"
+                    :key="teamUser.id"
+                    :data-testid="`organisation-team-compact-user-${teamUser.id}`"
+                >
+                    <OrganisationTeamIdentity
+                        :email="teamUser.email"
+                        :name="teamUser.name"
+                        :role-label="roleLabel(teamUser)"
+                        :role-test-id="`organisation-team-compact-role-${teamUser.id}`"
+                        :status="teamUser.status"
+                        :status-label="teamUser.statusLabel"
+                    />
+
+                    <dl class="grid grid-cols-2 gap-3">
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <dt class="text-muted-foreground text-xs">Last logged in</dt>
+                            <dd class="text-sm">{{ formatDate(teamUser.lastLoginAt, 'Never') }}</dd>
                         </div>
-                    </TableCell>
-                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-last-login-${teamUser.id}`">
-                        {{ formatDate(teamUser.lastLoginAt, 'Never') }}
-                    </TableCell>
-                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-created-${teamUser.id}`">
-                        {{ formatDate(teamUser.createdAt, 'Unknown') }}
-                    </TableCell>
-                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-verified-${teamUser.id}`">
-                        {{ formatDate(teamUser.verifiedAt, 'Unverified') }}
-                    </TableCell>
-                    <TableCell class="text-muted-foreground" :data-testid="`organisation-team-project-count-${teamUser.id}`">
-                        {{ formatProjectCount(teamUser) }}
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant="outline" :data-testid="`organisation-team-role-${teamUser.id}`">{{ roleLabel(teamUser) }}</Badge>
-                    </TableCell>
-                    <TableCell>
-                        <Badge :class="statusBadgeClass(teamUser.status)" variant="secondary">{{ teamUser.statusLabel }}</Badge>
-                    </TableCell>
-                    <TableCell>
-                        <div class="flex justify-end gap-2">
-                            <ActionIconButton
-                                v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
-                                label="Edit project access"
-                                title="Edit access"
-                                :data-testid="`organisation-team-edit-${teamUser.organisationUserId}`"
-                                @click="openAccessSheet(teamUser)"
-                            >
-                                <Pencil class="h-4 w-4" />
-                            </ActionIconButton>
-                            <ActionIconButton
-                                v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
-                                label="Remove organisation access"
-                                title="Remove from organisation"
-                                variant="destructive"
-                                :data-testid="`organisation-team-remove-${teamUser.organisationUserId}`"
-                                @click="openRemoveConfirmation(teamUser)"
-                            >
-                                <Trash2 class="h-4 w-4" />
-                            </ActionIconButton>
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <dt class="text-muted-foreground text-xs">Created on</dt>
+                            <dd class="text-sm">{{ formatDate(teamUser.createdAt, 'Unknown') }}</dd>
                         </div>
-                    </TableCell>
-                </TableRow>
-            </TableBody>
-        </Table>
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <dt class="text-muted-foreground text-xs">Verified on</dt>
+                            <dd class="text-sm">{{ formatDate(teamUser.verifiedAt, 'Unverified') }}</dd>
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <dt class="text-muted-foreground text-xs">Project access</dt>
+                            <dd class="text-sm">{{ formatProjectCount(teamUser) }}</dd>
+                        </div>
+                    </dl>
+
+                    <template v-if="teamUser.organisationUserId && teamUser.status !== 'owner'" #actions>
+                        <ActionIconButton
+                            label="Edit project access"
+                            title="Edit access"
+                            :data-testid="`organisation-team-compact-edit-${teamUser.organisationUserId}`"
+                            @click="openAccessSheet(teamUser)"
+                        >
+                            <Pencil class="h-4 w-4" />
+                        </ActionIconButton>
+                        <ActionIconButton
+                            label="Remove organisation access"
+                            title="Remove from organisation"
+                            variant="destructive"
+                            :data-testid="`organisation-team-compact-remove-${teamUser.organisationUserId}`"
+                            @click="openRemoveConfirmation(teamUser)"
+                        >
+                            <Trash2 class="h-4 w-4" />
+                        </ActionIconButton>
+                    </template>
+                </ResponsiveRecordItem>
+            </template>
+        </ResponsiveRecordList>
     </section>
 
     <Sheet :open="sheetOpen" @update:open="(open) => !open && closeAccessSheet()">
