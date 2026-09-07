@@ -153,16 +153,31 @@ describe('Organisations/Index.vue', () => {
 
         expect(wrapper.text()).toContain('Team');
         expect(wrapper.text()).toContain('Acme Labs');
-        expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner User (owner@example.com)');
+        expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner User');
+        expect(wrapper.get('[data-testid="organisation-team-email-owner-7"]').text()).toBe('owner@example.com');
         expect(wrapper.get('[data-testid="organisation-team-user-owner-7"]').text()).toContain('Owner');
+        expect(wrapper.get('[data-testid="organisation-team-role-owner-7"]').element.closest('td')).toBe(
+            wrapper.get('[data-testid="organisation-team-identity-owner-7"]').element.closest('td'),
+        );
+        expect(wrapper.get('[data-testid="organisation-team-status-owner-7"]').element.closest('td')).toBe(
+            wrapper.get('[data-testid="organisation-team-identity-owner-7"]').element.closest('td'),
+        );
         expect(wrapper.get('[data-testid="organisation-team-project-count-owner-7"]').text()).toContain('2 projects');
-        expect(wrapper.get('[data-testid="organisation-team-user-access-20"]').text()).toContain('Jane Admin (jane@example.com)');
+        expect(wrapper.get('[data-testid="organisation-team-user-access-20"]').text()).toContain('Jane Admin');
+        expect(wrapper.get('[data-testid="organisation-team-email-access-20"]').text()).toBe('jane@example.com');
         expect(wrapper.get('[data-testid="organisation-team-last-login-access-20"]').text()).toContain('Never');
         expect(wrapper.get('[data-testid="organisation-team-verified-access-20"]').text()).toContain('Unverified');
         expect(wrapper.get('[data-testid="organisation-team-project-count-access-20"]').text()).toContain('1 project');
         expect(wrapper.find('[data-testid="organisation-team-edit-20"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="organisation-team-remove-20"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="organisation-team-remove-undefined"]').exists()).toBe(false);
+        expect(
+            wrapper
+                .get('[data-testid="organisation-team-table"]')
+                .findAll('thead th')
+                .map((header) => header.text()),
+        ).toEqual(['User', 'Last logged in', 'Created on', 'Verified on', 'Project access', 'Actions']);
+        expect(wrapper.find('[data-testid="organisation-team-compact-user-access-20"]').exists()).toBe(true);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 

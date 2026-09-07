@@ -108,6 +108,7 @@ describe('Dashboard.vue', () => {
         expect(wrapper.text()).toContain('Open Work');
         expect(wrapper.text()).toContain('Completion Rate');
         expect(wrapper.text()).toContain('High Priority Open');
+        expect(wrapper.text()).toContain('Awaiting Feedback');
         expect(wrapper.text()).toContain('100');
         expect(wrapper.text()).toContain('80');
         expect(wrapper.text()).toContain('25.0%');
@@ -119,6 +120,29 @@ describe('Dashboard.vue', () => {
         expect(wrapper.text()).toContain('Environment Exposure');
         expect(wrapper.find('a[href="/tasks"]').text()).toContain('Open Tasks');
         expect(wrapper.find('a[href="/requirements"]').text()).toContain('Review Requirements');
+
+        const summaryGrid = wrapper.get('[data-testid="dashboard-summary-grid"]');
+        const awaitingFeedbackCard = wrapper.get('[data-testid="awaiting-feedback-card"]');
+
+        expect(summaryGrid.classes()).toContain('xl:grid-cols-5');
+        expect(awaitingFeedbackCard.element.parentElement).toBe(summaryGrid.element);
+        expect(awaitingFeedbackCard.text()).toContain('5');
+        expect(awaitingFeedbackCard.text()).toContain('May be blocking closure');
+    });
+
+    it('keeps the four-card summary grid when no tasks await feedback', () => {
+        const wrapper = mount(Dashboard, {
+            props: {
+                metrics: {
+                    ...mockMetrics,
+                    awaiting_feedback: 0,
+                },
+                charts: mockCharts,
+            },
+        });
+
+        expect(wrapper.find('[data-testid="awaiting-feedback-card"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="dashboard-summary-grid"]').classes()).toContain('xl:grid-cols-4');
     });
 
     it('uses organisation-scoped links when shown inside an organisation dashboard', () => {

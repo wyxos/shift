@@ -272,7 +272,11 @@ const totalThroughputDelta = computed(() => {
                 </div>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div
+                class="grid gap-4 md:grid-cols-2"
+                :class="(props.metrics.awaiting_feedback ?? 0) > 0 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+                data-testid="dashboard-summary-grid"
+            >
                 <Card>
                     <CardHeader class="pb-2">
                         <CardDescription>Total Tasks</CardDescription>
@@ -289,6 +293,21 @@ const totalThroughputDelta = computed(() => {
                     <CardContent class="text-muted-foreground flex items-center gap-2 text-xs">
                         <Clock3 class="h-3.5 w-3.5" />
                         Pending + In Progress + Awaiting Feedback
+                    </CardContent>
+                </Card>
+
+                <Card
+                    v-if="(props.metrics.awaiting_feedback ?? 0) > 0"
+                    class="border-amber-300/70 bg-amber-50/30 dark:border-amber-700/50 dark:bg-amber-950/15"
+                    data-testid="awaiting-feedback-card"
+                >
+                    <CardHeader class="pb-2">
+                        <CardDescription>Awaiting Feedback</CardDescription>
+                        <CardTitle class="text-3xl">{{ props.metrics.awaiting_feedback }}</CardTitle>
+                    </CardHeader>
+                    <CardContent class="text-muted-foreground flex items-center gap-2 text-xs">
+                        <AlertTriangle class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        May be blocking closure
                     </CardContent>
                 </Card>
 
@@ -467,19 +486,6 @@ const totalThroughputDelta = computed(() => {
                             </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
-
-            <Card
-                v-if="(props.metrics.awaiting_feedback ?? 0) > 0"
-                class="border-amber-300/70 bg-amber-50/30 dark:border-amber-700/50 dark:bg-amber-950/15"
-            >
-                <CardContent class="flex items-center gap-3 py-4 text-sm">
-                    <AlertTriangle class="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <span>
-                        {{ props.metrics.awaiting_feedback }} task{{ props.metrics.awaiting_feedback === 1 ? '' : 's' }} awaiting feedback may be
-                        blocking closure.
-                    </span>
                 </CardContent>
             </Card>
         </div>
