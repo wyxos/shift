@@ -14,6 +14,26 @@ class TaskCollaboratorNotificationScheduler
 {
     public function __construct(private readonly TaskCollaboratorService $collaborators) {}
 
+    public function scheduleWidgetFeedbackCreated(Task $task): void
+    {
+        foreach (app(WidgetFeedbackAudience::class)->recipients($task) as $user) {
+            $scheduledAt = now()->addSeconds($this->gracePeriodSeconds());
+            $notification = TaskCollaboratorNotification::query()->firstOrCreate([
+                'task_id' => $task->id,
+                'event' => TaskCollaboratorNotification::EVENT_WIDGET_FEEDBACK_CREATED,
+                'kind' => TaskCollaboratorKind::Internal->value,
+                'user_id' => $user->id,
+            ], [
+                'scheduled_at' => $scheduledAt,
+            ]);
+
+            if ($notification->wasRecentlyCreated) {
+                SendPendingTaskCollaboratorNotification::dispatch($notification->id)
+                    ->delay($scheduledAt)->afterCommit();
+            }
+        }
+    }
+
     public function scheduleTaskCreated(Task $task, ?string $url = null): void
     {
         $task->load(['submitter', 'internalCollaborators', 'externalCollaborators', 'project']);
@@ -110,6 +130,7 @@ class TaskCollaboratorNotificationScheduler
         foreach ($recipientIds as $recipientId) {
             TaskCollaboratorNotification::query()
                 ->where('task_id', $task->id)
+                ->where('event', '!=', TaskCollaboratorNotification::EVENT_WIDGET_FEEDBACK_CREATED)
                 ->where('kind', $kind->value)
                 ->when(
                     $kind === TaskCollaboratorKind::Internal,
