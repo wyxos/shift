@@ -11,9 +11,11 @@ use App\Models\ProjectEnvironment;
 use App\Models\Task;
 use App\Services\ExternalUserService;
 use App\Services\ProjectEnvironmentService;
+use App\Services\TaskCollaboratorNotificationScheduler;
 use App\Services\TaskCollaboratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +25,7 @@ class ExternalWidgetController extends Controller
         private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly TaskCollaboratorService $taskCollaboratorService,
+        private readonly TaskCollaboratorNotificationScheduler $notifications,
     ) {}
 
     public function config(Request $request): JsonResponse
@@ -112,25 +115,31 @@ class ExternalWidgetController extends Controller
         $sourceUrl = $this->sourceUrl($attributes);
         $submitter = $attributes['anonymous'] ? null : $this->externalUser($project, $attributes);
 
-        $task = Task::query()->create([
-            'title' => $attributes['title'],
-            'description' => $attributes['description'] ?? null,
-            'project_id' => $project->id,
-            'status' => TaskStatus::Pending->value,
-            'priority' => TaskPriority::Medium->value,
-        ]);
+        $task = DB::transaction(function () use ($attributes, $project, $submitter, $selectedEnvironment, $sourceUrl): Task {
+            $task = Task::query()->create([
+                'title' => $attributes['title'],
+                'description' => $attributes['description'] ?? null,
+                'project_id' => $project->id,
+                'status' => TaskStatus::Pending->value,
+                'priority' => TaskPriority::Medium->value,
+            ]);
 
-        if ($submitter instanceof ExternalUser) {
-            $task->submitter()->associate($submitter)->save();
-            $this->taskCollaboratorService->initialize($task);
-        }
+            if ($submitter instanceof ExternalUser) {
+                $task->submitter()->associate($submitter)->save();
+                $this->taskCollaboratorService->initialize($task);
+            }
 
-        $task->metadata()->create([
-            'environment' => $selectedEnvironment ?? 'production',
-            'url' => $sourceUrl,
-            'source' => 'embedded_widget',
-            'intake_type' => $attributes['kind'],
-        ]);
+            $task->metadata()->create([
+                'environment' => $selectedEnvironment ?? 'production',
+                'url' => $sourceUrl,
+                'source' => 'embedded_widget',
+                'intake_type' => $attributes['kind'],
+            ]);
+
+            $this->notifications->scheduleWidgetFeedbackCreated($task);
+
+            return $task;
+        });
 
         $task->load(['submitter', 'metadata']);
 

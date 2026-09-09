@@ -10,6 +10,8 @@ class TaskCollaboratorNotification extends Model
 {
     public const EVENT_TASK_CREATED = 'task_created';
 
+    public const EVENT_WIDGET_FEEDBACK_CREATED = 'widget_feedback_created';
+
     public const EVENT_COLLABORATOR_ADDED = 'collaborator_added';
 
     protected $guarded = ['id'];

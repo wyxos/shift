@@ -11,7 +11,9 @@ use App\Models\TaskCollaboratorNotification;
 use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
+use App\Notifications\WidgetFeedbackNotification;
 use App\Services\ExternalNotificationService;
+use App\Services\WidgetFeedbackAudience;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Notifications\Notification;
@@ -62,7 +64,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
             return;
         }
 
-        if (! $pending->task || ! $this->collaboratorStillAttached($pending) || $this->recipientIsSubmitter($pending)) {
+        if (! $pending->task || ! $this->recipientStillEligible($pending) || $this->recipientIsSubmitter($pending)) {
             $pending->markCancelled();
             ExternalNotificationDelivery::findForTaskCollaborator($this->notificationId)?->markCancelled();
 
@@ -187,8 +189,13 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
         $delivery->markFailed('job_exhausted');
     }
 
-    private function collaboratorStillAttached(TaskCollaboratorNotification $pending): bool
+    private function recipientStillEligible(TaskCollaboratorNotification $pending): bool
     {
+        if ($pending->event === TaskCollaboratorNotification::EVENT_WIDGET_FEEDBACK_CREATED) {
+            return $pending->kind === TaskCollaboratorKind::Internal
+                && app(WidgetFeedbackAudience::class)->recipients($pending->task)->contains('id', $pending->user_id);
+        }
+
         return TaskCollaborator::query()
             ->where('task_id', $pending->task_id)
             ->where('kind', $pending->kind->value)
@@ -236,6 +243,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
     {
         return match ($pending->event) {
             TaskCollaboratorNotification::EVENT_TASK_CREATED => new TaskCreationNotification($pending->task, $url ?? $pending->url),
+            TaskCollaboratorNotification::EVENT_WIDGET_FEEDBACK_CREATED => new WidgetFeedbackNotification($pending->task),
             TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED => new TaskCollaboratorAddedNotification($pending->task, $url ?? $pending->url),
         };
     }
