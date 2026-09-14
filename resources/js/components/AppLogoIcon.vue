@@ -13,20 +13,12 @@ defineProps<Props>();
 </script>
 
 <template>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" :class="className" v-bind="$attrs">
-        <defs>
-            <linearGradient id="shift-blue" x1="0" y1="0" x2="40" y2="0" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stop-color="#0B1D4D" />
-                <stop offset="0.5" stop-color="#123B8C" />
-                <stop offset="1" stop-color="#1B4DB5" />
-            </linearGradient>
-        </defs>
-        <g fill="url(#shift-blue)" transform="translate(0 5) scale(0.25)">
-            <path d="M32 24h86l-10 12H22z" />
-            <path d="M40 42h64l-8 6H32z" />
-            <path d="M24 54h98l-12 12H12z" />
-            <path d="M44 72h68l-8 6H36z" />
-            <path d="M14 84h110l-14 12H0z" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132" :class="className" v-bind="$attrs" aria-hidden="true">
+        <g transform="translate(8 23)">
+            <path
+                fill="#6798FF"
+                d="M46 0H116L94 25H68Q65 25 63 27L48 42H12Q7 42 10 38L42 3Q44 0 46 0Z M0 86L34 59H49L65 43H104Q109 43 106 47L76 82Q72 86 68 86Z"
+            />
         </g>
     </svg>
 </template>
