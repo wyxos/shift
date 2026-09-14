@@ -14,12 +14,12 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEmailImportController;
 use App\Http\Controllers\TaskErrorOccurrenceController;
 use App\Support\LaravelIssueReportingDemo;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Home');
+Route::get('/', function (Request $request): RedirectResponse {
+    return to_route($request->user() ? 'dashboard' : 'login');
 })->name('home');
 
 Route::get('docs/laravel-issue-reporting-demo/{screen}', function (string $screen) {
