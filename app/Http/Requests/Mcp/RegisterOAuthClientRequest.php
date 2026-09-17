@@ -21,7 +21,7 @@ class RegisterOAuthClientRequest extends FormRequest
         return [
             'client_name' => ['nullable', 'string', 'max:255'],
             'redirect_uris' => ['required', 'array', 'min:1', 'max:5'],
-            'redirect_uris.*' => ['required', 'url', 'distinct'],
+            'redirect_uris.*' => ['required', 'string', 'distinct', 'max:2048'],
             'grant_types' => ['required', 'array', 'size:2'],
             'grant_types.*' => ['required', 'string', 'distinct', Rule::in(['authorization_code', 'refresh_token'])],
             'response_types' => ['required', 'array', 'size:1'],
@@ -41,7 +41,7 @@ class RegisterOAuthClientRequest extends FormRequest
                 if (! is_string($redirectUri) || ! $this->isAllowedRedirectUri($redirectUri)) {
                     $validator->errors()->add(
                         'redirect_uris',
-                        'Redirect URIs must use HTTPS, except for HTTP loopback callbacks.',
+                        'Redirect URIs must use HTTPS, HTTP loopback, or the Cursor callback scheme.',
                     );
                 }
             }
@@ -60,7 +60,7 @@ class RegisterOAuthClientRequest extends FormRequest
         $scheme = strtolower((string) parse_url($redirectUri, PHP_URL_SCHEME));
         $host = strtolower(trim((string) parse_url($redirectUri, PHP_URL_HOST), '[]'));
 
-        if ($scheme === 'https') {
+        if ($scheme === 'https' || $scheme === 'cursor') {
             return $host !== '';
         }
 

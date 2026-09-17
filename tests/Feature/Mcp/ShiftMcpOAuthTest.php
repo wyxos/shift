@@ -85,6 +85,19 @@ test('registers only public OAuth clients with safe redirect URIs', function () 
         ->assertJsonValidationErrors(['token_endpoint_auth_method']);
 });
 
+test('registers Cursor custom-scheme redirect URIs', function () {
+    $this->postJson('/oauth/register', [
+        'client_name' => 'Cursor',
+        'redirect_uris' => ['cursor://anysphere.cursor-mcp/oauth/callback'],
+        'grant_types' => ['authorization_code', 'refresh_token'],
+        'response_types' => ['code'],
+        'token_endpoint_auth_method' => 'none',
+        'scope' => 'mcp:read mcp:write',
+    ])
+        ->assertCreated()
+        ->assertJsonMissing(['client_secret']);
+});
+
 test('completes a PKCE OAuth flow and uses the resulting token for MCP', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create([
