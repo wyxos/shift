@@ -38,6 +38,15 @@ test('publishes OAuth authorization server and protected resource metadata', fun
             'bearer_methods_supported' => ['header'],
         ]);
 
+    $this->getJson('/.well-known/oauth-protected-resource/mcp/shift')
+        ->assertOk()
+        ->assertJson([
+            'resource' => 'https://shift.test/mcp/shift',
+            'authorization_servers' => ['https://shift.test'],
+            'scopes_supported' => ['mcp:read', 'mcp:write'],
+            'bearer_methods_supported' => ['header'],
+        ]);
+
     $this->getJson('/.well-known/oauth-authorization-server')
         ->assertOk()
         ->assertJson([

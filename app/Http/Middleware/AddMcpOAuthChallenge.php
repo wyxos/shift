@@ -22,10 +22,14 @@ class AddMcpOAuthChallenge
             $response = response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
+        if ($response->isRedirection()) {
+            $response = response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
         if ($response->getStatusCode() === 401) {
             $response->headers->set('WWW-Authenticate', sprintf(
-                'Bearer resource_metadata="%s", scope="%s"',
-                route('mcp.oauth.protected-resource'),
+                'Bearer realm="mcp", resource_metadata="%s", scope="%s"',
+                route('mcp.oauth.protected-resource', ['path' => $request->path()]),
                 implode(' ', array_keys(config('shift_mcp.scopes'))),
             ));
         }

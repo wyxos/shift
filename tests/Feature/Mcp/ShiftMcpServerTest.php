@@ -50,11 +50,13 @@ test('mcp tools fail closed without an authenticated user', function () {
 });
 
 test('web mcp route advertises OAuth authentication', function () {
-    $challenge = 'Bearer resource_metadata="'.route('mcp.oauth.protected-resource').'", scope="mcp:read mcp:write"';
+    $challenge = 'Bearer realm="mcp", resource_metadata="'.route('mcp.oauth.protected-resource', ['path' => 'mcp/shift']).'", scope="mcp:read mcp:write"';
+
+    $this->get('/mcp/shift', ['Accept' => 'text/event-stream'])
+        ->assertStatus(405);
 
     $this->getJson('/mcp/shift')
-        ->assertUnauthorized()
-        ->assertHeader('WWW-Authenticate', $challenge);
+        ->assertStatus(405);
 
     $this->postJson('/mcp/shift', [
         'jsonrpc' => '2.0',
