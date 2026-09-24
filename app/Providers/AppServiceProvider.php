@@ -63,6 +63,8 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('ai-email-import:'.$key);
         });
 
-        URL::forceScheme('https');
+        if (! app()->environment('local')) {
+            URL::forceScheme('https');
+        }
     }
 }

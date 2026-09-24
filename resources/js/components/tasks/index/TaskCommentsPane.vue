@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
+import { imageTiles } from '@/shared/tasks/image-tile';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
 import { Paperclip } from 'lucide-vue-next';
@@ -14,6 +15,7 @@ import TaskErrorOccurrencesPane from './TaskErrorOccurrencesPane.vue';
 const props = defineProps<{
     state: any;
 }>();
+const vImageTiles = imageTiles;
 const state = props.state;
 const threadComposerHtmlModel = computed({
     get: () => state.threadComposerHtml,
@@ -229,7 +231,8 @@ watch(deleteDialogOpen, (open) => {
                                     </Badge>
                                 </div>
                                 <div
-                                    class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-cover"
+                                    v-image-tiles
+                                    class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-contain"
                                     @click="state.onRichContentClick"
                                     v-html="renderRichContent(message.content)"
                                 ></div>
