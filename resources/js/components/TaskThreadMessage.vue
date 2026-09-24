@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { imageTiles } from '@/shared/tasks/image-tile';
 import hljs from 'highlight.js/lib/core';
 import cssLang from 'highlight.js/lib/languages/css';
 import jsLang from 'highlight.js/lib/languages/javascript';
@@ -47,6 +48,7 @@ interface Emits {
 
 const props = defineProps<Props>();
 defineEmits<Emits>();
+const vImageTiles = imageTiles;
 
 const contentRef = ref<HTMLElement | null>(null);
 
@@ -98,7 +100,7 @@ watch(
                     :class="message.isCurrentUser ? 'rounded-br-none bg-blue-200' : 'rounded-bl-none bg-gray-200 text-gray-800'"
                     class="tiptap ProseMirror !h-auto !max-h-none rounded-lg p-3 text-left"
                 >
-                    <div ref="contentRef" class="" v-html="message.content"></div>
+                    <div ref="contentRef" v-image-tiles v-html="message.content"></div>
                 </div>
                 <!-- Display message attachments if any (backend already filters embedded ones) -->
                 <div v-if="(message.attachments || []).length > 0" class="mt-2">

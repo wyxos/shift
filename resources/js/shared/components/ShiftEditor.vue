@@ -20,6 +20,7 @@ import InlineImage from '../extensions/inlineImage';
 import ShiftMention from '../extensions/mention';
 import ReplyQuote from '../extensions/replyQuote';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
+import { imageTiles } from '../tasks/image-tile';
 import { renderRichContent } from '../tasks/rich-content';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
@@ -30,6 +31,8 @@ import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachme
 import { useShiftEditorMentions } from './shift-editor/useShiftEditorMentions';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
+
+const vImageTiles = imageTiles;
 
 declare const route: undefined | ((name: string, params?: Record<string, unknown>) => string);
 
@@ -410,6 +413,7 @@ defineExpose({ confirmMentionAddition, editor, reset });
 <template>
     <div>
         <div
+            v-image-tiles
             :class="['tiptap', { 'is-focused': editorFocused }]"
             data-testid="tiptap-editor"
             :style="editorStyle"
