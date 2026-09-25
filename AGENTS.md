@@ -11,7 +11,7 @@ Read `.codex/agents/laravel-boost/index.md` for the Laravel Boost baseline and `
 - Treat SDK-facing route, payload, auth, attachment, install, or notification changes as cross-repo contract changes. Update the SDK in the same task.
 - For editor-backed task create and edit flows, use the canonical task-list routes and route names (`tasks.*`), with create/edit state owned by the `Tasks/Index` sheet flow. The former `tasks.v2.*`/`tasks-v2` surface was removed; `tasks.create` and `tasks.edit` are redirect compatibility routes, not page owners.
 - For task and thread authorization tests, establish a real access path first. Hidden tasks intentionally return `404`.
-- For MCP route, auth, tool, or project-visibility work, read `shared:projects/notes/shift-mcp.md` through Knowledge MCP before changing behavior.
+- For MCP route, auth, tool, or project-visibility work, read `projects/shift.md` and `projects/shift/engineering.md` through Knowledge MCP before changing behavior.
 - Shared task UI or helpers that may be consumed by the SDK must not rely on a global Ziggy `route()` helper at SDK runtime. Pass explicit `/shift/api/**` URLs from the consuming SDK layer when needed.
 - After SDK UI changes in the sibling repo, rebuild there with `npm run build:shift`, then publish here with `php artisan shift:publish --group=public`.
 - For public SHIFT changes that need production, commit and push this repo first, then bring that commit into `../shift-hosted` by merge/cherry-pick/fetch-based application. Do not manually recreate the same edit in `shift-hosted` unless the user explicitly approves that exceptional fallback.
