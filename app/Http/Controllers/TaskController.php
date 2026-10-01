@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Http\Requests\SearchTaskCollaboratorsRequest;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Organisation;
@@ -924,7 +925,7 @@ class TaskController extends Controller
             ]);
     }
 
-    public function collaborators(Project $project, Request $request): JsonResponse
+    public function collaborators(Project $project, SearchTaskCollaboratorsRequest $request): JsonResponse
     {
         if (! $this->visibleProjectsQuery()->whereKey($project->id)->exists()) {
             abort(404);
@@ -939,10 +940,10 @@ class TaskController extends Controller
 
         if (! filled($environment)) {
             $externalError = 'Select an environment before tagging external collaborators.';
-        } else {
+        } elseif ($search !== '') {
             try {
-                $lookup = $this->externalUserService->searchCollaborators($project, (string) $environment, $search);
-                $external = $lookup['users'];
+                $lookup = $this->externalUserService->searchCollaborators($project, (string) $environment, $search, paginate: true, perPage: 10);
+                $external = array_slice($lookup['users'], 0, 10);
                 $externalAvailable = true;
             } catch (\RuntimeException $exception) {
                 $externalError = $exception->getMessage();
@@ -951,7 +952,7 @@ class TaskController extends Controller
 
         return response()->json([
             'internal' => $this->taskCollaboratorService
-                ->internalCandidates($project, $search)
+                ->searchInternalCandidates($project, $search)
                 ->map(fn (User $user) => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -960,7 +961,7 @@ class TaskController extends Controller
                 ->values(),
             'internal_available' => true,
             'internal_error' => null,
-            'internal_label' => 'Team',
+            'internal_label' => 'SHIFT team',
             'internal_description' => 'Registered SHIFT users on this project.',
             'external' => $external,
             'external_available' => $externalAvailable,

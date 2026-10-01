@@ -1446,8 +1446,9 @@ test('collaborator candidate endpoint requires an environment before external lo
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
+    $this->user->update(['name' => 'Alex Owner']);
 
-    $registeredUser = User::factory()->create();
+    $registeredUser = User::factory()->create(['name' => 'Alex Registered']);
     \App\Models\ProjectUser::factory()->create([
         'project_id' => $project->id,
         'user_id' => $registeredUser->id,
@@ -1465,7 +1466,7 @@ test('collaborator candidate endpoint requires an environment before external lo
     ]);
 
     $response = $this->actingAs($this->user)
-        ->getJson(route('tasks.collaborators', $project));
+        ->getJson(route('tasks.collaborators', ['project' => $project, 'search' => 'Alex']));
 
     $response
         ->assertOk()
@@ -1506,6 +1507,7 @@ test('collaborator candidate endpoint uses the selected environment registration
         ->getJson(route('tasks.collaborators', [
             'project' => $project,
             'environment' => 'staging',
+            'search' => 'Client',
         ]));
 
     $response

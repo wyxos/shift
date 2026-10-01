@@ -49,6 +49,28 @@ class TaskCollaboratorService
             ->get(['id', 'name', 'email']);
     }
 
+    public function searchInternalCandidates(Project $project, string $search, int $limit = 10): Collection
+    {
+        $search = trim($search);
+        if ($search === '') {
+            return collect();
+        }
+
+        $candidates = $this->internalCandidates($project);
+        $matches = app(CollaboratorSearch::class)->search($project, $candidates, $search, $limit);
+        if ($matches !== null) {
+            return $matches;
+        }
+
+        $term = mb_strtolower($search);
+
+        return $candidates
+            ->filter(fn (User $user): bool => str_contains(mb_strtolower($user->name), $term) || str_contains(mb_strtolower($user->email), $term))
+            ->sortBy(fn (User $user): int => str_starts_with(mb_strtolower($user->name), $term) ? 0 : (str_starts_with(mb_strtolower($user->email), $term) ? 1 : 2))
+            ->take($limit)
+            ->values();
+    }
+
     public function validateInternalCollaboratorIds(Project $project, array $ids): array
     {
         $normalizedIds = collect($ids)
