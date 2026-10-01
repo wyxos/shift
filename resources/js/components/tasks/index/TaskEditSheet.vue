@@ -9,6 +9,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import TaskChoiceMenu from '@/shared/components/tasks/TaskChoiceMenu.vue';
 import { getPriorityOptions, getRequirementStatusOptions, getStatusOptions } from '@/shared/tasks/presentation';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { ArrowLeft } from 'lucide-vue-next';
@@ -143,43 +144,39 @@ function formatTaskTime(value?: string | null) {
                                 </div>
                             </div>
 
-                            <div v-if="!state.isRequirementPhase" class="space-y-2">
-                                <Label class="text-muted-foreground">Status</Label>
-                                <ButtonGroup
-                                    v-model="editStatusModel"
-                                    :aria-label="'Task status'"
-                                    :class="'xl:grid-cols-4'"
-                                    :columns="2"
-                                    :disabled="!state.canEditTaskScope || state.taskSaving"
-                                    :options="taskStatusOptions"
-                                    test-id-prefix="task-status"
-                                />
-                            </div>
+                            <div class="grid grid-cols-2 gap-3" data-testid="task-choice-fields">
+                                <div v-if="!state.isRequirementPhase" class="space-y-2">
+                                    <Label class="text-muted-foreground">Status</Label>
+                                    <TaskChoiceMenu
+                                        v-model="editStatusModel"
+                                        :label="'Task status'"
+                                        :disabled="!state.canEditTaskScope || state.taskSaving"
+                                        :options="taskStatusOptions"
+                                        test-id-prefix="task-status"
+                                    />
+                                </div>
 
-                            <div v-if="state.isRequirementPhase" class="space-y-2">
-                                <Label class="text-muted-foreground">Requirement state</Label>
-                                <ButtonGroup
-                                    v-model="editRequirementStatusModel"
-                                    :aria-label="'Requirement state'"
-                                    :class="'xl:grid-cols-3'"
-                                    :columns="2"
-                                    :disabled="!state.canEditTaskScope || state.taskSaving"
-                                    :options="requirementStatusOptions"
-                                    test-id-prefix="requirement-status"
-                                />
-                            </div>
+                                <div v-if="state.isRequirementPhase" class="space-y-2">
+                                    <Label class="text-muted-foreground">Requirement state</Label>
+                                    <TaskChoiceMenu
+                                        v-model="editRequirementStatusModel"
+                                        :label="'Requirement state'"
+                                        :disabled="!state.canEditTaskScope || state.taskSaving"
+                                        :options="requirementStatusOptions"
+                                        test-id-prefix="requirement-status"
+                                    />
+                                </div>
 
-                            <div class="space-y-2">
-                                <Label class="text-muted-foreground">Priority</Label>
-                                <ButtonGroup
-                                    v-model="editPriorityModel"
-                                    :aria-label="'Task priority'"
-                                    :class="'xl:grid-cols-3'"
-                                    :columns="3"
-                                    :disabled="!state.canEditTaskScope || state.taskSaving"
-                                    :options="taskPriorityOptions"
-                                    test-id-prefix="task-priority"
-                                />
+                                <div class="space-y-2">
+                                    <Label class="text-muted-foreground">Priority</Label>
+                                    <TaskChoiceMenu
+                                        v-model="editPriorityModel"
+                                        :label="'Task priority'"
+                                        :disabled="!state.canEditTaskScope || state.taskSaving"
+                                        :options="taskPriorityOptions"
+                                        test-id-prefix="task-priority"
+                                    />
+                                </div>
                             </div>
 
                             <div class="space-y-2">

@@ -93,7 +93,10 @@ describe('Tasks/Index.vue', () => {
         await (wrapper.vm as any).$nextTick();
         expect((wrapper.vm as any).editForm.collaborators).toEqual(nextCollaborators);
 
-        await wrapper.get('[data-testid="task-priority-medium"]').trigger('click');
+        wrapper
+            .findAllComponents({ name: 'TaskChoiceMenu' })
+            .find((control) => control.props('testIdPrefix') === 'task-priority')!
+            .vm.$emit('update:modelValue', 'medium');
         await flushPromises();
 
         vi.advanceTimersByTime(800);

@@ -141,14 +141,13 @@ describe('Tasks/Index.vue', () => {
         expect(editLayout.classes()).not.toContain('lg:grid-cols-[1.15fr_0.85fr]');
         expect(wrapper.get('[data-testid="task-edit-details-pane"]').classes()).toContain('min-w-0');
         expect(wrapper.get('[data-testid="task-comments-pane"]').classes()).toContain('min-w-0');
-        expect(editStatusGroup.classes()).toContain('flex');
-        expect(editStatusGroup.classes()).toContain('flex-wrap');
-        expect(editStatusGroup.classes()).toContain('xl:grid-cols-4');
+        expect(editStatusGroup.text()).toContain('Pending');
+        expect(wrapper.get('[data-testid="task-choice-fields"]').classes()).toContain('grid-cols-2');
         expect(mobilePaneGroup.classes()).toContain('flex');
         expect(mobilePaneGroup.classes()).toContain('flex-wrap');
         expect(wrapper.get('[data-testid="edit-mobile-pane-details"]').text()).toContain('Details');
         expect(wrapper.get('[data-testid="edit-mobile-pane-comments"]').text()).toContain('Comments');
-        expect(wrapper.get('[data-testid="task-status-pending"]').classes()).toContain('bg-amber-100');
+        expect(wrapper.get('[data-testid="task-status-trigger"]').text()).toContain('Pending');
 
         wrapper.unmount();
         vi.useRealTimers();
@@ -232,9 +231,12 @@ describe('Tasks/Index.vue', () => {
         await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
-        await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
+        wrapper
+            .findAllComponents({ name: 'TaskChoiceMenu' })
+            .find((control) => control.props('testIdPrefix') === 'task-status')!
+            .vm.$emit('update:modelValue', 'in-progress');
         await flushPromises();
-        expect(wrapper.get('[data-testid="task-status-in-progress"]').classes()).toContain('bg-sky-100');
+        expect(wrapper.get('[data-testid="task-status-trigger"]').text()).toContain('In Progress');
 
         vi.advanceTimersByTime(800);
         await flushPromises();
@@ -289,9 +291,9 @@ describe('Tasks/Index.vue', () => {
 
         expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="task-edit-title"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.get('[data-testid="task-status-in-progress"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[data-testid="task-status-trigger"]').attributes('disabled')).toBeDefined();
 
-        await wrapper.get('[data-testid="task-status-in-progress"]').trigger('click');
+        await wrapper.get('[data-testid="task-status-trigger"]').trigger('click');
         vi.advanceTimersByTime(800);
         await flushPromises();
 
