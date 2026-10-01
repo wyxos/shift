@@ -41,6 +41,7 @@ export function useTaskIndexThreadState(options: UseTaskIndexThreadStateOptions)
                     content: payload.html,
                     type: payload.audience === 'team' ? 'internal' : 'external',
                     temp_identifier: payload.tempIdentifier,
+                    client_request_id: payload.clientRequestId,
                     mentions: payload.mentions,
                     add_collaborators: payload.addCollaborators,
                 });

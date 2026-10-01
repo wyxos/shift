@@ -10,10 +10,13 @@ import { useTaskThreadRichInteraction } from './useTaskThreadRichInteraction';
 type ThreadPayload = {
     html: string;
     tempIdentifier: string;
+    clientRequestId?: string;
     audience: 'all' | 'team';
     mentions: MentionIdentity[];
     addCollaborators: MentionIdentity[];
 };
+
+type PendingThread = { taskId: number; payload: ThreadPayload };
 
 type UseTaskThreadStateOptions<TTaskDetail> = {
     editOpen: Ref<boolean>;
@@ -43,6 +46,11 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     const threadSending = ref(false);
     const threadError = ref<string | null>(null);
     const threadMessages = ref<ThreadMessage[]>([]);
+    const transientMessages = new Map<number, ThreadMessage[]>();
+    const pendingThreads = new Map<string, PendingThread>();
+    let activeTaskId: number | null = null;
+    let fetchGeneration = 0;
+    let localMessageSequence = 0;
     const threadComposerRef = ref<any>(null);
     const threadComposerHtml = ref('');
     const threadComposerUploading = ref(false);
@@ -124,6 +132,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     );
 
     function resetThreadState() {
+        fetchGeneration += 1;
+        activeTaskId = null;
         threadTempIdentifier.value = Date.now().toString();
         threadLoading.value = false;
         threadSending.value = false;
@@ -171,17 +181,66 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     }
 
     async function fetchThreads(taskId: number) {
+        const generation = ++fetchGeneration;
+        activeTaskId = taskId;
         threadLoading.value = true;
         threadError.value = null;
         try {
             const list = await options.fetchThreads(taskId);
-            threadMessages.value = list.map((thread) => mapThreadToMessage<TaskAttachment>(thread));
+            if (generation !== fetchGeneration || activeTaskId !== taskId) return;
+            const fetched = list.map((thread) => mapThreadToMessage<TaskAttachment>(thread));
+            const fetchedIds = new Set(fetched.map((message) => message.id));
+            const deliveredDuringFetch = threadMessages.value.filter((message) => message.id && message.clientId.startsWith('local-') && !fetchedIds.has(message.id));
+            threadMessages.value = [...fetched, ...deliveredDuringFetch, ...(transientMessages.get(taskId) ?? [])];
+            refreshThreadSending();
             scrollCommentsToBottomSoon();
         } catch (error: any) {
-            threadError.value = getErrorMessage(error, 'Failed to load comments');
+            if (generation === fetchGeneration) threadError.value = getErrorMessage(error, 'Failed to load comments');
         } finally {
-            threadLoading.value = false;
+            if (generation === fetchGeneration) threadLoading.value = false;
         }
+    }
+
+    function refreshThreadSending() {
+        threadSending.value = (transientMessages.get(activeTaskId ?? -1) ?? []).some((message) => message.pending);
+    }
+
+    function updateTransientMessage(taskId: number, clientId: string, update: (message: ThreadMessage) => ThreadMessage | null) {
+        const messages = transientMessages.get(taskId) ?? [];
+        const next = messages.map((message) => (message.clientId === clientId ? update(message) : message)).filter((message): message is ThreadMessage => message !== null);
+        if (next.length) transientMessages.set(taskId, next);
+        else transientMessages.delete(taskId);
+        if (activeTaskId === taskId) {
+            threadMessages.value = threadMessages.value.map((message) => (message.clientId === clientId ? update(message) : message)).filter((message): message is ThreadMessage => message !== null);
+            refreshThreadSending();
+        }
+    }
+
+    async function createPendingThread(clientId: string, taskId: number, payload: ThreadPayload) {
+        try {
+            const thread = await options.createThread(taskId, payload);
+            const serverMessage = { ...mapThreadToMessage<TaskAttachment>(thread), clientId };
+            updateTransientMessage(taskId, clientId, () => serverMessage);
+            const remaining = (transientMessages.get(taskId) ?? []).filter((message) => message.clientId !== clientId);
+            if (remaining.length) transientMessages.set(taskId, remaining);
+            else transientMessages.delete(taskId);
+            if (activeTaskId === taskId) {
+                if (!threadMessages.value.some((message) => message.clientId === clientId)) threadMessages.value.push(serverMessage);
+                scrollCommentsToBottomSoon();
+            }
+            pendingThreads.delete(clientId);
+        } catch (error: any) {
+            const message = getErrorMessage(error, 'Failed to send comment');
+            updateTransientMessage(taskId, clientId, (item) => ({ ...item, pending: false, failed: true, time: 'Failed to send' }));
+            if (options.onSendError) options.onSendError(message);
+        }
+    }
+
+    function retryThreadSend(message: ThreadMessage) {
+        const pending = pendingThreads.get(message.clientId);
+        if (!pending || message.pending || !message.failed) return;
+        updateTransientMessage(pending.taskId, message.clientId, (item) => ({ ...item, pending: true, failed: false, time: 'Sending...' }));
+        void createPendingThread(message.clientId, pending.taskId, pending.payload);
     }
 
     async function handleThreadSend(payload: {
@@ -198,6 +257,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         if (!html) return;
 
         const taskId = options.getTaskId(options.editTask.value);
+        activeTaskId = taskId;
 
         if (threadEditingId.value) {
             threadEditSaving.value = true;
@@ -238,8 +298,19 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             return;
         }
 
-        const localId = `local-${Date.now()}`;
+        const localId = `local-${Date.now()}-${++localMessageSequence}`;
         const createdAt = new Date().toISOString();
+        const request: ThreadPayload = {
+            html,
+            tempIdentifier: threadTempIdentifier.value,
+            clientRequestId: globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+                const digit = Math.floor(Math.random() * 16);
+                return (char === 'x' ? digit : (digit & 3) | 8).toString(16);
+            }),
+            audience: threadAudience.value,
+            mentions: payload.mentions ?? [],
+            addCollaborators: payload.addCollaborators ?? [],
+        };
         const optimistic: ThreadMessage = {
             clientId: localId,
             author: options.optimisticAuthor?.() || 'You',
@@ -249,40 +320,24 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             isYou: true,
             pending: true,
             failed: false,
-            audience: threadAudience.value,
+            audience: request.audience,
+            attachments: (payload.attachments ?? []).map((attachment, index) => ({
+                id: -(index + 1),
+                original_filename: attachment.name ?? attachment.original_filename ?? 'Attachment',
+                path: attachment.path,
+            })),
         };
+        pendingThreads.set(localId, { taskId, payload: request });
+        transientMessages.set(taskId, [...(transientMessages.get(taskId) ?? []), optimistic]);
         threadMessages.value = [...threadMessages.value, optimistic];
-
-        try {
-            threadSending.value = true;
-            const thread = await options.createThread(taskId, {
-                html,
-                tempIdentifier: threadTempIdentifier.value,
-                audience: threadAudience.value,
-                mentions: payload.mentions ?? [],
-                addCollaborators: payload.addCollaborators ?? [],
-            });
-            const serverMessage = mapThreadToMessage<TaskAttachment>(thread);
-            threadMessages.value = [...threadMessages.value.filter((message) => message.clientId !== localId), serverMessage];
-            threadTempIdentifier.value = Date.now().toString();
-            threadAudience.value = 'all';
-            threadAudienceError.value = null;
-            threadComposerHtml.value = '';
-            threadComposerRef.value?.reset?.();
-            scrollCommentsToBottomSoon();
-        } catch (error: any) {
-            const message = getErrorMessage(error, 'Failed to send comment');
-            threadMessages.value = threadMessages.value.map((item) =>
-                item.clientId === localId ? { ...item, pending: false, failed: true, time: 'Failed to send' } : item,
-            );
-            if (options.onSendError) {
-                options.onSendError(message);
-            } else {
-                threadError.value = message;
-            }
-        } finally {
-            threadSending.value = false;
-        }
+        refreshThreadSending();
+        threadComposerRef.value?.reset?.();
+        threadComposerHtml.value = '';
+        threadTempIdentifier.value = `${Date.now()}-${localMessageSequence}`;
+        threadAudience.value = 'all';
+        threadAudienceError.value = null;
+        scrollCommentsToBottomSoon();
+        await createPendingThread(localId, taskId, request);
     }
 
     function startThreadEdit(message: ThreadMessage) {
@@ -421,6 +476,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         onMessageTouchEnd,
         onRichContentClick,
         resetThreadState,
+        retryThreadSend,
         scrollCommentsToBottomSoon,
         shouldShowCopySelection,
         startReplyToMessage,
