@@ -17,15 +17,6 @@ function expectBorderOnlyFocus(classes: string[]) {
     expect(classes).not.toContain('transition-[color,box-shadow]');
 }
 
-function expectBorderOnlyFocusSource(source: string) {
-    expect(source).toContain('focus-visible:border-ring');
-    expect(source).not.toMatch(/focus-visible:ring/);
-    expect(source).not.toMatch(/ring-offset/);
-    expect(source).not.toMatch(/focus-visible:(shadow|drop-shadow|blur)/);
-    expect(source).not.toMatch(/\bshadow-(xs|sm|md|lg|xl|2xl)\b/);
-    expect(source).not.toContain('transition-[color,box-shadow]');
-}
-
 function styleRule(source: string, selector: string) {
     const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
@@ -94,9 +85,12 @@ describe('field focus styles', () => {
         const titleInputSource = source.slice(Math.max(0, titleInputIndex - 800), titleInputIndex + 300);
 
         expect(titleInputIndex).toBeGreaterThan(-1);
-        expectBorderOnlyFocusSource(titleInputSource);
-        expect(titleInputSource).toContain('border-input');
-        expect(titleInputSource).not.toContain('border-transparent');
+        expect(titleInputSource).toContain('<InputGroupInput');
+        const groupSource = readFileSync(join(process.cwd(), 'resources/js/components/ui/input-group/InputGroup.vue'), 'utf8');
+        expect(groupSource).toContain('border-input');
+        expect(groupSource).toContain('has-[[data-slot=input-group-control]:focus-visible]:border-ring');
+        expect(groupSource).not.toMatch(/focus-visible\]:ring/);
+        expect(groupSource).not.toContain('ring-offset');
     });
 
     it('keeps the shared rich editor neutral until focus changes only the border', () => {
