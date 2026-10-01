@@ -14,7 +14,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
-import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
 import ShiftMention from '../extensions/mention';
@@ -95,6 +95,10 @@ const props = withDefaults(
 
 const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
 const showEmoji = ref(false);
+const emojiPopover = ref<HTMLElement | null>(null);
+const emojiToolbar = ref<HTMLElement | null>(null);
+const emojiPlacement = ref<'above' | 'below'>('above');
+const emojiPopoverStyle = ref({ left: '0px', top: '0px', visibility: 'hidden' as 'hidden' | 'visible' });
 const hasUploadPlaceholder = ref(false);
 const editorFocused = ref(false);
 const hasAiImprovableText = ref(containsAiImprovableText(resolveEditorContent(props.modelValue)));
@@ -358,6 +362,58 @@ function onEmojiClick(ev: Event) {
     showEmoji.value = false;
 }
 
+async function toggleEmojiPicker() {
+    if (showEmoji.value) {
+        showEmoji.value = false;
+        return;
+    }
+
+    emojiPopoverStyle.value.visibility = 'hidden';
+    showEmoji.value = true;
+    await nextTick();
+    positionEmojiPicker();
+}
+
+function positionEmojiPicker() {
+    if (!showEmoji.value || !emojiToolbar.value || !emojiPopover.value) return;
+
+    const toolbar = emojiToolbar.value.getBoundingClientRect();
+    const popover = emojiPopover.value.getBoundingClientRect();
+    const height = popover.height || 440;
+    const width = popover.width || 350;
+    const spaceAbove = toolbar.top - 8;
+    const spaceBelow = window.innerHeight - toolbar.bottom - 8;
+    emojiPlacement.value = spaceAbove >= height || spaceAbove > spaceBelow ? 'above' : 'below';
+    emojiPopoverStyle.value = {
+        left: `${Math.max(8, Math.min(toolbar.left, window.innerWidth - width - 8))}px`,
+        top: `${emojiPlacement.value === 'above' ? Math.max(8, toolbar.top - height - 8) : Math.min(window.innerHeight - height - 8, toolbar.bottom + 8)}px`,
+        visibility: 'visible',
+    };
+}
+
+function closeEmojiOnOutsidePointer(event: PointerEvent) {
+    if (!showEmoji.value || emojiToolbar.value?.contains(event.target as Node) || emojiPopover.value?.contains(event.target as Node)) return;
+    showEmoji.value = false;
+}
+
+function closeEmojiOnEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape') showEmoji.value = false;
+}
+
+onMounted(() => {
+    document.addEventListener('pointerdown', closeEmojiOnOutsidePointer);
+    document.addEventListener('keydown', closeEmojiOnEscape);
+    document.addEventListener('scroll', positionEmojiPicker, true);
+    window.addEventListener('resize', positionEmojiPicker);
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('pointerdown', closeEmojiOnOutsidePointer);
+    document.removeEventListener('keydown', closeEmojiOnEscape);
+    document.removeEventListener('scroll', positionEmojiPicker, true);
+    window.removeEventListener('resize', positionEmojiPicker);
+});
+
 function onSend() {
     if (!props.sendable) return;
     if (isUploading.value || props.sendDisabled) return;
@@ -433,8 +489,15 @@ defineExpose({ confirmMentionAddition, editor, reset });
                 @select="selectMentionCandidate"
             />
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
-            <div class="flex flex-wrap items-center justify-start gap-2 p-2 px-1">
-                <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-accent hover:text-accent-foreground" @click="showEmoji = !showEmoji">
+            <div ref="emojiToolbar" class="relative flex flex-wrap items-center justify-start gap-2 p-2 px-1">
+                <button
+                    type="button"
+                    data-testid="toolbar-emoji"
+                    class="rounded p-1 hover:bg-accent hover:text-accent-foreground"
+                    aria-label="Choose emoji"
+                    :aria-expanded="showEmoji"
+                    @click="toggleEmojiPicker"
+                >
                     <Smile :size="18" />
                 </button>
                 <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-accent hover:text-accent-foreground" @click="openFilePicker">
@@ -479,9 +542,18 @@ defineExpose({ confirmMentionAddition, editor, reset });
             </div>
         </div>
 
-        <div v-if="showEmoji" class="mb-2 px-4">
-            <emoji-picker data-testid="emoji-picker" @emoji-click="onEmojiClick"></emoji-picker>
-        </div>
+        <Teleport to="body">
+            <div
+                v-if="showEmoji"
+                ref="emojiPopover"
+                data-testid="emoji-popover"
+                class="fixed z-50 w-[min(350px,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-lg border border-border bg-popover shadow-lg"
+                :data-placement="emojiPlacement"
+                :style="emojiPopoverStyle"
+            >
+                <emoji-picker class="block max-w-full" data-testid="emoji-picker" @emoji-click="onEmojiClick"></emoji-picker>
+            </div>
+        </Teleport>
 
         <div v-if="aiError" data-testid="ai-improve-error" class="mt-2 px-1 text-xs text-red-600">
             {{ aiError }}
