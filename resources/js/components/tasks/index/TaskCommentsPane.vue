@@ -201,7 +201,7 @@ watch(deleteDialogOpen, (open) => {
             >
                 <div :class="message.isYou ? 'items-end' : 'items-start'" class="flex max-w-[86%] min-w-0 flex-col">
                     <div
-                        v-if="shouldShowMessageMeta(messageIndex)"
+                        v-if="!message.pending && !message.failed && shouldShowMessageMeta(messageIndex)"
                         :data-testid="message.id ? `comment-meta-${message.id}` : undefined"
                         :class="message.isYou ? 'justify-end' : 'justify-start'"
                         class="text-muted-foreground mb-1 flex max-w-full items-center gap-1 text-[10px]"
