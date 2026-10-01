@@ -65,6 +65,7 @@ class EditTaskThreadCommentTool extends Tool
             $thread->task,
             \App\Enums\TaskThreadAudience::fromStoredType((string) $thread->type),
             $content,
+            $thread->is_draft ? $thread : null,
         );
         $thread->content = app(TaskThreadMentionService::class)->normalizeContent(
             $content,

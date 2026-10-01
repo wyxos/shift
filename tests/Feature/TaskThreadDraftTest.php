@@ -328,3 +328,54 @@ test('notification delivery failure is retried by the durable job after publicat
     $job->handle($notifications);
     Notification::assertSentToTimes($this->other, TaskThreadUpdated::class, 1);
 });
+
+test('owned All draft edits preserve their own permanent inline image without publishing', function (string $surface) {
+    $attachment = Attachment::query()->create([
+        'attachable_type' => TaskThread::class, 'attachable_id' => $this->draft->id,
+        'original_filename' => 'draft.png', 'path' => 'attachments/draft.png',
+    ]);
+    $content = '<p>Revised reply</p><p><img src="/attachments/'.$attachment->id.'/download"></p>';
+
+    if ($surface === 'portal') {
+        $this->actingAs($this->author)->putJson(route('task-threads.update', [$this->task, $this->draft]), [
+            'content' => $content,
+        ])->assertOk()->assertJsonPath('thread.is_draft', true)->assertJsonPath('thread.content', $content);
+    } else {
+        draftMcpAs($this->author)->tool(EditTaskThreadCommentTool::class, [
+            'thread_id' => $this->draft->id, 'content' => $content,
+        ])->assertOk()->assertSee('Revised reply');
+    }
+
+    $draft = TaskThread::withoutGlobalScope('published')->findOrFail($this->draft->id);
+    expect($draft->is_draft)->toBeTrue()->and($draft->content)->toBe($content);
+    Notification::assertNothingSent();
+    Queue::assertNothingPushed();
+})->with(['portal', 'mcp']);
+
+test('All draft edits cannot expose another unpublished drafts permanent inline image', function (string $surface) {
+    $otherDraft = TaskThread::withoutGlobalScope('published')->create([
+        'task_id' => $this->task->id, 'type' => 'external', 'content' => '<p>Another private draft</p>',
+        'sender_name' => $this->author->name, 'sender_type' => User::class, 'sender_id' => $this->author->id,
+        'is_draft' => true,
+    ]);
+    $attachment = Attachment::query()->create([
+        'attachable_type' => TaskThread::class, 'attachable_id' => $otherDraft->id,
+        'original_filename' => 'other-draft.png', 'path' => 'attachments/other-draft.png',
+    ]);
+    $content = '<p><img src="/attachments/'.$attachment->id.'/download"></p>';
+
+    if ($surface === 'portal') {
+        $this->actingAs($this->author)->putJson(route('task-threads.update', [$this->task, $this->draft]), [
+            'content' => $content,
+        ])->assertUnprocessable()->assertJsonValidationErrors('content');
+    } else {
+        draftMcpAs($this->author)->tool(EditTaskThreadCommentTool::class, [
+            'thread_id' => $this->draft->id, 'content' => $content,
+        ])->assertHasErrors(['Remove Team or unrelated attachments']);
+    }
+
+    $draft = TaskThread::withoutGlobalScope('published')->findOrFail($this->draft->id);
+    expect($draft->is_draft)->toBeTrue()->and($draft->content)->toBe('<p>Private prepared reply</p>');
+    Notification::assertNothingSent();
+    Queue::assertNothingPushed();
+})->with(['portal', 'mcp']);
