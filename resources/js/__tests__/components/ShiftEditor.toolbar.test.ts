@@ -104,13 +104,36 @@ describe('ShiftEditor toolbar', () => {
         // open emoji
         await wrapper.get('[data-testid="toolbar-emoji"]').trigger('click');
         await nextTick();
-        const picker = wrapper.get('[data-testid="emoji-picker"]').element;
+        const popover = document.querySelector<HTMLElement>('[data-testid="emoji-popover"]');
+        expect(popover).not.toBeNull();
+        expect(popover?.parentElement).toBe(document.body);
+        expect(popover?.classList.contains('fixed')).toBe(true);
+        expect(popover?.style.visibility).toBe('visible');
+        const picker = popover!.querySelector('[data-testid="emoji-picker"]')!;
         // dispatch custom event
         picker.dispatchEvent(new CustomEvent('emoji-click', { detail: { unicode: '😀' } }));
         await nextTick();
         // Expect emoji in editor
         const text = wrapper.find('.ProseMirror').text();
         expect(text).toContain('😀');
+        expect(document.querySelector('[data-testid="emoji-popover"]')).toBeNull();
+        wrapper.unmount();
+    });
+
+    it('closes the emoji overlay on Escape without changing editor layout', async () => {
+        const wrapper = mount(ShiftEditor);
+        await wrapper.get('[data-testid="toolbar-emoji"]').trigger('click');
+        await nextTick();
+
+        expect(document.querySelector('[data-testid="emoji-popover"]')).not.toBeNull();
+        expect(wrapper.find('[data-testid="emoji-popover"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="toolbar-emoji"]').attributes('aria-expanded')).toBe('true');
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await nextTick();
+        expect(document.querySelector('[data-testid="emoji-popover"]')).toBeNull();
+        expect(wrapper.get('[data-testid="toolbar-emoji"]').attributes('aria-expanded')).toBe('false');
+        wrapper.unmount();
     });
 
     it('adds files via attachment icon to attachments list (image and non-image)', async () => {
