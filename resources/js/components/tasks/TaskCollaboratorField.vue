@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SharedTaskCollaboratorField from '@/shared/components/TaskCollaboratorField.vue';
 import { emptyTaskCollaborators, type TaskCollaboratorSelection } from '@/shared/tasks/collaborators';
+import { computed } from 'vue';
 
 const props = withDefaults(
     defineProps<{
@@ -23,12 +24,16 @@ const props = withDefaults(
         readOnly: false,
         disabled: false,
         lookupUrl: null,
-        internalLabel: 'Team',
+        internalLabel: 'SHIFT team',
         internalDescription: 'Registered SHIFT users on this project.',
         externalLabel: 'Project users',
         externalDescription: 'Users available in the selected environment.',
         searchPlaceholder: 'Search collaborators',
     },
+);
+
+const resolvedLookupUrl = computed(
+    () => props.lookupUrl ?? (props.projectId === null ? null : route('tasks.collaborators', { project: props.projectId })),
 );
 
 const emit = defineEmits<{
@@ -37,5 +42,5 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <SharedTaskCollaboratorField v-bind="props" @update:model-value="emit('update:modelValue', $event)" />
+    <SharedTaskCollaboratorField v-bind="props" :lookup-url="resolvedLookupUrl" @update:model-value="emit('update:modelValue', $event)" />
 </template>

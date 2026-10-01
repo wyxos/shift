@@ -6,6 +6,7 @@ use App\Enums\RequirementStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SearchTaskCollaboratorsRequest;
 use App\Models\Attachment;
 use App\Models\ExternalUser;
 use App\Models\Project;
@@ -559,7 +560,7 @@ class ExternalTaskController extends Controller
         );
     }
 
-    public function internalCollaborators(Request $request): JsonResponse
+    public function internalCollaborators(SearchTaskCollaboratorsRequest $request): JsonResponse
     {
         $project = $this->resolveProjectFromRequest();
 
@@ -574,7 +575,7 @@ class ExternalTaskController extends Controller
         return response()->json([
             'organisation_name' => $organisationName,
             'users' => $this->taskCollaboratorService
-                ->internalCandidates($project, $search)
+                ->searchInternalCandidates($project, $search)
                 ->map(fn (\App\Models\User $user) => [
                     'id' => $user->id,
                     'name' => $user->name,

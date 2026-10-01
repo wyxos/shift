@@ -9,6 +9,7 @@ import {
 } from '@shared/tasks/collaborators';
 import axios from 'axios';
 import { Check, LoaderCircle, Search, UserPlus, X } from 'lucide-vue-next';
+import { ComboboxAnchor, ComboboxContent, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxPortal, ComboboxRoot } from 'reka-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = withDefaults(
@@ -34,7 +35,7 @@ const props = withDefaults(
         readOnly: false,
         disabled: false,
         lookupUrl: null,
-        internalLabel: 'Team',
+        internalLabel: 'SHIFT team',
         internalBadgeLabel: null,
         internalDescription: 'Registered SHIFT users on this project.',
         externalLabel: 'Project users',
@@ -49,7 +50,7 @@ const emit = defineEmits<{
 }>();
 
 const search = ref('');
-const activeGroup = ref<CollaboratorKind>('internal');
+const open = ref(false);
 const loading = ref(false);
 const internalOptions = ref<CollaboratorOption[]>([]);
 const externalOptions = ref<CollaboratorOption[]>([]);
@@ -59,23 +60,16 @@ const internalError = ref<string | null>(null);
 const externalError = ref<string | null>(null);
 const responseInternalLabel = ref<string | null>(null);
 const responseExternalLabel = ref<string | null>(null);
-const responseInternalDescription = ref<string | null>(null);
-const responseExternalDescription = ref<string | null>(null);
-let searchTimer: number | null = null;
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let lookupSequence = 0;
+let lookupAbort: AbortController | null = null;
 
 const selection = computed(() => normalizeTaskCollaborators(props.modelValue));
 const hasSelection = computed(() => selection.value.internal.length > 0 || selection.value.external.length > 0);
 
 type CollaboratorKind = 'internal' | 'external';
 
-type CollaboratorGroup = {
-    kind: CollaboratorKind;
-    label: string;
-    description: string;
-    options: CollaboratorOption[];
-    available: boolean;
-    error: string | null;
-};
+type CollaboratorSuggestion = CollaboratorOption & { kind: CollaboratorKind; rank: number };
 
 type CollaboratorBadgeStyle = {
     shell: string;
@@ -101,31 +95,43 @@ const collaboratorBadgeStyles: Record<CollaboratorKind, CollaboratorBadgeStyle> 
 
 const resolvedInternalLabel = computed(() => responseInternalLabel.value ?? props.internalLabel);
 const resolvedExternalLabel = computed(() => responseExternalLabel.value ?? props.externalLabel);
-const resolvedInternalDescription = computed(() => responseInternalDescription.value ?? props.internalDescription);
-const resolvedExternalDescription = computed(() => responseExternalDescription.value ?? props.externalDescription);
+const suggestions = computed<CollaboratorSuggestion[]>(() => {
+    const term = search.value.trim().toLocaleLowerCase();
+    const score = (option: CollaboratorOption) => {
+        const name = option.name.toLocaleLowerCase();
+        const email = option.email?.toLocaleLowerCase() ?? '';
+        if (name === term || email === term) return 0;
+        if (name.startsWith(term) || email.startsWith(term)) return 1;
+        if (name.split(/\s+/).some((word) => word.startsWith(term))) return 2;
+        return 3;
+    };
 
-const collaboratorGroups = computed<CollaboratorGroup[]>(() => [
-    {
-        kind: 'internal',
-        label: resolvedInternalLabel.value,
-        description: resolvedInternalDescription.value,
-        options: internalOptions.value,
-        available: internalAvailable.value,
-        error: internalError.value,
-    },
-    {
-        kind: 'external',
-        label: resolvedExternalLabel.value,
-        description: resolvedExternalDescription.value,
-        options: externalOptions.value,
-        available: externalAvailable.value,
-        error: externalError.value,
-    },
-]);
+    return [
+        ...internalOptions.value.map((option, rank) => ({ ...option, kind: 'internal' as const, rank })),
+        ...externalOptions.value.map((option, rank) => ({ ...option, kind: 'external' as const, rank })),
+    ]
+        .sort((left, right) => score(left) - score(right) || left.rank - right.rank || left.name.localeCompare(right.name))
+        .slice(0, 10);
+});
 
-const activeCollaboratorGroup = computed(
-    () => collaboratorGroups.value.find((group) => group.kind === activeGroup.value) ?? collaboratorGroups.value[0],
-);
+const lookupErrors = computed(() => {
+    const messages = [
+        internalError.value ?? (!internalAvailable.value ? `${resolvedInternalLabel.value} collaborators are unavailable.` : null),
+        externalError.value ?? (!externalAvailable.value ? `${resolvedExternalLabel.value} collaborators are unavailable.` : null),
+    ];
+
+    return [...new Set(messages.filter((message): message is string => Boolean(message)))];
+});
+
+function updateOpen(next: boolean) {
+    open.value = next && search.value.trim().length > 0 && !props.disabled;
+}
+
+function chooseSuggestion(suggestion: CollaboratorSuggestion) {
+    toggleCollaborator(suggestion.kind, suggestion);
+    search.value = '';
+    open.value = false;
+}
 
 function normalizeBadgeLabel(value?: string | null): string | null {
     if (typeof value !== 'string') {
@@ -160,8 +166,6 @@ function normalizeLookupText(value: unknown): string | null {
 function resetLookupMetadata() {
     responseInternalLabel.value = null;
     responseExternalLabel.value = null;
-    responseInternalDescription.value = null;
-    responseExternalDescription.value = null;
 }
 
 function selectedBadgeStyle(kind: CollaboratorKind): CollaboratorBadgeStyle {
@@ -195,67 +199,38 @@ function toggleCollaborator(kind: 'internal' | 'external', collaborator: Collabo
     emitSelection(next);
 }
 
-function groupStatusMessage(group: CollaboratorGroup): string | null {
-    if (group.error) {
-        return group.error;
-    }
-
-    if (!group.available) {
-        return `${group.label} collaborators are unavailable.`;
-    }
-
-    if (group.options.length === 0) {
-        return `No ${group.label.toLowerCase()} collaborators found.`;
-    }
-
-    return null;
-}
-
-function resolveLookupUrl(): string | null {
-    if (props.lookupUrl) {
-        return props.lookupUrl;
-    }
-
-    if (props.projectId === null) {
-        return null;
-    }
-
-    return route('tasks.collaborators', { project: props.projectId });
+function resetLookup() {
+    lookupSequence += 1;
+    lookupAbort?.abort();
+    lookupAbort = null;
+    if (searchTimer !== null) clearTimeout(searchTimer);
+    searchTimer = null;
+    loading.value = false;
+    internalOptions.value = [];
+    externalOptions.value = [];
+    internalError.value = null;
+    externalError.value = null;
+    resetLookupMetadata();
 }
 
 async function fetchCollaborators() {
-    if (props.readOnly) {
-        internalOptions.value = [];
-        externalOptions.value = [];
-        internalAvailable.value = true;
-        externalAvailable.value = props.environment !== null || props.lookupUrl !== null;
-        internalError.value = null;
-        externalError.value = null;
-        resetLookupMetadata();
-        return;
-    }
+    const term = search.value.trim();
+    if (props.readOnly || props.disabled || !props.lookupUrl || !term) return;
 
-    const lookupUrl = resolveLookupUrl();
-    if (!lookupUrl) {
-        internalOptions.value = [];
-        externalOptions.value = [];
-        internalAvailable.value = false;
-        externalAvailable.value = false;
-        internalError.value = 'Select a project before tagging collaborators.';
-        externalError.value = 'Select a project before tagging collaborators.';
-        resetLookupMetadata();
-        return;
-    }
-
+    const sequence = ++lookupSequence;
+    lookupAbort?.abort();
+    lookupAbort = new AbortController();
     loading.value = true;
 
     try {
-        const response = await axios.get(lookupUrl, {
+        const response = await axios.get(props.lookupUrl, {
             params: {
-                ...(search.value.trim() ? { search: search.value.trim() } : {}),
+                search: term,
                 ...(props.environment ? { environment: props.environment } : {}),
             },
+            signal: lookupAbort.signal,
         });
+        if (sequence !== lookupSequence) return;
 
         internalOptions.value = Array.isArray(response.data?.internal) ? response.data.internal : [];
         externalOptions.value = Array.isArray(response.data?.external) ? response.data.external : [];
@@ -265,19 +240,15 @@ async function fetchCollaborators() {
         externalError.value = typeof response.data?.external_error === 'string' ? response.data.external_error : null;
         responseInternalLabel.value = normalizeLookupText(response.data?.internal_label);
         responseExternalLabel.value = normalizeLookupText(response.data?.external_label);
-        responseInternalDescription.value = normalizeLookupText(response.data?.internal_description);
-        responseExternalDescription.value = normalizeLookupText(response.data?.external_description);
-    } catch (error: any) {
-        const message = error.response?.data?.message || error.message || 'Failed to load collaborators.';
+    } catch (error: unknown) {
+        if (sequence !== lookupSequence || axios.isCancel(error)) return;
+        const message = axios.isAxiosError(error) ? error.response?.data?.message || error.message : 'Failed to load collaborators.';
         internalOptions.value = [];
         externalOptions.value = [];
-        internalAvailable.value = false;
-        externalAvailable.value = false;
         internalError.value = message;
-        externalError.value = message;
-        resetLookupMetadata();
+        externalError.value = null;
     } finally {
-        loading.value = false;
+        if (sequence === lookupSequence) loading.value = false;
     }
 }
 
@@ -301,40 +272,44 @@ watch(
             });
         }
 
-        void fetchCollaborators();
+        resetLookup();
+        search.value = '';
+        open.value = false;
     },
     { immediate: true },
 );
 
 watch(search, () => {
-    if (props.readOnly) return;
-    if (resolveLookupUrl() === null) return;
+    resetLookup();
+    updateOpen(true);
+    if (!open.value || props.readOnly || !props.lookupUrl) return;
 
-    if (searchTimer !== null) {
-        window.clearTimeout(searchTimer);
-    }
-
-    searchTimer = window.setTimeout(() => {
+    loading.value = true;
+    searchTimer = setTimeout(() => {
         searchTimer = null;
         void fetchCollaborators();
     }, 250);
 });
 
-onBeforeUnmount(() => {
-    if (searchTimer !== null) {
-        window.clearTimeout(searchTimer);
-    }
-});
+watch(
+    () => [props.readOnly, props.disabled],
+    () => {
+        resetLookup();
+        open.value = false;
+    },
+);
+
+onBeforeUnmount(resetLookup);
 </script>
 
 <template>
-    <div class="space-y-4" data-testid="task-collaborators">
-        <div class="space-y-1">
+    <div class="flex flex-col gap-4" data-testid="task-collaborators">
+        <div class="flex flex-col gap-1">
             <div class="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium select-none">Collaborators</div>
             <p class="text-muted-foreground text-xs">Tag the people who should be able to access this task.</p>
         </div>
 
-        <div v-if="hasSelection" class="space-y-3">
+        <div v-if="hasSelection" class="flex flex-col gap-3">
             <div class="flex flex-wrap gap-2">
                 <div
                     v-for="collaborator in selection.internal"
@@ -357,6 +332,7 @@ onBeforeUnmount(() => {
                         type="button"
                         :class="selectedBadgeStyle('internal').remove"
                         :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
+                        :disabled="disabled"
                         @click="toggleCollaborator('internal', collaborator)"
                     >
                         <X class="h-3 w-3" />
@@ -384,6 +360,7 @@ onBeforeUnmount(() => {
                         type="button"
                         :class="selectedBadgeStyle('external').remove"
                         :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
+                        :disabled="disabled"
                         @click="toggleCollaborator('external', collaborator)"
                     >
                         <X class="h-3 w-3" />
@@ -396,96 +373,83 @@ onBeforeUnmount(() => {
             No collaborators tagged.
         </div>
 
-        <div v-if="!readOnly" class="space-y-4">
-            <div
-                v-if="!lookupUrl && projectId === null"
-                class="border-muted-foreground/30 bg-muted/10 text-muted-foreground rounded-md border border-dashed p-3 text-sm"
-            >
+        <div v-if="!readOnly" class="flex flex-col gap-2">
+            <div v-if="!lookupUrl" class="text-muted-foreground rounded-md border border-dashed p-3 text-sm">
                 Select a project before tagging collaborators.
             </div>
 
-            <template v-else>
-                <div class="bg-background overflow-hidden rounded-md border" data-testid="task-collaborators-dropdown">
-                    <div class="border-b p-2">
-                        <div class="relative">
-                            <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                            <Input v-model="search" class="pr-9 pl-9" data-testid="task-collaborators-search" :placeholder="searchPlaceholder" />
-                            <LoaderCircle
-                                v-if="loading"
-                                class="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin"
-                            />
-                        </div>
-                    </div>
+            <ComboboxRoot
+                v-else
+                :open="open"
+                :disabled="disabled"
+                :ignore-filter="true"
+                :reset-search-term-on-blur="false"
+                :reset-search-term-on-select="false"
+                @update:open="updateOpen"
+            >
+                <ComboboxAnchor class="relative">
+                    <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                    <ComboboxInput v-model="search" as-child>
+                        <Input
+                            v-model="search"
+                            :disabled="disabled"
+                            class="pr-9 pl-9"
+                            data-testid="task-collaborators-search"
+                            :placeholder="searchPlaceholder"
+                            aria-label="Search collaborators"
+                        />
+                    </ComboboxInput>
+                    <LoaderCircle v-if="loading" class="text-muted-foreground absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin" />
+                </ComboboxAnchor>
 
-                    <div class="grid gap-1 border-b p-2 sm:grid-cols-2" data-testid="task-collaborators-group-filter">
-                        <button
-                            v-for="group in collaboratorGroups"
-                            :key="group.kind"
-                            type="button"
-                            class="hover:bg-muted rounded-md border px-3 py-2 text-left transition"
-                            :class="
-                                activeGroup === group.kind
-                                    ? 'border-primary/40 bg-muted text-foreground shadow-xs'
-                                    : 'text-muted-foreground border-transparent'
-                            "
-                            :data-testid="`task-collaborators-group-${group.kind}`"
-                            @click="activeGroup = group.kind"
-                        >
-                            <span class="flex items-start justify-between gap-3">
-                                <span class="min-w-0">
-                                    <span class="block truncate text-sm font-medium">{{ group.label }}</span>
-                                    <span class="text-muted-foreground mt-0.5 block text-xs leading-snug">{{ group.description }}</span>
-                                </span>
-                                <span
-                                    v-if="selection[group.kind].length > 0"
-                                    class="bg-background text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px]"
+                <ComboboxPortal>
+                    <ComboboxContent
+                        position="popper"
+                        update-position-strategy="always"
+                        align="start"
+                        :side-offset="4"
+                        class="bg-popover text-popover-foreground z-50 w-(--reka-combobox-trigger-width) max-w-[calc(100vw-2rem)] rounded-md border shadow-md outline-none"
+                        data-testid="task-collaborators-dropdown"
+                    >
+                        <div class="max-h-72 overflow-y-auto p-1">
+                            <div v-if="loading" role="status" class="text-muted-foreground px-3 py-4 text-sm">Searching collaborators…</div>
+                            <ComboboxGroup v-else-if="suggestions.length > 0" aria-label="Matching collaborators">
+                                <ComboboxItem
+                                    v-for="suggestion in suggestions"
+                                    :key="`${suggestion.kind}-${collaboratorKey(suggestion.id)}`"
+                                    :value="`${suggestion.kind}-${collaboratorKey(suggestion.id)}`"
+                                    :text-value="suggestion.name"
+                                    :data-testid="`${suggestion.kind}-collaborator-option-${collaboratorKey(suggestion.id)}`"
+                                    class="data-highlighted:bg-accent data-highlighted:text-accent-foreground flex cursor-pointer items-center gap-3 rounded-sm px-3 py-2 text-sm outline-none"
+                                    @select.prevent="chooseSuggestion(suggestion)"
                                 >
-                                    {{ selection[group.kind].length }}
-                                </span>
-                            </span>
-                        </button>
-                    </div>
-
-                    <div class="max-h-64 overflow-auto p-2">
-                        <div
-                            v-if="groupStatusMessage(activeCollaboratorGroup)"
-                            class="text-muted-foreground rounded-md border border-dashed p-3 text-sm"
-                        >
-                            {{ groupStatusMessage(activeCollaboratorGroup) }}
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate font-medium">{{ collaboratorDisplayValue(suggestion) }}</span>
+                                        <span v-if="suggestion.email" class="text-muted-foreground block truncate text-xs">{{
+                                            suggestion.email
+                                        }}</span>
+                                    </span>
+                                    <span class="text-muted-foreground max-w-[35%] truncate text-xs" data-collaborator-source>
+                                        {{ suggestion.kind === 'internal' ? resolvedInternalLabel : resolvedExternalLabel }}
+                                    </span>
+                                    <Check
+                                        v-if="isSelected(suggestion.kind, suggestion)"
+                                        class="text-primary size-4 shrink-0"
+                                        :data-testid="`${suggestion.kind}-collaborator-selected-${collaboratorKey(suggestion.id)}`"
+                                    />
+                                    <UserPlus v-else class="text-muted-foreground size-4 shrink-0" />
+                                </ComboboxItem>
+                            </ComboboxGroup>
+                            <div v-else-if="lookupErrors.length === 0" role="status" class="text-muted-foreground px-3 py-4 text-sm">
+                                No matching collaborators.
+                            </div>
+                            <div v-for="message in lookupErrors" :key="message" role="status" class="text-muted-foreground px-3 py-2 text-xs">
+                                {{ message }}
+                            </div>
                         </div>
-
-                        <div v-else class="space-y-1">
-                            <button
-                                v-for="collaborator in activeCollaboratorGroup.options"
-                                :key="`${activeCollaboratorGroup.kind}-option-${collaboratorKey(collaborator.id)}`"
-                                type="button"
-                                :class="
-                                    isSelected(activeCollaboratorGroup.kind, collaborator)
-                                        ? 'border-primary/40 bg-primary/10 hover:bg-primary/15'
-                                        : 'hover:bg-muted/70 border-transparent'
-                                "
-                                class="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left transition"
-                                :data-testid="`${activeCollaboratorGroup.kind}-collaborator-option-${collaboratorKey(collaborator.id)}`"
-                                @click="toggleCollaborator(activeCollaboratorGroup.kind, collaborator)"
-                            >
-                                <span class="min-w-0">
-                                    <span class="block truncate text-sm font-medium">{{ collaborator.name }}</span>
-                                    <span v-if="collaborator.email" class="text-muted-foreground block truncate text-xs">{{
-                                        collaborator.email
-                                    }}</span>
-                                </span>
-                                <Check
-                                    v-if="isSelected(activeCollaboratorGroup.kind, collaborator)"
-                                    class="text-primary h-4 w-4 shrink-0"
-                                    :data-testid="`${activeCollaboratorGroup.kind}-collaborator-selected-${collaboratorKey(collaborator.id)}`"
-                                    aria-hidden="true"
-                                />
-                                <UserPlus v-else class="text-muted-foreground h-4 w-4 shrink-0" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </template>
+                    </ComboboxContent>
+                </ComboboxPortal>
+            </ComboboxRoot>
         </div>
     </div>
 </template>
