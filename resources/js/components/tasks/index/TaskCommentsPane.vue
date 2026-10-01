@@ -7,7 +7,7 @@ import type { MentionCandidate } from '@/shared/components/shift-editor/types';
 import { imageTiles } from '@/shared/tasks/image-tile';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
-import { Paperclip } from 'lucide-vue-next';
+import { LoaderCircle, Paperclip, RotateCcw } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
 import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
 import TaskErrorOccurrencesPane from './TaskErrorOccurrencesPane.vue';
@@ -183,8 +183,8 @@ watch(deleteDialogOpen, (open) => {
         <TaskErrorOccurrencesPane v-if="showOccurrences" :state="state" />
 
         <div v-else :ref="assignCommentsScrollRef" class="flex-1 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
-            <div v-if="state.threadLoading" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
-            <div v-else-if="state.threadError" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
+            <div v-if="state.threadLoading && state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
+            <div v-else-if="state.threadError && state.threadMessages.length === 0" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
             <div
                 v-for="(message, messageIndex) in state.threadMessages"
@@ -237,10 +237,11 @@ watch(deleteDialogOpen, (open) => {
                                     v-html="renderRichContent(message.content)"
                                 ></div>
                                 <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
-                                    <a
+                                    <component
+                                        :is="message.pending || message.failed ? 'span' : 'a'"
                                         v-for="attachment in message.attachments"
                                         :key="attachment.id"
-                                        :href="attachment.url"
+                                        :href="message.pending || message.failed ? undefined : attachment.url"
                                         :class="
                                             message.isYou
                                                 ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
@@ -252,7 +253,20 @@ watch(deleteDialogOpen, (open) => {
                                     >
                                         <Paperclip class="h-3 w-3 shrink-0 opacity-80" />
                                         <span class="min-w-0 truncate">{{ attachment.original_filename }}</span>
-                                    </a>
+                                    </component>
+                                </div>
+                                <div v-if="message.pending || message.failed" class="mt-2 flex items-center justify-end gap-2 text-xs text-white/80" role="status">
+                                    <LoaderCircle v-if="message.pending" class="size-3 animate-spin" aria-hidden="true" />
+                                    <span>{{ message.pending ? 'Sending...' : 'Failed to send' }}</span>
+                                    <button
+                                        v-if="message.failed"
+                                        type="button"
+                                        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-white underline-offset-2 hover:bg-white/15 hover:underline"
+                                        :data-testid="`retry-comment-${message.clientId}`"
+                                        @click="state.retryThreadSend(message)"
+                                    >
+                                        <RotateCcw class="size-3" aria-hidden="true" /> Retry
+                                    </button>
                                 </div>
                             </div>
                         </ContextMenuTrigger>

@@ -148,6 +148,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
             content: '<p>Team reply</p>',
             type: 'internal',
             temp_identifier: expect.any(String),
+            client_request_id: expect.any(String),
             mentions: [],
             add_collaborators: [],
         });
