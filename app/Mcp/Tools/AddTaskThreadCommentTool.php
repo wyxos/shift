@@ -29,6 +29,8 @@ class AddTaskThreadCommentTool extends Tool
 
     protected string $description = 'Add an All or Team comment to a visible SHIFT task. Requires comment permission and the mcp:write OAuth scope.';
 
+    protected bool $draft = false;
+
     public function handle(Request $request): Response|ResponseFactory
     {
         $validated = $request->validate([
@@ -84,11 +86,14 @@ class AddTaskThreadCommentTool extends Tool
             'sender_name' => $principal->user->name,
             'sender_type' => $principal->user::class,
             'sender_id' => $principal->user->id,
+            'is_draft' => $this->draft,
         ]);
 
         $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
-        app(TaskThreadNotificationService::class)->send($task, $thread);
+        if (! $thread->is_draft) {
+            app(TaskThreadNotificationService::class)->send($task, $thread);
+        }
 
         return Response::structured([
             'thread' => $this->thread($thread),

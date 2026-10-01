@@ -68,6 +68,7 @@ class TaskThreadController extends Controller
     private function getThreadsByType(Task $task, string $type): array
     {
         return $task->threads()
+            ->withDraftsFor(Auth::user())
             ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
@@ -95,6 +96,8 @@ class TaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
+                    'is_draft' => $thread->is_draft,
+                    'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                     'content' => $thread->content,
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $this->isCurrentUserThread($task, $thread),
@@ -209,6 +212,8 @@ class TaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'is_draft' => $thread->is_draft,
+                'can_publish' => false,
                 'content' => $thread->content,
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
@@ -299,6 +304,8 @@ class TaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'is_draft' => $thread->is_draft,
+                'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                 'content' => $thread->content,
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => $thread->sender_id === Auth::id() && $thread->sender_type === get_class(Auth::user()),
@@ -341,6 +348,43 @@ class TaskThreadController extends Controller
         $thread->delete();
 
         return response()->json(['message' => 'Thread message deleted successfully']);
+    }
+
+    public function publish(Task $task, TaskThread $thread): JsonResponse
+    {
+        $this->ensureTaskVisible($task);
+        abort_unless((int) $thread->task_id === (int) $task->id, 404);
+        abort_unless($this->isCurrentUserThread($task, $thread), 403);
+
+        [$thread, $published] = DB::transaction(function () use ($thread): array {
+            $lockedThread = TaskThread::query()
+                ->withDraftsFor(Auth::user())
+                ->lockForUpdate()
+                ->findOrFail($thread->id);
+
+            if (! $lockedThread->is_draft) {
+                return [$lockedThread, false];
+            }
+
+            $this->audiences->assertContentMayBeShared(
+                $lockedThread->task,
+                $this->audiences->audience($lockedThread),
+                (string) $lockedThread->content,
+            );
+
+            $lockedThread->is_draft = false;
+            $lockedThread->published_at = now();
+            $lockedThread->created_at = $lockedThread->published_at;
+            $lockedThread->save();
+
+            return [$lockedThread, true];
+        });
+
+        if ($published) {
+            $this->taskThreadNotificationService->send($task, $thread);
+        }
+
+        return $this->show($task, $thread);
     }
 
     /**
@@ -442,6 +486,8 @@ class TaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'is_draft' => $thread->is_draft,
+                'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                 'content' => $thread->content,
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,

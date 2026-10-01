@@ -149,6 +149,8 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
+                    'is_draft' => false,
+                    'can_publish' => false,
                     'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $isCurrentUser,
@@ -174,6 +176,7 @@ class ExternalTaskThreadController extends Controller
 
         $request->validate([
             'content' => 'required|string',
+            'is_draft' => ['prohibited'],
             'type' => 'required|in:internal,external',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
@@ -404,6 +407,7 @@ class ExternalTaskThreadController extends Controller
         $request->validate([
             'content' => 'required|string',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
+            'is_draft' => ['prohibited'],
         ]);
 
         /** @var TaskThread $thread */

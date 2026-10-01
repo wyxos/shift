@@ -74,6 +74,8 @@ trait FormatsShiftRecords
             'id' => $thread->id,
             'task_id' => $thread->task_id,
             'type' => $thread->type,
+            'is_draft' => $thread->is_draft,
+            'published_at' => $this->date($thread->published_at),
             'audience' => \App\Enums\TaskThreadAudience::fromStoredType((string) $thread->type)->value,
             'content' => $thread->content,
             'sender_name' => $thread->sender_name,

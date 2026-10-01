@@ -44,6 +44,7 @@ class EditTaskThreadCommentTool extends Tool
         }
 
         $thread = TaskThread::query()
+            ->withDraftsFor($principal->user)
             ->with(['task.project', 'sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
             ->find($validated['thread_id']);
 
