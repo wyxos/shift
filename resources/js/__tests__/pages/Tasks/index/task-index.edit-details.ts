@@ -77,6 +77,7 @@ describe('Tasks/Index.vue', () => {
         await flushPromises();
 
         expect(wrapper.find('.sheet-header [data-testid="task-edit-title"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="task-title-group"] [data-testid="task-edit-back"]').attributes('aria-label')).toBe('Back to tasks');
         expect(wrapper.find('[data-testid="task-edit-details-pane"] [data-testid="task-edit-title"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="save-task-changes"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="task-edit-footer"]').exists()).toBe(false);

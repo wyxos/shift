@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getPriorityOptions, getRequirementStatusOptions, getStatusOptions } from '@/shared/tasks/presentation';
 import { renderRichContent } from '@/shared/tasks/rich-content';
+import { ArrowLeft } from 'lucide-vue-next';
 import { computed } from 'vue';
 import TaskCommentsPane from './TaskCommentsPane.vue';
 
@@ -63,21 +65,33 @@ function formatTaskTime(value?: string | null) {
 
 <template>
     <Sheet :open="state.editOpen" @update:open="state.onEditOpenChange">
-        <SheetContent class="flex h-full min-h-0 flex-col p-0" side="right" width-preset="task">
+        <SheetContent :show-close="false" class="flex h-full min-h-0 flex-col p-0" side="right" width-preset="task">
             <SheetHeader class="shrink-0 p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle class="min-w-0">
-                        <input
-                            v-if="state.editTask"
-                            v-model="editTitleModel"
-                            :aria-label="titleInputLabel"
-                            class="border-input bg-background text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground focus:border-ring focus-visible:border-ring block h-9 w-full min-w-0 rounded-md border px-3 py-1 text-lg font-semibold shadow-none transition-colors outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-100"
-                            data-shift-field-control
-                            data-testid="task-edit-title"
-                            :disabled="!state.canEditTaskScope || state.taskSaving"
-                            type="text"
-                        />
-                        <span v-else class="block truncate">{{ sheetTitle }}</span>
+                        <InputGroup data-testid="task-title-group">
+                            <InputGroupAddon>
+                                <InputGroupButton
+                                    size="icon-sm"
+                                    aria-label="Back to tasks"
+                                    data-testid="task-edit-back"
+                                    type="button"
+                                    @click="state.onEditOpenChange(false)"
+                                >
+                                    <ArrowLeft />
+                                </InputGroupButton>
+                            </InputGroupAddon>
+                            <InputGroupInput
+                                v-if="state.editTask"
+                                v-model="editTitleModel"
+                                :aria-label="titleInputLabel"
+                                data-shift-field-control
+                                data-testid="task-edit-title"
+                                :disabled="!state.canEditTaskScope || state.taskSaving"
+                                type="text"
+                            />
+                            <span v-else class="block truncate">{{ sheetTitle }}</span>
+                        </InputGroup>
                     </SheetTitle>
                 </div>
             </SheetHeader>
