@@ -152,6 +152,7 @@ export type TaskErrorOccurrencePagination = {
 
 export type ThreadMessage = {
     clientId: string;
+    clientRequestId?: string;
     id?: number;
     author: string;
     createdAt?: string | null;
@@ -160,6 +161,10 @@ export type ThreadMessage = {
     isYou?: boolean;
     pending?: boolean;
     failed?: boolean;
+    isDraft?: boolean;
+    canPublish?: boolean;
+    publishing?: boolean;
+    publishError?: string | null;
     audience: 'all' | 'team';
     attachments?: TaskAttachment[];
     mentions?: ThreadMention[];

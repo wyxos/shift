@@ -1,11 +1,16 @@
+import type { ThreadMessage } from './types';
+
 export type MappedThreadMessage<TAttachment = unknown> = {
     clientId: string;
+    clientRequestId?: string;
     id?: number;
     author: string;
     createdAt: string | null;
     time: string;
     content: string;
     isYou: boolean;
+    isDraft: boolean;
+    canPublish: boolean;
     audience: 'all' | 'team';
     attachments: TAttachment[];
     mentions: Array<{
@@ -16,6 +21,40 @@ export type MappedThreadMessage<TAttachment = unknown> = {
 };
 
 export const THREAD_MESSAGE_META_REPEAT_THRESHOLD_MS = 5 * 60 * 1000;
+
+export function getThreadErrorMessage(error: any, fallback: string): string {
+    return error?.response?.data?.error || error?.response?.data?.message || error?.message || fallback;
+}
+
+export function createThreadRequestId(): string {
+    return (
+        globalThis.crypto?.randomUUID?.() ??
+        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+            const digit = Math.floor(Math.random() * 16);
+            return (char === 'x' ? digit : (digit & 3) | 8).toString(16);
+        })
+    );
+}
+
+export function mapPendingThreadAttachments(attachments: Array<{ name?: string; original_filename?: string; path?: string }>) {
+    return attachments.map((attachment, index) => ({
+        id: -(index + 1),
+        original_filename: attachment.name ?? attachment.original_filename ?? 'Attachment',
+        path: attachment.path,
+    }));
+}
+
+export function mergeDeliveredThreadMessage(messages: ThreadMessage[], delivered: ThreadMessage): ThreadMessage[] {
+    const matches = (message: ThreadMessage) =>
+        message.clientId === delivered.clientId ||
+        message.id === delivered.id ||
+        Boolean(delivered.clientRequestId && message.clientRequestId === delivered.clientRequestId);
+    const firstIndex = messages.findIndex(matches);
+    if (firstIndex === -1) return [...messages, delivered];
+    return messages
+        .filter((message, index) => index === firstIndex || !matches(message))
+        .map((message, index) => (index === firstIndex ? delivered : message));
+}
 
 export function formatThreadTime(value: any): string {
     if (!value) return '';
@@ -81,6 +120,8 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
     const id = typeof thread?.id === 'number' ? (thread.id as number) : undefined;
     const author = String(thread?.sender_name ?? thread?.author ?? 'Unknown');
     const isYou = Boolean(thread?.is_current_user ?? thread?.isYou);
+    const isDraft = Boolean(thread?.is_draft ?? thread?.isDraft);
+    const canPublish = Boolean(thread?.can_publish ?? thread?.canPublish);
     const content = String(thread?.content ?? '');
     const createdAtValue = thread?.created_at ?? thread?.createdAt ?? null;
     const createdAt = createdAtValue instanceof Date ? createdAtValue.toISOString() : createdAtValue ? String(createdAtValue) : null;
@@ -91,12 +132,15 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
 
     return {
         clientId: id ? `thread-${id}` : `thread-${Date.now()}`,
+        clientRequestId: thread?.client_request_id ?? thread?.clientRequestId ?? undefined,
         id,
         author,
         createdAt,
         time,
         content,
         isYou,
+        isDraft,
+        canPublish,
         audience,
         attachments,
         mentions,

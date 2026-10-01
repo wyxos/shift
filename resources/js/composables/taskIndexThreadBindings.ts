@@ -15,6 +15,8 @@ export function taskIndexThreadBindings(thread: TaskIndexThreadState) {
         handleMentionQuery: thread.handleMentionQuery,
         handleSlashCommand: thread.handleSlashCommand,
         handleThreadSend: thread.handleThreadSend,
+        retryThreadSend: thread.retryThreadSend,
+        publishThreadMessage: thread.publishThreadMessage,
         lightboxAlt: thread.lightboxAlt,
         lightboxOpen: thread.lightboxOpen,
         lightboxSrc: thread.lightboxSrc,
