@@ -296,17 +296,13 @@ const totalThroughputDelta = computed(() => {
                     </CardContent>
                 </Card>
 
-                <Card
-                    v-if="(props.metrics.awaiting_feedback ?? 0) > 0"
-                    class="border-amber-300/70 bg-amber-50/30 dark:border-amber-700/50 dark:bg-amber-950/15"
-                    data-testid="awaiting-feedback-card"
-                >
+                <Card v-if="(props.metrics.awaiting_feedback ?? 0) > 0" data-testid="awaiting-feedback-card">
                     <CardHeader class="pb-2">
                         <CardDescription>Awaiting Feedback</CardDescription>
                         <CardTitle class="text-3xl">{{ props.metrics.awaiting_feedback }}</CardTitle>
                     </CardHeader>
                     <CardContent class="text-muted-foreground flex items-center gap-2 text-xs">
-                        <AlertTriangle class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        <AlertTriangle class="h-3.5 w-3.5" />
                         May be blocking closure
                     </CardContent>
                 </Card>

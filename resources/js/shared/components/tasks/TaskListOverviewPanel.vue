@@ -4,19 +4,12 @@ import { Button } from '@/components/ui/button';
 import { ResponsiveRecordList } from '@/components/ui/record-list';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
-import {
-    getPriorityBadgeClass,
-    getPriorityLabel,
-    getRequirementStatusBadgeClass,
-    getRequirementStatusLabel,
-    getStatusBadgeClass,
-    getStatusLabel,
-} from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import TaskListCompact from './TaskListCompact.vue';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
 import TaskListTimestamp from './TaskListTimestamp.vue';
+import TaskStateBadge from './TaskStateBadge.vue';
 import {
     canDeleteTask,
     canFinalizeRequirementPack,
@@ -260,22 +253,14 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                                             </button>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                :class="getRequirementStatusBadgeClass(requirementState(task))"
+                                            <TaskStateBadge
+                                                kind="requirement"
+                                                :value="requirementState(task)"
                                                 :data-testid="`task-status-badge-${task.id}`"
-                                                variant="outline"
-                                            >
-                                                {{ getRequirementStatusLabel(requirementState(task)) }}
-                                            </Badge>
+                                            />
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                :class="getPriorityBadgeClass(task.priority)"
-                                                :data-testid="`task-priority-badge-${task.id}`"
-                                                variant="outline"
-                                            >
-                                                {{ getPriorityLabel(task.priority) }}
-                                            </Badge>
+                                            <TaskStateBadge kind="priority" :value="task.priority" :data-testid="`task-priority-badge-${task.id}`" />
                                         </TableCell>
                                         <TableCell>
                                             <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
@@ -334,20 +319,12 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                                                 >
                                                     {{ taskProjectLabel(task) }}
                                                 </Badge>
-                                                <Badge
-                                                    :class="getStatusBadgeClass(task.status)"
-                                                    :data-testid="`task-status-badge-${task.id}`"
-                                                    variant="outline"
-                                                >
-                                                    {{ getStatusLabel(task.status) }}
-                                                </Badge>
-                                                <Badge
-                                                    :class="getPriorityBadgeClass(task.priority)"
+                                                <TaskStateBadge kind="status" :value="task.status" :data-testid="`task-status-badge-${task.id}`" />
+                                                <TaskStateBadge
+                                                    kind="priority"
+                                                    :value="task.priority"
                                                     :data-testid="`task-priority-badge-${task.id}`"
-                                                    variant="outline"
-                                                >
-                                                    {{ getPriorityLabel(task.priority) }}
-                                                </Badge>
+                                                />
                                                 <Badge :data-testid="`task-environment-badge-${task.id}`" variant="outline">
                                                     {{ getTaskEnvironmentLabel(task) }}
                                                 </Badge>

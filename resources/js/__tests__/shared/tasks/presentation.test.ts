@@ -1,15 +1,13 @@
 import {
     getDefaultStatuses,
-    getPriorityBadgeClass,
     getPriorityLabel,
     getPriorityOptions,
-    getRequirementStatusBadgeClass,
     getRequirementStatusLabel,
     getRequirementStatusOptions,
     getSortByOptions,
-    getStatusBadgeClass,
     getStatusLabel,
     getStatusOptions,
+    getTaskStateIcon,
     normalizeStringList,
 } from '@shared/tasks/presentation';
 import { describe, expect, it } from 'vitest';
@@ -33,7 +31,7 @@ describe('shared/tasks/presentation', () => {
 
         expect(statuses.map((option) => option.value)).toContain('on-hold');
         expect(getStatusLabel('on-hold', statuses)).toBe('On Hold');
-        expect(getStatusBadgeClass('on-hold')).toContain('border-orange-300');
+        expect(getTaskStateIcon('on-hold')).not.toBe(getTaskStateIcon('pending'));
     });
 
     it('exposes requirement lifecycle options with neutral awaiting feedback wording', () => {
@@ -50,7 +48,7 @@ describe('shared/tasks/presentation', () => {
         expect(getRequirementStatusLabel('awaiting-feedback')).toBe('Awaiting Feedback');
         expect(getRequirementStatusLabel('ready-to-finalize')).toBe('Ready');
         expect(getRequirementStatusLabel('finalized')).toBe('Finalized');
-        expect(getRequirementStatusBadgeClass('finalized')).toContain('border-emerald-300');
+        expect(getTaskStateIcon('declined')).not.toBe(getTaskStateIcon('finalized'));
         expect(getRequirementStatusLabel('unknown')).toBe('unknown');
     });
 
@@ -70,17 +68,18 @@ describe('shared/tasks/presentation', () => {
         expect(getPriorityLabel('unknown', priorityOptions)).toBe('unknown');
     });
 
-    it('returns fallback badge classes for unknown values', () => {
-        expect(getStatusBadgeClass('unknown')).toContain('border-zinc-300');
-        expect(getPriorityBadgeClass('unknown')).toContain('border-zinc-300');
+    it('returns a fallback icon for unknown values', () => {
+        expect(getTaskStateIcon('unknown')).toBeTruthy();
     });
 
-    it('includes dark mode state classes for status and priority options', () => {
+    it('leaves task state selection styling to the shared ButtonGroup variants', () => {
         const statuses = getStatusOptions({ includeClosed: false });
         const priorities = getPriorityOptions();
+        const requirements = getRequirementStatusOptions();
 
-        expect(statuses.every((option) => option.selectedClass.includes('dark:bg-') && option.unselectedClass.includes('dark:bg-'))).toBe(true);
-        expect(priorities.every((option) => option.selectedClass.includes('dark:bg-') && option.unselectedClass.includes('dark:bg-'))).toBe(true);
+        expect([...statuses, ...priorities, ...requirements].every((option) => !('selectedClass' in option) && !('unselectedClass' in option))).toBe(
+            true,
+        );
     });
 
     it('exposes supported sort options', () => {
