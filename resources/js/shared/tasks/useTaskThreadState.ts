@@ -164,6 +164,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
                 (message) => message.id && !deliveredAtStart.has(message.id) && !fetchedIds.has(message.id),
             );
             threadMessages.value = [...fetched, ...deliveredDuringFetch, ...(transientMessages.get(taskId) ?? [])];
+            threadError.value = null;
             refreshThreadSending();
             if (!quiet) scrollCommentsToBottomSoon();
         } catch (error: any) {
@@ -172,7 +173,6 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             if (!quiet && generation === fetchGeneration) threadLoading.value = false;
         }
     }
-
     function refreshThreadSending() {
         threadSending.value = (transientMessages.get(activeTaskId ?? -1) ?? []).some((message) => message.pending);
     }
@@ -212,7 +212,6 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             if (options.onSendError) options.onSendError(message);
         }
     }
-
     function retryThreadSend(message: ThreadMessage) {
         const pending = pendingThreads.get(message.clientId);
         if (!pending || message.pending || !message.failed) return;
@@ -221,7 +220,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     }
 
     async function publishThreadMessage(message: ThreadMessage) {
-        if (!options.publishThread || !options.editTask.value || !message.id || !message.isDraft || !message.canPublish || message.publishing) return;
+        if (!options.publishThread || !options.editTask.value || !message.id || !message.isDraft || !message.canPublish) return;
+        if (threadMessages.value.some((item) => item.id === message.id && item.publishing)) return;
         const taskId = options.getTaskId(options.editTask.value);
         const threadId = message.id;
         threadMessages.value = threadMessages.value.map((item) => (item.id === threadId ? { ...item, publishing: true, publishError: null } : item));
