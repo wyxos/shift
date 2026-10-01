@@ -151,7 +151,7 @@ watch(deleteDialogOpen, (open) => {
                 <AlertDialogFooter>
                     <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        class="bg-destructive-surface text-destructive-foreground hover:bg-destructive-hover"
                         data-testid="confirm-legacy-thread-message-delete"
                         @click="confirmDeleteMessage"
                     >

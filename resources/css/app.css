@@ -36,6 +36,8 @@
     --color-accent-foreground: var(--accent-foreground);
 
     --color-destructive: var(--destructive);
+    --color-destructive-surface: var(--destructive-surface);
+    --color-destructive-hover: var(--destructive-hover);
     --color-destructive-foreground: var(--destructive-foreground);
 
     --color-border: var(--border);
@@ -129,8 +131,10 @@
     --muted-foreground: hsl(215 16% 46%);
     --accent: hsl(214 100% 97%);
     --accent-foreground: hsl(221 83% 40%);
-    --destructive: hsl(0 84.2% 60.2%);
-    --destructive-foreground: hsl(0 0% 98%);
+    --destructive: hsl(0 76% 50%);
+    --destructive-surface: hsl(0 76% 50%);
+    --destructive-hover: hsl(0 76% 44%);
+    --destructive-foreground: hsl(0 0% 100%);
     --border: hsl(214 32% 91%);
     --input: hsl(214 32% 88%);
     --ring: hsl(221 83% 53%);
@@ -166,7 +170,8 @@
     --muted-foreground: hsl(215 24% 76%);
     --accent: hsl(223 30% 23%);
     --accent-foreground: hsl(214 100% 97%);
-    --destructive: hsl(0 72% 56%);
+    /* Error text needs a lighter red; filled danger controls retain solid crimson. */
+    --destructive: hsl(0 78% 67%);
     --destructive-foreground: hsl(0 0% 100%);
     --border: hsl(223 24% 26%);
     --input: hsl(223 24% 21%);
