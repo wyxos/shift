@@ -20,7 +20,7 @@ class TaskThreadAudienceService
 
     public function isVisibleToExternalUsers(TaskThread $thread): bool
     {
-        return $this->audience($thread) === TaskThreadAudience::All;
+        return ! $thread->is_draft && $this->audience($thread) === TaskThreadAudience::All;
     }
 
     public function assertContentMayBeShared(

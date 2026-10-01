@@ -50,6 +50,7 @@ class ListTaskThreadsTool extends Tool
         $limit = (int) ($validated['limit'] ?? 20);
 
         $threads = TaskThread::query()
+            ->withDraftsFor($principal->user)
             ->with(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
             ->where('task_id', $validated['task_id'])
             ->when($validated['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))

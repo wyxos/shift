@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,33 @@ class TaskThread extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected $attributes = [
+        'is_draft' => false,
+    ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('published', fn (Builder $query) => $query->where('task_threads.is_draft', false));
+    }
+
+    public function scopeWithDraftsFor(Builder $query, User $user): Builder
+    {
+        return $query->withoutGlobalScope('published')
+            ->where(fn (Builder $query) => $query
+                ->where('task_threads.is_draft', false)
+                ->orWhere(fn (Builder $query) => $query
+                    ->where('task_threads.sender_type', User::class)
+                    ->where('task_threads.sender_id', $user->id)));
+    }
+
+    public function resolveRouteBindingQuery($query, $value, $field = null): Builder
+    {
+        $query = parent::resolveRouteBindingQuery($query, $value, $field);
+        $user = auth()->user();
+
+        return $user instanceof User ? $query->withDraftsFor($user) : $query;
+    }
 
     /**
      * Scope a query to only include threads of a specific type.
@@ -29,6 +57,8 @@ class TaskThread extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'is_draft' => 'boolean',
+        'published_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

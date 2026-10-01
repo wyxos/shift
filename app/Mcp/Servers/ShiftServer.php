@@ -4,6 +4,7 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddTaskThreadCommentTool;
 use App\Mcp\Tools\CreateTaskTool;
+use App\Mcp\Tools\DraftTaskThreadCommentTool;
 use App\Mcp\Tools\EditTaskThreadCommentTool;
 use App\Mcp\Tools\EditTaskTool;
 use App\Mcp\Tools\GetTaskTool;
@@ -26,6 +27,8 @@ class ShiftServer extends Server
         writable fields, capabilities, and the user's own notification records. Mutation
         tools require the authenticated OAuth grant to include mcp:write and should only be
         used after the user approves the specific task or thread change.
+        Use draft_task_thread_comment when asked to prepare a reply without sending it.
+        Drafts are private to their author and must be published by that person in SHIFT.
     MARKDOWN;
 
     /**
@@ -41,6 +44,7 @@ class ShiftServer extends Server
         CreateTaskTool::class,
         EditTaskTool::class,
         AddTaskThreadCommentTool::class,
+        DraftTaskThreadCommentTool::class,
         EditTaskThreadCommentTool::class,
     ];
 }

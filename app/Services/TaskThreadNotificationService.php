@@ -19,6 +19,10 @@ class TaskThreadNotificationService
 
     public function send(Task $task, TaskThread $thread): void
     {
+        if ($thread->is_draft) {
+            return;
+        }
+
         $internalSenderId = $thread->sender_type === User::class
             ? (int) $thread->sender_id
             : null;

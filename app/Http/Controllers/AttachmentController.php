@@ -417,7 +417,9 @@ class AttachmentController extends Controller
             return response()->json(['error' => 'Invalid type'], 400);
         }
 
-        $model = $modelClass::findOrFail($id);
+        $model = $modelClass === TaskThread::class
+            ? TaskThread::query()->withDraftsFor(auth()->user())->findOrFail($id)
+            : $modelClass::findOrFail($id);
 
         $task = $model instanceof Task ? $model : ($model instanceof TaskThread ? $model->task : null);
         if ($task instanceof Task) {
@@ -507,6 +509,7 @@ class AttachmentController extends Controller
     public function downloadAttachment(Attachment $attachment)
     {
         $task = $this->getTaskFromAttachment($attachment);
+        abort_unless($task instanceof Task, 404);
         if ($task instanceof Task) {
             $this->ensureTaskVisible($task);
         }
@@ -538,7 +541,9 @@ class AttachmentController extends Controller
 
     private function getTaskFromAttachment(Attachment $attachment): ?Task
     {
-        $attachable = $attachment->attachable;
+        $attachable = $attachment->attachable_type === TaskThread::class
+            ? TaskThread::query()->withDraftsFor(auth()->user())->find($attachment->attachable_id)
+            : $attachment->attachable;
 
         if ($attachable instanceof Task) {
             return $attachable;

@@ -114,6 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Task Threads
     Route::get('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'index'])->name('task-threads.index');
     Route::post('tasks/{task}/threads', [\App\Http\Controllers\TaskThreadController::class, 'store'])->name('task-threads.store');
+    Route::post('tasks/{task}/threads/{thread}/publish', [\App\Http\Controllers\TaskThreadController::class, 'publish'])->name('task-threads.publish');
     Route::get('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'show'])->name('task-threads.show');
     Route::put('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'update'])->name('task-threads.update');
     Route::delete('tasks/{task}/threads/{thread}', [\App\Http\Controllers\TaskThreadController::class, 'destroy'])->name('task-threads.destroy');
