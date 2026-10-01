@@ -60,9 +60,15 @@ describe('Tasks/Index.vue draft comments', () => {
         await wrapper.get('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
-        expect(wrapper.get('[data-testid="thread-draft-badge"]').text()).toBe('Draft');
+        const draftAction = wrapper.get('[data-testid="publish-draft-21"]');
+        expect(wrapper.find('[data-testid="thread-draft-badge"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="comment-bubble-21"]').element.contains(draftAction.element)).toBe(false);
+        expect(draftAction.attributes('aria-label')).toBe('Publish draft');
+        expect(draftAction.classes()).toContain('destructive');
+        expect(draftAction.get('[data-testid="draft-action-label"]').text()).toBe('Draft');
+        expect(draftAction.get('[data-testid="publish-action-label"]').text()).toBe('Publish');
         expect(wrapper.get('[data-testid="comment-bubble-21"]').text()).toContain('Ready for review');
-        await wrapper.get('[data-testid="publish-draft-21"]').trigger('click');
+        await draftAction.trigger('click');
         await flushPromises();
 
         expect(axiosPostMock).toHaveBeenCalledWith('/task-threads.publish');
