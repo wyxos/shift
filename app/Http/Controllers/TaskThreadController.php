@@ -448,7 +448,7 @@ class TaskThreadController extends Controller
         $user = Auth::user();
         $audience = $this->audiences->audience($thread);
         $content = (string) $this->sanitizeRichContent($request->input('content'));
-        $this->audiences->assertContentMayBeShared($task, $audience, $content);
+        $this->audiences->assertContentMayBeShared($task, $audience, $content, $thread->is_draft ? $thread : null);
         $resolvedMentions = $request->has('mentions')
             ? $this->mentions->resolve(
                 $task,
