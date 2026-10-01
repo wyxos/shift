@@ -14,20 +14,21 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue';
+import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
 import InlineImage from '../extensions/inlineImage';
 import ShiftMention from '../extensions/mention';
 import ReplyQuote from '../extensions/replyQuote';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
 import { imageTiles } from '../tasks/image-tile';
-import { renderRichContent } from '../tasks/rich-content';
+import { isInRichBlockNeedingEnter, resolveEditorContent } from './shift-editor/editorContent';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
 import ShiftEditorMentionSuggestions from './shift-editor/ShiftEditorMentionSuggestions.vue';
 import type { MentionCandidate, MentionIdentity, SentAttachment } from './shift-editor/types';
 import { containsAiImprovableText, useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
+import { useShiftEditorEmoji } from './shift-editor/useShiftEditorEmoji';
 import { useShiftEditorMentions } from './shift-editor/useShiftEditorMentions';
 // Optional: import a highlight.js theme for lowlight token colors
 import 'highlight.js/styles/github.css';
@@ -94,11 +95,6 @@ const props = withDefaults(
 );
 
 const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
-const showEmoji = ref(false);
-const emojiPopover = ref<HTMLElement | null>(null);
-const emojiToolbar = ref<HTMLElement | null>(null);
-const emojiPlacement = ref<'above' | 'below'>('above');
-const emojiPopoverStyle = ref({ left: '0px', top: '0px', visibility: 'hidden' as 'hidden' | 'visible' });
 const hasUploadPlaceholder = ref(false);
 const editorFocused = ref(false);
 const hasAiImprovableText = ref(containsAiImprovableText(resolveEditorContent(props.modelValue)));
@@ -157,33 +153,12 @@ watch(
     },
 );
 
-function resolveEditorContent(value?: string): string {
-    const content = String(value ?? '');
-    if (!content.trim()) return '';
-    return renderRichContent(content);
-}
-
 function resolveAiImproveUrl(): string | null {
     if (props.aiImproveUrl) return props.aiImproveUrl;
     if (typeof route === 'function') {
         return route('ai.improve') as string;
     }
     return null;
-}
-
-function isInRichBlockNeedingEnter(editorInstance: any): boolean {
-    const selection = editorInstance?.state?.selection;
-    const from = selection?.$from;
-    if (!from) return false;
-
-    for (let depth = from.depth; depth >= 0; depth -= 1) {
-        const typeName = from.node(depth)?.type?.name;
-        if (typeName === 'listItem' || typeName === 'codeBlock' || typeName === 'blockquote') {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 const editor = useEditor({
@@ -355,64 +330,9 @@ watch(
     { immediate: true },
 );
 
-function onEmojiClick(ev: Event) {
-    const unicode = (ev as CustomEvent).detail?.unicode || (ev as any).detail?.emoji?.unicode;
-    if (!unicode || !editor.value) return;
-    editor.value.chain().focus().insertContent(unicode).run();
-    showEmoji.value = false;
-}
-
-async function toggleEmojiPicker() {
-    if (showEmoji.value) {
-        showEmoji.value = false;
-        return;
-    }
-
-    emojiPopoverStyle.value.visibility = 'hidden';
-    showEmoji.value = true;
-    await nextTick();
-    positionEmojiPicker();
-}
-
-function positionEmojiPicker() {
-    if (!showEmoji.value || !emojiToolbar.value || !emojiPopover.value) return;
-
-    const toolbar = emojiToolbar.value.getBoundingClientRect();
-    const popover = emojiPopover.value.getBoundingClientRect();
-    const height = popover.height || 440;
-    const width = popover.width || 350;
-    const spaceAbove = toolbar.top - 8;
-    const spaceBelow = window.innerHeight - toolbar.bottom - 8;
-    emojiPlacement.value = spaceAbove >= height || spaceAbove > spaceBelow ? 'above' : 'below';
-    emojiPopoverStyle.value = {
-        left: `${Math.max(8, Math.min(toolbar.left, window.innerWidth - width - 8))}px`,
-        top: `${emojiPlacement.value === 'above' ? Math.max(8, toolbar.top - height - 8) : Math.min(window.innerHeight - height - 8, toolbar.bottom + 8)}px`,
-        visibility: 'visible',
-    };
-}
-
-function closeEmojiOnOutsidePointer(event: PointerEvent) {
-    if (!showEmoji.value || emojiToolbar.value?.contains(event.target as Node) || emojiPopover.value?.contains(event.target as Node)) return;
-    showEmoji.value = false;
-}
-
-function closeEmojiOnEscape(event: KeyboardEvent) {
-    if (event.key === 'Escape') showEmoji.value = false;
-}
-
-onMounted(() => {
-    document.addEventListener('pointerdown', closeEmojiOnOutsidePointer);
-    document.addEventListener('keydown', closeEmojiOnEscape);
-    document.addEventListener('scroll', positionEmojiPicker, true);
-    window.addEventListener('resize', positionEmojiPicker);
-});
-
-onBeforeUnmount(() => {
-    document.removeEventListener('pointerdown', closeEmojiOnOutsidePointer);
-    document.removeEventListener('keydown', closeEmojiOnEscape);
-    document.removeEventListener('scroll', positionEmojiPicker, true);
-    window.removeEventListener('resize', positionEmojiPicker);
-});
+const { emojiPlacement, emojiPopoverStyle, onEmojiClick, setEmojiPopover, setEmojiToolbar, showEmoji, toggleEmojiPicker } = useShiftEditorEmoji(
+    (unicode) => editor.value?.chain().focus().insertContent(unicode).run(),
+);
 
 function onSend() {
     if (!props.sendable) return;
@@ -489,25 +409,31 @@ defineExpose({ confirmMentionAddition, editor, reset });
                 @select="selectMentionCandidate"
             />
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
-            <div ref="emojiToolbar" class="relative flex flex-wrap items-center justify-start gap-2 p-2 px-1">
+            <div :ref="setEmojiToolbar" class="relative flex flex-wrap items-center justify-start gap-2 p-2 px-1">
                 <button
                     type="button"
                     data-testid="toolbar-emoji"
-                    class="rounded p-1 hover:bg-accent hover:text-accent-foreground"
+                    class="hover:bg-accent hover:text-accent-foreground rounded p-1"
                     aria-label="Choose emoji"
                     :aria-expanded="showEmoji"
                     @click="toggleEmojiPicker"
                 >
                     <Smile :size="18" />
                 </button>
-                <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-accent hover:text-accent-foreground" @click="openFilePicker">
+                <button
+                    type="button"
+                    data-testid="toolbar-attachment"
+                    class="hover:bg-accent hover:text-accent-foreground rounded p-1"
+                    aria-label="Attach file"
+                    @click="openFilePicker"
+                >
                     <Paperclip :size="18" />
                 </button>
                 <button
                     v-if="props.enableAiImprove"
                     type="button"
                     data-testid="toolbar-ai-improve"
-                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    class="text-foreground hover:bg-accent hover:text-accent-foreground inline-flex items-center gap-1 rounded px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="isUploading || aiImproving || !hasAiImprovableText"
                     @click="requestAiImprove"
                 >
@@ -518,7 +444,7 @@ defineExpose({ confirmMentionAddition, editor, reset });
                     v-if="props.cancelable"
                     type="button"
                     data-testid="toolbar-cancel"
-                    class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-600"
+                    class="text-muted-foreground hover:bg-accent rounded p-1 hover:text-red-600"
                     aria-label="Cancel edit"
                     title="Cancel"
                     @click="emit('cancel')"
@@ -531,7 +457,8 @@ defineExpose({ confirmMentionAddition, editor, reset });
                         v-if="props.sendable"
                         type="button"
                         data-testid="toolbar-send"
-                        class="rounded p-1 text-blue-600 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Send message"
+                        class="hover:bg-accent rounded p-1 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="isUploading || props.sendDisabled"
                         @click="onSend"
                     >
@@ -545,9 +472,9 @@ defineExpose({ confirmMentionAddition, editor, reset });
         <Teleport to="body">
             <div
                 v-if="showEmoji"
-                ref="emojiPopover"
+                :ref="setEmojiPopover"
                 data-testid="emoji-popover"
-                class="fixed z-50 w-[min(350px,calc(100vw-1rem))] max-h-[calc(100vh-1rem)] overflow-auto rounded-lg border border-border bg-popover shadow-lg"
+                class="border-border bg-popover fixed z-50 max-h-[calc(100vh-1rem)] w-[min(350px,calc(100vw-1rem))] overflow-auto rounded-lg border shadow-lg"
                 :data-placement="emojiPlacement"
                 :style="emojiPopoverStyle"
             >

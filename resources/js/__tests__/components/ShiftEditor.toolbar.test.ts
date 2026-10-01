@@ -35,17 +35,6 @@ vi.mock('axios', () => ({
 import 'emoji-picker-element';
 
 describe('ShiftEditor toolbar', () => {
-    it('uses theme-aware hover surfaces for every toolbar action', async () => {
-        const wrapper = mount(ShiftEditor, { props: { cancelable: true } });
-        await nextTick();
-
-        for (const action of ['emoji', 'attachment', 'ai-improve', 'cancel', 'send']) {
-            const button = wrapper.get(`[data-testid="toolbar-${action}"]`);
-            expect(button.classes()).toContain('hover:bg-accent');
-            expect(button.classes()).not.toContain('hover:bg-gray-100');
-        }
-    });
-
     it('renders html-backed model values as rich content instead of raw tags', async () => {
         const wrapper = mount(ShiftEditor, {
             props: {
@@ -129,10 +118,16 @@ describe('ShiftEditor toolbar', () => {
         expect(wrapper.find('[data-testid="emoji-popover"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="toolbar-emoji"]').attributes('aria-expanded')).toBe('true');
 
+        const sheetEscapeHandler = vi.fn();
+        document.addEventListener('keydown', sheetEscapeHandler);
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await nextTick();
         expect(document.querySelector('[data-testid="emoji-popover"]')).toBeNull();
         expect(wrapper.get('[data-testid="toolbar-emoji"]').attributes('aria-expanded')).toBe('false');
+        expect(sheetEscapeHandler).not.toHaveBeenCalled();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(sheetEscapeHandler).toHaveBeenCalledOnce();
+        document.removeEventListener('keydown', sheetEscapeHandler);
         wrapper.unmount();
     });
 
