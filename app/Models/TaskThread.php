@@ -59,6 +59,7 @@ class TaskThread extends Model
     protected $casts = [
         'is_draft' => 'boolean',
         'published_at' => 'datetime',
+        'notifications_queued_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

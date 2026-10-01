@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\SendTaskThreadNotification;
+use App\Jobs\SendTaskThreadNotifications;
 use App\Mcp\Servers\ShiftServer;
 use App\Mcp\Tools\DraftTaskThreadCommentTool;
 use App\Mcp\Tools\EditTaskThreadCommentTool;
@@ -14,6 +15,9 @@ use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
 use App\Services\TaskThreadNotificationService;
+use Illuminate\Queue\QueueManager;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -25,7 +29,10 @@ beforeEach(function () {
     Queue::fake();
     $this->author = User::factory()->create();
     $this->other = User::factory()->create();
-    $this->project = Project::factory()->withAuthor($this->author->id)->create(['mcp_enabled' => true]);
+    $this->project = Project::factory()->withAuthor($this->author->id)->create([
+        'mcp_enabled' => true,
+        'token' => 'draft-project-token',
+    ]);
     $this->task = Task::factory()->for($this->project)->create();
     $this->task->submitter()->associate($this->author)->save();
     $this->task->internalCollaborators()->attach($this->other);
@@ -131,6 +138,12 @@ test('publishing a draft once exposes it and notifies the audience exactly once'
     $this->actingAs($this->author)->postJson($url)
         ->assertOk()->assertJsonPath('thread.is_draft', false)->assertJsonPath('thread.can_publish', false);
     $this->actingAs($this->author)->postJson($url)->assertOk();
+    Queue::assertPushed(SendTaskThreadNotifications::class, 1);
+    Queue::assertPushed(SendTaskThreadNotifications::class, function (SendTaskThreadNotifications $job): bool {
+        $job->handle(app(TaskThreadNotificationService::class));
+
+        return true;
+    });
     $published = TaskThread::query()->findOrFail($this->draft->id);
     expect($published->published_at)->not->toBeNull()
         ->and($published->created_at->equalTo($published->published_at))->toBeTrue();
@@ -165,9 +178,14 @@ test('publishing Team drafts preserves their audience and sends no external call
 
     $this->actingAs($this->author)->postJson(route('task-threads.publish', [$this->task, $this->draft]))
         ->assertOk()->assertJsonPath('thread.audience', 'team')->assertJsonPath('thread.is_draft', false);
+    Queue::assertPushed(SendTaskThreadNotifications::class, function (SendTaskThreadNotifications $job): bool {
+        $job->handle(app(TaskThreadNotificationService::class));
+
+        return true;
+    });
 
     Notification::assertSentToTimes($this->other, TaskThreadUpdated::class, 1);
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(SendTaskThreadNotification::class);
 });
 
 test('publishing revalidates audience references and leaves invalid drafts unpublished', function () {
@@ -202,7 +220,11 @@ test('draft attachments remain private and the owner can download them', functio
 test('external API cannot list read edit delete or download unpublished drafts', function () {
     Storage::fake('local');
     Sanctum::actingAs($this->author);
-    $external = ExternalUser::factory()->create(['project_id' => $this->project->id]);
+    $external = ExternalUser::factory()->create([
+        'project_id' => $this->project->id,
+        'environment' => 'testing',
+        'url' => 'https://consumer.example.test',
+    ]);
     $this->task->externalCollaborators()->attach($external);
     $context = [
         'project' => $this->project->token,
@@ -222,4 +244,87 @@ test('external API cannot list read edit delete or download unpublished drafts',
     $this->postJson(route('api.task-threads.store', ['task' => $this->task]), [
         ...$context, 'content' => '<p>Cannot draft here</p>', 'type' => 'external', 'is_draft' => true,
     ])->assertUnprocessable()->assertJsonValidationErrors('is_draft');
+});
+
+test('publishing All drafts permits their own inline attachments', function () {
+    $attachment = Attachment::query()->create([
+        'attachable_type' => TaskThread::class, 'attachable_id' => $this->draft->id,
+        'original_filename' => 'draft.png', 'path' => 'attachments/draft.png',
+    ]);
+    $this->draft->update(['content' => '<p><img src="/attachments/'.$attachment->id.'/download"></p>']);
+
+    $this->actingAs($this->author)->postJson(route('task-threads.publish', [$this->task, $this->draft]))
+        ->assertOk()->assertJsonPath('thread.is_draft', false);
+
+    expect(TaskThread::query()->findOrFail($this->draft->id)->content)->toContain('/attachments/'.$attachment->id.'/download');
+});
+
+test('publishing All drafts cannot expose another unpublished drafts inline attachments', function () {
+    $otherDraft = TaskThread::withoutGlobalScope('published')->create([
+        'task_id' => $this->task->id, 'type' => 'external', 'content' => '<p>Another draft</p>',
+        'sender_name' => $this->author->name, 'sender_type' => User::class, 'sender_id' => $this->author->id,
+        'is_draft' => true,
+    ]);
+    $attachment = Attachment::query()->create([
+        'attachable_type' => TaskThread::class, 'attachable_id' => $otherDraft->id,
+        'original_filename' => 'other-draft.png', 'path' => 'attachments/other-draft.png',
+    ]);
+    $this->draft->update(['content' => '<p><img src="/attachments/'.$attachment->id.'/download"></p>']);
+
+    $this->actingAs($this->author)->postJson(route('task-threads.publish', [$this->task, $this->draft]))
+        ->assertUnprocessable()->assertJsonValidationErrors('content');
+
+    expect(TaskThread::withoutGlobalScope('published')->findOrFail($this->draft->id)->is_draft)->toBeTrue();
+    Notification::assertNothingSent();
+});
+
+test('database queue insertion failure rolls back draft publication so a retry can recover', function () {
+    config()->set('queue.default', 'database');
+    config()->set('queue.connections.database.connection', config('database.default'));
+    $dispatcher = Bus::getFacadeRoot();
+    Bus::shouldReceive('dispatch')->once()->andThrow(new RuntimeException('Queue unavailable'));
+    $url = route('task-threads.publish', [$this->task, $this->draft]);
+
+    $this->actingAs($this->author)->postJson($url)->assertServerError();
+
+    $draft = TaskThread::withoutGlobalScope('published')->findOrFail($this->draft->id);
+    expect($draft->is_draft)->toBeTrue()
+        ->and($draft->published_at)->toBeNull()
+        ->and($draft->notifications_queued_at)->toBeNull();
+
+    Bus::swap($dispatcher);
+    $this->actingAs($this->author)->postJson($url)->assertOk()->assertJsonPath('thread.is_draft', false);
+    Queue::assertPushed(SendTaskThreadNotifications::class, 1);
+});
+
+test('publication atomically persists a durable database notification job', function () {
+    config()->set('queue.default', 'database');
+    config()->set('queue.connections.database.connection', config('database.default'));
+    $queue = new QueueManager(app());
+    $queue->addConnector('database', fn () => new \Illuminate\Queue\Connectors\DatabaseConnector(app('db')));
+    Queue::swap($queue);
+    $url = route('task-threads.publish', [$this->task, $this->draft]);
+
+    $this->actingAs($this->author)->postJson($url)->assertOk();
+    $this->actingAs($this->author)->postJson($url)->assertOk();
+
+    expect(DB::table('jobs')->count())->toBe(1)
+        ->and(json_decode(DB::table('jobs')->value('payload'), true)['displayName'])->toBe(SendTaskThreadNotifications::class)
+        ->and(TaskThread::query()->findOrFail($this->draft->id)->notifications_queued_at)->not->toBeNull();
+    Notification::assertNothingSent();
+});
+
+test('notification delivery failure is retried by the durable job after publication', function () {
+    $this->actingAs($this->author)->postJson(route('task-threads.publish', [$this->task, $this->draft]))->assertOk();
+    Queue::assertPushed(SendTaskThreadNotifications::class, 1);
+    $job = Queue::pushed(SendTaskThreadNotifications::class)->first();
+    $notifications = app(TaskThreadNotificationService::class);
+    $failure = Mockery::mock(TaskThreadNotificationService::class);
+    $failure->shouldReceive('send')->once()->andThrow(new RuntimeException('Dispatch failed'));
+
+    expect(fn () => $job->handle($failure))->toThrow(RuntimeException::class, 'Dispatch failed');
+    expect(TaskThread::query()->findOrFail($this->draft->id)->is_draft)->toBeFalse();
+
+    $job->handle($notifications);
+    Notification::assertSentToTimes($this->other, TaskThreadUpdated::class, 1);
 });
