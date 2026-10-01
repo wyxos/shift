@@ -35,6 +35,17 @@ vi.mock('axios', () => ({
 import 'emoji-picker-element';
 
 describe('ShiftEditor toolbar', () => {
+    it('uses theme-aware hover surfaces for every toolbar action', async () => {
+        const wrapper = mount(ShiftEditor, { props: { cancelable: true } });
+        await nextTick();
+
+        for (const action of ['emoji', 'attachment', 'ai-improve', 'cancel', 'send']) {
+            const button = wrapper.get(`[data-testid="toolbar-${action}"]`);
+            expect(button.classes()).toContain('hover:bg-accent');
+            expect(button.classes()).not.toContain('hover:bg-gray-100');
+        }
+    });
+
     it('renders html-backed model values as rich content instead of raw tags', async () => {
         const wrapper = mount(ShiftEditor, {
             props: {

@@ -434,17 +434,17 @@ defineExpose({ confirmMentionAddition, editor, reset });
             />
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
             <div class="flex flex-wrap items-center justify-start gap-2 p-2 px-1">
-                <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-gray-100" @click="showEmoji = !showEmoji">
+                <button type="button" data-testid="toolbar-emoji" class="rounded p-1 hover:bg-accent hover:text-accent-foreground" @click="showEmoji = !showEmoji">
                     <Smile :size="18" />
                 </button>
-                <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-gray-100" @click="openFilePicker">
+                <button type="button" data-testid="toolbar-attachment" class="rounded p-1 hover:bg-accent hover:text-accent-foreground" @click="openFilePicker">
                     <Paperclip :size="18" />
                 </button>
                 <button
                     v-if="props.enableAiImprove"
                     type="button"
                     data-testid="toolbar-ai-improve"
-                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="isUploading || aiImproving || !hasAiImprovableText"
                     @click="requestAiImprove"
                 >
@@ -455,7 +455,7 @@ defineExpose({ confirmMentionAddition, editor, reset });
                     v-if="props.cancelable"
                     type="button"
                     data-testid="toolbar-cancel"
-                    class="rounded p-1 text-slate-500 hover:bg-gray-100 hover:text-red-600"
+                    class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-600"
                     aria-label="Cancel edit"
                     title="Cancel"
                     @click="emit('cancel')"
@@ -468,7 +468,7 @@ defineExpose({ confirmMentionAddition, editor, reset });
                         v-if="props.sendable"
                         type="button"
                         data-testid="toolbar-send"
-                        class="rounded p-1 text-blue-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="rounded p-1 text-blue-600 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="isUploading || props.sendDisabled"
                         @click="onSend"
                     >
