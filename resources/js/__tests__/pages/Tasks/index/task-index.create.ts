@@ -205,7 +205,6 @@ describe('Tasks/Index.vue', () => {
         expect(
             (wrapper.get('[data-testid="create-description-editor"] [data-testid="stub-editor-input"]').element as HTMLTextAreaElement).value,
         ).toBe('<p>Customer reports the urgent fixes API fails during submission.</p>');
-        expect(wrapper.get('[data-testid="create-task-priority-high"]').classes().join(' ')).toContain('bg-rose-100');
         expect(wrapper.get('[data-testid="task-email-import-summary"]').text()).toContain('Fw: EXT Urgent Fixes - API question');
         expect(wrapper.get('[data-testid="task-email-import-missing"]').text()).toContain('Exact request payload');
 

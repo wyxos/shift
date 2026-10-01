@@ -3,17 +3,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ResponsiveRecordItem } from '@/components/ui/record-list';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
-import {
-    getPriorityBadgeClass,
-    getPriorityLabel,
-    getRequirementStatusBadgeClass,
-    getRequirementStatusLabel,
-    getStatusBadgeClass,
-    getStatusLabel,
-} from '@shared/tasks/presentation';
 import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import TaskListTimestamp from './TaskListTimestamp.vue';
+import TaskStateBadge from './TaskStateBadge.vue';
 import {
     canDeleteTask,
     canFinalizeRequirementPack,
@@ -120,17 +113,13 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                             <div class="flex min-w-0 flex-col gap-1">
                                 <dt class="text-muted-foreground text-xs">State</dt>
                                 <dd>
-                                    <Badge :class="getRequirementStatusBadgeClass(requirementState(task))" variant="outline">
-                                        {{ getRequirementStatusLabel(requirementState(task)) }}
-                                    </Badge>
+                                    <TaskStateBadge kind="requirement" :value="requirementState(task)" />
                                 </dd>
                             </div>
                             <div class="flex min-w-0 flex-col gap-1">
                                 <dt class="text-muted-foreground text-xs">Priority</dt>
                                 <dd>
-                                    <Badge :class="getPriorityBadgeClass(task.priority)" variant="outline">{{
-                                        getPriorityLabel(task.priority)
-                                    }}</Badge>
+                                    <TaskStateBadge kind="priority" :value="task.priority" />
                                 </dd>
                             </div>
                             <div class="col-span-2 flex min-w-0 flex-col gap-1">
@@ -189,13 +178,13 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                     <div class="flex min-w-0 flex-col gap-1">
                         <dt class="text-muted-foreground text-xs">Status</dt>
                         <dd>
-                            <Badge :class="getStatusBadgeClass(task.status)" variant="outline">{{ getStatusLabel(task.status) }}</Badge>
+                            <TaskStateBadge kind="status" :value="task.status" />
                         </dd>
                     </div>
                     <div class="flex min-w-0 flex-col gap-1">
                         <dt class="text-muted-foreground text-xs">Priority</dt>
                         <dd>
-                            <Badge :class="getPriorityBadgeClass(task.priority)" variant="outline">{{ getPriorityLabel(task.priority) }}</Badge>
+                            <TaskStateBadge kind="priority" :value="task.priority" />
                         </dd>
                     </div>
                     <div class="col-span-2 flex min-w-0 flex-col gap-1">
