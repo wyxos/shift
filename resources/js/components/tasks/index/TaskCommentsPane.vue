@@ -183,8 +183,12 @@ watch(deleteDialogOpen, (open) => {
         <TaskErrorOccurrencesPane v-if="showOccurrences" :state="state" />
 
         <div v-else :ref="assignCommentsScrollRef" class="flex-1 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
-            <div v-if="state.threadLoading && state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">Loading comments...</div>
-            <div v-else-if="state.threadError && state.threadMessages.length === 0" class="text-destructive py-6 text-center text-sm">{{ state.threadError }}</div>
+            <div v-if="state.threadLoading && state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">
+                Loading comments...
+            </div>
+            <div v-else-if="state.threadError && state.threadMessages.length === 0" class="text-destructive py-6 text-center text-sm">
+                {{ state.threadError }}
+            </div>
             <div v-else-if="state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">No comments yet.</div>
             <div
                 v-for="(message, messageIndex) in state.threadMessages"
@@ -221,8 +225,20 @@ watch(deleteDialogOpen, (open) => {
                                 @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                                 @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
-                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end text-[11px] font-semibold">
+                                <div
+                                    v-if="message.audience === 'team' || message.isDraft"
+                                    class="mb-1 flex items-center justify-end gap-1 text-[11px] font-semibold"
+                                >
                                     <Badge
+                                        v-if="message.isDraft"
+                                        variant="secondary"
+                                        class="border-white/20 bg-white/15 px-1.5 py-0 text-[10px] text-white"
+                                        data-testid="thread-draft-badge"
+                                    >
+                                        Draft
+                                    </Badge>
+                                    <Badge
+                                        v-if="message.audience === 'team'"
                                         variant="secondary"
                                         :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
                                         class="px-1.5 py-0 text-[10px]"
@@ -255,7 +271,11 @@ watch(deleteDialogOpen, (open) => {
                                         <span class="min-w-0 truncate">{{ attachment.original_filename }}</span>
                                     </component>
                                 </div>
-                                <div v-if="message.pending || message.failed" class="mt-2 flex items-center justify-end gap-2 text-xs text-white/80" role="status">
+                                <div
+                                    v-if="message.pending || message.failed"
+                                    class="mt-2 flex items-center justify-end gap-2 text-xs text-white/80"
+                                    role="status"
+                                >
                                     <LoaderCircle v-if="message.pending" class="size-3 animate-spin" aria-hidden="true" />
                                     <span>{{ message.pending ? 'Sending...' : 'Failed to send' }}</span>
                                     <button
@@ -321,6 +341,19 @@ watch(deleteDialogOpen, (open) => {
                             </ContextMenuContent>
                         </ContextMenuPortal>
                     </ContextMenuRoot>
+                    <div v-if="message.isDraft && message.canPublish" class="mt-1 flex flex-col items-end gap-1">
+                        <button
+                            type="button"
+                            class="border-border bg-background text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                            :data-testid="`publish-draft-${message.id}`"
+                            :disabled="message.publishing"
+                            @click="state.publishThreadMessage(message)"
+                        >
+                            <LoaderCircle v-if="message.publishing" class="size-3 animate-spin" aria-hidden="true" />
+                            {{ message.publishing ? 'Publishing...' : 'Publish' }}
+                        </button>
+                        <span v-if="message.publishError" class="text-destructive text-xs" role="alert">{{ message.publishError }}</span>
+                    </div>
                 </div>
             </div>
         </div>
