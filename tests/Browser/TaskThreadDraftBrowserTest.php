@@ -66,32 +66,54 @@ it('shows a private draft and lets its author publish it from desktop and mobile
     $draft->save();
 
     $this->actingAs($user);
+    $draftAction = "[data-testid=\"publish-draft-{$draft->id}\"]";
 
     $page = visit("/tasks?task={$task->id}")
         ->resize(1440, 900)
         ->assertNoSmoke()
         ->assertVisible('[data-testid="task-comments-pane"]')
-        ->assertVisible('[data-testid="thread-draft-badge"]')
         ->assertSee('Prepared reply for human review')
-        ->assertVisible("[data-testid=\"publish-draft-{$draft->id}\"]")
+        ->assertVisible($draftAction)
+        ->assertAttribute($draftAction, 'aria-label', 'Publish draft')
+        ->assertScript("!document.querySelector('[data-testid=\"comment-bubble-{$draft->id}\"]').contains(document.querySelector('{$draftAction}'))")
+        ->assertScript('document.querySelectorAll("[data-testid^=publish-draft-]").length === 1')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "visible"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "hidden"')
+        ->assertScript("(window.draftActionWidth = document.querySelector('{$draftAction}').getBoundingClientRect().width) > 0")
         ->screenshot(false, 'task-thread-draft-desktop.png');
     copyBrowserReviewScreenshot('task-thread-draft-desktop.png');
 
-    $page->resize(768, 1024)
+    $page->hover($draftAction)
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
+        ->assertScript("document.querySelector('{$draftAction}').getBoundingClientRect().width === window.draftActionWidth")
+        ->screenshot(false, 'task-thread-draft-hover-desktop.png');
+    copyBrowserReviewScreenshot('task-thread-draft-hover-desktop.png');
+
+    $page->hover('[data-testid="comments-editor"]')
+        ->keys($draftAction, 'Shift')
+        ->assertScript("document.activeElement.matches('{$draftAction}:focus-visible')")
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
+        ->screenshot(false, 'task-thread-draft-focus-desktop.png');
+    copyBrowserReviewScreenshot('task-thread-draft-focus-desktop.png');
+
+    $mobilePage = visit("/tasks?task={$task->id}")->on()->mobile()
+        ->assertNoSmoke()
         ->click('[data-testid="edit-mobile-pane-comments"]')
-        ->resize(390, 844)
         ->assertVisible('[data-testid="task-comments-pane"]')
-        ->assertVisible('[data-testid="thread-draft-badge"]')
-        ->assertVisible("[data-testid=\"publish-draft-{$draft->id}\"]")
+        ->assertVisible($draftAction)
+        ->assertScript('matchMedia("(hover: none)").matches')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->screenshot(false, 'task-thread-draft-mobile.png');
     copyBrowserReviewScreenshot('task-thread-draft-mobile.png');
 
-    $page
-        ->click("[data-testid=\"publish-draft-{$draft->id}\"]")
+    $mobilePage
+        ->click($draftAction)
         ->waitForText('Prepared reply for human review')
-        ->assertNotPresent('[data-testid="thread-draft-badge"]')
-        ->assertNotPresent("[data-testid=\"publish-draft-{$draft->id}\"]")
+        ->assertNotPresent($draftAction)
         ->assertNoSmoke();
 
     expect($draft->refresh()->is_draft)->toBeFalse()

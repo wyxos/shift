@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ShiftEditor from '@/components/ShiftEditor.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
@@ -225,20 +226,8 @@ watch(deleteDialogOpen, (open) => {
                                 @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                                 @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
-                                <div
-                                    v-if="message.audience === 'team' || message.isDraft"
-                                    class="mb-1 flex items-center justify-end gap-1 text-[11px] font-semibold"
-                                >
+                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-[11px] font-semibold">
                                     <Badge
-                                        v-if="message.isDraft"
-                                        variant="secondary"
-                                        class="border-white/20 bg-white/15 px-1.5 py-0 text-[10px] text-white"
-                                        data-testid="thread-draft-badge"
-                                    >
-                                        Draft
-                                    </Badge>
-                                    <Badge
-                                        v-if="message.audience === 'team'"
                                         variant="secondary"
                                         :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
                                         class="px-1.5 py-0 text-[10px]"
@@ -341,17 +330,35 @@ watch(deleteDialogOpen, (open) => {
                             </ContextMenuContent>
                         </ContextMenuPortal>
                     </ContextMenuRoot>
-                    <div v-if="message.isDraft && message.canPublish" class="mt-1 flex flex-col items-end gap-1">
-                        <button
+                    <div v-if="message.isDraft" class="mt-1 flex flex-col items-end gap-1">
+                        <Button
                             type="button"
-                            class="border-border bg-background text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                            variant="destructive"
+                            size="sm"
+                            class="group/draft rounded-full"
                             :data-testid="`publish-draft-${message.id}`"
-                            :disabled="message.publishing"
+                            :aria-label="message.publishing ? 'Publishing draft' : message.canPublish ? 'Publish draft' : 'Draft'"
+                            :disabled="message.publishing || !message.canPublish"
                             @click="state.publishThreadMessage(message)"
                         >
-                            <LoaderCircle v-if="message.publishing" class="size-3 animate-spin" aria-hidden="true" />
-                            {{ message.publishing ? 'Publishing...' : 'Publish' }}
-                        </button>
+                            <LoaderCircle v-if="message.publishing" class="animate-spin" aria-hidden="true" />
+                            <span v-if="message.publishing">Publishing...</span>
+                            <span v-else-if="!message.canPublish">Draft</span>
+                            <span v-else class="grid" aria-hidden="true">
+                                <span
+                                    data-testid="draft-action-label"
+                                    class="col-start-1 row-start-1 group-hover/draft:invisible group-focus-visible/draft:invisible [@media(hover:none)]:invisible"
+                                >
+                                    Draft
+                                </span>
+                                <span
+                                    data-testid="publish-action-label"
+                                    class="invisible col-start-1 row-start-1 group-hover/draft:visible group-focus-visible/draft:visible [@media(hover:none)]:visible"
+                                >
+                                    Publish
+                                </span>
+                            </span>
+                        </Button>
                         <span v-if="message.publishError" class="text-destructive text-xs" role="alert">{{ message.publishError }}</span>
                     </div>
                 </div>
