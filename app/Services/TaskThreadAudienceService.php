@@ -27,6 +27,7 @@ class TaskThreadAudienceService
         Task $task,
         TaskThreadAudience $audience,
         string $content,
+        ?TaskThread $publishingThread = null,
     ): void {
         if ($audience === TaskThreadAudience::Team || trim($content) === '') {
             return;
@@ -73,6 +74,15 @@ class TaskThreadAudienceService
             }
 
             $attachable = $attachment->attachable;
+
+            if ($publishingThread instanceof TaskThread
+                && $publishingThread->is_draft
+                && (int) $publishingThread->task_id === (int) $task->id
+                && $this->audience($publishingThread) === $audience
+                && $attachment->attachable_type === TaskThread::class
+                && (int) $attachment->attachable_id === (int) $publishingThread->id) {
+                continue;
+            }
 
             if ($attachable instanceof Task && (int) $attachable->id === (int) $task->id) {
                 continue;

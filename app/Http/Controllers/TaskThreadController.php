@@ -356,33 +356,35 @@ class TaskThreadController extends Controller
         abort_unless((int) $thread->task_id === (int) $task->id, 404);
         abort_unless($this->isCurrentUserThread($task, $thread), 403);
 
-        [$thread, $published] = DB::transaction(function () use ($thread): array {
+        $thread = DB::transaction(function () use ($thread): TaskThread {
             $lockedThread = TaskThread::query()
                 ->withDraftsFor(Auth::user())
                 ->lockForUpdate()
                 ->findOrFail($thread->id);
 
             if (! $lockedThread->is_draft) {
-                return [$lockedThread, false];
+                if ($lockedThread->published_at !== null) {
+                    $this->taskThreadNotificationService->schedule($lockedThread);
+                }
+
+                return $lockedThread;
             }
 
             $this->audiences->assertContentMayBeShared(
                 $lockedThread->task,
                 $this->audiences->audience($lockedThread),
                 (string) $lockedThread->content,
+                $lockedThread,
             );
 
             $lockedThread->is_draft = false;
             $lockedThread->published_at = now();
             $lockedThread->created_at = $lockedThread->published_at;
             $lockedThread->save();
+            $this->taskThreadNotificationService->schedule($lockedThread);
 
-            return [$lockedThread, true];
+            return $lockedThread;
         });
-
-        if ($published) {
-            $this->taskThreadNotificationService->send($task, $thread);
-        }
 
         return $this->show($task, $thread);
     }

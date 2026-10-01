@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Enums\TaskThreadAudience;
 use App\Jobs\SendTaskThreadNotification;
+use App\Jobs\SendTaskThreadNotifications;
 use App\Models\ExternalUser;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
 
 class TaskThreadNotificationService
@@ -16,6 +18,36 @@ class TaskThreadNotificationService
     public function __construct(
         private readonly TaskCollaboratorService $taskCollaboratorService,
     ) {}
+
+    public function schedule(TaskThread $thread): void
+    {
+        $connection = $thread->getConnection();
+        $queueConnection = (string) config('queue.default');
+        $queueConfig = config('queue.connections.'.$queueConnection, []);
+        $queueDatabaseConnection = $queueConfig['connection'] ?? config('database.default');
+
+        $enqueue = function () use ($thread, $connection, $queueConnection): void {
+            $connection->transaction(function () use ($thread, $queueConnection): void {
+                $lockedThread = TaskThread::query()->lockForUpdate()->findOrFail($thread->id);
+                if ($lockedThread->notifications_queued_at !== null) {
+                    return;
+                }
+
+                Bus::dispatch((new SendTaskThreadNotifications($lockedThread->id))
+                    ->onConnection($queueConnection)->beforeCommit());
+                $lockedThread->forceFill(['notifications_queued_at' => now()])->save();
+            });
+        };
+
+        if (($queueConfig['driver'] ?? null) === 'database'
+            && $queueDatabaseConnection === $connection->getName()) {
+            $enqueue();
+
+            return;
+        }
+
+        $connection->afterCommit($enqueue);
+    }
 
     public function send(Task $task, TaskThread $thread): void
     {
