@@ -96,6 +96,7 @@ class TaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
+                    'client_request_id' => $thread->client_request_id,
                     'is_draft' => $thread->is_draft,
                     'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                     'content' => $thread->content,
@@ -132,6 +133,7 @@ class TaskThreadController extends Controller
 
         $request->validate([
             'content' => 'required|string',
+            'client_request_id' => ['nullable', 'uuid'],
             'type' => 'required|in:internal,external',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
             'mentions' => ['sometimes', 'array', 'max:50'],
@@ -144,53 +146,72 @@ class TaskThreadController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
-        $audience = TaskThreadAudience::fromStoredType($request->string('type')->toString());
-        $content = (string) $this->sanitizeRichContent($request->input('content'));
-        $this->audiences->assertContentMayBeShared($task, $audience, $content);
-        $resolvedMentions = $this->mentions->resolve(
-            $task,
-            $user,
-            $audience,
-            $request->input('mentions', []),
-            $request->input('add_collaborators', []),
-        );
-        $content = $this->mentions->normalizeContent($content, $resolvedMentions);
+        $clientRequestId = $request->filled('client_request_id')
+            ? strtolower($request->string('client_request_id')->toString())
+            : null;
 
-        $thread = DB::transaction(function () use ($task, $user, $audience, $content, $resolvedMentions): TaskThread {
+        $thread = DB::transaction(function () use ($request, $task, $user, $clientRequestId): TaskThread {
+            if ($clientRequestId !== null) {
+                Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+                $existing = TaskThread::query()
+                    ->where('task_id', $task->id)
+                    ->where('sender_type', User::class)
+                    ->where('sender_id', $user->id)
+                    ->where('client_request_id', $clientRequestId)
+                    ->first();
+
+                if ($existing instanceof TaskThread) {
+                    return $existing;
+                }
+            }
+
+            $audience = TaskThreadAudience::fromStoredType($request->string('type')->toString());
+            $content = (string) $this->sanitizeRichContent($request->input('content'));
+            $this->audiences->assertContentMayBeShared($task, $audience, $content);
+            $resolvedMentions = $this->mentions->resolve(
+                $task,
+                $user,
+                $audience,
+                $request->input('mentions', []),
+                $request->input('add_collaborators', []),
+            );
+            $content = $this->mentions->normalizeContent($content, $resolvedMentions);
             $thread = new TaskThread([
                 'task_id' => $task->id,
                 'type' => $audience->storedType(),
                 'content' => $content,
                 'sender_name' => $user->name,
+                'client_request_id' => $clientRequestId,
             ]);
 
             $thread->sender()->associate($user);
             $thread->save();
             $this->mentions->persist($task, $thread, $resolvedMentions);
+            if ($request->has('temp_identifier')) {
+                $this->processTemporaryAttachments($request->temp_identifier, $thread);
+            }
+
+            if ($request->filled('temp_identifier')) {
+                $thread->load('attachments');
+                $thread->content = $this->replaceTempUrlsInContent(
+                    $thread->content,
+                    $request->input('temp_identifier'),
+                    $thread->attachments
+                );
+                $thread->save();
+            }
 
             return $thread;
         });
 
-        // Process any temporary attachments
-        if ($request->has('temp_identifier')) {
-            $this->processTemporaryAttachments($request->temp_identifier, $thread);
-        }
-
-        // After moving attachments, replace temp URLs in content with final URLs
-        if ($request->filled('temp_identifier')) {
-            $thread->load('attachments');
-            $thread->content = $this->replaceTempUrlsInContent(
-                $thread->content,
-                $request->input('temp_identifier'),
-                $thread->attachments
-            );
-            $thread->save();
-        }
-
         // Get the thread with attachments
         $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
 
-        $this->taskThreadNotificationService->send($task, $thread);
+        if ($clientRequestId !== null) {
+            $this->taskThreadNotificationService->schedule($thread);
+        } else {
+            $this->taskThreadNotificationService->send($task, $thread);
+        }
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
@@ -212,6 +233,7 @@ class TaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'client_request_id' => $thread->client_request_id,
                 'is_draft' => $thread->is_draft,
                 'can_publish' => false,
                 'content' => $thread->content,
@@ -219,7 +241,7 @@ class TaskThreadController extends Controller
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
                 'attachments' => $responseAttachments,
-                'audience' => $audience->value,
+                'audience' => $this->audiences->audience($thread)->value,
                 'mentions' => $this->mentions->serialize($thread),
             ],
         ], 201);
@@ -305,6 +327,7 @@ class TaskThreadController extends Controller
             'thread' => [
                 'id' => $thread->id,
                 'is_draft' => $thread->is_draft,
+                'client_request_id' => $thread->client_request_id,
                 'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                 'content' => $thread->content,
                 'sender_name' => $thread->sender_name,
@@ -489,6 +512,7 @@ class TaskThreadController extends Controller
             'thread' => [
                 'id' => $thread->id,
                 'is_draft' => $thread->is_draft,
+                'client_request_id' => $thread->client_request_id,
                 'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
                 'content' => $thread->content,
                 'sender_name' => $thread->sender_name,

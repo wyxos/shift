@@ -16,6 +16,7 @@ use App\Services\TaskThreadNotificationService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ExternalTaskThreadController extends Controller
@@ -149,6 +150,7 @@ class ExternalTaskThreadController extends Controller
 
                 return [
                     'id' => $thread->id,
+                    'client_request_id' => $thread->client_request_id,
                     'is_draft' => false,
                     'can_publish' => false,
                     'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
@@ -176,6 +178,7 @@ class ExternalTaskThreadController extends Controller
 
         $request->validate([
             'content' => 'required|string',
+            'client_request_id' => ['nullable', 'uuid'],
             'is_draft' => ['prohibited'],
             'type' => 'required|in:internal,external',
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
@@ -187,43 +190,67 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Unauthorized to comment on this task'], 403);
         }
 
-        $content = (string) $this->sanitizeRichContent($request->input('content'));
-        $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
-        $content = $this->mentions->normalizeContent($content, [
-            'user_ids' => [],
-            'external_user_ids' => [],
-        ]);
+        $clientRequestId = $request->filled('client_request_id')
+            ? strtolower($request->string('client_request_id')->toString())
+            : null;
 
-        $thread = new TaskThread([
-            'task_id' => $task->id,
-            'type' => 'external',
-            'content' => $content,
-            'sender_name' => $externalUser->name,
-        ]);
+        $thread = DB::transaction(function () use ($request, $task, $externalUser, $clientRequestId): TaskThread {
+            if ($clientRequestId !== null) {
+                Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+                $existing = TaskThread::query()
+                    ->where('task_id', $task->id)
+                    ->where('sender_type', ExternalUser::class)
+                    ->where('sender_id', $externalUser->id)
+                    ->where('client_request_id', $clientRequestId)
+                    ->first();
 
-        $thread->sender()->associate($externalUser);
-        $thread->save();
+                if ($existing instanceof TaskThread) {
+                    return $existing;
+                }
+            }
 
-        // Process any temporary attachments
-        if ($request->has('temp_identifier')) {
-            $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
-        }
+            $content = (string) $this->sanitizeRichContent($request->input('content'));
+            $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
+            $content = $this->mentions->normalizeContent($content, [
+                'user_ids' => [],
+                'external_user_ids' => [],
+            ]);
+            $thread = new TaskThread([
+                'task_id' => $task->id,
+                'type' => 'external',
+                'content' => $content,
+                'sender_name' => $externalUser->name,
+                'client_request_id' => $clientRequestId,
+            ]);
 
-        // After moving attachments, replace temp URLs in content with final URLs (internal download route)
-        if ($request->filled('temp_identifier')) {
-            $thread->load('attachments');
-            $thread->content = $this->replaceTempUrlsInContent(
-                $thread->content,
-                $request->input('temp_identifier'),
-                $thread->attachments
-            );
+            $thread->sender()->associate($externalUser);
             $thread->save();
-        }
+
+            if ($request->has('temp_identifier')) {
+                $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
+            }
+
+            if ($request->filled('temp_identifier')) {
+                $thread->load('attachments');
+                $thread->content = $this->replaceTempUrlsInContent(
+                    $thread->content,
+                    $request->input('temp_identifier'),
+                    $thread->attachments
+                );
+                $thread->save();
+            }
+
+            return $thread;
+        });
 
         // Get the thread with attachments
         $thread->load('attachments');
 
-        $this->taskThreadNotificationService->send($task, $thread);
+        if ($clientRequestId !== null) {
+            $this->taskThreadNotificationService->schedule($thread);
+        } else {
+            $this->taskThreadNotificationService->send($task, $thread);
+        }
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
@@ -248,6 +275,7 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'client_request_id' => $thread->client_request_id,
                 'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
@@ -370,6 +398,7 @@ class ExternalTaskThreadController extends Controller
         return response()->json([
             'thread' => [
                 'id' => $thread->id,
+                'client_request_id' => $thread->client_request_id,
                 'content' => $this->rewriteContentUrlsToClientProxyUrls(
                     $thread->content ?? '',
                     (string) (request('metadata.url') ?? request('user.url') ?? config('app.url'))
@@ -477,6 +506,7 @@ class ExternalTaskThreadController extends Controller
             'thread' => [
                 'id' => $thread->id,
                 'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
+                'client_request_id' => $thread->client_request_id,
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
