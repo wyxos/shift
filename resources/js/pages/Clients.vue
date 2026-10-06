@@ -53,7 +53,6 @@ type ClientFilters = {
 };
 
 type SortBy = 'newest' | 'oldest' | 'name';
-
 const props = withDefaults(
     defineProps<{
         clients: ClientPaginator;
@@ -73,7 +72,6 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/clients',
     },
 ];
-
 const defaultSortBy: SortBy = 'newest';
 const sortOptions = [
     { value: 'newest', label: 'Newest' },
@@ -359,7 +357,7 @@ function confirmDelete() {
                     </TableHeader>
                     <TableBody>
                         <template v-if="clientRows.length">
-                            <TableRow v-for="client in clientRows" :key="client.id" :data-testid="`client-row-${client.id}`">
+                            <TableRow v-for="client in clientRows" :key="client.id" data-list-row :data-testid="`client-row-${client.id}`">
                                 <TableCell>
                                     <div class="flex flex-col gap-1">
                                         <span class="font-medium">{{ client.name }}</span>
@@ -383,6 +381,7 @@ function confirmDelete() {
                                     <div class="flex flex-wrap justify-end gap-2">
                                         <ActionIconButton
                                             label="Edit client"
+                                            data-row-action
                                             title="Edit"
                                             :data-testid="`client-edit-${client.id}`"
                                             @click="openEditModal(client)"
@@ -391,6 +390,7 @@ function confirmDelete() {
                                         </ActionIconButton>
                                         <ActionIconButton
                                             label="Delete client"
+                                            data-row-action
                                             title="Delete"
                                             variant="destructive"
                                             :data-testid="`client-delete-${client.id}`"

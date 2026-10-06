@@ -94,7 +94,13 @@ function updateOpen(value: boolean) {
                 <p v-if="loading" class="text-muted-foreground text-sm">Loading organisation users…</p>
                 <p v-else-if="error" class="text-sm text-red-500">{{ error }}</p>
                 <p v-else-if="form.users.length === 0" class="text-muted-foreground text-sm">No users have access to this organisation.</p>
-                <div v-for="user in form.users" v-else :key="user.id" class="flex items-start justify-between gap-4 rounded-lg border p-3">
+                <div
+                    v-for="user in form.users"
+                    v-else
+                    :key="user.id"
+                    class="flex items-start justify-between gap-4 rounded-lg border p-3"
+                    data-list-row
+                >
                     <div class="space-y-1">
                         <div class="font-medium">{{ accessUserDisplayName(user) }}</div>
                         <Badge :class="accessStatusBadgeClass(user)" variant="secondary">{{ accessStatusLabel(user) }}</Badge>
@@ -103,6 +109,7 @@ function updateOpen(value: boolean) {
                         size="icon"
                         title="Remove access"
                         variant="destructive"
+                        data-row-action
                         :loading="removingAccessId === user.id"
                         :data-testid="`organisation-remove-access-${user.id}`"
                         @click="emit('remove-access', user)"

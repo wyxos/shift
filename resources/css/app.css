@@ -79,6 +79,29 @@
 }
 
 @layer utilities {
+    [data-list-row] [data-row-action]:focus-visible {
+        box-shadow: inset 0 -2px 0 currentColor;
+    }
+
+    /* Keep row actions in the tab order and reserve their space while concealed. */
+    @media (hover: hover) and (pointer: fine) {
+        [data-list-row] [data-row-action] {
+            transition-property: color, background-color, border-color, box-shadow, opacity;
+            transition-duration: 150ms;
+        }
+
+        [data-list-row]:not(:hover):not(:focus-within) [data-row-action]:not([aria-busy='true']) {
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-list-row] [data-row-action] {
+            transition-duration: 0ms;
+        }
+    }
+
     body,
     html {
         --font-sans:

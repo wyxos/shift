@@ -81,6 +81,7 @@ function updateOpen(value: boolean) {
                     v-for="projectUser in form.users"
                     :key="projectUser.id"
                     class="flex items-start justify-between gap-4 rounded-lg border p-3"
+                    data-list-row
                 >
                     <div class="space-y-1">
                         <div class="font-medium">{{ accessUserDisplayName(projectUser) }}</div>
@@ -90,6 +91,7 @@ function updateOpen(value: boolean) {
                         type="button"
                         variant="destructive"
                         size="icon"
+                        data-row-action
                         :loading="removingAccessId === projectUser.id"
                         title="Remove access"
                         :data-testid="`project-remove-access-${projectUser.id}`"
