@@ -96,6 +96,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                 </div>
                 <div :aria-label="`${requirementPackTitle(group.batch)} items`" class="divide-y border-t" role="list">
                     <ResponsiveRecordItem
+                        data-list-row
                         v-for="task in group.tasks"
                         :key="task.id"
                         :class="highlightedTaskId === task.id ? 'bg-sky-500/10 ring-2 ring-sky-500/40 ring-inset' : ''"
@@ -132,6 +133,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
 
                         <template #actions>
                             <ActionIconButton
+                                data-row-action
                                 label="Open requirement details"
                                 title="Open details"
                                 :data-testid="`requirement-compact-open-${task.id}`"
@@ -140,6 +142,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                                 <Eye class="h-4 w-4" />
                             </ActionIconButton>
                             <ActionIconButton
+                                data-row-action
                                 v-if="canDeleteTask(task)"
                                 label="Delete requirement"
                                 title="Delete"
@@ -158,6 +161,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
 
         <template v-else>
             <ResponsiveRecordItem
+                data-list-row
                 v-for="task in tasks"
                 :key="task.id"
                 :class="highlightedTaskId === task.id ? 'bg-sky-500/10 ring-2 ring-sky-500/40 ring-inset' : ''"
@@ -205,6 +209,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
 
                 <template #actions>
                     <ActionIconButton
+                        data-row-action
                         label="Open task details"
                         title="Open details"
                         :data-testid="`task-compact-open-${task.id}`"
@@ -213,6 +218,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                         <Eye class="h-4 w-4" />
                     </ActionIconButton>
                     <ActionIconButton
+                        data-row-action
                         v-if="canDeleteTask(task)"
                         label="Delete task"
                         title="Delete"

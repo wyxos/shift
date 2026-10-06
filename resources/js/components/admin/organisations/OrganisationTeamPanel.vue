@@ -38,7 +38,6 @@ type OrganisationProject = {
 };
 
 type OrganisationRoleOption = SelectOption;
-
 const props = defineProps<{
     organisation: {
         id: number;
@@ -59,11 +58,9 @@ const props = defineProps<{
         };
     };
 }>();
-
 const emit = defineEmits<{
     invite: [];
 }>();
-
 const editingUser = ref<OrganisationTeamUser | null>(null);
 const selectedProjectIds = ref<number[]>([]);
 const selectedRole = ref<string>('');
@@ -73,7 +70,6 @@ const projectIdsByTeamUser = ref<Record<string, number[]>>({});
 const removingUser = ref<OrganisationTeamUser | null>(null);
 const removingUserProcessing = ref(false);
 const removingUserError = ref<string | null>(null);
-
 const sheetOpen = computed(() => Boolean(editingUser.value));
 const removeDialogOpen = computed(() => Boolean(removingUser.value));
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -104,7 +100,6 @@ const canEditSelectedUserRole = computed(() => {
 
     return editingUser.value.canManageRole !== false && editingUser.value.can_manage_role !== false;
 });
-
 watch(
     () => props.organisation.teamUsers,
     (teamUsers) => {
@@ -112,7 +107,6 @@ watch(
     },
     { immediate: true, deep: true },
 );
-
 function formatDate(value: string | null | undefined, fallback: string) {
     if (!value) {
         return fallback;
@@ -296,6 +290,7 @@ function confirmRemoveOrganisationAccess() {
                             v-for="teamUser in organisation.teamUsers"
                             v-else
                             :key="teamUser.id"
+                            data-list-row
                             :data-testid="`organisation-team-user-${teamUser.id}`"
                         >
                             <TableCell class="min-w-[18rem] whitespace-normal">
@@ -328,6 +323,7 @@ function confirmRemoveOrganisationAccess() {
                                     <ActionIconButton
                                         v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
                                         label="Edit project access"
+                                        data-row-action
                                         title="Edit access"
                                         :data-testid="`organisation-team-edit-${teamUser.organisationUserId}`"
                                         @click="openAccessSheet(teamUser)"
@@ -337,6 +333,7 @@ function confirmRemoveOrganisationAccess() {
                                     <ActionIconButton
                                         v-if="teamUser.organisationUserId && teamUser.status !== 'owner'"
                                         label="Remove organisation access"
+                                        data-row-action
                                         title="Remove from organisation"
                                         variant="destructive"
                                         :data-testid="`organisation-team-remove-${teamUser.organisationUserId}`"
@@ -355,6 +352,7 @@ function confirmRemoveOrganisationAccess() {
                 <ResponsiveRecordItem
                     v-for="teamUser in organisation.teamUsers"
                     :key="teamUser.id"
+                    data-list-row
                     :data-testid="`organisation-team-compact-user-${teamUser.id}`"
                 >
                     <OrganisationTeamIdentity
@@ -388,6 +386,7 @@ function confirmRemoveOrganisationAccess() {
                     <template v-if="teamUser.organisationUserId && teamUser.status !== 'owner'" #actions>
                         <ActionIconButton
                             label="Edit project access"
+                            data-row-action
                             title="Edit access"
                             :data-testid="`organisation-team-compact-edit-${teamUser.organisationUserId}`"
                             @click="openAccessSheet(teamUser)"
@@ -396,6 +395,7 @@ function confirmRemoveOrganisationAccess() {
                         </ActionIconButton>
                         <ActionIconButton
                             label="Remove organisation access"
+                            data-row-action
                             title="Remove from organisation"
                             variant="destructive"
                             :data-testid="`organisation-team-compact-remove-${teamUser.organisationUserId}`"

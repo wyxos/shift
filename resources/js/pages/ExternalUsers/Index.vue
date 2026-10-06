@@ -314,6 +314,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                             <TableRow
                                 v-for="externalUser in props.externalUsers.data"
                                 :key="externalUser.id"
+                                data-list-row
                                 :data-testid="`external-user-row-${externalUser.id}`"
                             >
                                 <TableCell class="min-w-[14rem] whitespace-normal" :data-testid="`external-user-identity-${externalUser.id}`">
@@ -346,6 +347,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                                         <Button
                                             size="sm"
                                             variant="outline"
+                                            data-row-action
                                             :data-testid="`external-user-edit-${externalUser.id}`"
                                             title="Edit external user"
                                             @click="openEditSheet(externalUser)"

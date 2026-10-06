@@ -65,7 +65,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                 </TableHeader>
                 <TableBody>
                     <template v-if="projects.length">
-                        <TableRow v-for="project in projects" :key="project.id" :data-testid="`project-row-${project.id}`">
+                        <TableRow v-for="project in projects" :key="project.id" data-list-row :data-testid="`project-row-${project.id}`">
                             <TableCell>
                                 <div class="flex flex-col gap-1">
                                     <span class="font-medium">{{ project.name }}</span>
@@ -182,6 +182,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                                         v-if="canEditProject(project)"
                                         label="Edit project"
                                         title="Edit"
+                                        data-row-action
                                         :data-testid="`project-edit-${project.id}`"
                                         @click="emit('open-edit', project)"
                                     >
@@ -192,6 +193,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                                         label="Delete project"
                                         title="Delete"
                                         variant="destructive"
+                                        data-row-action
                                         :data-testid="`project-delete-${project.id}`"
                                         @click="emit('open-delete', project)"
                                     >
@@ -207,7 +209,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
         </template>
 
         <template #compact>
-            <ResponsiveRecordItem v-for="project in projects" :key="project.id" :data-testid="`project-compact-row-${project.id}`">
+            <ResponsiveRecordItem v-for="project in projects" :key="project.id" data-list-row :data-testid="`project-compact-row-${project.id}`">
                 <div class="flex min-w-0 flex-col gap-2">
                     <h2 class="truncate font-medium">{{ project.name }}</h2>
                     <div v-if="projectClientLabel(project) || hasWidgetEnabled(project) || project.mcp_enabled" class="flex flex-wrap gap-1">
@@ -314,6 +316,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                         v-if="canEditProject(project)"
                         label="Edit project"
                         title="Edit"
+                        data-row-action
                         :data-testid="`project-compact-edit-${project.id}`"
                         @click="emit('open-edit', project)"
                     >
@@ -324,6 +327,7 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                         label="Delete project"
                         title="Delete"
                         variant="destructive"
+                        data-row-action
                         :data-testid="`project-compact-delete-${project.id}`"
                         @click="emit('open-delete', project)"
                     >

@@ -197,6 +197,7 @@ async function unlinkLinkedAccount(account: LinkedAccount) {
                 v-for="account in linkedAccountsFor(externalUser)"
                 :key="String(account.id)"
                 class="flex items-start justify-between gap-3 rounded-lg border p-3 text-sm"
+                data-list-row
                 :data-testid="`external-user-linked-account-${String(account.id)}`"
             >
                 <div class="min-w-0">
@@ -210,6 +211,7 @@ async function unlinkLinkedAccount(account: LinkedAccount) {
                     type="button"
                     variant="outline"
                     size="sm"
+                    data-row-action
                     :disabled="savingId !== null"
                     :data-testid="`external-user-linked-account-unlink-${String(account.id)}`"
                     @click="unlinkLinkedAccount(account)"
