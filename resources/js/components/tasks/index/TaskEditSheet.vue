@@ -9,12 +9,13 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import TaskChoiceMenu from '@/shared/components/tasks/TaskChoiceMenu.vue';
-import { getPriorityOptions, getRequirementStatusOptions, getStatusOptions } from '@/shared/tasks/presentation';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { ArrowLeft } from 'lucide-vue-next';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 import { computed } from 'vue';
 import TaskCommentsPane from './TaskCommentsPane.vue';
+import TaskEditSummary from './TaskEditSummary.vue';
+import TaskErrorOccurrencesPane from './TaskErrorOccurrencesPane.vue';
 
 const props = defineProps<{
     state: any;
@@ -32,36 +33,22 @@ const editMobilePaneModel = computed({
     get: () => state.editMobilePane,
     set: (value: 'details' | 'comments') => state.setEditMobilePane(value),
 });
-const editPriorityModel = computed({
-    get: () => state.editForm.priority,
-    set: (value: string) => state.setEditField('priority', value),
-});
-const editStatusModel = computed({
-    get: () => state.editForm.status,
-    set: (value: string) => state.setEditField('status', value),
-});
-const editRequirementStatusModel = computed({
-    get: () => state.editForm.requirement_status,
-    set: (value: string) => state.setEditField('requirement_status', value),
-});
 const editTitleModel = computed({
     get: () => state.editForm.title,
     set: (value: string) => state.setEditField('title', value),
 });
 
-const taskStatusOptions = getStatusOptions({ includeClosed: false });
-const requirementStatusOptions = getRequirementStatusOptions();
-const taskPriorityOptions = getPriorityOptions();
 const sheetTitle = computed(() => state.editTask?.title || (state.isRequirementPhase ? 'Requirement details' : 'Task details'));
 const titleInputLabel = computed(() => (state.isRequirementPhase ? 'Requirement title' : 'Task title'));
 const canShowFinalizeRequirement = computed(
     () => state.isRequirementPhase && state.canFinalizeRequirement && state.editForm.requirement_status === 'ready-to-finalize',
 );
 
-function formatTaskTime(value?: string | null) {
-    if (!value) return 'Unknown';
-    return value.slice(11, 16);
-}
+const errorSectionModel = computed({
+    get: () => (state.isErrorIntakeTask ? state.activeErrorSection : 'task'),
+    set: (value: string | number) => state.setActiveErrorSection(value === 'events' ? 'events' : 'task'),
+});
+const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? state.editTask?.error_occurrences_count ?? 0);
 </script>
 
 <template>
@@ -100,169 +87,143 @@ function formatTaskTime(value?: string | null) {
             <div class="min-h-0 flex-1 overflow-hidden px-6 pb-4">
                 <div v-if="state.editLoading" class="text-muted-foreground py-10 text-center text-sm">Loading task...</div>
                 <div v-else-if="state.editError" class="text-destructive py-10 text-center text-sm">{{ state.editError }}</div>
-                <div v-else-if="state.editTask" class="grid h-full min-h-0 gap-4 lg:grid-cols-2" data-testid="task-edit-layout">
-                    <div class="lg:hidden">
-                        <ButtonGroup
-                            v-model="editMobilePaneModel"
-                            :options="state.editMobilePaneOptions"
-                            aria-label="Edit task section"
-                            class="w-full"
-                            :columns="2"
-                            test-id-prefix="edit-mobile-pane"
-                        />
-                    </div>
-                    <div
-                        :class="state.editMobilePane === 'comments' ? 'hidden lg:block' : 'block'"
-                        class="min-h-0 min-w-0 overflow-auto pr-1"
-                        data-testid="task-edit-details-pane"
-                    >
-                        <div class="flex flex-col gap-4">
-                            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="edit-task-meta">
-                                <div class="space-y-1">
-                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created by</div>
-                                    <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">
-                                        {{ state.editTaskCreatorLabel }}
-                                    </div>
-                                </div>
-                                <div class="space-y-1">
-                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created</div>
-                                    <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">
-                                        {{ formatTaskTime(state.editTask.created_at) }}
-                                    </div>
-                                </div>
-                                <div class="space-y-1">
-                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Updated</div>
-                                    <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">
-                                        {{ formatTaskTime(state.editTask.updated_at) }}
-                                    </div>
-                                </div>
-                                <div class="space-y-1">
-                                    <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Environment</div>
-                                    <div data-testid="edit-task-environment" class="text-foreground text-sm font-medium">
-                                        {{ state.editTaskEnvironmentLabel }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3" data-testid="task-choice-fields">
-                                <div v-if="!state.isRequirementPhase" class="space-y-2">
-                                    <Label class="text-muted-foreground">Status</Label>
-                                    <TaskChoiceMenu
-                                        v-model="editStatusModel"
-                                        :label="'Task status'"
-                                        :disabled="!state.canEditTaskScope || state.taskSaving"
-                                        :options="taskStatusOptions"
-                                        test-id-prefix="task-status"
-                                    />
-                                </div>
-
-                                <div v-if="state.isRequirementPhase" class="space-y-2">
-                                    <Label class="text-muted-foreground">Requirement state</Label>
-                                    <TaskChoiceMenu
-                                        v-model="editRequirementStatusModel"
-                                        :label="'Requirement state'"
-                                        :disabled="!state.canEditTaskScope || state.taskSaving"
-                                        :options="requirementStatusOptions"
-                                        test-id-prefix="requirement-status"
-                                    />
-                                </div>
-
-                                <div class="space-y-2">
-                                    <Label class="text-muted-foreground">Priority</Label>
-                                    <TaskChoiceMenu
-                                        v-model="editPriorityModel"
-                                        :label="'Task priority'"
-                                        :disabled="!state.canEditTaskScope || state.taskSaving"
-                                        :options="taskPriorityOptions"
-                                        test-id-prefix="task-priority"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="space-y-2">
-                                <Label class="text-muted-foreground">Description</Label>
-                                <ShiftEditor
-                                    v-if="state.canEditTaskScope"
-                                    v-model="editDescriptionModel"
-                                    :enable-ai-improve="state.aiImproveEnabled"
-                                    :temp-identifier="state.editTempIdentifier"
-                                    data-testid="task-edit-description"
-                                    min-height="180"
-                                    :sendable="false"
-                                />
-                                <div
-                                    v-else
-                                    class="shift-rich border-muted-foreground/30 bg-muted/10 text-foreground min-h-24 rounded-md border border-dashed p-3 text-sm"
-                                    data-testid="task-edit-description"
-                                    v-html="renderRichContent(state.editForm.description)"
-                                ></div>
-                            </div>
-
-                            <div
-                                v-if="state.isRequirementPhase && (state.editTask.submitted_title || state.editTask.submitted_description)"
-                                class="space-y-2"
+                <TabsRoot v-else-if="state.editTask" v-model="errorSectionModel" class="flex h-full min-h-0 flex-col gap-4">
+                    <template v-if="state.isErrorIntakeTask">
+                        <TaskEditSummary :state="state" class="shrink-0" />
+                        <TabsList aria-label="Error report sections" class="border-muted-foreground/10 flex shrink-0 gap-2 border-b pb-3">
+                            <TabsTrigger value="task" data-testid="error-task-tab" class="error-section-tab">Task</TabsTrigger>
+                            <TabsTrigger value="events" data-testid="error-events-tab" dusk="error-events-tab" class="error-section-tab">
+                                Events <span class="tabular-nums">{{ eventCount }}</span>
+                            </TabsTrigger>
+                        </TabsList>
+                    </template>
+                    <div class="relative min-h-0 flex-1">
+                        <Transition name="error-section">
+                            <TabsContent
+                                value="task"
+                                force-mount
+                                v-show="errorSectionModel === 'task'"
+                                class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-2 lg:grid-rows-1"
+                                data-testid="task-edit-layout"
                             >
-                                <Label class="text-muted-foreground">Original Submission</Label>
-                                <div class="border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed p-3 text-sm">
-                                    <div v-if="state.editTask.submitted_title" class="text-foreground font-medium">
-                                        {{ state.editTask.submitted_title }}
-                                    </div>
-                                    <div
-                                        v-if="state.editTask.submitted_description"
-                                        class="shift-rich text-muted-foreground mt-2"
-                                        v-html="state.editTask.submitted_description"
-                                    ></div>
+                                <div class="lg:hidden">
+                                    <ButtonGroup
+                                        v-model="editMobilePaneModel"
+                                        :options="state.editMobilePaneOptions"
+                                        aria-label="Edit task section"
+                                        class="w-full"
+                                        :columns="2"
+                                        test-id-prefix="edit-mobile-pane"
+                                    />
                                 </div>
-                            </div>
+                                <div
+                                    :class="state.editMobilePane === 'comments' ? 'hidden lg:block' : 'block'"
+                                    class="min-h-0 min-w-0 overflow-auto pr-1"
+                                    data-testid="task-edit-details-pane"
+                                >
+                                    <div class="flex flex-col gap-4">
+                                        <TaskEditSummary v-if="!state.isErrorIntakeTask" :state="state" />
 
-                            <div class="space-y-2">
-                                <TaskCollaboratorField
-                                    :disabled="state.editLoading || state.editUploading"
-                                    :environment="state.editForm.environment"
-                                    :external-label="state.editTaskProjectUsersLabel"
-                                    :model-value="state.editForm.collaborators"
-                                    :project-id="state.editTask.project_id ?? null"
-                                    :read-only="!state.canManageCollaborators"
-                                    @update:model-value="state.updateEditCollaborators"
-                                />
-                                <p v-if="state.canManageCollaborators" class="text-muted-foreground text-xs">
-                                    Adding collaborators here sends access notifications to newly added collaborators only.
-                                </p>
-                            </div>
+                                        <div class="space-y-2">
+                                            <Label class="text-muted-foreground">Description</Label>
+                                            <ShiftEditor
+                                                v-if="state.canEditTaskScope"
+                                                v-model="editDescriptionModel"
+                                                :enable-ai-improve="state.aiImproveEnabled"
+                                                :temp-identifier="state.editTempIdentifier"
+                                                data-testid="task-edit-description"
+                                                min-height="180"
+                                                :sendable="false"
+                                            />
+                                            <div
+                                                v-else
+                                                class="shift-rich border-muted-foreground/30 bg-muted/10 text-foreground min-h-24 rounded-md border border-dashed p-3 text-sm"
+                                                data-testid="task-edit-description"
+                                                v-html="renderRichContent(state.editForm.description)"
+                                            ></div>
+                                        </div>
 
-                            <div v-if="state.taskAttachments.length" class="space-y-2" data-testid="task-edit-attachments">
-                                <Label class="text-muted-foreground">Attachments</Label>
-                                <div class="space-y-2">
-                                    <div
-                                        v-for="attachment in state.taskAttachments"
-                                        :key="attachment.id"
-                                        class="border-muted-foreground/20 bg-muted/10 text-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                                    >
-                                        <a
-                                            :href="attachment.url"
-                                            class="hover:text-foreground min-w-0 flex-1 truncate transition"
-                                            rel="noreferrer"
-                                            target="_blank"
+                                        <div
+                                            v-if="
+                                                state.isRequirementPhase && (state.editTask.submitted_title || state.editTask.submitted_description)
+                                            "
+                                            class="space-y-2"
                                         >
-                                            {{ attachment.original_filename }}
-                                        </a>
-                                        <Button
-                                            v-if="state.canEditTaskScope"
-                                            size="sm"
-                                            type="button"
-                                            variant="outline"
-                                            @click="state.removeAttachmentFromTask(attachment.id)"
-                                        >
-                                            Remove
-                                        </Button>
+                                            <Label class="text-muted-foreground">Original Submission</Label>
+                                            <div class="border-muted-foreground/30 bg-muted/10 rounded-md border border-dashed p-3 text-sm">
+                                                <div v-if="state.editTask.submitted_title" class="text-foreground font-medium">
+                                                    {{ state.editTask.submitted_title }}
+                                                </div>
+                                                <div
+                                                    v-if="state.editTask.submitted_description"
+                                                    class="shift-rich text-muted-foreground mt-2"
+                                                    v-html="state.editTask.submitted_description"
+                                                ></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <TaskCollaboratorField
+                                                :disabled="state.editLoading || state.editUploading"
+                                                :environment="state.editForm.environment"
+                                                :external-label="state.editTaskProjectUsersLabel"
+                                                :model-value="state.editForm.collaborators"
+                                                :project-id="state.editTask.project_id ?? null"
+                                                :read-only="!state.canManageCollaborators"
+                                                @update:model-value="state.updateEditCollaborators"
+                                            />
+                                            <p v-if="state.canManageCollaborators" class="text-muted-foreground text-xs">
+                                                Adding collaborators here sends access notifications to newly added collaborators only.
+                                            </p>
+                                        </div>
+
+                                        <div v-if="state.taskAttachments.length" class="space-y-2" data-testid="task-edit-attachments">
+                                            <Label class="text-muted-foreground">Attachments</Label>
+                                            <div class="space-y-2">
+                                                <div
+                                                    v-for="attachment in state.taskAttachments"
+                                                    :key="attachment.id"
+                                                    class="border-muted-foreground/20 bg-muted/10 text-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                                >
+                                                    <a
+                                                        :href="attachment.url"
+                                                        class="hover:text-foreground min-w-0 flex-1 truncate transition"
+                                                        rel="noreferrer"
+                                                        target="_blank"
+                                                    >
+                                                        {{ attachment.original_filename }}
+                                                    </a>
+                                                    <Button
+                                                        v-if="state.canEditTaskScope"
+                                                        size="sm"
+                                                        type="button"
+                                                        variant="outline"
+                                                        @click="state.removeAttachmentFromTask(attachment.id)"
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+
+                                <TaskCommentsPane :class="state.editMobilePane === 'details' ? 'hidden lg:flex' : 'flex'" :state="state" />
+                            </TabsContent>
+                        </Transition>
+                        <Transition name="error-section">
+                            <TabsContent
+                                v-if="state.isErrorIntakeTask"
+                                value="events"
+                                force-mount
+                                v-show="errorSectionModel === 'events'"
+                                class="flex h-full min-h-0 min-w-0 flex-col"
+                            >
+                                <TaskErrorOccurrencesPane :state="state" />
+                            </TabsContent>
+                        </Transition>
                     </div>
-
-                    <TaskCommentsPane :class="state.editMobilePane === 'details' ? 'hidden lg:flex' : 'flex'" :state="state" />
-                </div>
+                </TabsRoot>
             </div>
 
             <SheetFooter
@@ -311,3 +272,34 @@ function formatTaskTime(value?: string | null) {
 
     <ImageLightbox v-model:open="state.lightboxOpen" :alt="state.lightboxAlt" :src="state.lightboxSrc" />
 </template>
+
+<style scoped>
+@reference "../../../../css/app.css";
+.error-section-tab {
+    @apply focus-visible:ring-ring flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none motion-reduce:transition-none;
+}
+.error-section-tab[data-state='active'] {
+    @apply bg-foreground text-background;
+}
+.error-section-tab[data-state='inactive'] {
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground;
+}
+.error-section-enter-active,
+.error-section-leave-active {
+    transition: opacity 120ms ease;
+}
+.error-section-leave-active {
+    position: absolute;
+    inset: 0;
+}
+.error-section-enter-from,
+.error-section-leave-to {
+    opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+    .error-section-enter-active,
+    .error-section-leave-active {
+        transition: none;
+    }
+}
+</style>

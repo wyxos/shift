@@ -452,7 +452,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     return {
         aiImproveEnabled: options.aiImproveEnabled,
         attemptCloseEdit,
-        activeErrorThreadTab: errorOccurrenceState.activeErrorThreadTab,
+        activeErrorSection: errorOccurrenceState.activeErrorSection,
         canComment,
         canEditTaskScope,
         canFinalizeRequirement,
@@ -488,7 +488,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         requirementFinalizeError,
         requirementFinalizing,
         saveTaskChanges,
-        setActiveErrorThreadTab: errorOccurrenceState.setActiveErrorThreadTab,
+        setActiveErrorSection: errorOccurrenceState.setActiveErrorSection,
         taskAttachments,
         taskSaveError,
         taskSaving,

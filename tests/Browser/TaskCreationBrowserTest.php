@@ -75,7 +75,7 @@ it('renders email import independently from editor rewriting', function () {
         ->assertDontSee('Improve with AI');
 });
 
-it('opens an error intake task with tabbed comments and occurrences', function () {
+it('opens error events first and keeps task details and comments in their own tab', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create();
 
@@ -91,7 +91,7 @@ it('opens an error intake task with tabbed comments and occurrences', function (
         'error_name' => 'WidgetCrash',
         'error_culprit_file' => 'https://consumer.test/widget.js',
         'error_culprit_line' => 88,
-        'error_occurrences_count' => 1,
+        'error_occurrences_count' => 2,
         'error_first_seen_at' => now()->subMinute(),
         'error_last_seen_at' => now(),
     ]);
@@ -128,19 +128,51 @@ it('opens an error intake task with tabbed comments and occurrences', function (
         'updated_at' => now(),
     ]);
 
+    $latest = $task->errorOccurrences()->first()->replicate();
+    $latest->number = 2;
+    $latest->message = 'Newest widget failure';
+    $latest->received_at = now();
+    $latest->save();
+
     $this->actingAs($user);
 
-    visit("/error-reports?task={$task->id}")
+    $page = visit("/error-reports?task={$task->id}")
+        ->resize(1440, 1000)
         ->assertPathIs('/error-reports')
+        ->assertNoSmoke()
         ->assertSee('UI error: Widget crashed')
-        ->assertSee('Occurrences')
+        ->assertSee('Events')
+        ->assertSee('Event #2')
+        ->assertSee('Newest widget failure')
+        ->assertVisible('[data-testid="edit-task-meta"]')
+        ->assertVisible('[data-testid="task-choice-fields"]')
+        ->assertScript("document.querySelector('[data-testid=\"task-edit-layout\"]').getClientRects().length === 0")
+        ->assertAttribute("#error-event-trigger-{$latest->id}", 'aria-expanded', 'true')
+        ->assertScript("document.querySelector('[data-testid=\"error-events-list\"]').firstElementChild.dataset.testid === 'error-occurrence-row-{$latest->id}'")
+        ->screenshot(filename: 'shift-events-desktop')
+        ->click('[data-testid="error-task-tab"]')
+        ->assertSee('Description')
         ->assertSee('Comments')
-        ->assertDontSee('Occurrence #1')
-        ->click('@error-occurrences-tab')
-        ->assertSee('Occurrence #1')
-        ->assertSee('Widget crashed token=[Filtered]')
+        ->assertScript("document.querySelector('[data-testid=\"error-occurrences-panel\"]').getClientRects().length === 0")
+        ->click('@error-events-tab')
+        ->assertSee('Event #2');
+
+    $first = $task->errorOccurrences()->where('number', 1)->first();
+    $page->click("#error-event-trigger-{$first->id}")
+        ->assertAttribute("#error-event-trigger-{$first->id}", 'aria-expanded', 'true')
+        ->assertAttribute("#error-event-trigger-{$latest->id}", 'aria-expanded', 'false')
         ->assertSee('https://consumer.test/dashboard')
-        ->assertSee('https://consumer.test/widget.js:88');
+        ->assertSee('https://consumer.test/widget.js:88')
+        ->resize(390, 844)
+        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertVisible('[data-testid="error-events-tab"]')
+        ->assertVisible('[data-testid="task-choice-fields"]')
+        ->screenshot(filename: 'shift-events-mobile')
+        ->click('[data-testid="error-task-tab"]')
+        ->click('[data-testid="edit-mobile-pane-comments"]')
+        ->assertVisible('[data-testid="toolbar-send"]')
+        ->assertNoSmoke();
+
 });
 
 it('groups nearby messages and keeps the timeline controls visible across task sheet widths', function () {

@@ -1,7 +1,7 @@
 import TaskErrorOccurrencesPane from '@/components/tasks/index/TaskErrorOccurrencesPane.vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { h } from 'vue';
+import { h, nextTick, reactive } from 'vue';
 
 vi.mock('@/components/ui/button', () => ({
     Button: {
@@ -27,6 +27,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
             {
                 id: 31,
                 number: 2,
+                received_at: '2026-10-08T10:00:00Z',
                 source: 'backend',
                 environment: 'local',
                 message: 'Primary failure',
@@ -70,6 +71,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
             {
                 id: 30,
                 number: 1,
+                received_at: '2026-10-08T09:00:00Z',
                 source: 'backend',
                 message: 'Previous failure',
                 exception_class: 'RuntimeException',
@@ -100,16 +102,52 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskErrorOccurrencesPane', () => {
-    it('uses the row as the occurrence activation target', async () => {
+    it('opens the latest event first and expands the event selected by its heading', async () => {
         const wrapper = mount(TaskErrorOccurrencesPane, {
             props: { state: makeState() },
         });
 
+        expect(wrapper.findAll('[data-testid^="error-occurrence-row-"]').map((row) => row.attributes('data-testid'))).toEqual([
+            'error-occurrence-row-31',
+            'error-occurrence-row-30',
+        ]);
+        expect(wrapper.get('#error-event-trigger-31').attributes('aria-expanded')).toBe('true');
+        expect(wrapper.get('[data-testid="error-events-sort"]').text()).toBe('Newest first');
+        expect(wrapper.get('[data-testid="error-event-latest"]').text()).toBe('Latest');
         expect(wrapper.get('[data-testid="error-occurrence-stack"]').text()).toContain('Primary failure');
 
-        await wrapper.get('[data-testid="error-occurrence-row-30"]').trigger('click');
+        await wrapper.get('#error-event-trigger-30').trigger('click');
 
+        expect(wrapper.get('#error-event-trigger-31').attributes('aria-expanded')).toBe('false');
+        expect(wrapper.get('#error-event-trigger-30').attributes('aria-expanded')).toBe('true');
         expect(wrapper.get('[data-testid="error-occurrence-stack"]').text()).toContain('Previous failure');
+
+        await wrapper.get('#error-event-trigger-30').trigger('click');
+
+        expect(wrapper.find('[data-testid="error-occurrence-stack"]').exists()).toBe(false);
+    });
+
+    it('preserves API receipt order when event numbers differ and opens the first event on a new page', async () => {
+        const state = reactive(makeState());
+        state.errorOccurrences[0].number = 1;
+        state.errorOccurrences[0].received_at = '2026-10-08T10:00:00Z';
+        state.errorOccurrences[1].number = 2;
+        state.errorOccurrences[1].received_at = '2026-10-08T09:00:00Z';
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+
+        expect(wrapper.findAll('[data-testid^="error-occurrence-row-"]').map((row) => row.attributes('data-testid'))).toEqual([
+            'error-occurrence-row-31',
+            'error-occurrence-row-30',
+        ]);
+        expect(wrapper.get('#error-event-trigger-31').attributes('aria-expanded')).toBe('true');
+
+        state.errorOccurrences = [{ ...state.errorOccurrences[0], id: 42, number: 3, message: 'New page failure' }];
+        state.errorOccurrencesPagination = { ...state.errorOccurrencesPagination, current_page: 2, last_page: 2 };
+        await nextTick();
+
+        expect(wrapper.get('#error-event-trigger-42').attributes('aria-expanded')).toBe('true');
+        expect(wrapper.get('[data-testid="error-occurrence-stack"]').text()).toContain('New page failure');
+        expect(wrapper.find('[data-testid="error-event-latest"]').exists()).toBe(false);
     });
 
     it('uses source language, removes redundant badges and avoids nesting the active occurrence in another card', () => {
@@ -134,7 +172,10 @@ describe('TaskErrorOccurrencesPane', () => {
         });
 
         const requestDetails = wrapper.get('[data-testid="error-occurrence-request-details"]').text();
+        const disclosures = wrapper.findAll('[data-testid="error-occurrence-request-details"] details');
 
+        expect(disclosures).toHaveLength(2);
+        expect(disclosures.every((disclosure) => disclosure.attributes('open') === undefined)).toBe(true);
         expect(requestDetails).toContain('Query');
         expect(requestDetails).toContain('"coupon": "SAVE"');
         expect(requestDetails).toContain('Body');
