@@ -36,8 +36,12 @@ describe('shared/tasks/rich-content', () => {
 
     it('preserves long source-qualified mention IDs while rejecting unsafe values', () => {
         const qualifiedId = `source:${'a'.repeat(4089)}`;
-        const valid = sanitizeRichHtml(`<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="${qualifiedId}">@Alex</span></p>`);
-        const unsafe = sanitizeRichHtml('<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="source:unsafe value">@Alex</span></p>');
+        const valid = sanitizeRichHtml(
+            `<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="${qualifiedId}">@Alex</span></p>`,
+        );
+        const unsafe = sanitizeRichHtml(
+            '<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="source:unsafe value">@Alex</span></p>',
+        );
 
         expect(valid).toContain(`data-mention-id="${qualifiedId}"`);
         expect(unsafe).not.toContain('data-mention-id');

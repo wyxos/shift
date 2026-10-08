@@ -476,7 +476,23 @@ class ExternalUserService
         $existing = collect($existing)->filter(fn (ExternalUser $user) => $user->project_id === $project->id);
         $groups = collect($collaborators)
             ->filter(fn ($item) => is_array($item))
-            ->groupBy(fn (array $item) => $this->projectEnvironmentService->normalizeEnvironment($item['environment'] ?? $environment) ?? '');
+            ->groupBy(function (array $item) use ($existing, $environment): string {
+                $source = $this->projectEnvironmentService->normalizeEnvironment($item['environment'] ?? null);
+                if ($source !== null) {
+                    return $source;
+                }
+
+                $matches = $existing->filter(fn (ExternalUser $user): bool => (string) $user->external_id === $this->normalizeExternalId($item['id'] ?? null));
+                if ($matches->count() > 1) {
+                    throw ValidationException::withMessages([
+                        'external_collaborators' => 'This selection matches multiple source accounts. Refresh and select each collaborator with its source environment.',
+                    ]);
+                }
+
+                return $matches->first()?->environment
+                    ?? $this->projectEnvironmentService->normalizeEnvironment($environment)
+                    ?? '';
+            });
         $resolved = collect();
 
         foreach ($groups as $source => $selection) {
