@@ -75,7 +75,7 @@ describe('Tasks/Index.vue', () => {
         });
 
         expect(wrapper.get('[data-testid="task-environment-badge-1"]').text()).toContain('Staging');
-        expect(wrapper.get('[data-testid="task-environment-badge-2"]').text()).toContain('Unknown');
+        expect(wrapper.get('[data-testid="task-environment-badge-2"]').text()).toContain('N/A');
 
         wrapper.unmount();
     });

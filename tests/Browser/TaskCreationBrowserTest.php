@@ -26,6 +26,7 @@ it('lets a task manager remove an external submitter from follow up collaborator
     $project = Project::factory()->withAuthor($user->id)->create();
     $externalSubmitter = ExternalUser::factory()->create([
         'project_id' => $project->id,
+        'environment' => 'production',
         'name' => 'External Submitter',
         'email' => 'external-submitter@example.com',
     ]);
@@ -44,10 +45,10 @@ it('lets a task manager remove an external submitter from follow up collaborator
     visit("/tasks?task={$task->id}")
         ->assertNoSmoke()
         ->assertSee('External Submitter')
-        ->assertPresent('[aria-label="Remove External Submitter"]')
-        ->click('[aria-label="Remove External Submitter"]')
+        ->assertPresent('[aria-label="Remove External Submitter from Production"]')
+        ->click('[aria-label="Remove External Submitter from Production"]')
         ->waitForText('Task changes saved')
-        ->assertNotPresent('[aria-label="Remove External Submitter"]')
+        ->assertNotPresent('[aria-label="Remove External Submitter from Production"]')
         ->assertNoSmoke();
 
     expect($task->refresh()->submitter_id)->toBe($externalSubmitter->id);

@@ -277,6 +277,7 @@ async function createTask() {
                 id: collaborator.id,
                 name: collaborator.name,
                 email: collaborator.email,
+                environment: collaborator.environment ?? createForm.value.environment ?? undefined,
             })),
         });
 

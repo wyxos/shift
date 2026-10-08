@@ -129,6 +129,42 @@ describe('TaskCollaboratorField', () => {
         wrapper.unmount();
     });
 
+    it('keeps matching external IDs from different environments separate when the task has no environment', async () => {
+        axiosGetMock.mockResolvedValue({
+            data: {
+                internal: [],
+                external: [
+                    { id: '42', name: 'Sam', email: 'sam@example.com', environment: 'staging' },
+                    { id: '42', name: 'Sam', email: 'sam@example.com', environment: 'production' },
+                ],
+                external_label: 'Project users',
+            },
+        });
+        const wrapper = mountPicker({ environment: null, modelValue: { internal: [], external: [] } });
+        await searchFor(wrapper, 'sam');
+
+        expect(axiosGetMock).toHaveBeenCalledWith('/shift/api/task-collaborators', {
+            params: { search: 'sam' },
+            signal: expect.any(AbortSignal),
+        });
+        const stagingKey = encodeURIComponent(JSON.stringify(['staging', '42']));
+        const productionKey = encodeURIComponent(JSON.stringify(['production', '42']));
+        expect(document.querySelector(`[data-testid="external-collaborator-option-${stagingKey}"]`)).not.toBeNull();
+        expect(document.querySelector(`[data-testid="external-collaborator-option-${productionKey}"]`)).not.toBeNull();
+        expect(document.querySelector('[data-testid="task-collaborators-dropdown"]')?.textContent).toContain('Staging');
+        expect(document.querySelector('[data-testid="task-collaborators-dropdown"]')?.textContent).toContain('Production');
+
+        (document.querySelector(`[data-testid="external-collaborator-option-${stagingKey}"]`) as HTMLElement).click();
+        await flushPromises();
+        const selected = wrapper.emitted('update:modelValue')?.at(-1)?.[0] as any;
+        expect(selected.external).toEqual([{ id: '42', name: 'Sam', email: 'sam@example.com', environment: 'staging' }]);
+        await wrapper.setProps({ modelValue: selected });
+        await searchFor(wrapper, 'sam');
+        expect(document.querySelector(`[data-testid="external-collaborator-selected-${stagingKey}"]`)).not.toBeNull();
+        expect(document.querySelector(`[data-testid="external-collaborator-selected-${productionKey}"]`)).toBeNull();
+        wrapper.unmount();
+    });
+
     it('ignores a stale response after the search changes or is cleared', async () => {
         let resolveFirst: (response: unknown) => void = () => {};
         axiosGetMock.mockImplementationOnce(

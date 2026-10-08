@@ -92,7 +92,7 @@ describe('Tasks/Index.vue', () => {
                 project_id: 42,
                 environment: 'staging',
                 internal_collaborator_ids: [91],
-                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com', environment: 'staging' }],
             }),
         );
         expect((router.reload as any).mock.calls).toHaveLength(1);

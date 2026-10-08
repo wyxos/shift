@@ -5,6 +5,8 @@ use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -48,5 +50,72 @@ it('searches collaborators without moving the task details and adds a matching t
         ->waitForText('Alexandra 10')
         ->assertScript("document.querySelector('[data-testid=\"task-collaborators-dropdown\"]').getBoundingClientRect().right <= window.innerWidth")
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertNoSmoke();
+});
+
+it('adds collaborators from two registered environments while the task environment remains N/A', function () {
+    config()->set('collaborator_search.enabled', false);
+    Queue::fake();
+    $owner = User::factory()->create();
+    $project = Project::factory()->withAuthor($owner->id)->create(['token' => 'project-token']);
+    $responses = [];
+    foreach (['staging', 'production'] as $environment) {
+        $url = "https://{$environment}-client.test";
+        $project->environments()->create(['environment' => $environment, 'url' => $url, 'callback_trusted_at' => now()]);
+        $responses[$url.'/shift/api/collaborators/external*'] = Http::response([
+            'environment' => $environment,
+            'url' => $url,
+            'users' => [['id' => '7', 'name' => 'Alex Client', 'email' => 'alex@example.test']],
+        ]);
+    }
+    Http::fake($responses);
+    $task = Task::factory()->for($project)->create(['title' => 'Review general project work']);
+    $task->submitter()->associate($owner)->save();
+    $this->actingAs($owner);
+
+    $stagingKey = rawurlencode(json_encode(['staging', '7']));
+    $productionKey = rawurlencode(json_encode(['production', '7']));
+    $page = visit('/tasks?task='.$task->id)->resize(1440, 900)
+        ->assertNoSmoke()
+        ->assertSee('N/A')
+        ->fill('[data-testid="task-collaborators-search"]', 'Alex')
+        ->waitForText('Alex Client')
+        ->assertPresent('[data-testid="external-collaborator-option-'.$stagingKey.'"]')
+        ->assertPresent('[data-testid="external-collaborator-option-'.$productionKey.'"]')
+        ->click('[data-testid="external-collaborator-option-'.$stagingKey.'"]')
+        ->waitForText('Task changes saved')
+        ->fill('[data-testid="task-collaborators-search"]', 'Alex')
+        ->waitForText('Alex Client')
+        ->click('[data-testid="external-collaborator-option-'.$productionKey.'"]')
+        ->assertPresent('[aria-label="Remove Alex Client from Staging"]')
+        ->assertPresent('[aria-label="Remove Alex Client from Production"]')
+        ->assertSee('N/A');
+
+    expect($page->script(<<<JS
+        async () => {
+            const path = '/tasks/{$task->id}/collaborators';
+            const completedSaves = () => performance.getEntriesByType('resource')
+                .filter((entry) => new URL(entry.name).pathname === path).length;
+            if (completedSaves() >= 2) return true;
+            return await new Promise((resolve) => {
+                const observer = new PerformanceObserver(() => {
+                    if (completedSaves() < 2) return;
+                    observer.disconnect();
+                    resolve(true);
+                });
+                observer.observe({ type: 'resource', buffered: true });
+            });
+        }
+    JS))->toBeTrue();
+    $page->screenshot(false, 'task-collaborator-na-desktop.png');
+
+    expect($task->fresh()->metadata)->toBeNull();
+    expect($task->externalCollaborators()->count())->toBe(2);
+
+    $page->resize(390, 844)
+        ->assertPresent('[aria-label="Remove Alex Client from Staging"]')
+        ->assertPresent('[aria-label="Remove Alex Client from Production"]')
+        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
+        ->screenshot(false, 'task-collaborator-na-mobile.png')
         ->assertNoSmoke();
 });

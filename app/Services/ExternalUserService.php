@@ -437,42 +437,82 @@ class ExternalUserService
         ];
     }
 
-    public function resolveCollaborators(Project $project, ?string $environment, array $collaborators): Collection
+    /**
+     * @return array{users: array, available: bool, error: string|null}
+     */
+    public function searchProjectCollaborators(Project $project, ?string $environment, string $search): array
     {
-        $selectedIds = collect($collaborators)
+        $environments = $project->environments()->orderBy('environment')->get();
+        if (filled($environment)) {
+            $environments = $environments->where('environment', $this->projectEnvironmentService->normalizeEnvironment($environment));
+        }
+
+        $users = [];
+        $errors = [];
+        $available = false;
+        foreach ($environments as $registration) {
+            try {
+                $lookup = $this->searchCollaborators($project, $registration->environment, $search, paginate: true, perPage: 10);
+                foreach (array_slice($lookup['users'], 0, 10) as $user) {
+                    $users[] = [...$user, 'environment' => $registration->environment];
+                }
+                $available = true;
+            } catch (RuntimeException $exception) {
+                $errors[] = $this->projectEnvironmentService->label($registration->environment).': '.$exception->getMessage();
+            }
+        }
+
+        return [
+            'users' => $users,
+            'available' => $available,
+            'error' => $environments->isEmpty()
+                ? (filled($environment) ? 'The selected environment is not registered for this project.' : 'No environments are registered for this project.')
+                : ($errors === [] ? null : implode(' ', $errors)),
+        ];
+    }
+
+    public function resolveCollaborators(Project $project, ?string $environment, array $collaborators, iterable $existing = []): Collection
+    {
+        $existing = collect($existing)->filter(fn (ExternalUser $user) => $user->project_id === $project->id);
+        $groups = collect($collaborators)
             ->filter(fn ($item) => is_array($item))
-            ->map(fn (array $item) => $this->normalizeExternalId($item['id'] ?? null))
-            ->filter()
-            ->unique()
-            ->values();
+            ->groupBy(fn (array $item) => $this->projectEnvironmentService->normalizeEnvironment($item['environment'] ?? $environment) ?? '');
+        $resolved = collect();
 
-        if ($selectedIds->isEmpty()) {
-            return collect();
-        }
+        foreach ($groups as $source => $selection) {
+            $ids = $selection->map(fn (array $item) => $this->normalizeExternalId($item['id'] ?? null))->filter()->unique()->values();
+            $retained = $existing->filter(fn (ExternalUser $user) => $user->environment === $source && $ids->contains((string) $user->external_id));
+            $resolved = $resolved->merge($retained);
+            $newIds = $ids->diff($retained->pluck('external_id')->map(fn ($id) => (string) $id));
+            if ($newIds->isEmpty()) {
+                continue;
+            }
+            if ($source === '') {
+                throw ValidationException::withMessages([
+                    'external_collaborators' => 'Select a collaborator with a verified source environment.',
+                ]);
+            }
 
-        $lookup = $this->searchCollaborators($project, $environment);
-        $available = collect($lookup['users'])->keyBy(fn (array $user) => $user['id']);
-        $missing = $selectedIds->reject(fn (string $id) => $available->has($id));
-
-        if ($missing->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'external_collaborators' => 'One or more external collaborators are no longer available for this project.',
-            ]);
-        }
-
-        return $selectedIds
-            ->map(function (string $id) use ($available, $lookup, $project) {
+            $lookup = $this->searchCollaborators($project, (string) $source);
+            $available = collect($lookup['users'])->keyBy(fn (array $user) => $user['id']);
+            if ($newIds->contains(fn (string $id) => ! $available->has($id))) {
+                throw ValidationException::withMessages([
+                    'external_collaborators' => 'One or more external collaborators are no longer available for this project.',
+                ]);
+            }
+            foreach ($newIds as $id) {
                 $candidate = $available->get($id);
-
-                return $this->upsert($project, [
+                $resolved->push($this->upsert($project, [
                     'external_id' => $candidate['id'],
                     'name' => $candidate['name'],
                     'email' => $candidate['email'],
                     'environment' => $lookup['environment'],
                     'url' => $lookup['url'],
-                ]);
-            })
-            ->values();
+                ]));
+            }
+        }
+
+        return $resolved->unique('id')->values();
     }
 
     public function environmentRegistration(Project $project, ?string $environment): ?ProjectEnvironment

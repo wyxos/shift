@@ -77,7 +77,7 @@ trait FormatsShiftRecords
             'is_draft' => $thread->is_draft,
             'published_at' => $this->date($thread->published_at),
             'audience' => \App\Enums\TaskThreadAudience::fromStoredType((string) $thread->type)->value,
-            'content' => $thread->content,
+            'content' => app(\App\Services\TaskThreadMentionService::class)->contentForThread($thread),
             'sender_name' => $thread->sender_name,
             'sender' => $this->person($thread->sender),
             'attachments' => $thread->attachments
@@ -87,29 +87,7 @@ trait FormatsShiftRecords
                 ])
                 ->values()
                 ->all(),
-            'mentions' => $thread->mentions
-                ->map(function ($mention): ?array {
-                    if ($mention->user instanceof User) {
-                        return [
-                            'kind' => 'internal',
-                            'id' => $mention->user->id,
-                            'name' => $mention->user->name,
-                        ];
-                    }
-
-                    if ($mention->externalUser instanceof ExternalUser) {
-                        return [
-                            'kind' => 'external',
-                            'id' => $mention->externalUser->external_id,
-                            'name' => $mention->externalUser->name,
-                        ];
-                    }
-
-                    return null;
-                })
-                ->filter()
-                ->values()
-                ->all(),
+            'mentions' => app(\App\Services\TaskThreadMentionService::class)->serialize($thread),
             'created_at' => $this->date($thread->created_at),
             'updated_at' => $this->date($thread->updated_at),
         ];

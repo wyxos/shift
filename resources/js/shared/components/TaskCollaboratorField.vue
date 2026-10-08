@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import {
     collaboratorKey,
     emptyTaskCollaborators,
+    externalCollaboratorKey,
     normalizeTaskCollaborators,
     type CollaboratorOption,
     type TaskCollaboratorSelection,
@@ -40,7 +41,7 @@ const props = withDefaults(
         internalDescription: 'Registered SHIFT users on this project.',
         externalLabel: 'Project users',
         externalBadgeLabel: 'Guest',
-        externalDescription: 'Users available in the selected environment.',
+        externalDescription: 'Users available in this project.',
         searchPlaceholder: 'Search collaborators',
     },
 );
@@ -153,6 +154,23 @@ function collaboratorDisplayValue(collaborator: Pick<CollaboratorOption, 'name' 
     return name || email || 'Unknown collaborator';
 }
 
+function environmentLabel(environment?: string | null): string | null {
+    return environment ? environment.charAt(0).toUpperCase() + environment.slice(1) : null;
+}
+
+function selectionKey(kind: CollaboratorKind, collaborator: CollaboratorOption): string {
+    return kind === 'external' ? externalCollaboratorKey(collaborator) : collaboratorKey(collaborator.id);
+}
+
+function selectionTestKey(kind: CollaboratorKind, collaborator: CollaboratorOption): string {
+    return kind === 'external' && collaborator.environment ? encodeURIComponent(selectionKey(kind, collaborator)) : collaboratorKey(collaborator.id);
+}
+
+function collaboratorRemoveLabel(kind: CollaboratorKind, collaborator: CollaboratorOption): string {
+    const source = kind === 'external' ? environmentLabel(collaborator.environment) : null;
+    return `Remove ${collaboratorDisplayValue(collaborator)}${source ? ` from ${source}` : ''}`;
+}
+
 function normalizeLookupText(value: unknown): string | null {
     if (typeof value !== 'string') {
         return null;
@@ -177,14 +195,14 @@ function emitSelection(next: TaskCollaboratorSelection) {
 }
 
 function isSelected(kind: 'internal' | 'external', collaborator: CollaboratorOption): boolean {
-    return normalizeTaskCollaborators(props.modelValue)[kind].some((selected) => collaboratorKey(selected.id) === collaboratorKey(collaborator.id));
+    return normalizeTaskCollaborators(props.modelValue)[kind].some((selected) => selectionKey(kind, selected) === selectionKey(kind, collaborator));
 }
 
 function toggleCollaborator(kind: 'internal' | 'external', collaborator: CollaboratorOption) {
     if (props.readOnly || props.disabled) return;
 
     const next = normalizeTaskCollaborators(props.modelValue);
-    const existingIndex = next[kind].findIndex((selected) => collaboratorKey(selected.id) === collaboratorKey(collaborator.id));
+    const existingIndex = next[kind].findIndex((selected) => selectionKey(kind, selected) === selectionKey(kind, collaborator));
 
     if (existingIndex >= 0) {
         next[kind].splice(existingIndex, 1);
@@ -193,6 +211,7 @@ function toggleCollaborator(kind: 'internal' | 'external', collaborator: Collabo
             id: collaborator.id,
             name: collaborator.name,
             email: collaborator.email,
+            ...(kind === 'external' ? { environment: collaborator.environment } : {}),
         });
     }
 
@@ -254,22 +273,11 @@ async function fetchCollaborators() {
 
 watch(
     () => [props.projectId, props.environment, props.lookupUrl] as const,
-    ([nextProjectId, nextEnvironment, nextLookupUrl], previousValue) => {
-        const [previousProjectId, previousEnvironment, previousLookupUrl] = previousValue ?? [];
+    ([nextProjectId], previousValue) => {
+        const [previousProjectId] = previousValue ?? [];
 
         if (!props.readOnly && previousProjectId !== undefined && previousProjectId !== null && previousProjectId !== nextProjectId) {
             emitSelection(emptyTaskCollaborators());
-        } else if (
-            !props.readOnly &&
-            previousProjectId === nextProjectId &&
-            previousLookupUrl === nextLookupUrl &&
-            previousEnvironment !== undefined &&
-            previousEnvironment !== nextEnvironment
-        ) {
-            emitSelection({
-                internal: [...selection.value.internal],
-                external: [],
-            });
         }
 
         resetLookup();
@@ -331,7 +339,7 @@ onBeforeUnmount(resetLookup);
                         v-if="!readOnly"
                         type="button"
                         :class="selectedBadgeStyle('internal').remove"
-                        :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
+                        :aria-label="collaboratorRemoveLabel('internal', collaborator)"
                         :disabled="disabled"
                         @click="toggleCollaborator('internal', collaborator)"
                     >
@@ -341,7 +349,7 @@ onBeforeUnmount(resetLookup);
 
                 <div
                     v-for="collaborator in selection.external"
-                    :key="`external-${collaboratorKey(collaborator.id)}`"
+                    :key="`external-${externalCollaboratorKey(collaborator)}`"
                     :class="selectedBadgeStyle('external').shell"
                     data-collaborator-badge-kind="external"
                 >
@@ -353,13 +361,16 @@ onBeforeUnmount(resetLookup);
                         {{ collaboratorBadgeLabel('external') }}
                     </span>
                     <span :class="selectedBadgeStyle('external').value" data-collaborator-badge-value-kind="external">
-                        {{ collaboratorDisplayValue(collaborator) }}
+                        {{ collaboratorDisplayValue(collaborator)
+                        }}<span v-if="environmentLabel(collaborator.environment)" class="text-xs opacity-75">
+                            · {{ environmentLabel(collaborator.environment) }}</span
+                        >
                     </span>
                     <button
                         v-if="!readOnly"
                         type="button"
                         :class="selectedBadgeStyle('external').remove"
-                        :aria-label="`Remove ${collaboratorDisplayValue(collaborator)}`"
+                        :aria-label="collaboratorRemoveLabel('external', collaborator)"
                         :disabled="disabled"
                         @click="toggleCollaborator('external', collaborator)"
                     >
@@ -416,10 +427,10 @@ onBeforeUnmount(resetLookup);
                             <ComboboxGroup v-else-if="suggestions.length > 0" aria-label="Matching collaborators">
                                 <ComboboxItem
                                     v-for="suggestion in suggestions"
-                                    :key="`${suggestion.kind}-${collaboratorKey(suggestion.id)}`"
-                                    :value="`${suggestion.kind}-${collaboratorKey(suggestion.id)}`"
+                                    :key="`${suggestion.kind}-${selectionKey(suggestion.kind, suggestion)}`"
+                                    :value="`${suggestion.kind}-${selectionKey(suggestion.kind, suggestion)}`"
                                     :text-value="suggestion.name"
-                                    :data-testid="`${suggestion.kind}-collaborator-option-${collaboratorKey(suggestion.id)}`"
+                                    :data-testid="`${suggestion.kind}-collaborator-option-${selectionTestKey(suggestion.kind, suggestion)}`"
                                     class="data-highlighted:bg-accent data-highlighted:text-accent-foreground flex cursor-pointer items-center gap-3 rounded-sm px-3 py-2 text-sm outline-none"
                                     @select.prevent="chooseSuggestion(suggestion)"
                                 >
@@ -430,12 +441,15 @@ onBeforeUnmount(resetLookup);
                                         }}</span>
                                     </span>
                                     <span class="text-muted-foreground max-w-[35%] truncate text-xs" data-collaborator-source>
-                                        {{ suggestion.kind === 'internal' ? resolvedInternalLabel : resolvedExternalLabel }}
+                                        {{ suggestion.kind === 'internal' ? resolvedInternalLabel : resolvedExternalLabel
+                                        }}<template v-if="suggestion.kind === 'external' && environmentLabel(suggestion.environment)">
+                                            · {{ environmentLabel(suggestion.environment) }}</template
+                                        >
                                     </span>
                                     <Check
                                         v-if="isSelected(suggestion.kind, suggestion)"
                                         class="text-primary size-4 shrink-0"
-                                        :data-testid="`${suggestion.kind}-collaborator-selected-${collaboratorKey(suggestion.id)}`"
+                                        :data-testid="`${suggestion.kind}-collaborator-selected-${selectionTestKey(suggestion.kind, suggestion)}`"
                                     />
                                     <UserPlus v-else class="text-muted-foreground size-4 shrink-0" />
                                 </ComboboxItem>

@@ -50,10 +50,6 @@ export function getTaskEnvironment(task: any): string | null {
         task?.target_environment,
         task?.for_environment,
         task?.metadata?.environment,
-        task?.submitter?.environment,
-        task?.creator?.environment,
-        task?.created_by?.environment,
-        task?.user?.environment,
     ]);
     if (!environment) return null;
     const label = formatEnvironmentLabel(environment);
