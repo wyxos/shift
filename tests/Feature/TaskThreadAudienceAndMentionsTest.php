@@ -250,7 +250,9 @@ test('mention candidates prioritize current collaborators and Team omits externa
         ->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'team']))
         ->assertOk();
 
-    expect(collect($all->json('existing'))->pluck('id')->all())->toBe([$internal->id, $external->external_id])
+    expect($all->json('existing.0.id'))->toBe($internal->id)
+        ->and($all->json('existing.1.id'))->toStartWith('source:')
+        ->and($all->json('existing.1.name'))->toBe($external->name.' (testing)')
         ->and(collect($all->json('addable'))->pluck('id'))->toContain($addable->id)
         ->and(collect($team->json('existing'))->pluck('id')->all())->toBe([$internal->id])
         ->and(collect($team->json('addable'))->pluck('kind')->unique()->all())->toBe(['internal']);
@@ -338,4 +340,100 @@ test('additive mention migration leaves historical audience rows untouched and r
         ->and(TaskThread::query()->whereKey($all->id)->value('type'))->toBe('external')
         ->and(TaskThread::query()->whereKey($team->id)->value('type'))->toBe('internal')
         ->and(TaskThreadMention::query()->count())->toBe(0);
+});
+
+test('mentions keep matching external IDs in different environments distinct and reject ambiguous legacy IDs', function () {
+    Notification::fake();
+    Queue::fake();
+    $people = collect(['staging', 'production'])->map(fn ($environment) => ExternalUser::factory()->create([
+        'project_id' => $this->project->id, 'external_id' => '7', 'environment' => $environment,
+        'name' => 'Alex', 'url' => "https://{$environment}.test",
+    ]));
+    $this->task->externalCollaborators()->attach($people->pluck('id'));
+    $candidates = $this->actingAs($this->owner)->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'all']))
+        ->assertOk()->json('existing');
+    expect(collect($candidates)->pluck('id')->unique())->toHaveCount(2);
+    foreach ($people as $person) {
+        $candidate = collect($candidates)->firstWhere('name', 'Alex ('.$person->environment.')');
+        $response = $this->actingAs($this->owner)->postJson(route('task-threads.store', $this->task), [
+            'content' => audienceMentionHtml('external', $candidate['id'], 'Spoofed'), 'type' => 'external',
+            'mentions' => [['kind' => 'external', 'id' => $candidate['id']]],
+        ])->assertCreated()->assertJsonPath('thread.mentions.0.id', $candidate['id']);
+        $this->assertDatabaseHas('task_thread_mentions', [
+            'task_thread_id' => $response->json('thread.id'), 'external_user_id' => $person->id,
+        ]);
+        expect($response->json('thread.content'))->toContain('data-mention-id="'.$candidate['id'].'"')->not->toContain('Spoofed');
+    }
+    $this->actingAs($this->owner)->postJson(route('task-threads.store', $this->task), [
+        'content' => audienceMentionHtml('external', '7', 'Alex'), 'type' => 'external',
+        'mentions' => [['kind' => 'external', 'id' => '7']],
+    ])->assertUnprocessable()->assertJsonValidationErrors('mentions');
+    expect($this->task->threads()->count())->toBe(2);
+});
+
+test('mentioning an addable external collaborator on an environmentless task keeps its source', function () {
+    Notification::fake();
+    Queue::fake();
+    $this->project->environments()->create(['environment' => 'production', 'url' => 'https://client.test', 'callback_trusted_at' => now()]);
+    \Illuminate\Support\Facades\Http::fake(['https://client.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+        'environment' => 'production', 'url' => 'https://client.test',
+        'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+    ])]);
+    $candidate = collect($this->actingAs($this->owner)->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'all', 'search' => 'Alex']))
+        ->assertOk()->json('addable'))->firstWhere('kind', 'external');
+    $identity = ['kind' => 'external', 'id' => $candidate['id']];
+    $this->actingAs($this->owner)->postJson(route('task-threads.store', $this->task), [
+        'content' => audienceMentionHtml('external', $candidate['id'], 'Alex'), 'type' => 'external',
+        'mentions' => [$identity], 'add_collaborators' => [$identity],
+    ])->assertCreated();
+    expect($this->task->fresh()->metadata)->toBeNull()
+        ->and($this->task->externalCollaborators()->sole()->environment)->toBe('production');
+});
+
+test('legacy mention content remains editable after adding a same-ID collaborator from another source', function () {
+    Notification::fake();
+    Queue::fake();
+    $original = ExternalUser::factory()->create(['project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'staging']);
+    $other = ExternalUser::factory()->create(['project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'production']);
+    $this->task->externalCollaborators()->attach([$original->id, $other->id]);
+    $thread = $this->task->threads()->create([
+        'content' => audienceMentionHtml('external', '7', $original->name), 'type' => 'external',
+        'sender_type' => User::class, 'sender_id' => $this->owner->id, 'sender_name' => $this->owner->name,
+    ]);
+    $thread->mentions()->create(['kind' => 'external', 'external_user_id' => $original->id]);
+    $loaded = $this->actingAs($this->owner)->getJson(route('task-threads.index', $this->task))->assertOk()->json('threads.0');
+    expect($loaded['content'])->toContain('data-mention-id="'.$loaded['mentions'][0]['id'].'"');
+    $this->actingAs($this->owner)->putJson(route('task-threads.update', [$this->task, $thread]), [
+        'content' => $loaded['content'].'<p>Updated</p>', 'mentions' => $loaded['mentions'],
+    ])->assertOk();
+    expect($thread->mentions()->sole()->external_user_id)->toBe($original->id);
+});
+
+test('source-qualified mention IDs support long existing external IDs', function () {
+    Notification::fake();
+    Queue::fake();
+    $person = ExternalUser::factory()->create(['project_id' => $this->project->id, 'external_id' => str_repeat('a', 200), 'environment' => 'production']);
+    $this->task->externalCollaborators()->attach($person->id);
+    $candidate = $this->actingAs($this->owner)->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'all']))->assertOk()->json('existing.0');
+    $this->actingAs($this->owner)->postJson(route('task-threads.store', $this->task), [
+        'content' => audienceMentionHtml('external', $candidate['id'], $person->name), 'type' => 'external',
+        'mentions' => [['kind' => 'external', 'id' => $candidate['id']]],
+    ])->assertCreated();
+});
+
+test('canonical mention IDs take precedence over matching legacy account IDs', function () {
+    Notification::fake();
+    Queue::fake();
+    $first = ExternalUser::factory()->create(['project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'staging']);
+    $this->task->externalCollaborators()->attach($first->id);
+    $firstCandidate = $this->actingAs($this->owner)->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'all']))->assertOk()->json('existing.0');
+    $second = ExternalUser::factory()->create(['project_id' => $this->project->id, 'external_id' => $firstCandidate['id'], 'environment' => 'production']);
+    $this->task->externalCollaborators()->attach($second->id);
+    $candidates = $this->actingAs($this->owner)->getJson(route('task-thread-mentions.candidates', [$this->task, 'audience' => 'all']))->assertOk()->json('existing');
+    $response = $this->actingAs($this->owner)->postJson(route('task-threads.store', $this->task), [
+        'content' => collect($candidates)->map(fn ($candidate) => audienceMentionHtml('external', $candidate['id'], 'Alex'))->implode(''),
+        'type' => 'external', 'mentions' => $candidates,
+    ])->assertCreated();
+    expect(TaskThreadMention::where('task_thread_id', $response->json('thread.id'))->pluck('external_user_id')->sort()->values()->all())
+        ->toBe([$first->id, $second->id]);
 });

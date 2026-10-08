@@ -73,11 +73,6 @@ class ExternalTaskController extends Controller
         return $this->taskCollaboratorService->canManageForExternalUser($task, $externalUser);
     }
 
-    private function externalCollaboratorsRequested(array $attributes): bool
-    {
-        return ! empty($attributes['external_collaborators'] ?? []);
-    }
-
     private function resolveTaskEnvironment(Project $project, array $attributes, ?string $fallbackEnvironment = null): ?string
     {
         $rawEnvironment = array_key_exists('environment', $attributes)
@@ -87,12 +82,6 @@ class ExternalTaskController extends Controller
         $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($rawEnvironment);
 
         if ($normalizedEnvironment === null) {
-            if ($this->externalCollaboratorsRequested($attributes)) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'environment' => 'Select an environment before tagging external collaborators.',
-                ]);
-            }
-
             return null;
         }
 
@@ -122,12 +111,13 @@ class ExternalTaskController extends Controller
         );
     }
 
-    private function resolveExternalCollaborators(Project $project, ?string $environment, array $attributes): \Illuminate\Support\Collection
+    private function resolveExternalCollaborators(Project $project, ?string $environment, array $attributes, Task $task): \Illuminate\Support\Collection
     {
         return $this->externalUserService->resolveCollaborators(
             $project,
             $environment,
             $attributes['external_collaborators'] ?? [],
+            $task->externalCollaborators,
         );
     }
 
@@ -144,7 +134,7 @@ class ExternalTaskController extends Controller
         );
 
         try {
-            $externalUsers = $this->resolveExternalCollaborators($project, $environment, $attributes);
+            $externalUsers = $this->resolveExternalCollaborators($project, $environment, $attributes, $task);
         } catch (\RuntimeException $exception) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'external_collaborators' => $exception->getMessage(),
@@ -175,6 +165,7 @@ class ExternalTaskController extends Controller
             'external_collaborators' => $task->externalCollaborators
                 ->map(fn (ExternalUser $user) => [
                     'id' => $user->external_id,
+                    'environment' => $user->environment,
                     'name' => $user->name,
                     'email' => $user->email,
                 ])
@@ -247,13 +238,7 @@ class ExternalTaskController extends Controller
 
     private function taskEnvironment(Task $task): ?string
     {
-        $environment = $task->metadata?->environment;
-
-        if (! filled($environment) && $task->submitter) {
-            $environment = $task->submitter->environment ?? null;
-        }
-
-        return $environment;
+        return $task->metadata?->environment;
     }
 
     private function sendCollaboratorAddedNotifications(Task $task, array $syncResult): void
@@ -356,7 +341,7 @@ class ExternalTaskController extends Controller
             ->paginate(10)
             ->withQueryString();
         $tasks->through(function (Task $task) use ($externalUser) {
-            $task->environment = $task->metadata?->environment ?? ($task->submitter->environment ?? null);
+            $task->environment = $this->taskEnvironment($task);
             foreach ($this->externalUserService->capabilityFlags($task, $externalUser) as $key => $value) {
                 $task->setAttribute($key, $value);
             }
@@ -431,6 +416,7 @@ class ExternalTaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'external_collaborators.*.environment' => 'nullable|string|max:255',
             'include_submitter_as_collaborator' => 'sometimes|boolean',
         ]);
 
@@ -616,11 +602,10 @@ class ExternalTaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'external_collaborators.*.environment' => 'nullable|string|max:255',
         ]);
 
-        $selectedEnvironment = $this->resolveTaskEnvironment($project, $attributes, $this->taskEnvironment($task));
-        $this->syncTaskEnvironment($task, $selectedEnvironment, $task->metadata?->url ?? $externalUser->url);
-        $syncResult = $this->syncCollaborators($task, $project, $attributes, $selectedEnvironment);
+        $syncResult = $this->syncCollaborators($task, $project, $attributes, $externalUser->environment);
         $this->sendCollaboratorAddedNotifications($task, $syncResult);
 
         $task->load(['submitter', 'metadata', 'project', 'attachments', 'internalCollaborators', 'externalCollaborators']);

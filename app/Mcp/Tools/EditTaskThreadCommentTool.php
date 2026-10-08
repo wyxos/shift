@@ -45,7 +45,7 @@ class EditTaskThreadCommentTool extends Tool
 
         $thread = TaskThread::query()
             ->withDraftsFor($principal->user)
-            ->with(['task.project', 'sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
+            ->with(['task.project', 'sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name'])
             ->find($validated['thread_id']);
 
         if (! $thread instanceof TaskThread) {
@@ -72,7 +72,7 @@ class EditTaskThreadCommentTool extends Tool
             app(TaskThreadMentionService::class)->resolvedForThread($thread),
         );
         $thread->save();
-        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
+        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
 
         return Response::structured([
             'thread' => $this->thread($thread),

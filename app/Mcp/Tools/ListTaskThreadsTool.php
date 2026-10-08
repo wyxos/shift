@@ -51,7 +51,7 @@ class ListTaskThreadsTool extends Tool
 
         $threads = TaskThread::query()
             ->withDraftsFor($principal->user)
-            ->with(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
+            ->with(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name'])
             ->where('task_id', $validated['task_id'])
             ->when($validated['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
             ->when(

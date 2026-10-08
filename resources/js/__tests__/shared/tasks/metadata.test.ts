@@ -32,5 +32,6 @@ describe('shared/tasks/metadata', () => {
 
         expect(getTaskEnvironment(task)).toBe('Staging Zone');
         expect(getTaskEnvironment({})).toBeNull();
+        expect(getTaskEnvironment({ environment: null, submitter: { environment: 'production' } })).toBeNull();
     });
 });

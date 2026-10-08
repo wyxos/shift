@@ -1399,7 +1399,7 @@ test('store rejects inaccessible project ids', function () {
     $response->assertJsonValidationErrors('project_id');
 });
 
-test('store requires an environment before syncing external collaborators', function () {
+test('store requires a source identity for external collaborators without a task environment', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
         'token' => 'project-token',
@@ -1418,7 +1418,7 @@ test('store requires an environment before syncing external collaborators', func
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('environment');
+    $response->assertJsonValidationErrors('external_collaborators');
 });
 
 test('internal collaborator can view task details without broader project visibility', function () {
@@ -1442,7 +1442,7 @@ test('internal collaborator can view task details without broader project visibi
         ->assertJsonPath('internal_collaborators.0.id', $this->user->id);
 });
 
-test('collaborator candidate endpoint requires an environment before external lookup', function () {
+test('collaborator candidate endpoint explains when no project environments are registered', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
@@ -1471,7 +1471,7 @@ test('collaborator candidate endpoint requires an environment before external lo
     $response
         ->assertOk()
         ->assertJsonPath('external_available', false)
-        ->assertJsonPath('external_error', 'Select an environment before tagging external collaborators.')
+        ->assertJsonPath('external_error', 'No environments are registered for this project.')
         ->assertJsonPath('external_label', "{$project->name} users")
         ->assertJsonCount(2, 'internal');
     $response->assertJsonFragment(['id' => $this->user->id]);
@@ -2282,4 +2282,97 @@ test('store sanitizes dangerous description html without breaking inline uploads
     expect($task->description)->toContain('class="editor-tile"');
     expect($task->description)->not->toContain('<script');
     expect($task->description)->not->toContain('onerror');
+});
+
+test('environmentless tasks search and save collaborators from distinct source environments', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    $project = Project::factory()->create(['author_id' => $this->user->id, 'token' => 'project-token']);
+    $responses = [];
+    foreach (['staging', 'production'] as $environment) {
+        $url = "https://{$environment}-client.test";
+        $project->environments()->create(['environment' => $environment, 'url' => $url, 'callback_trusted_at' => now()]);
+        $responses[$url.'/shift/api/collaborators/external*'] = \Illuminate\Support\Facades\Http::response([
+            'environment' => $environment, 'url' => $url,
+            'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+        ]);
+    }
+    \Illuminate\Support\Facades\Http::fake($responses);
+    $this->actingAs($this->user)->getJson(route('tasks.collaborators', ['project' => $project, 'search' => 'Alex']))
+        ->assertOk()->assertJsonPath('external_available', true)->assertJsonCount(2, 'external')
+        ->assertJsonFragment(['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'staging'])
+        ->assertJsonFragment(['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'production']);
+
+    $task = Task::factory()->for($project)->create();
+    $task->submitter()->associate($this->user)->save();
+    $selection = collect(['staging', 'production'])->map(fn ($environment) => [
+        'id' => '7', 'name' => 'Untrusted name', 'email' => 'untrusted@example.test', 'environment' => $environment,
+    ])->all();
+    $this->actingAs($this->user)->patchJson(route('tasks.collaborators.update', $task), [
+        'environment' => 'production', 'external_collaborators' => $selection,
+    ])->assertOk()->assertJsonPath('task.environment', null)->assertJsonCount(2, 'task.external_collaborators');
+    expect($task->fresh()->metadata)->toBeNull();
+    expect($task->externalCollaborators()->count())->toBe(2);
+    expect($task->externalCollaborators()->pluck('name')->unique()->all())->toBe(['Alex']);
+
+    // Retaining existing access must not require the source application to be online.
+    \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response([], 503)]);
+    $this->actingAs($this->user)->patchJson(route('tasks.collaborators.update', $task), [
+        'external_collaborators' => [$selection[1]],
+    ])->assertOk()->assertJsonPath('task.environment', null)->assertJsonCount(1, 'task.external_collaborators')
+        ->assertJsonPath('task.external_collaborators.0.environment', 'production');
+});
+
+test('creating a task with source-qualified collaborators does not assign a task environment', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    $project = Project::factory()->create(['author_id' => $this->user->id, 'token' => 'project-token']);
+    $project->environments()->create(['environment' => 'production', 'url' => 'https://client.test', 'callback_trusted_at' => now()]);
+    \Illuminate\Support\Facades\Http::fake(['https://client.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+        'environment' => 'production', 'url' => 'https://client.test',
+        'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+    ])]);
+    $response = $this->actingAs($this->user)->postJson(route('tasks.store'), [
+        'title' => 'General project work', 'project_id' => $project->id,
+        'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'production']],
+    ])->assertSuccessful();
+    $task = Task::where('title', 'General project work')->firstOrFail();
+    expect($task->metadata)->toBeNull()
+        ->and($task->externalCollaborators()->sole()->environment)->toBe('production');
+});
+
+test('project collaborator lookup keeps available sources when another source fails', function () {
+    $project = Project::factory()->create(['author_id' => $this->user->id, 'token' => 'project-token']);
+    foreach (['staging', 'production'] as $environment) {
+        $project->environments()->create(['environment' => $environment, 'url' => "https://{$environment}.test", 'callback_trusted_at' => now()]);
+    }
+    \Illuminate\Support\Facades\Http::fake([
+        'https://staging.test/*' => \Illuminate\Support\Facades\Http::response([], 503),
+        'https://production.test/*' => \Illuminate\Support\Facades\Http::response([
+            'environment' => 'production', 'url' => 'https://production.test',
+            'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+        ]),
+    ]);
+    $this->actingAs($this->user)->getJson(route('tasks.collaborators', ['project' => $project, 'search' => 'Alex']))
+        ->assertOk()->assertJsonCount(1, 'external')->assertJsonPath('external_available', true)
+        ->assertJsonPath('external.0.environment', 'production')
+        ->assertJsonPath('external_error', fn ($error) => str_contains($error, 'Staging'));
+});
+
+test('collaborator changes preserve task metadata and reject sources outside its project', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    \Illuminate\Support\Facades\Http::preventStrayRequests();
+    $project = Project::factory()->create(['author_id' => $this->user->id]);
+    $task = Task::factory()->for($project)->create();
+    $task->submitter()->associate($this->user)->save();
+    $task->metadata()->create(['environment' => 'staging', 'url' => 'https://staging.test', 'requirement_status' => 'submitted']);
+    $other = Project::factory()->create();
+    $other->environments()->create(['environment' => 'production', 'url' => 'https://other.test', 'callback_trusted_at' => now()]);
+    $this->actingAs($this->user)->patchJson(route('tasks.collaborators.update', $task), [
+        'environment' => null, 'internal_collaborator_ids' => [$this->user->id],
+    ])->assertOk();
+    $this->actingAs($this->user)->patchJson(route('tasks.collaborators.update', $task), [
+        'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'production']],
+    ])->assertUnprocessable()->assertJsonValidationErrors('external_collaborators');
+    expect($task->fresh()->metadata->environment)->toBe('staging')
+        ->and($task->fresh()->metadata->requirement_status)->toBe(RequirementStatus::Submitted->value)
+        ->and($task->externalCollaborators()->count())->toBe(0);
 });

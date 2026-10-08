@@ -27,7 +27,7 @@ const props = withDefaults(
         internalLabel: 'SHIFT team',
         internalDescription: 'Registered SHIFT users on this project.',
         externalLabel: 'Project users',
-        externalDescription: 'Users available in the selected environment.',
+        externalDescription: 'Users available in this project.',
         searchPlaceholder: 'Search collaborators',
     },
 );

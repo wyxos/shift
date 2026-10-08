@@ -1557,7 +1557,7 @@ test('non submitter external collaborator cannot update collaborators', function
     $response->assertStatus(403);
 });
 
-test('store requires an environment before syncing external collaborators', function () {
+test('store requires a source identity for external collaborators without a task environment', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/tasks', [
             'title' => 'Needs environment',
@@ -1573,8 +1573,7 @@ test('store requires an environment before syncing external collaborators', func
 
     $response
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['environment'])
-        ->assertJsonPath('errors.environment.0', 'Select an environment before tagging external collaborators.');
+        ->assertJsonValidationErrors(['external_collaborators']);
 });
 
 test('store sanitizes dangerous external description html', function () {
@@ -1610,4 +1609,21 @@ test('store sanitizes dangerous external description html', function () {
     expect($responseDescription)->toContain('data-reply-to="42"');
     expect($responseDescription)->not->toContain('<script');
     expect($responseDescription)->not->toContain('javascript:');
+});
+
+test('SDK collaborator updates preserve missing task metadata and source-qualified accounts', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    $this->project->environments()->create(['environment' => 'production', 'url' => 'https://production.test', 'callback_trusted_at' => now()]);
+    \Illuminate\Support\Facades\Http::fake(['https://production.test/shift/api/collaborators/external*' => \Illuminate\Support\Facades\Http::response([
+        'environment' => 'production', 'url' => 'https://production.test',
+        'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+    ])]);
+    $task = Task::factory()->for($this->project)->create();
+    $task->submitter()->associate($this->externalUser)->save();
+    $this->withHeader('Authorization', 'Bearer '.$this->token)->patchJson("/api/tasks/{$task->id}/collaborators", [
+        'project' => $this->project->token, 'user' => $this->externalUserData, 'environment' => 'production',
+        'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'production']],
+    ])->assertOk()->assertJsonPath('external_collaborators.0.environment', 'production')->assertJsonPath('environment', null);
+    expect($task->fresh()->metadata)->toBeNull()
+        ->and($task->externalCollaborators()->sole()->url)->toBe('https://production.test');
 });

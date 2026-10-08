@@ -155,17 +155,11 @@ class TaskController extends Controller
         return ! empty($attributes['external_collaborators'] ?? []);
     }
 
-    private function resolveTaskEnvironment(Project $project, ?string $environment, bool $required): ?string
+    private function resolveTaskEnvironment(Project $project, ?string $environment): ?string
     {
         $normalizedEnvironment = $this->projectEnvironmentService->normalizeEnvironment($environment);
 
         if ($normalizedEnvironment === null) {
-            if ($required) {
-                throw ValidationException::withMessages([
-                    'environment' => 'Select an environment before tagging external collaborators.',
-                ]);
-            }
-
             return null;
         }
 
@@ -261,6 +255,7 @@ class TaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'external_collaborators.*.environment' => 'nullable|string|max:255',
         ];
 
         $attributes = $request->validate($rules);
@@ -285,12 +280,13 @@ class TaskController extends Controller
         return $attributes;
     }
 
-    private function resolveExternalCollaboratorsForProject(Project $project, ?string $environment, array $attributes): \Illuminate\Support\Collection
+    private function resolveExternalCollaboratorsForProject(Project $project, ?string $environment, array $attributes, Task $task): \Illuminate\Support\Collection
     {
         return $this->externalUserService->resolveCollaborators(
             $project,
             $environment,
             $attributes['external_collaborators'] ?? [],
+            $task->externalCollaborators,
         );
     }
 
@@ -307,7 +303,7 @@ class TaskController extends Controller
             $attributes['internal_collaborator_ids'] ?? [],
         );
         try {
-            $externalUsers = $this->resolveExternalCollaboratorsForProject($project, $environment, $attributes);
+            $externalUsers = $this->resolveExternalCollaboratorsForProject($project, $environment, $attributes, $task);
         } catch (\RuntimeException $exception) {
             throw ValidationException::withMessages([
                 'external_collaborators' => $exception->getMessage(),
@@ -330,7 +326,6 @@ class TaskController extends Controller
         $environment = $this->resolveTaskEnvironment(
             $project,
             $attributes['environment'] ?? null,
-            $this->externalCollaboratorsRequested($attributes),
         );
         $environmentUrl = $environment !== null
             ? $project->environments->firstWhere('environment', $environment)?->url
@@ -510,6 +505,7 @@ class TaskController extends Controller
             'external_collaborators' => $task->externalCollaborators
                 ->map(fn (ExternalUser $user) => [
                     'id' => $user->external_id,
+                    'environment' => $user->environment,
                     'name' => $user->name,
                     'email' => $user->email,
                 ])
@@ -520,13 +516,7 @@ class TaskController extends Controller
 
     private function taskEnvironment(Task $task): ?string
     {
-        $environment = $task->metadata?->environment;
-
-        if (! filled($environment) && $task->submitter) {
-            $environment = $task->submitter->environment ?? null;
-        }
-
-        return $environment;
+        return $task->metadata?->environment;
     }
 
     private function requirementBatchSummaries($tasks): array
@@ -938,16 +928,11 @@ class TaskController extends Controller
         $externalAvailable = false;
         $externalError = null;
 
-        if (! filled($environment)) {
-            $externalError = 'Select an environment before tagging external collaborators.';
-        } elseif ($search !== '') {
-            try {
-                $lookup = $this->externalUserService->searchCollaborators($project, (string) $environment, $search, paginate: true, perPage: 10);
-                $external = array_slice($lookup['users'], 0, 10);
-                $externalAvailable = true;
-            } catch (\RuntimeException $exception) {
-                $externalError = $exception->getMessage();
-            }
+        if ($search !== '') {
+            $lookup = $this->externalUserService->searchProjectCollaborators($project, $environment, $search);
+            $external = $lookup['users'];
+            $externalAvailable = $lookup['available'];
+            $externalError = $lookup['error'];
         }
 
         return response()->json([
@@ -967,7 +952,7 @@ class TaskController extends Controller
             'external_available' => $externalAvailable,
             'external_error' => $externalError,
             'external_label' => "{$project->name} users",
-            'external_description' => 'Users available in the selected environment.',
+            'external_description' => filled($environment) ? 'Users available in the selected environment.' : 'Users available across this project’s environments.',
         ]);
     }
 
@@ -1003,6 +988,7 @@ class TaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'external_collaborators.*.environment' => 'nullable|string|max:255',
         ]);
         if (array_key_exists('description', $attributes)) {
             $attributes['description'] = $this->sanitizeRichContent($attributes['description']);
@@ -1022,7 +1008,6 @@ class TaskController extends Controller
             $selectedEnvironment = $this->resolveTaskEnvironment(
                 $project,
                 $rawEnvironment,
-                $externalCollaboratorsRequested && ! filled($rawEnvironment),
             );
         }
         $selectedEnvironmentUrl = $selectedEnvironment !== null
@@ -1096,24 +1081,10 @@ class TaskController extends Controller
             'external_collaborators.*.id' => 'required',
             'external_collaborators.*.name' => 'required|string|max:255',
             'external_collaborators.*.email' => 'required|email',
+            'external_collaborators.*.environment' => 'nullable|string|max:255',
         ]);
 
-        $rawEnvironment = array_key_exists('environment', $attributes)
-            ? ($attributes['environment'] ?? null)
-            : $this->taskEnvironment($task);
-
-        $selectedEnvironment = $this->resolveTaskEnvironment(
-            $task->project()->with('environments')->firstOrFail(),
-            $rawEnvironment,
-            $this->externalCollaboratorsRequested($attributes) && ! filled($rawEnvironment),
-        );
-
-        $selectedEnvironmentUrl = $selectedEnvironment !== null
-            ? $task->project->environments()->where('environment', $selectedEnvironment)->value('url')
-            : null;
-
-        $this->syncTaskEnvironment($task, $selectedEnvironment, $selectedEnvironmentUrl);
-        $syncResult = $this->syncCollaborators($task, $attributes, $selectedEnvironment);
+        $syncResult = $this->syncCollaborators($task, $attributes, $this->taskEnvironment($task));
         $this->sendCollaboratorAddedNotifications($task, $syncResult);
 
         $task->load(['attachments', 'submitter', 'metadata', 'internalCollaborators', 'externalCollaborators']);

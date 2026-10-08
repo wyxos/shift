@@ -213,7 +213,7 @@ async function confirmRequirementBatchFinalize() {
         :priority-options="filters.priorityOptions"
         :type-options="filters.typeOptions"
         :sort-by-options="filters.sortByOptions"
-        :get-task-environment-label="(task) => getTaskEnvironment(task) ?? 'Unknown'"
+        :get-task-environment-label="(task) => getTaskEnvironment(task) ?? 'N/A'"
         :set-filters-open="filters.setFiltersOpen"
         :set-draft-statuses="filters.setDraftStatuses"
         :set-draft-priorities="filters.setDraftPriorities"

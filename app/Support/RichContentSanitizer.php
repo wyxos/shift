@@ -269,7 +269,7 @@ class RichContentSanitizer
                 continue;
             }
 
-            if ($tag === 'span' && $name === 'data-mention-id' && preg_match('/^[^\s<>"\']{1,255}$/u', $value) !== 1) {
+            if ($tag === 'span' && $name === 'data-mention-id' && preg_match('/^(?:source:[A-Za-z0-9_-]{1,4089}|[^\s<>"\']{1,255})$/u', $value) !== 1) {
                 $element->removeAttribute($attribute->name);
 
                 continue;

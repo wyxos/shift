@@ -72,7 +72,7 @@ class TaskThreadController extends Controller
             ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
-            ->with(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name'])
+            ->with(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name'])
             ->get()
             ->map(function (TaskThread $thread) use ($task) {
                 // Filter out attachments that are already embedded in the content
@@ -99,7 +99,7 @@ class TaskThreadController extends Controller
                     'client_request_id' => $thread->client_request_id,
                     'is_draft' => $thread->is_draft,
                     'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
-                    'content' => $thread->content,
+                    'content' => $this->mentions->contentForThread($thread),
                     'sender_name' => $thread->sender_name,
                     'is_current_user' => $this->isCurrentUserThread($task, $thread),
                     'created_at' => $thread->created_at,
@@ -205,7 +205,7 @@ class TaskThreadController extends Controller
         });
 
         // Get the thread with attachments
-        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
 
         if ($clientRequestId !== null) {
             $this->taskThreadNotificationService->schedule($thread);
@@ -236,7 +236,7 @@ class TaskThreadController extends Controller
                 'client_request_id' => $thread->client_request_id,
                 'is_draft' => $thread->is_draft,
                 'can_publish' => false,
-                'content' => $thread->content,
+                'content' => $this->mentions->contentForThread($thread),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
@@ -329,7 +329,7 @@ class TaskThreadController extends Controller
                 'is_draft' => $thread->is_draft,
                 'client_request_id' => $thread->client_request_id,
                 'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
-                'content' => $thread->content,
+                'content' => $this->mentions->contentForThread($thread),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => $thread->sender_id === Auth::id() && $thread->sender_type === get_class(Auth::user()),
                 'created_at' => $thread->created_at,
@@ -489,7 +489,7 @@ class TaskThreadController extends Controller
             $thread->save();
         }
 
-        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');
@@ -514,7 +514,7 @@ class TaskThreadController extends Controller
                 'is_draft' => $thread->is_draft,
                 'client_request_id' => $thread->client_request_id,
                 'can_publish' => $thread->is_draft && $this->isCurrentUserThread($task, $thread),
-                'content' => $thread->content,
+                'content' => $this->mentions->contentForThread($thread),
                 'sender_name' => $thread->sender_name,
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
@@ -563,7 +563,7 @@ class TaskThreadController extends Controller
         return static function (string $attribute, mixed $value, \Closure $fail): void {
             if ((! is_int($value) && ! is_string($value))
                 || trim((string) $value) === ''
-                || mb_strlen((string) $value) > 255) {
+                || mb_strlen((string) $value) > (str_starts_with((string) $value, 'source:') ? 4096 : 255)) {
                 $fail("The {$attribute} field must contain a valid collaborator identity.");
             }
         };

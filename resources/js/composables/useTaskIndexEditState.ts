@@ -68,7 +68,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 selectedEnvironment
             );
         }
-        return getTaskEnvironment(editTask.value) ?? 'Unknown';
+        return getTaskEnvironment(editTask.value) ?? 'N/A';
     });
     const taskAttachments = computed(() => {
         if (!editTask.value?.attachments) return [];
@@ -201,6 +201,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         const snapshot = initialEditSnapshot.value;
         if (!snapshot) return;
         const taskId = editTask.value.id;
+        const taskEnvironment = editTask.value.environment;
         const needsCollaboratorUpdate = canManageCollaborators.value && hasCollaboratorManagementChanges();
         const needsCoreUpdate = canEditTaskScope.value
             ? editForm.value.title !== snapshot.title ||
@@ -215,12 +216,12 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
         const collaboratorPayload = needsCollaboratorUpdate
             ? {
-                  environment: editTask.value.environment ?? null,
                   internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
                   external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
                       id: collaborator.id,
                       name: collaborator.name,
                       email: collaborator.email,
+                      environment: collaborator.environment ?? taskEnvironment ?? undefined,
                   })),
               }
             : null;

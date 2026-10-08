@@ -89,7 +89,7 @@ class AddTaskThreadCommentTool extends Tool
             'is_draft' => $this->draft,
         ]);
 
-        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
+        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
 
         if (! $thread->is_draft) {
             app(TaskThreadNotificationService::class)->send($task, $thread);

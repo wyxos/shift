@@ -289,8 +289,10 @@ function sanitizeElement(element: Element): void {
                     remove();
                 }
 
-                if (name === 'data-mention-id' && (!value || value.length > 255 || /[\s<>"']/.test(value))) {
-                    remove();
+                if (name === 'data-mention-id') {
+                    const validSourceId = value.length <= 4096 && /^source:[A-Za-z0-9_-]{1,4089}$/.test(value);
+                    const validLegacyId = !value.startsWith('source:') && value.length <= 255 && !/[\s<>"']/.test(value);
+                    if (!value || !(validSourceId || validLegacyId)) remove();
                 }
 
                 break;

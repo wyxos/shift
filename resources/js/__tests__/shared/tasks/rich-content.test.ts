@@ -34,6 +34,15 @@ describe('shared/tasks/rich-content', () => {
         expect(html).not.toContain('javascript:');
     });
 
+    it('preserves long source-qualified mention IDs while rejecting unsafe values', () => {
+        const qualifiedId = `source:${'a'.repeat(4089)}`;
+        const valid = sanitizeRichHtml(`<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="${qualifiedId}">@Alex</span></p>`);
+        const unsafe = sanitizeRichHtml('<p><span class="shift-mention" data-shift-mention="true" data-mention-kind="external" data-mention-id="source:unsafe value">@Alex</span></p>');
+
+        expect(valid).toContain(`data-mention-id="${qualifiedId}"`);
+        expect(unsafe).not.toContain('data-mention-id');
+    });
+
     it('extracts plain text from rich content', () => {
         expect(extractPlainTextFromContent('Line 1\n\nLine 2')).toContain('Line 1');
         expect(extractPlainTextFromContent('<p>hello</p>')).toBe('hello');

@@ -36,7 +36,7 @@ class TaskThreadMentionService
             'project',
             'metadata',
             'internalCollaborators:id,name,email',
-            'externalCollaborators:id,external_id,name,email',
+            'externalCollaborators:id,external_id,environment,name,email',
         ]);
 
         $term = trim((string) $search);
@@ -84,23 +84,23 @@ class TaskThreadMentionService
 
         if ($audience === TaskThreadAudience::All && mb_strlen($term) >= 2) {
             try {
-                $externalLookup = $this->externalUsers->searchCollaborators(
+                $externalLookup = $this->externalUsers->searchProjectCollaborators(
                     $task->project,
                     $task->metadata?->environment,
                     $term,
                 );
+                $addableError = $externalLookup['error'];
                 $existingExternalIds = $task->externalCollaborators
-                    ->pluck('external_id')
-                    ->map(fn ($id) => (string) $id);
+                    ->map(fn (ExternalUser $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
 
                 $addable = $addable
                     ->concat(
                         collect($externalLookup['users'])
-                            ->reject(fn (array $candidate): bool => $existingExternalIds->contains((string) $candidate['id']))
+                            ->reject(fn (array $candidate): bool => $existingExternalIds->contains($this->externalIdentity($candidate['environment'], (string) $candidate['id'])))
                             ->map(fn (array $candidate): array => [
                                 'kind' => TaskCollaboratorKind::External->value,
-                                'id' => (string) $candidate['id'],
-                                'name' => (string) $candidate['name'],
+                                'id' => $this->externalIdentity($candidate['environment'], (string) $candidate['id']),
+                                'name' => (string) $candidate['name'].' ('.$candidate['environment'].')',
                                 'email' => (string) $candidate['email'],
                                 'is_collaborator' => false,
                             ])
@@ -135,7 +135,7 @@ class TaskThreadMentionService
             'project',
             'metadata',
             'internalCollaborators:id',
-            'externalCollaborators:id,external_id',
+            'externalCollaborators:id,external_id,environment',
         ]);
 
         $normalizedMentions = $this->normalizeIdentities($mentions);
@@ -178,7 +178,7 @@ class TaskThreadMentionService
                 $task->project,
                 $task->metadata?->environment,
                 $normalizedAdditions['external']
-                    ->map(fn (string $id): array => ['id' => $id])
+                    ->map(fn (string $id): array => $this->externalSelection($id))
                     ->all(),
             );
 
@@ -192,7 +192,12 @@ class TaskThreadMentionService
         $availableExternalUsers = $task->externalCollaborators
             ->concat($addExternalUsers)
             ->unique('id')
-            ->keyBy(fn (ExternalUser $user): string => (string) $user->external_id);
+            ->values();
+        $sourceIdentities = $availableExternalUsers->keyBy(fn (ExternalUser $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
+        $legacyIdentities = $availableExternalUsers->groupBy('external_id')
+            ->filter(fn (Collection $users): bool => $users->count() === 1)
+            ->map(fn (Collection $users): ExternalUser => $users->first());
+        $availableExternalUsers = $sourceIdentities->union($legacyIdentities);
 
         $missingInternal = $normalizedMentions['internal']->diff($availableInternalIds);
         $missingExternal = $normalizedMentions['external']->reject(
@@ -298,16 +303,18 @@ class TaskThreadMentionService
      */
     public function normalizeContent(string $content, array $resolved): string
     {
+        $externalUsers = ExternalUser::query()->whereIn('id', $resolved['external_user_ids'])
+            ->get(['id', 'external_id', 'environment', 'name']);
+        $legacyIdentities = $externalUsers->groupBy('external_id')
+            ->filter(fn (Collection $users): bool => $users->count() === 1)
+            ->map(fn (Collection $users): string => $this->externalIdentity($users->first()->environment, (string) $users->first()->external_id));
         $labels = User::query()
             ->whereIn('id', $resolved['user_ids'])
             ->pluck('name', 'id')
             ->mapWithKeys(fn (string $name, int|string $id): array => ['internal:'.(int) $id => $name])
-            ->merge(
-                ExternalUser::query()
-                    ->whereIn('id', $resolved['external_user_ids'])
-                    ->get(['id', 'external_id', 'name'])
-                    ->mapWithKeys(fn (ExternalUser $user): array => ['external:'.(string) $user->external_id => $user->name])
-            );
+            ->merge($externalUsers->mapWithKeys(fn (ExternalUser $user): array => [
+                'external:'.$this->externalIdentity($user->environment, (string) $user->external_id) => $user->name,
+            ]));
 
         $previous = libxml_use_internal_errors(true);
         $document = new DOMDocument('1.0', 'UTF-8');
@@ -326,6 +333,12 @@ class TaskThreadMentionService
 
                 $kind = $element->getAttribute('data-mention-kind');
                 $identity = trim($element->getAttribute('data-mention-id'));
+                if ($kind === TaskCollaboratorKind::External->value) {
+                    if (! $labels->has('external:'.$identity)) {
+                        $identity = $legacyIdentities->get($identity, $identity);
+                    }
+                    $element->setAttribute('data-mention-id', $identity);
+                }
                 $key = $kind === TaskCollaboratorKind::Internal->value
                     ? 'internal:'.(int) $identity
                     : 'external:'.$identity;
@@ -361,11 +374,30 @@ class TaskThreadMentionService
     }
 
     /**
+     * Upgrade legacy mention markup from persisted identities for safe editing.
+     * Incomplete historical mappings must not make old messages unreadable.
+     */
+    public function contentForThread(TaskThread $thread): string
+    {
+        $content = (string) $thread->content;
+        $resolved = $this->resolvedForThread($thread);
+        if ($resolved['external_user_ids'] === []) {
+            return $content;
+        }
+
+        try {
+            return $this->normalizeContent($content, $resolved);
+        } catch (ValidationException) {
+            return $content;
+        }
+    }
+
+    /**
      * @return array<int, array{kind: string, id: int|string, name: string}>
      */
     public function serialize(TaskThread $thread): array
     {
-        $thread->loadMissing(['mentions.user:id,name', 'mentions.externalUser:id,external_id,name']);
+        $thread->loadMissing(['mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
 
         return $thread->mentions
             ->map(function (TaskThreadMention $mention): ?array {
@@ -380,7 +412,7 @@ class TaskThreadMentionService
                 if ($mention->kind === TaskCollaboratorKind::External && $mention->externalUser instanceof ExternalUser) {
                     return [
                         'kind' => TaskCollaboratorKind::External->value,
-                        'id' => $mention->externalUser->external_id,
+                        'id' => $this->externalIdentity($mention->externalUser->environment, (string) $mention->externalUser->external_id),
                         'name' => $mention->externalUser->name,
                     ];
                 }
@@ -418,6 +450,27 @@ class TaskThreadMentionService
         ];
     }
 
+    private function externalIdentity(?string $environment, string $id): string
+    {
+        return 'source:'.rtrim(strtr(base64_encode(json_encode([$environment, $id], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)), '+/', '-_'), '=');
+    }
+
+    /**
+     * @return array{id: string, environment?: string|null}
+     */
+    private function externalSelection(string $identity): array
+    {
+        if (str_starts_with($identity, 'source:')) {
+            $decoded = json_decode((string) base64_decode(strtr(substr($identity, 7), '-_', '+/'), true), true);
+            if (is_array($decoded) && count($decoded) === 2 && array_is_list($decoded)
+                && (is_string($decoded[0]) || $decoded[0] === null) && is_string($decoded[1])) {
+                return ['environment' => $decoded[0], 'id' => $decoded[1]];
+            }
+        }
+
+        return ['id' => $identity];
+    }
+
     private function throwMentionMarkupValidationException(): never
     {
         throw ValidationException::withMessages([
@@ -446,8 +499,8 @@ class TaskThreadMentionService
     {
         return [
             'kind' => TaskCollaboratorKind::External->value,
-            'id' => (string) $user->external_id,
-            'name' => $user->name,
+            'id' => $this->externalIdentity($user->environment, (string) $user->external_id),
+            'name' => $user->name.' ('.$user->environment.')',
             'email' => $user->email,
             'is_collaborator' => $isCollaborator,
         ];

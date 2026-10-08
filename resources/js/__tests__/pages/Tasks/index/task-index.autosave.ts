@@ -114,9 +114,8 @@ describe('Tasks/Index.vue', () => {
         expect(axiosPatchMock).toHaveBeenCalledWith(
             '/tasks.collaborators.update',
             expect.objectContaining({
-                environment: 'staging',
                 internal_collaborator_ids: [91],
-                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com' }],
+                external_collaborators: [{ id: 'client-7', name: 'Client User', email: 'client@example.com', environment: 'staging' }],
             }),
         );
 
