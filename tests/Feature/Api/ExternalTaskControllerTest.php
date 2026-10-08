@@ -1627,3 +1627,30 @@ test('SDK collaborator updates preserve missing task metadata and source-qualifi
     expect($task->fresh()->metadata)->toBeNull()
         ->and($task->externalCollaborators()->sole()->url)->toBe('https://production.test');
 });
+
+test('older SDK selections retain existing cross-environment accounts and reject ambiguous IDs', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    \Illuminate\Support\Facades\Http::preventStrayRequests();
+    $task = Task::factory()->for($this->project)->create();
+    $task->submitter()->associate($this->externalUser)->save();
+    $productionUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'production', 'url' => 'https://production.test',
+    ]);
+    $task->externalCollaborators()->attach($productionUser->id);
+    $payload = [
+        'project' => $this->project->token, 'user' => $this->externalUserData,
+        'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
+    ];
+    $this->withHeader('Authorization', 'Bearer '.$this->token)->patchJson("/api/tasks/{$task->id}/collaborators", $payload)
+        ->assertOk()->assertJsonPath('external_collaborators.0.environment', 'production');
+    expect($task->externalCollaborators()->sole()->id)->toBe($productionUser->id);
+
+    $testingUser = ExternalUser::factory()->create([
+        'project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'testing', 'url' => 'https://example.com',
+    ]);
+    $task->externalCollaborators()->attach($testingUser->id);
+    $this->withHeader('Authorization', 'Bearer '.$this->token)->patchJson("/api/tasks/{$task->id}/collaborators", $payload)
+        ->assertUnprocessable()->assertJsonValidationErrors('external_collaborators');
+    expect($task->externalCollaborators()->count())->toBe(2);
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+});
