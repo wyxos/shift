@@ -188,23 +188,30 @@ describe('Tasks/Index.vue', () => {
         await wrapper.find('button[data-testid^="task-open-"]').trigger('click');
         await flushPromises();
 
-        expect(wrapper.get('[data-testid="error-comments-tab"]').attributes('aria-selected')).toBe('true');
+        expect(wrapper.get('[data-testid="error-events-tab"]').attributes('aria-selected')).toBe('true');
+        expect(wrapper.get('[data-testid="task-edit-layout"]').isVisible()).toBe(false);
+        expect(wrapper.get('[data-testid="edit-task-meta"]').isVisible()).toBe(true);
+        expect(wrapper.get('[data-testid="task-choice-fields"]').isVisible()).toBe(true);
+
+        await wrapper.get('[data-testid="error-task-tab"]').trigger('mousedown', { button: 0, ctrlKey: false });
+        await flushPromises();
+        expect(wrapper.get('[data-testid="error-task-tab"]').attributes('aria-selected')).toBe('true');
         expect(wrapper.get('[data-testid="comment-bubble-22"]').text()).toContain('Customer-facing comment');
         expect(wrapper.find('[data-testid="comment-bubble-31"]').exists()).toBe(false);
-        expect(wrapper.text()).not.toContain('Widget render failed token=[Filtered]');
+        expect(wrapper.get('[data-testid="error-occurrences-panel"]').isVisible()).toBe(false);
 
-        await wrapper.get('[data-testid="error-occurrences-tab"]').trigger('click');
+        await wrapper.get('[data-testid="error-events-tab"]').trigger('mousedown', { button: 0, ctrlKey: false });
         await flushPromises();
 
         const occurrencesText = wrapper.get('[data-testid="error-occurrences-panel"]').text();
-        expect(wrapper.get('[data-testid="error-occurrences-tab"]').attributes('aria-selected')).toBe('true');
-        expect(occurrencesText).toContain('Occurrence #2');
+        expect(wrapper.get('[data-testid="error-events-tab"]').attributes('aria-selected')).toBe('true');
+        expect(occurrencesText).toContain('Event #2');
         expect(occurrencesText).toContain('Widget render failed token=[Filtered]');
         expect(occurrencesText).toContain('https://consumer.test/widget.js:88');
         expect(occurrencesText).toContain('renderWidget');
         expect(occurrencesText).toContain('Stack trace');
         expect(occurrencesText).toContain('https://consumer.test/demo');
-        expect(wrapper.find('[data-testid="comments-editor"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="comments-editor"]').isVisible()).toBe(false);
 
         expect(wrapper.get('[data-testid="error-occurrences-range"]').text()).toContain('Showing 1-15 of 16');
         await wrapper.get('[data-testid="error-occurrences-next"]').trigger('click');

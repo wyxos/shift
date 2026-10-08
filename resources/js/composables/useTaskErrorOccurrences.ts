@@ -3,7 +3,7 @@ import axios from 'axios';
 import { ref } from 'vue';
 
 export function useTaskErrorOccurrences() {
-    const activeErrorThreadTab = ref<'comments' | 'occurrences'>('comments');
+    const activeErrorSection = ref<'task' | 'events'>('events');
     const errorOccurrences = ref<TaskErrorOccurrence[]>([]);
     const errorOccurrencesPagination = ref<TaskErrorOccurrencePagination | null>(null);
     const errorOccurrencesLoading = ref(false);
@@ -14,15 +14,15 @@ export function useTaskErrorOccurrences() {
     }
 
     function resetErrorOccurrences() {
-        activeErrorThreadTab.value = 'comments';
+        activeErrorSection.value = 'events';
         errorOccurrences.value = [];
         errorOccurrencesPagination.value = null;
         errorOccurrencesLoading.value = false;
         errorOccurrencesError.value = null;
     }
 
-    function setActiveErrorThreadTab(tab: 'comments' | 'occurrences') {
-        activeErrorThreadTab.value = tab;
+    function setActiveErrorSection(tab: 'task' | 'events') {
+        activeErrorSection.value = tab;
     }
 
     async function fetchErrorOccurrences(taskId: number, page = 1) {
@@ -34,20 +34,20 @@ export function useTaskErrorOccurrences() {
             errorOccurrences.value = Array.isArray(response.data?.occurrences) ? response.data.occurrences : [];
             errorOccurrencesPagination.value = response.data?.pagination ?? null;
         } catch (error: any) {
-            errorOccurrencesError.value = errorMessage(error, 'Failed to load occurrences');
+            errorOccurrencesError.value = errorMessage(error, 'Failed to load events');
         } finally {
             errorOccurrencesLoading.value = false;
         }
     }
 
     return {
-        activeErrorThreadTab,
+        activeErrorSection,
         errorOccurrences,
         errorOccurrencesError,
         errorOccurrencesLoading,
         errorOccurrencesPagination,
         fetchErrorOccurrences,
         resetErrorOccurrences,
-        setActiveErrorThreadTab,
+        setActiveErrorSection,
     };
 }
