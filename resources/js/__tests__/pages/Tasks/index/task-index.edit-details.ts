@@ -131,7 +131,7 @@ describe('Tasks/Index.vue', () => {
         expect(metadataLabels.map((label) => label.text())).toEqual(['Created by', 'Created', 'Updated', 'Environment']);
         metadataLabels.forEach((label) => {
             expect(label.classes()).not.toContain('uppercase');
-            expect(label.classes()).toContain('text-[11px]');
+            expect(label.classes()).toContain('text-xs');
         });
         expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');

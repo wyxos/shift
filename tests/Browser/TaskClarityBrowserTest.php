@@ -2,6 +2,7 @@
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskThread;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
@@ -105,4 +106,51 @@ it('uses matching local timestamps and supports direct title search recovery', f
         ->assertScript('document.documentElement.scrollWidth <= innerWidth')
         ->assertNoSmoke();
     captureTaskClarityReview($page, 'task-list-mobile.png');
+});
+
+it('keeps the mobile report close to the conversation without losing a comment draft', function () {
+    $user = User::factory()->create(['name' => 'Alex Taylor']);
+    $project = Project::factory()->withAuthor($user->id)->create();
+    $task = Task::factory()->for($project)->create([
+        'title' => 'Export selected filters',
+        'status' => 'pending',
+        'description' => '<p>Include selected filters in the export.</p><p>Keep the date range and selected columns when downloading a report.</p>',
+    ]);
+    $task->submitter()->associate($user)->save();
+    for ($index = 1; $index <= 8; $index++) {
+        $message = new TaskThread([
+            'task_id' => $task->id,
+            'type' => 'external',
+            'content' => '<p>Review note '.$index.': preserve the selected filters and columns when exporting this report.</p>',
+            'sender_name' => $user->name,
+        ]);
+        $message->sender()->associate($user);
+        $message->save();
+    }
+    $this->actingAs($user);
+
+    $page = visit("/tasks?task={$task->id}")->resize(390, 844)
+        ->assertVisible('[data-testid="task-edit-description"]')
+        ->assertScript('document.querySelector("[data-testid=task-edit-description]").getBoundingClientRect().top < 500')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=edit-task-meta]")).gridTemplateColumns.split(" ").length === 2')
+        ->assertScript('Array.from(document.querySelectorAll("[data-testid=edit-task-meta-label]")).every(el => parseFloat(getComputedStyle(el).fontSize) >= 12)');
+    captureTaskClarityReview($page, 'task-details-density-mobile.png');
+
+    $page->click('[data-testid="edit-mobile-pane-comments"]')
+        ->fill('[data-testid="comments-editor"] .ProseMirror', 'Keep this reply while reading the report')
+        ->assertVisible('[data-testid="task-report-context"]')
+        ->click('[data-testid="task-report-context"] summary')
+        ->assertVisible('[data-testid="task-report-context-body"]')
+        ->assertSee('Keep the date range and selected columns when downloading a report.')
+        ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").textContent === "Keep this reply while reading the report"');
+    captureTaskClarityReview($page, 'task-report-context-mobile.png');
+
+    $page->click('[data-testid="task-report-context"] summary')
+        ->click('[data-testid="edit-mobile-pane-details"]')
+        ->click('[data-testid="edit-mobile-pane-comments"]')
+        ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").textContent === "Keep this reply while reading the report"')
+        ->resize(320, 844)
+        ->assertVisible('[data-testid="task-report-context"]')
+        ->assertScript('document.documentElement.scrollWidth <= innerWidth')
+        ->assertNoSmoke();
 });
