@@ -170,7 +170,7 @@ watch(
                             <span class="bg-muted text-muted-foreground rounded px-2 py-1 text-xs font-medium">Event #{{ occurrence.number }}</span>
                             <span
                                 v-if="index === 0 && (!occurrencePagination || occurrencePagination.current_page === 1)"
-                                class="bg-primary/10 text-primary rounded px-2 py-0.5 text-[11px] font-medium"
+                                class="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-medium"
                                 data-testid="error-event-latest"
                             >
                                 Latest
@@ -186,7 +186,7 @@ watch(
                             <span class="text-muted-foreground line-clamp-2 block text-xs break-all">{{
                                 occurrence.message || 'No message captured.'
                             }}</span>
-                            <span class="text-muted-foreground block truncate font-mono text-[11px]" :title="sourceLocationLabel(occurrence)">
+                            <span class="text-muted-foreground block truncate font-mono text-xs" :title="sourceLocationLabel(occurrence)">
                                 {{ sourceLocationLabel(occurrence) }}
                             </span>
                         </span>
@@ -294,11 +294,11 @@ watch(
                                             <div class="flex items-start gap-2">
                                                 <span
                                                     v-if="frame.in_app"
-                                                    class="rounded bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100"
+                                                    class="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100"
                                                 >
                                                     in app
                                                 </span>
-                                                <span class="text-muted-foreground font-mono text-[11px]">#{{ index + 1 }}</span>
+                                                <span class="text-muted-foreground font-mono text-xs">#{{ index + 1 }}</span>
                                             </div>
                                         </li>
                                     </ol>

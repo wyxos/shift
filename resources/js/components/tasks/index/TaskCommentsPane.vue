@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
+import TaskReportContext from '@/shared/components/tasks/TaskReportContext.vue';
 import { imageTiles } from '@/shared/tasks/image-tile';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
@@ -135,6 +136,7 @@ watch(deleteDialogOpen, (open) => {
         </div>
 
         <div :ref="assignCommentsScrollRef" class="flex-1 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+            <TaskReportContext :key="state.editTask?.id" :description="state.editForm.description" />
             <div v-if="state.threadLoading && state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">
                 Loading comments...
             </div>
@@ -156,7 +158,7 @@ watch(deleteDialogOpen, (open) => {
                         v-if="!message.pending && !message.failed && shouldShowMessageMeta(messageIndex)"
                         :data-testid="message.id ? `comment-meta-${message.id}` : undefined"
                         :class="message.isYou ? 'justify-end' : 'justify-start'"
-                        class="text-muted-foreground mb-1 flex max-w-full items-center gap-1 text-[10px]"
+                        class="text-muted-foreground mb-1 flex max-w-full items-center gap-1 text-xs"
                     >
                         <span v-if="!message.isYou" class="text-foreground/80 font-medium">{{ message.author }}</span>
                         <span v-if="!message.isYou" aria-hidden="true">–</span>
@@ -177,11 +179,11 @@ watch(deleteDialogOpen, (open) => {
                                 @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                                 @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                             >
-                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-[11px] font-semibold">
+                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-xs font-semibold">
                                     <Badge
                                         variant="secondary"
                                         :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
-                                        class="px-1.5 py-0 text-[10px]"
+                                        class="px-1.5 py-0 text-xs"
                                     >
                                         Team
                                     </Badge>

@@ -131,7 +131,7 @@ describe('Tasks/Index.vue All and Team comments', () => {
         expect(wrapper.get('[data-testid="comment-meta-11"]').text()).toContain('Alice–');
         expect(wrapper.find('[data-testid="comment-meta-14"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="comment-meta-12"]').text()).toContain('Bob–');
-        expect(wrapper.get('[data-testid="comment-meta-11"]').classes()).toContain('text-[10px]');
+        expect(wrapper.get('[data-testid="comment-meta-11"]').classes()).toContain('text-xs');
         expect(bubbles[0].text()).not.toContain('Alice');
         expect(bubbles[2].text()).not.toContain('Bob');
         expect(bubbles[0].text()).not.toContain('Team');

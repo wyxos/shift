@@ -27,31 +27,31 @@ const taskPriorityOptions = getPriorityOptions();
 <template>
     <div class="flex flex-col gap-4">
         <div
-            class="grid gap-4"
-            :class="state.isErrorIntakeTask ? 'grid-cols-2 sm:grid-cols-4' : 'sm:grid-cols-2 xl:grid-cols-4'"
+            class="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-4"
+            :class="state.isErrorIntakeTask ? 'sm:grid-cols-4' : 'xl:grid-cols-4'"
             data-testid="edit-task-meta"
         >
-            <div class="space-y-1">
-                <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created by</div>
-                <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium">
+            <div class="min-w-0 space-y-1">
+                <div class="text-muted-foreground text-xs leading-4" data-testid="edit-task-meta-label">Created by</div>
+                <div data-testid="edit-task-created-by" class="text-foreground text-sm font-medium break-words">
                     {{ state.editTaskCreatorLabel }}
                 </div>
             </div>
-            <div class="space-y-1">
-                <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created</div>
-                <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">
+            <div class="min-w-0 space-y-1">
+                <div class="text-muted-foreground text-xs leading-4" data-testid="edit-task-meta-label">Created</div>
+                <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium break-words">
                     <TaskListTimestamp :value="state.editTask.created_at" />
                 </div>
             </div>
-            <div class="space-y-1">
-                <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Updated</div>
-                <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">
+            <div class="min-w-0 space-y-1">
+                <div class="text-muted-foreground text-xs leading-4" data-testid="edit-task-meta-label">Updated</div>
+                <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium break-words">
                     <TaskListTimestamp :value="state.editTask.updated_at" />
                 </div>
             </div>
-            <div class="space-y-1">
-                <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Environment</div>
-                <div data-testid="edit-task-environment" class="text-foreground text-sm font-medium">
+            <div class="min-w-0 space-y-1">
+                <div class="text-muted-foreground text-xs leading-4" data-testid="edit-task-meta-label">Environment</div>
+                <div data-testid="edit-task-environment" class="text-foreground text-sm font-medium break-words">
                     {{ state.editTaskEnvironmentLabel }}
                 </div>
             </div>
