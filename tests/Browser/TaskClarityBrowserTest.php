@@ -66,6 +66,10 @@ it('explains automatic saving and preserves changes through failure and retry', 
     expect($task->refresh()->title)->toBe('Export selected filters');
     captureTaskClarityReview($page, 'task-sheet-desktop.png');
 
+    $page->resize(2560, 900)
+        ->assertScript('document.querySelector("[data-slot=sheet-content]").getBoundingClientRect().width <= 1152');
+    captureTaskClarityReview($page, 'task-sheet-wide-desktop.png');
+
     $page = visit("/tasks?task={$task->id}")->resize(390, 844)
         ->click('[data-testid="edit-mobile-pane-comments"]')
         ->assertSee('Visible to task collaborators, including external collaborators.')
@@ -138,12 +142,20 @@ it('keeps the mobile report close to the conversation without losing a comment d
 
     $page->click('[data-testid="edit-mobile-pane-comments"]')
         ->fill('[data-testid="comments-editor"] .ProseMirror', 'Keep this reply while reading the report')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane]")).borderLeftWidth === "0px"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane] > div:nth-child(2)")).paddingLeft === "0px"')
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane] > div:nth-child(2)")).scrollbarWidth === "thin"')
+        ->assertScript('document.querySelector("[data-testid=task-comments-pane]").getBoundingClientRect().bottom <= innerHeight')
         ->assertVisible('[data-testid="task-report-context"]')
         ->click('[data-testid="task-report-context"] summary')
         ->assertVisible('[data-testid="task-report-context-body"]')
         ->assertSee('Keep the date range and selected columns when downloading a report.')
         ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").textContent === "Keep this reply while reading the report"');
     captureTaskClarityReview($page, 'task-report-context-mobile.png');
+
+    $page->fill('[data-testid="comments-editor"] .ProseMirror', str_repeat('Long review note. ', 1200))
+        ->assertScript('document.querySelector("[data-testid=comments-editor]").getBoundingClientRect().bottom <= innerHeight')
+        ->fill('[data-testid="comments-editor"] .ProseMirror', 'Keep this reply while reading the report');
 
     $page->click('[data-testid="task-report-context"] summary')
         ->click('[data-testid="edit-mobile-pane-details"]')
@@ -152,5 +164,8 @@ it('keeps the mobile report close to the conversation without losing a comment d
         ->resize(320, 844)
         ->assertVisible('[data-testid="task-report-context"]')
         ->assertScript('document.documentElement.scrollWidth <= innerWidth')
+        ->resize(852, 393)
+        ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane]")).overflowY === "auto"')
+        ->assertScript('document.querySelector("[data-testid=task-comments-pane]").scrollHeight > document.querySelector("[data-testid=task-comments-pane]").clientHeight')
         ->assertNoSmoke();
 });

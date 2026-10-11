@@ -54,9 +54,15 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
 
 <template>
     <Sheet :open="state.editOpen" @update:open="state.onEditOpenChange">
-        <SheetContent :show-close="false" class="flex h-full min-h-0 flex-col p-0" side="right" width-preset="task">
+        <SheetContent
+            :show-close="false"
+            class="flex h-full min-h-0 flex-col p-0"
+            side="right"
+            width-preset="task"
+            data-testid="task-edit-sheet-content"
+        >
             <SheetHeader class="shrink-0 p-0">
-                <div class="px-6 pt-6 pb-3">
+                <div class="px-4 pt-6 pb-3 md:px-6">
                     <SheetTitle class="min-w-0">
                         <InputGroup data-testid="task-title-group" class="max-md:min-h-12 [@media(pointer:coarse)]:min-h-12">
                             <InputGroupAddon>
@@ -92,7 +98,7 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                 </div>
             </SheetHeader>
 
-            <div class="min-h-0 flex-1 overflow-hidden px-6 pb-4">
+            <div class="min-h-0 flex-1 overflow-hidden px-4 pb-4 md:px-6">
                 <div v-if="state.editLoading" class="text-muted-foreground py-10 text-center text-sm">Loading task...</div>
                 <div v-else-if="state.editError" class="text-destructive py-10 text-center text-sm">{{ state.editError }}</div>
                 <TabsRoot v-else-if="state.editTask" v-model="errorSectionModel" class="flex h-full min-h-0 flex-col gap-4">
@@ -127,8 +133,11 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                                 </div>
                                 <div
                                     :class="state.editMobilePane === 'comments' ? 'hidden lg:block' : 'block'"
-                                    class="min-h-0 min-w-0 overflow-auto pr-1"
+                                    class="shift-scrollbar focus-visible:ring-ring min-h-0 min-w-0 overflow-auto pr-1 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
                                     data-testid="task-edit-details-pane"
+                                    role="region"
+                                    aria-label="Task details"
+                                    tabindex="0"
                                 >
                                     <div class="flex flex-col gap-4">
                                         <TaskEditSummary v-if="!state.isErrorIntakeTask" :state="state" />

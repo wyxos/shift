@@ -123,10 +123,10 @@ watch(deleteDialogOpen, (open) => {
 
 <template>
     <div
-        class="border-muted-foreground/10 bg-background h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border"
+        class="task-comments-pane shift-scrollbar border-muted-foreground/10 bg-background h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none border-0 md:rounded-md md:border"
         data-testid="task-comments-pane"
     >
-        <div class="border-muted-foreground/10 flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div class="border-muted-foreground/10 flex shrink-0 items-center justify-between gap-3 px-0 py-3 md:border-b md:px-4">
             <div>
                 <h3 class="text-foreground text-sm font-semibold">
                     {{ state.isRequirementPhase ? 'Clarifications' : 'Comments' }}
@@ -135,7 +135,15 @@ watch(deleteDialogOpen, (open) => {
             <div class="text-muted-foreground shrink-0 text-xs">{{ messageCountLabel }}</div>
         </div>
 
-        <div :ref="assignCommentsScrollRef" class="flex-1 overflow-auto px-4 py-4" @load.capture="state.onCommentsMediaLoadCapture">
+        <div
+            :ref="assignCommentsScrollRef"
+            class="task-comments-history shift-scrollbar focus-visible:ring-ring min-h-0 flex-1 overflow-auto overscroll-contain px-0 py-4 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset md:px-4"
+            data-testid="task-comments-scroll"
+            role="region"
+            aria-label="Task comments"
+            tabindex="0"
+            @load.capture="state.onCommentsMediaLoadCapture"
+        >
             <TaskReportContext :key="state.editTask?.id" :description="state.editForm.description" />
             <div v-if="state.threadLoading && state.threadMessages.length === 0" class="text-muted-foreground py-6 text-center text-sm">
                 Loading comments...
@@ -318,7 +326,7 @@ watch(deleteDialogOpen, (open) => {
             </div>
         </div>
 
-        <div class="border-muted-foreground/10 bg-background/80 border-t px-4 py-3 backdrop-blur">
+        <div class="border-muted-foreground/10 bg-background/80 shrink-0 px-0 py-3 backdrop-blur md:border-t md:px-4">
             <div v-if="state.threadAudienceError" class="text-destructive mb-2 text-xs">{{ state.threadAudienceError }}</div>
             <div v-if="state.threadEditError" class="text-destructive mb-2 text-xs">{{ state.threadEditError }}</div>
             <ShiftEditor
@@ -338,6 +346,7 @@ watch(deleteDialogOpen, (open) => {
                 :slash-commands="['all', 'team']"
                 :temp-identifier="state.threadTempIdentifier"
                 data-testid="comments-editor"
+                class="task-comment-composer"
                 :placeholder="state.threadEditingId ? 'Edit your comment...' : 'Write a comment...'"
                 @cancel="state.cancelThreadEdit"
                 @mention-add-request="requestMentionCollaboratorAddition"

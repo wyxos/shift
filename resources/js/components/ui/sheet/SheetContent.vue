@@ -48,11 +48,10 @@ const horizontalSheetWidthPresets = {
   },
   task: {
     classes:
-      'h-full w-[var(--sheet-width-mobile)] max-w-none xl:w-[var(--sheet-width-desktop)] min-[1921px]:w-[var(--sheet-width-wide)]',
+      'h-full w-[var(--sheet-width-mobile)] max-w-none xl:w-[var(--sheet-width-desktop)]',
     style: {
       '--sheet-width-mobile': '100vw',
-      '--sheet-width-desktop': '75vw',
-      '--sheet-width-wide': '50vw',
+      '--sheet-width-desktop': 'min(75vw, 72rem)',
     },
   },
 } as const
