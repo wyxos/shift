@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Label } from '@/components/ui/label';
 import TaskChoiceMenu from '@/shared/components/tasks/TaskChoiceMenu.vue';
+import TaskListTimestamp from '@/shared/components/tasks/TaskListTimestamp.vue';
 import { getPriorityOptions, getRequirementStatusOptions, getStatusOptions } from '@/shared/tasks/presentation';
 import { computed } from 'vue';
 
@@ -21,11 +22,6 @@ const editRequirementStatusModel = computed({
 const taskStatusOptions = getStatusOptions({ includeClosed: false });
 const requirementStatusOptions = getRequirementStatusOptions();
 const taskPriorityOptions = getPriorityOptions();
-
-function formatTaskTime(value?: string | null) {
-    if (!value) return 'Unknown';
-    return value.slice(11, 16);
-}
 </script>
 
 <template>
@@ -44,13 +40,13 @@ function formatTaskTime(value?: string | null) {
             <div class="space-y-1">
                 <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Created</div>
                 <div data-testid="edit-task-created-at" class="text-foreground text-sm font-medium">
-                    {{ formatTaskTime(state.editTask.created_at) }}
+                    <TaskListTimestamp :value="state.editTask.created_at" />
                 </div>
             </div>
             <div class="space-y-1">
                 <div class="text-muted-foreground text-[11px] leading-4" data-testid="edit-task-meta-label">Updated</div>
                 <div data-testid="edit-task-updated-at" class="text-foreground text-sm font-medium">
-                    {{ formatTaskTime(state.editTask.updated_at) }}
+                    <TaskListTimestamp :value="state.editTask.updated_at" />
                 </div>
             </div>
             <div class="space-y-1">

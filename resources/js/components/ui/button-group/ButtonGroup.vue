@@ -20,6 +20,7 @@ const props = withDefaults(
         class?: string;
         testIdPrefix?: string;
         ariaLabel?: string;
+        touchFriendly?: boolean;
     }>(),
     {
         columns: 3,
@@ -107,7 +108,7 @@ function handleKeydown(event: KeyboardEvent, index: number): void {
             :aria-pressed="multiple ? isSelected(option) : undefined"
             :tabindex="optionTabIndex(option, index)"
             :variant="optionButtonVariant(option)"
-            :class="cn('w-auto flex-none', optionButtonClass(option))"
+            :class="cn('w-auto flex-none', touchFriendly && 'max-md:min-h-11 [@media(pointer:coarse)]:min-h-11', optionButtonClass(option))"
             :data-testid="testIdPrefix ? `${testIdPrefix}-${option.testId ?? option.value}` : undefined"
             @click="selectOption(option)"
             @keydown="handleKeydown($event, index)"

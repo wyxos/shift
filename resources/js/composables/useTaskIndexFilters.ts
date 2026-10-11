@@ -65,11 +65,18 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
         state.filtersOpen.value = false;
     }
 
+    function searchTasks(term: string) {
+        state.appliedSearchTerm.value = term.trim();
+        if (!state.filtersOpen.value) state.draftSearchTerm.value = state.appliedSearchTerm.value;
+        router.get(indexPath(), buildListQuery(1), { preserveState: true, preserveScroll: true, replace: true });
+    }
+
     return {
         ...state,
         applyFilters,
         buildListQuery,
         indexPath,
         resetFilters,
+        searchTasks,
     };
 }

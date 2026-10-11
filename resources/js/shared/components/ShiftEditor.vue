@@ -12,6 +12,7 @@ import phpLang from 'highlight.js/lib/languages/php';
 import pythonLang from 'highlight.js/lib/languages/python';
 import tsLang from 'highlight.js/lib/languages/typescript';
 import htmlLang from 'highlight.js/lib/languages/xml';
+import 'highlight.js/styles/github.css';
 import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
@@ -30,15 +31,11 @@ import { containsAiImprovableText, useShiftEditorAiImprove } from './shift-edito
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
 import { useShiftEditorEmoji } from './shift-editor/useShiftEditorEmoji';
 import { useShiftEditorMentions } from './shift-editor/useShiftEditorMentions';
-// Optional: import a highlight.js theme for lowlight token colors
-import 'highlight.js/styles/github.css';
 
 const vImageTiles = imageTiles;
 
 declare const route: undefined | ((name: string, params?: Record<string, unknown>) => string);
 
-// Emits
-// Include attachments in the payload so consumers can persist them alongside the content
 const emit = defineEmits<{
     (
         e: 'send',
@@ -80,6 +77,7 @@ const props = withDefaults(
         mentionError?: string | null;
         sendDisabled?: boolean;
         slashCommands?: string[];
+        touchFriendly?: boolean;
     }>(),
     {
         clearOnSend: true,
@@ -409,7 +407,11 @@ defineExpose({ confirmMentionAddition, editor, reset });
                 @select="selectMentionCandidate"
             />
             <ShiftEditorAttachmentList :attachments="attachments" :format-bytes="formatBytes" @remove="removeAttachment" />
-            <div :ref="setEmojiToolbar" class="relative flex flex-wrap items-center justify-start gap-2 p-2 px-1">
+            <div
+                :ref="setEmojiToolbar"
+                :class="{ 'touch-friendly-toolbar': props.touchFriendly }"
+                class="relative flex flex-wrap items-center justify-start gap-2 p-2 px-1"
+            >
                 <button
                     type="button"
                     data-testid="toolbar-emoji"

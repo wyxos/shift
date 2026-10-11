@@ -1,11 +1,12 @@
 <script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ResponsiveRecordList } from '@/components/ui/record-list';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@shared/components/ActionIconButton.vue';
-import { CheckCircle2, Eye, Trash2 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { CheckCircle2, Eye, Search, Trash2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 import TaskListCompact from './TaskListCompact.vue';
 import TaskListFiltersSheet from './TaskListFiltersSheet.vue';
 import TaskListTimestamp from './TaskListTimestamp.vue';
@@ -41,6 +42,8 @@ interface Props {
     highlightedTaskId: number | null;
     filtersOpen: boolean;
     activeFilterCount: number;
+    searchTerm?: string;
+    searchTasks?: (term: string) => void;
     draftStatuses: string[];
     draftPriorities: string[];
     draftSearchTerm: string;
@@ -96,9 +99,28 @@ const props = withDefaults(defineProps<Props>(), {
     typeOptions: () => [],
     setDraftProjectId: () => {},
     setDraftType: () => {},
+    searchTerm: '',
+    searchTasks: undefined,
 });
 
 const groupedRequirements = computed(() => groupRequirementTasks(props.tasks, props.itemLabel));
+const toolbarSearchTerm = ref(props.searchTerm);
+
+watch(
+    () => props.searchTerm,
+    (value) => {
+        toolbarSearchTerm.value = value;
+    },
+);
+
+function submitSearch() {
+    props.searchTasks?.(toolbarSearchTerm.value);
+}
+
+function clearSearch() {
+    toolbarSearchTerm.value = '';
+    props.searchTasks?.('');
+}
 
 function canFinalizeGroup(group: RequirementGroup) {
     return Boolean(props.finalizeRequirementBatch) && canFinalizeRequirementPack(group);
@@ -132,6 +154,33 @@ async function finalizeRequirementPack(group: RequirementGroup) {
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
+                <form
+                    v-if="searchTasks"
+                    class="flex w-full min-w-0 flex-none items-center gap-2 sm:w-auto sm:flex-initial"
+                    role="search"
+                    @submit.prevent="submitSearch"
+                >
+                    <label class="sr-only" for="task-list-search">Search titles</label>
+                    <Input
+                        id="task-list-search"
+                        v-model="toolbarSearchTerm"
+                        class="min-w-0 flex-1 max-sm:min-h-11 sm:w-48"
+                        data-testid="task-list-search"
+                        placeholder="Search titles"
+                        type="search"
+                    />
+                    <Button
+                        class="max-sm:min-h-11"
+                        data-testid="task-list-search-submit"
+                        :disabled="loading"
+                        size="sm"
+                        type="submit"
+                        variant="outline"
+                    >
+                        <Search class="mr-2 h-4 w-4" aria-hidden="true" />
+                        Search
+                    </Button>
+                </form>
                 <TaskListFiltersSheet
                     :open="filtersOpen"
                     :active-filter-count="activeFilterCount"
@@ -386,6 +435,20 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                     />
                 </template>
             </ResponsiveRecordList>
+
+            <div v-if="!loading && !error && tasks.length === 0" class="mt-3 flex flex-wrap justify-center gap-2">
+                <Button
+                    v-if="searchTasks && searchTerm.trim()"
+                    data-testid="task-list-clear-search"
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    @click="clearSearch"
+                >
+                    Clear search
+                </Button>
+                <Button data-testid="task-list-reset-filters" size="sm" type="button" variant="outline" @click="resetFilters"> Reset filters </Button>
+            </div>
 
             <div v-if="lastPage > 1" class="mt-4 flex items-center justify-between border-t pt-4">
                 <div class="text-muted-foreground text-xs">Page {{ currentPage }} of {{ lastPage }}</div>

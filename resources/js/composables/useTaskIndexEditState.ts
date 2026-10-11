@@ -7,6 +7,7 @@ import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } from 'vue';
 import { toast } from 'vue-sonner';
 import { defaultTaskEditForm, editMobilePaneOptions } from './taskIndexEditDefaults';
+import { currentTaskSnapshot, hasCollaboratorManagementChanges, hasPendingTaskChanges, withTaskSnapshot } from './taskIndexEditSnapshot';
 import { taskIndexThreadBindings } from './taskIndexThreadBindings';
 import { useTaskErrorOccurrences } from './useTaskErrorOccurrences';
 import { useTaskIndexThreadState } from './useTaskIndexThreadState';
@@ -30,7 +31,9 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const editMobilePane = ref<'details' | 'comments'>('details');
     const taskSaving = ref(false);
     const taskSaveError = ref<string | null>(null);
+    const taskSaved = ref(false);
     const pendingTaskSave = ref(false);
+    let editSessionVersion = 0;
     const requirementFinalizing = ref(false);
     const requirementFinalizeError = ref<string | null>(null);
     const autosaveArmed = ref(false);
@@ -78,7 +81,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const hasUnsavedTaskChanges = computed(() => {
         if (!editOpen.value) return false;
         if (taskSaving.value) return true;
-        return hasPendingTaskChanges();
+        return hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value);
     });
     const hasUnsavedCommentDraft = computed(() => {
         if (!editOpen.value) return false;
@@ -87,6 +90,13 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         return false;
     });
     const hasUnsavedChanges = computed(() => hasUnsavedTaskChanges.value || hasUnsavedCommentDraft.value);
+    const taskSaveState = computed<'idle' | 'pending' | 'saving' | 'saved' | 'error'>(() => {
+        if (!editOpen.value || !editTask.value) return 'idle';
+        if (taskSaveError.value && hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value)) return 'error';
+        if (taskSaving.value) return 'saving';
+        if (hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value)) return 'pending';
+        return taskSaved.value ? 'saved' : 'idle';
+    });
     function onTaskQueryPopState() {
         const taskId = getTaskIdFromQuery();
         const currentTaskId = editTask.value?.id ?? null;
@@ -111,7 +121,10 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         ],
         () => {
             if (!editOpen.value || !autosaveArmed.value) return;
-            if (!hasPendingTaskChanges()) return;
+            if (!hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value)) {
+                if (!taskSaving.value) taskSaveError.value = null;
+                return;
+            }
             scheduleTaskAutosave();
         },
     );
@@ -119,62 +132,30 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         if (!editOpen.value || pane !== 'comments') return;
         thread.scrollCommentsToBottomSoon();
     });
-    function hasPendingTaskChanges() {
-        const snap = initialEditSnapshot.value;
-        if (!snap) return false;
-        if (editForm.value.title !== snap.title) return true;
-        if (editForm.value.priority !== snap.priority) return true;
-        if (editForm.value.status !== snap.status) return true;
-        if (editForm.value.requirement_status !== snap.requirement_status) return true;
-        if ((editForm.value.description ?? '') !== (snap.description ?? '')) return true;
-        if ((editForm.value.environment ?? '') !== (snap.environment ?? '')) return true;
-        if (!collaboratorsEqual(editForm.value.collaborators, snap.collaborators)) return true;
-        return deletedAttachmentIds.value.length > 0;
-    }
-    function currentTaskSnapshot(): TaskIndexEditSnapshot {
-        return {
-            title: editForm.value.title,
-            priority: editForm.value.priority,
-            status: editForm.value.status,
-            requirement_status: editForm.value.requirement_status,
-            description: editForm.value.description,
-            environment: editForm.value.environment,
-            collaborators: normalizeTaskCollaborators(editForm.value.collaborators),
-        };
-    }
-    function hasCollaboratorManagementChanges() {
-        const snap = initialEditSnapshot.value;
-        if (!snap) return false;
-        if ((editForm.value.environment ?? '') !== (snap.environment ?? '')) return true;
-        return !collaboratorsEqual(editForm.value.collaborators, snap.collaborators);
-    }
-    function mergeEditedTask(task: Partial<TaskDetail> | null | undefined) {
+    function mergeEditedTask(task: Partial<TaskDetail> | null | undefined, submittedSnapshot?: TaskIndexEditSnapshot, syncEditableFields = true) {
         if (!editTask.value || !task) return;
         editTask.value = {
             ...editTask.value,
             ...task,
             attachments: Array.isArray(task.attachments) ? task.attachments : editTask.value.attachments,
         };
-        if (Object.prototype.hasOwnProperty.call(task, 'environment')) {
+        if (
+            syncEditableFields &&
+            Object.prototype.hasOwnProperty.call(task, 'environment') &&
+            (!submittedSnapshot || editForm.value.environment === submittedSnapshot.environment)
+        ) {
             editForm.value.environment = task.environment ?? null;
         }
-        if (task.internal_collaborators || task.external_collaborators) {
+        if (
+            syncEditableFields &&
+            (task.internal_collaborators || task.external_collaborators) &&
+            (!submittedSnapshot || collaboratorsEqual(editForm.value.collaborators, submittedSnapshot.collaborators))
+        ) {
             editForm.value.collaborators = normalizeTaskCollaborators({
                 internal: Array.isArray(task.internal_collaborators) ? task.internal_collaborators : editForm.value.collaborators.internal,
                 external: Array.isArray(task.external_collaborators) ? task.external_collaborators : editForm.value.collaborators.external,
             });
         }
-    }
-    function syncTaskRowFromEditForm(taskId: number) {
-        if (editTask.value?.id !== taskId) return;
-        editTask.value = {
-            ...editTask.value,
-            title: editForm.value.title,
-            status: editForm.value.status,
-            requirement_status: editForm.value.requirement_status,
-            priority: editForm.value.priority,
-            environment: editForm.value.environment,
-        };
     }
     function scheduleTaskAutosave(immediate = false) {
         if (!autosaveArmed.value || !editTask.value) return;
@@ -197,27 +178,38 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     }
     async function saveTaskChanges() {
         if (!editTask.value) return;
-        if (!hasPendingTaskChanges()) return;
+        if (taskSaving.value) {
+            pendingTaskSave.value = true;
+            return;
+        }
+        if (taskAutosaveTimer) {
+            window.clearTimeout(taskAutosaveTimer);
+            taskAutosaveTimer = null;
+        }
+        if (!hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value)) return;
         const snapshot = initialEditSnapshot.value;
         if (!snapshot) return;
+        const submittedSnapshot = currentTaskSnapshot(editForm.value);
+        const submittedDeletedAttachmentIds = [...deletedAttachmentIds.value];
+        const sessionVersion = editSessionVersion;
         const taskId = editTask.value.id;
-        const taskEnvironment = editTask.value.environment;
-        const needsCollaboratorUpdate = canManageCollaborators.value && hasCollaboratorManagementChanges();
+        const taskEnvironment = submittedSnapshot.environment ?? editTask.value.environment;
+        const needsCollaboratorUpdate = canManageCollaborators.value && hasCollaboratorManagementChanges(editForm.value, snapshot);
         const needsCoreUpdate = canEditTaskScope.value
             ? editForm.value.title !== snapshot.title ||
               editForm.value.priority !== snapshot.priority ||
               editForm.value.status !== snapshot.status ||
               editForm.value.requirement_status !== snapshot.requirement_status ||
               (editForm.value.description ?? '') !== (snapshot.description ?? '') ||
-              deletedAttachmentIds.value.length > 0
+              submittedDeletedAttachmentIds.length > 0
             : false;
 
         if (!needsCoreUpdate && !needsCollaboratorUpdate) return;
 
         const collaboratorPayload = needsCollaboratorUpdate
             ? {
-                  internal_collaborator_ids: editForm.value.collaborators.internal.map((collaborator) => Number(collaborator.id)),
-                  external_collaborators: editForm.value.collaborators.external.map((collaborator) => ({
+                  internal_collaborator_ids: submittedSnapshot.collaborators.internal.map((collaborator) => Number(collaborator.id)),
+                  external_collaborators: submittedSnapshot.collaborators.external.map((collaborator) => ({
                       id: collaborator.id,
                       name: collaborator.name,
                       email: collaborator.email,
@@ -228,39 +220,46 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
         taskSaving.value = true;
         taskSaveError.value = null;
+        taskSaved.value = false;
         taskSaveToast.showTaskSavingToast();
 
         try {
             if (needsCoreUpdate) {
                 const payload = {
-                    title: editForm.value.title,
-                    description: editForm.value.description,
-                    priority: editForm.value.priority,
-                    status: editForm.value.status,
-                    requirement_status: editForm.value.requirement_status,
+                    title: submittedSnapshot.title,
+                    description: submittedSnapshot.description,
+                    priority: submittedSnapshot.priority,
+                    status: submittedSnapshot.status,
+                    requirement_status: submittedSnapshot.requirement_status,
                     temp_identifier: editTempIdentifier.value,
-                    deleted_attachment_ids: deletedAttachmentIds.value.length ? deletedAttachmentIds.value : undefined,
+                    deleted_attachment_ids: submittedDeletedAttachmentIds.length ? submittedDeletedAttachmentIds : undefined,
                 };
 
                 const response = await axios.put(route('tasks.update', { task: taskId }), payload);
-                mergeEditedTask(response.data?.task ?? null);
+                if (sessionVersion !== editSessionVersion) return;
+                mergeEditedTask(response.data?.task ?? null, submittedSnapshot, false);
             }
 
             if (needsCollaboratorUpdate && collaboratorPayload) {
                 const response = await axios.patch(route('tasks.collaborators.update', { task: taskId }), collaboratorPayload);
-                mergeEditedTask(response.data?.task ?? null);
+                if (sessionVersion !== editSessionVersion) return;
+                mergeEditedTask(response.data?.task ?? null, submittedSnapshot);
             }
 
-            deletedAttachmentIds.value = [];
-            initialEditSnapshot.value = currentTaskSnapshot();
-            syncTaskRowFromEditForm(taskId);
+            deletedAttachmentIds.value = deletedAttachmentIds.value.filter((id) => !submittedDeletedAttachmentIds.includes(id));
+            initialEditSnapshot.value = submittedSnapshot;
+            taskSaved.value = true;
+            if (editTask.value?.id === taskId) editTask.value = withTaskSnapshot(editTask.value, submittedSnapshot);
             options.onTaskSaved(taskId);
         } catch (e: any) {
+            if (sessionVersion !== editSessionVersion) return;
             taskSaveError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to autosave task';
         } finally {
+            if (sessionVersion !== editSessionVersion) return;
             taskSaving.value = false;
-            if (pendingTaskSave.value) {
-                pendingTaskSave.value = false;
+            const saveAgain = !taskSaveError.value && hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value);
+            pendingTaskSave.value = false;
+            if (saveAgain) {
                 scheduleTaskAutosave(true);
                 return;
             }
@@ -286,7 +285,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 editTask.value.phase = 'task';
                 editTask.value.finalized = true;
             }
-            initialEditSnapshot.value = currentTaskSnapshot();
+            initialEditSnapshot.value = currentTaskSnapshot(editForm.value);
             options.onTaskSaved(editTask.value.id);
             toast.success('Requirement finalized', {
                 description: 'The item now appears in the active task list.',
@@ -303,6 +302,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
 
     async function openEdit(taskId: number, options: TaskIndexOpenEditOptions = {}) {
         const { updateHistory = true } = options;
+        editSessionVersion += 1;
 
         if (taskAutosaveTimer) {
             window.clearTimeout(taskAutosaveTimer);
@@ -316,6 +316,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         editUploading.value = false;
         taskSaving.value = false;
         taskSaveError.value = null;
+        taskSaved.value = false;
         requirementFinalizing.value = false;
         requirementFinalizeError.value = null;
         pendingTaskSave.value = false;
@@ -347,15 +348,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                 }),
             };
             editTempIdentifier.value = Date.now().toString();
-            initialEditSnapshot.value = {
-                title: editForm.value.title,
-                priority: editForm.value.priority,
-                status: editForm.value.status,
-                requirement_status: editForm.value.requirement_status,
-                description: editForm.value.description,
-                environment: editForm.value.environment,
-                collaborators: normalizeTaskCollaborators(editForm.value.collaborators),
-            };
+            initialEditSnapshot.value = currentTaskSnapshot(editForm.value);
             autosaveArmed.value = true;
             void thread.fetchThreads(taskId);
             if (data?.error_signature) {
@@ -369,6 +362,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     }
 
     function closeEditNow(updateHistory = true) {
+        editSessionVersion += 1;
         if (taskAutosaveTimer) {
             window.clearTimeout(taskAutosaveTimer);
             taskAutosaveTimer = null;
@@ -384,6 +378,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         errorOccurrenceState.resetErrorOccurrences();
         taskSaving.value = false;
         taskSaveError.value = null;
+        taskSaved.value = false;
         requirementFinalizing.value = false;
         requirementFinalizeError.value = null;
         pendingTaskSave.value = false;
@@ -419,7 +414,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     function updateEditCollaborators(value: TaskCollaboratorSelection) {
         editForm.value.collaborators = normalizeTaskCollaborators(value);
         if (!editOpen.value || !autosaveArmed.value) return;
-        if (!hasPendingTaskChanges()) return;
+        if (!hasPendingTaskChanges(editForm.value, initialEditSnapshot.value, deletedAttachmentIds.value)) return;
         scheduleTaskAutosave();
     }
 
@@ -491,6 +486,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
         setActiveErrorSection: errorOccurrenceState.setActiveErrorSection,
         taskAttachments,
         taskSaveError,
+        taskSaveState,
         taskSaving,
         ...taskIndexThreadBindings(thread),
         updateEditCollaborators,

@@ -61,3 +61,14 @@
 .shift-mention {
     @apply rounded bg-sky-100 px-1 py-0.5 font-medium text-sky-800;
 }
+
+@media (max-width: 767px), (pointer: coarse) {
+    .touch-friendly-toolbar > button,
+    .touch-friendly-toolbar > div > button {
+        display: inline-flex;
+        min-width: 44px;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+    }
+}

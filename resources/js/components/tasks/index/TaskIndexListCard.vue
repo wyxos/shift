@@ -199,6 +199,8 @@ async function confirmRequirementBatchFinalize() {
         :highlighted-task-id="state.highlightedTaskId"
         :filters-open="filters.filtersOpen"
         :active-filter-count="filters.activeFilterCount"
+        :search-term="filters.appliedSearchTerm"
+        :search-tasks="filters.searchTasks"
         :draft-statuses="filters.draftStatuses"
         :draft-priorities="filters.draftPriorities"
         :draft-search-term="filters.draftSearchTerm"

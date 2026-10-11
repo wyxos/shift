@@ -135,7 +135,9 @@ describe('Tasks/Index.vue', () => {
         });
         expect(wrapper.find('[data-testid="edit-task-environment-select"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="edit-task-created-by"]').text()).toContain('Taylor Brown');
-        expect(wrapper.get('[data-testid="edit-task-updated-at"]').text()).toBe('17:55');
+        const updatedTime = wrapper.get('[data-testid="edit-task-updated-at"] time');
+        expect(updatedTime.text()).toBe('5 minutes ago17:55');
+        expect(updatedTime.attributes('datetime')).toBe(new Date('2026-02-10T17:55:00').toISOString());
         expect(wrapper.text()).not.toContain('No attachments available');
         expect(editLayout.classes()).toContain('lg:grid-cols-2');
         expect(editLayout.classes()).not.toContain('lg:grid-cols-[1.15fr_0.85fr]');
