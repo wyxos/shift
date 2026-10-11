@@ -28,8 +28,8 @@ const pendingDeleteMessage = ref<any | null>(null);
 const pendingMentionCandidate = ref<MentionCandidate | null>(null);
 const mentionAddDialogOpen = ref(false);
 const audienceOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'team', label: 'Team' },
+    { value: 'all', label: 'Everyone' },
+    { value: 'team', label: 'Internal team' },
 ];
 const audienceModel = computed({
     get: () => state.threadAudience,
@@ -325,6 +325,7 @@ watch(deleteDialogOpen, (open) => {
                 v-model="threadComposerHtmlModel"
                 :enable-ai-improve="state.aiImproveEnabled"
                 enable-mentions
+                touch-friendly
                 :ai-context="state.threadAiContext"
                 :cancelable="Boolean(state.threadEditingId)"
                 :clear-on-send="false"
@@ -345,7 +346,7 @@ watch(deleteDialogOpen, (open) => {
             >
                 <template #before-send>
                     <Badge v-if="state.threadEditingId" variant="outline" class="h-8 px-2.5" data-testid="thread-audience-locked">
-                        {{ state.threadAudience === 'team' ? 'Team' : 'All' }}
+                        {{ state.threadAudience === 'team' ? 'Internal team' : 'Everyone' }}
                     </Badge>
                     <ButtonGroup
                         v-else
@@ -355,9 +356,17 @@ watch(deleteDialogOpen, (open) => {
                         :disabled="audienceDisabled"
                         :options="audienceOptions"
                         test-id-prefix="thread-audience"
+                        touch-friendly
                     />
                 </template>
             </ShiftEditor>
+            <p v-if="state.canComment" class="text-muted-foreground mt-1 text-xs" data-testid="thread-audience-hint">
+                {{
+                    state.threadAudience === 'team'
+                        ? 'Visible to the internal team only. Other internal collaborators may be notified.'
+                        : 'Visible to task collaborators, including external collaborators. Other collaborators may be notified.'
+                }}
+            </p>
             <div v-else class="text-muted-foreground py-2 text-sm">Commenting is unavailable for this task.</div>
         </div>
 
@@ -385,7 +394,8 @@ watch(deleteDialogOpen, (open) => {
             @confirm="confirmMentionCollaboratorAddition"
         >
             <template #description>
-                They will become a task collaborator and receive this reply under the normal {{ state.threadAudience === 'team' ? 'Team' : 'All' }}
+                They will become a task collaborator and receive this reply under the normal
+                {{ state.threadAudience === 'team' ? 'internal team' : 'everyone' }}
                 notification rules.
             </template>
         </ConfirmRequestDialog>

@@ -9,6 +9,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import TaskSaveStatus from '@/shared/components/tasks/TaskSaveStatus.vue';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { ArrowLeft } from 'lucide-vue-next';
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
@@ -57,10 +58,11 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
             <SheetHeader class="shrink-0 p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle class="min-w-0">
-                        <InputGroup data-testid="task-title-group">
+                        <InputGroup data-testid="task-title-group" class="max-md:min-h-12 [@media(pointer:coarse)]:min-h-12">
                             <InputGroupAddon>
                                 <InputGroupButton
                                     size="icon-sm"
+                                    class="max-md:size-11 [@media(pointer:coarse)]:size-11"
                                     aria-label="Back to tasks"
                                     data-testid="task-edit-back"
                                     type="button"
@@ -81,6 +83,12 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                             <span v-else class="block truncate">{{ sheetTitle }}</span>
                         </InputGroup>
                     </SheetTitle>
+                    <TaskSaveStatus
+                        v-if="state.editTask && (state.canEditTaskScope || state.canManageCollaborators)"
+                        :state="state.taskSaveState"
+                        :error="state.taskSaveError"
+                        @retry="state.saveTaskChanges"
+                    />
                 </div>
             </SheetHeader>
 
@@ -113,6 +121,7 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                                         aria-label="Edit task section"
                                         class="w-full"
                                         :columns="2"
+                                        touch-friendly
                                         test-id-prefix="edit-mobile-pane"
                                     />
                                 </div>
@@ -134,6 +143,7 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                                                 data-testid="task-edit-description"
                                                 min-height="180"
                                                 :sendable="false"
+                                                touch-friendly
                                             />
                                             <div
                                                 v-else
