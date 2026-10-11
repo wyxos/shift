@@ -29,7 +29,7 @@ const hasContent = computed(() => Boolean(preview.value || /<img\b/i.test(conten
             <span v-if="preview" class="text-muted-foreground mt-1 line-clamp-2 text-sm leading-5 group-open:hidden">{{ preview }}</span>
         </summary>
         <div
-            class="shift-rich text-foreground focus-visible:ring-ring max-h-40 min-w-0 overflow-auto rounded-sm py-2 text-sm leading-5 break-words focus-visible:ring-2 focus-visible:outline-none"
+            class="task-report-context-body shift-rich shift-scrollbar text-foreground focus-visible:ring-ring max-h-40 min-w-0 overflow-auto overscroll-contain rounded-sm py-2 text-sm leading-5 break-words focus-visible:ring-2 focus-visible:outline-none"
             data-testid="task-report-context-body"
             role="region"
             aria-label="Task description"

@@ -65,7 +65,7 @@ describe('SheetContent', () => {
         expect(content.attributes()).not.toHaveProperty('width-preset');
     });
 
-    it('uses fixed viewport widths for task sheets instead of content-sized widths', () => {
+    it('caps desktop task sheets while keeping the full mobile viewport', () => {
         const wrapper = mount(SheetContent, {
             props: {
                 side: 'right',
@@ -76,13 +76,11 @@ describe('SheetContent', () => {
         const content = wrapper.get('[data-slot="sheet-content"]');
 
         expect(content.classes()).toContain('xl:w-[var(--sheet-width-desktop)]');
-        expect(content.classes()).toContain('min-[1921px]:w-[var(--sheet-width-wide)]');
         expect(content.classes()).not.toContain('min-[1441px]:w-fit');
         expect(content.classes()).not.toContain('min-[1441px]:max-w-fit');
         expect(content.classes()).not.toContain('md:w-[var(--sheet-width-tablet)]');
         expect(content.attributes('style')).toContain('--sheet-width-mobile: 100vw;');
-        expect(content.attributes('style')).toContain('--sheet-width-desktop: 75vw;');
-        expect(content.attributes('style')).toContain('--sheet-width-wide: 50vw;');
+        expect(content.attributes('style')).toContain('--sheet-width-desktop: min(75vw, 72rem);');
         expect(content.attributes()).not.toHaveProperty('widthpreset');
         expect(content.attributes()).not.toHaveProperty('width-preset');
     });

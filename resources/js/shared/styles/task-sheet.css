@@ -1,0 +1,21 @@
+.task-comment-composer .ProseMirror {
+    min-height: min(8.75rem, 18dvh);
+    max-height: min(15rem, 25dvh);
+}
+
+/* Short viewports need a way to reach the composer after the fixed sheet header. */
+@media (max-height: 600px) {
+    .task-comments-pane {
+        overflow-y: auto;
+    }
+
+    .task-comments-history {
+        flex: none;
+        min-height: 8rem;
+        max-height: 12rem;
+    }
+
+    .task-report-context-body {
+        max-height: 4rem;
+    }
+}

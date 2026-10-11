@@ -204,6 +204,7 @@ const editor = useEditor({
         refreshMentionSuggestions(editorInstance);
     },
     editorProps: {
+        attributes: { class: 'shift-scrollbar' },
         handleDrop: (_view: any, event: DragEvent) => {
             const dt = event.dataTransfer;
             if (dt?.files?.length) {

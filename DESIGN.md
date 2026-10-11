@@ -318,8 +318,8 @@ and 40px at the medium breakpoint.
   rather than assuming the CSS and provider switch identically at exactly 768px.
 - Large (1024px): task tables replace compact record lists; task details and comments
   can appear side by side. Below it, Details and Comments select one pane.
-- Extra large (1280px): task sheets occupy 75vw; smaller widths use the full viewport.
-- Above 1920px: task sheets occupy 50vw.
+- Extra large (1280px): task sheets occupy 75vw, capped at 72rem (1152px).
+  Smaller widths use the full viewport; wide desktop screens retain the same cap.
 
 The generic sheet preset differs: full viewport below medium, half viewport at
 medium, and content-fit with an 800px minimum at extra large. Keep the task preset
@@ -410,6 +410,11 @@ Task creation/editing belongs to the canonical task-list sheet flow. A back acti
 and title lead the sheet; metadata and editable controls precede description,
 collaborators, attachments, and discussion. Desktop panes sit side by side where
 space permits; mobile uses Details and Comments choices.
+
+On phones, Comments uses the sheet's 16px gutter without an additional card border
+or horizontal inset. Discussion history and bounded reply editors use the shared
+themed scrollbar. Short viewports allow the discussion pane to scroll so the reply
+controls remain reachable.
 
 Error reports add Task / Events tabs, with Events initially selected. Rich-text
 content preserves paragraph/list spacing, bordered code blocks, and inset reply
