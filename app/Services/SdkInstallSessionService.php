@@ -217,9 +217,9 @@ class SdkInstallSessionService
         });
     }
 
-    public function finalize(string $deviceCode, int $projectId): array
+    public function finalize(string $deviceCode, int $projectId, ?bool $feedbackEnabled = null): array
     {
-        return $this->withLock($deviceCode, function () use ($deviceCode, $projectId) {
+        return $this->withLock($deviceCode, function () use ($deviceCode, $projectId, $feedbackEnabled) {
             $session = $this->requireApprovedSession($deviceCode);
 
             if ($session['credentials_issued_at'] !== null) {
@@ -234,7 +234,7 @@ class SdkInstallSessionService
                 throw new AccessDeniedHttpException('You do not have permission to install against the selected project.');
             }
 
-            $credentials = DB::transaction(function () use ($project, $session) {
+            $credentials = DB::transaction(function () use ($project, $session, $feedbackEnabled) {
                 $lockedProject = Project::query()
                     ->with(['client.organisation', 'organisation'])
                     ->lockForUpdate()
@@ -248,11 +248,19 @@ class SdkInstallSessionService
                     ? $lockedProject->token
                     : $lockedProject->generateApiToken();
 
-                $this->projectEnvironmentService->register(
+                $environment = $this->projectEnvironmentService->register(
                     $lockedProject,
                     $session['environment'],
                     $session['url'],
                 );
+
+                if ($feedbackEnabled !== null) {
+                    $environment->external_widget_enabled = $feedbackEnabled;
+                    if (! $feedbackEnabled) {
+                        $environment->external_widget_guest_submissions_enabled = false;
+                    }
+                    $environment->save();
+                }
 
                 $user = User::query()->findOrFail((int) $session['approved_user_id']);
                 $userToken = $user->createToken($this->installerTokenName($lockedProject))->plainTextToken;
@@ -264,6 +272,8 @@ class SdkInstallSessionService
                     'user_token' => $userToken,
                     'environment' => $session['environment'],
                     'url' => $session['url'],
+                    'feedback_enabled' => $environment->external_widget_enabled,
+                    'connection_url' => route('connection.index', ['project_id' => $lockedProject->id]),
                 ];
             });
 

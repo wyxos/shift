@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DashboardFirstReport from '@/components/DashboardFirstReport.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import { VisAxis, VisDonut, VisGroupedBar, VisSingleContainer, VisXYContainer } from '@unovis/vue';
-import { AlertTriangle, CheckCircle2, Clock3, Flame } from 'lucide-vue-next';
+import { AlertTriangle, CheckCircle2, Clock3, Flame, PlugZap } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 type SegmentCount = {
@@ -262,7 +263,10 @@ const totalThroughputDelta = computed(() => {
                     <h1 class="text-2xl font-semibold tracking-tight">Task Intelligence</h1>
                     <p class="text-muted-foreground text-sm">A live summary of workload, flow, and risk across your visible projects.</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <Button as-child :variant="props.metrics.total === 0 ? 'default' : 'outline'">
+                        <Link href="/connect"><PlugZap class="mr-2 h-4 w-4" />Connect application</Link>
+                    </Button>
                     <Button as-child variant="outline">
                         <Link :href="requirementsHref">Review Requirements</Link>
                     </Button>
@@ -271,6 +275,8 @@ const totalThroughputDelta = computed(() => {
                     </Button>
                 </div>
             </div>
+
+            <DashboardFirstReport v-if="props.metrics.total === 0" />
 
             <div
                 class="grid gap-4 md:grid-cols-2"

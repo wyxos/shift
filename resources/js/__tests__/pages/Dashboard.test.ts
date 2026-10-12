@@ -145,6 +145,18 @@ describe('Dashboard.vue', () => {
         expect(wrapper.get('[data-testid="dashboard-summary-grid"]').classes()).toContain('xl:grid-cols-4');
     });
 
+    it('guides a zero-task account to the connection flow', () => {
+        const wrapper = mount(Dashboard, {
+            props: {
+                metrics: { ...mockMetrics, total: 0, pending: 0, in_progress: 0, completed: 0 },
+                charts: {},
+            },
+        });
+
+        expect(wrapper.get('[data-testid="dashboard-first-report"]').text()).toContain('Feedback report');
+        expect(wrapper.findAll('a[href="/connect"]')).toHaveLength(2);
+    });
+
     it('uses organisation-scoped links when shown inside an organisation dashboard', () => {
         const wrapper = mount(Dashboard, {
             props: {

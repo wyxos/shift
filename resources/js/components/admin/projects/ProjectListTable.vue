@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ResponsiveRecordItem, ResponsiveRecordList } from '@/components/ui/record-list';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
+import { Link } from '@inertiajs/vue3';
 import { BellRing, Bot, KeyRound, ListTodo, MessageSquare, Pencil, Trash2, Users, UserSearch } from 'lucide-vue-next';
 import { type ProjectRow, projectClientLabel, projectOrganisationLabel } from './project-shared';
 
@@ -117,6 +119,9 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                             </TableCell>
                             <TableCell>
                                 <div class="flex flex-wrap justify-end gap-2">
+                                    <Button v-if="canManageTechnicalSettings(project)" as-child size="sm" variant="outline">
+                                        <Link :href="`/connect?project_id=${project.id}`">Connect application</Link>
+                                    </Button>
                                     <ActionIconButton
                                         label="View project tasks"
                                         title="Tasks"
@@ -251,6 +256,9 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                 </dl>
 
                 <template #actions>
+                    <Button v-if="canManageTechnicalSettings(project)" as-child size="sm" variant="outline">
+                        <Link :href="`/connect?project_id=${project.id}`">Connect application</Link>
+                    </Button>
                     <ActionIconButton
                         label="View project tasks"
                         title="Tasks"
