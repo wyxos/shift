@@ -58,6 +58,16 @@ test('connection report matching treats URL wildcard characters literally', func
     $this->actingAs($user)->get('/connect')->assertInertia(fn (Assert $page) => $page->where('environments.0.feedback_report', null));
 });
 
+test('first reports from root query and fragment URLs are recognized', function (string $url) {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['author_id' => $user->id, 'client_id' => null]);
+    connectionEnvironment(['project_id' => $project->id]);
+    $feedback = Task::factory()->create(['project_id' => $project->id]);
+    $feedback->metadata()->create(['environment' => 'local', 'url' => $url, 'source' => 'embedded_widget']);
+
+    $this->actingAs($user)->get('/connect')->assertInertia(fn (Assert $page) => $page->where('environments.0.feedback_report.id', $feedback->id));
+})->with(['https://app.test?tab=orders', 'https://app.test#feedback']);
+
 test('Feedback activation changes only the selected environment and keeps guest intake disabled', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create(['author_id' => $user->id, 'client_id' => null, 'external_widget_enabled' => false]);
