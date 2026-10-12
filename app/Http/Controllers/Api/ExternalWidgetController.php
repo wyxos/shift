@@ -209,8 +209,11 @@ class ExternalWidgetController extends Controller
 
     private function sourceUrl(array $attributes): string
     {
+        $pageUrl = (string) (data_get($attributes, 'metadata.url') ?? data_get($attributes, 'user.url') ?? config('app.url'));
+        $pageUrl = preg_replace('/[?#].*$/', '', $pageUrl);
+
         return $this->projectEnvironmentService->normalizeUrl(
-            data_get($attributes, 'metadata.url') ?? data_get($attributes, 'user.url') ?? config('app.url')
+            $pageUrl
         ) ?? (string) config('app.url');
     }
 

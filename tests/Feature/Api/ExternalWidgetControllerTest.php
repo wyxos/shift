@@ -330,3 +330,18 @@ test('manual guest submissions create or update external users', function () {
         'kind' => 'external',
     ]);
 });
+
+test('query-bearing Feedback pages retain their consumer path and complete the connection check', function () {
+    $this->project->environments()->where('environment', 'testing')->update([
+        'external_widget_enabled' => true, 'external_widget_guest_submissions_enabled' => true,
+    ]);
+    $response = $this->withToken($this->token)->postJson('/api/widget/tasks', [
+        'project' => $this->project->token, 'kind' => 'issue', 'title' => 'Query route report', 'anonymous' => true,
+        'metadata' => ['environment' => 'testing', 'url' => 'https://example.com/orders?status=open#feedback'],
+    ])->assertCreated();
+
+    $task = Task::findOrFail($response->json('id'));
+    expect($task->metadata->url)->toBe('https://example.com/orders');
+    $states = app(\App\Services\ApplicationConnectionService::class)->environments($this->project, $this->user);
+    expect($states[0]['feedback_report']['id'])->toBe($task->id);
+});
