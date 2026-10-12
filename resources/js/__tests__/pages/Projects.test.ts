@@ -180,6 +180,7 @@ vi.mock('@inertiajs/vue3', async () => {
                 return () => null;
             },
         }),
+        Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
         router: {
             get: inertiaMocks.routerGet,
             delete: inertiaMocks.routerDelete,
@@ -215,7 +216,7 @@ vi.mock('axios', () => ({
     },
 }));
 // prettier-ignore
-vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
+vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'PlugZap', 'Plus', 'Search', 'Trash2', 'Users', 'UserPlus', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
 describe('Projects.vue', () => {
     const mockProjects = {
         data: [
@@ -319,9 +320,10 @@ describe('Projects.vue', () => {
         expect(wrapper.find('[data-testid="project-mcp-enabled-1"]').text()).toBe('MCP');
         expect(wrapper.find('[data-testid="project-access-1"]').text()).toBe('Owner');
         expect(wrapper.find('[data-testid="project-access-2"]').text()).toBe('Shared');
+        expect(wrapper.get('[data-testid="project-row-1"] a[href="/connect?project_id=1"]').text()).toBe('Connect application');
+        expect(wrapper.find('[data-testid="project-row-2"] a[href="/connect?project_id=2"]').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('View and collaborate only');
     });
-
     it('hides the organisation column when scoped to an organisation', () => {
         const wrapper = mountPage({
             filters: {

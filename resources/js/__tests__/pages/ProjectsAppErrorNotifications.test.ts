@@ -112,6 +112,7 @@ vi.mock('@inertiajs/vue3', async () => {
                 return () => null;
             },
         }),
+        Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
         router: {
             get: vi.fn(),
             delete: vi.fn(),
@@ -145,7 +146,7 @@ vi.mock('axios', () => ({
 }));
 
 // prettier-ignore
-vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'Plus', 'Search', 'Trash2', 'Users', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
+vi.mock('lucide-vue-next', () => Object.fromEntries(['BellRing', 'Bot', 'KeyRound', 'ListTodo', 'LoaderCircle', 'MessageSquare', 'Pencil', 'PlugZap', 'Plus', 'Search', 'Trash2', 'Users', 'UserSearch'].map((name) => [name, { render: () => h('span') }])));
 
 describe('Projects app error notifications', () => {
     function mountPage() {
