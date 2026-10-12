@@ -1,0 +1,46 @@
+@keyframes shift-reduced-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes shift-reduced-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+        scroll-behavior: auto;
+    }
+
+    /* Keep opening and closing feedback without sliding or scaling the surface. */
+    [data-state='open'][class*='animate-in'] {
+        animation-name: shift-reduced-in;
+        animation-duration: 120ms;
+    }
+
+    [data-state='closed'][class*='animate-out'] {
+        animation-name: shift-reduced-out;
+        animation-duration: 120ms;
+    }
+
+    .transition,
+    .transition-all,
+    .transition-transform {
+        transition-property: color, background-color, border-color, box-shadow, opacity;
+        transition-duration: 120ms;
+    }
+
+    /* Loading labels retain the state while their icons stay still. */
+    .animate-spin {
+        animation: none;
+    }
+}

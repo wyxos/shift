@@ -3,12 +3,14 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('reduced motion styles', () => {
-    it('removes spatial animation and smooth scrolling at the shared stylesheet boundary', () => {
+    it('keeps reduced-motion feedback without a global animation kill switch', () => {
         const stylesheet = readFileSync(join(process.cwd(), 'resources/css/app.css'), 'utf8');
-
-        expect(stylesheet).toContain('@media (prefers-reduced-motion: reduce)');
-        expect(stylesheet).toContain('animation-duration: 1ms !important;');
-        expect(stylesheet).toContain('transition-duration: 1ms !important;');
-        expect(stylesheet).toContain('scroll-behavior: auto !important;');
+        const motion = readFileSync(join(process.cwd(), 'resources/js/shared/styles/motion.css'), 'utf8');
+        expect(stylesheet).toContain("@import '../js/shared/styles/motion.css'");
+        expect(stylesheet + motion).not.toMatch(/(?:animation|transition)-duration:\s*1ms\s*!important/);
+        expect(motion).toContain('@media (prefers-reduced-motion: reduce)');
+        expect(motion).toContain('shift-reduced-in');
+        expect(motion).toContain('shift-reduced-out');
+        expect(motion).not.toMatch(/transform:|translate:|scale:/);
     });
 });

@@ -150,6 +150,7 @@ const eventCount = computed(() => state.errorOccurrencesPagination?.total ?? sta
                                                 :enable-ai-improve="state.aiImproveEnabled"
                                                 :temp-identifier="state.editTempIdentifier"
                                                 data-testid="task-edit-description"
+                                                accessible-label="Task description"
                                                 min-height="180"
                                                 :sendable="false"
                                                 touch-friendly

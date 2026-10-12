@@ -146,7 +146,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
 </script>
 
 <template>
-    <section class="flex w-full flex-col gap-4">
+    <section class="flex w-full flex-col gap-4" data-task-list>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-lg font-semibold">{{ title }}</h1>

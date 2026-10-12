@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
+import TaskCommentMenu from '@/shared/components/tasks/TaskCommentMenu.vue';
 import TaskReportContext from '@/shared/components/tasks/TaskReportContext.vue';
 import { imageTiles } from '@/shared/tasks/image-tile';
 import { renderRichContent } from '@/shared/tasks/rich-content';
 import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
 import { LoaderCircle, Paperclip, RotateCcw } from 'lucide-vue-next';
-import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui';
+import { ContextMenuItem, ContextMenuSeparator } from 'reka-ui';
 import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
 
 const props = defineProps<{
@@ -161,7 +162,7 @@ watch(deleteDialogOpen, (open) => {
                 ]"
                 class="flex"
             >
-                <div :class="message.isYou ? 'items-end' : 'items-start'" class="flex max-w-[86%] min-w-0 flex-col">
+                <div :class="message.isYou ? 'items-end' : 'items-start'" class="flex max-w-[min(86%,calc(100%_-_3rem))] min-w-0 flex-col">
                     <div
                         v-if="!message.pending && !message.failed && shouldShowMessageMeta(messageIndex)"
                         :data-testid="message.id ? `comment-meta-${message.id}` : undefined"
@@ -172,125 +173,128 @@ watch(deleteDialogOpen, (open) => {
                         <span v-if="!message.isYou" aria-hidden="true">–</span>
                         <span>{{ message.time }}</span>
                     </div>
-                    <ContextMenuRoot @update:open="(open) => state.onCommentContextMenuOpen(message, open)">
-                        <ContextMenuTrigger as-child>
-                            <div
-                                :id="message.id ? `comment-${message.id}` : undefined"
-                                :data-testid="message.id ? `comment-bubble-${message.id}` : undefined"
-                                :class="
-                                    message.isYou
-                                        ? 'rounded-br-md bg-sky-600 text-white'
-                                        : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
-                                "
-                                class="w-fit max-w-full rounded-lg px-3 py-2 text-sm shadow-sm"
-                                @copy="state.onMessageCopy(message, $event)"
-                                @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
-                                @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
-                            >
-                                <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-xs font-semibold">
-                                    <Badge
-                                        variant="secondary"
-                                        :class="message.isYou ? 'border-white/20 bg-white/15 text-white' : ''"
-                                        class="px-1.5 py-0 text-xs"
-                                    >
-                                        Team
-                                    </Badge>
-                                </div>
-                                <div
-                                    v-image-tiles
-                                    class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-contain"
-                                    @click="state.onRichContentClick"
-                                    v-html="renderRichContent(message.content)"
-                                ></div>
-                                <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
-                                    <component
-                                        :is="message.pending || message.failed ? 'span' : 'a'"
-                                        v-for="attachment in message.attachments"
-                                        :key="attachment.id"
-                                        :href="message.pending || message.failed ? undefined : attachment.url"
-                                        :class="
-                                            message.isYou
-                                                ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
-                                                : 'border-muted-foreground/20 bg-muted/20 text-foreground hover:bg-muted/30'
-                                        "
-                                        class="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-md border px-2 py-1 text-xs transition"
-                                        rel="noreferrer"
-                                        target="_blank"
-                                    >
-                                        <Paperclip class="h-3 w-3 shrink-0 opacity-80" />
-                                        <span class="min-w-0 truncate">{{ attachment.original_filename }}</span>
-                                    </component>
-                                </div>
-                                <div
-                                    v-if="message.pending || message.failed"
-                                    class="mt-2 flex items-center justify-end gap-2 text-xs text-white/80"
-                                    role="status"
+                    <TaskCommentMenu
+                        :label="`Actions for comment by ${message.author}`"
+                        :trigger-id="`comment-actions-${message.id}`"
+                        :own="message.isYou"
+                        :disabled="message.pending || message.failed"
+                        @update:open="(open) => state.onCommentContextMenuOpen(message, open)"
+                    >
+                        <div
+                            :id="message.id ? `comment-${message.id}` : undefined"
+                            :data-testid="message.id ? `comment-bubble-${message.id}` : undefined"
+                            :class="
+                                message.isYou
+                                    ? 'task-comment-own rounded-br-md'
+                                    : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
+                            "
+                            class="w-fit max-w-full rounded-lg px-3 py-2 text-sm shadow-sm"
+                            @copy="state.onMessageCopy(message, $event)"
+                            @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
+                            @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
+                        >
+                            <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-xs font-semibold">
+                                <Badge
+                                    variant="secondary"
+                                    :class="message.isYou ? 'border-white/20 bg-black/10 text-white' : ''"
+                                    class="px-1.5 py-0 text-xs"
                                 >
-                                    <LoaderCircle v-if="message.pending" class="size-3 animate-spin" aria-hidden="true" />
-                                    <span>{{ message.pending ? 'Sending...' : 'Failed to send' }}</span>
-                                    <button
-                                        v-if="message.failed"
-                                        type="button"
-                                        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-white underline-offset-2 hover:bg-white/15 hover:underline"
-                                        :data-testid="`retry-comment-${message.clientId}`"
-                                        @click="state.retryThreadSend(message)"
-                                    >
-                                        <RotateCcw class="size-3" aria-hidden="true" /> Retry
-                                    </button>
-                                </div>
+                                    Team
+                                </Badge>
                             </div>
-                        </ContextMenuTrigger>
-                        <ContextMenuPortal>
-                            <ContextMenuContent
-                                class="bg-popover text-popover-foreground z-50 min-w-[10rem] overflow-hidden rounded-md border p-1 shadow-md"
+                            <div
+                                v-image-tiles
+                                class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-contain"
+                                @click="state.onRichContentClick"
+                                v-html="renderRichContent(message.content)"
+                            ></div>
+                            <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
+                                <component
+                                    :is="message.pending || message.failed ? 'span' : 'a'"
+                                    v-for="attachment in message.attachments"
+                                    :key="attachment.id"
+                                    :href="message.pending || message.failed ? undefined : attachment.url"
+                                    :class="
+                                        message.isYou
+                                            ? 'border-white/20 bg-black/10 text-white hover:bg-black/20'
+                                            : 'border-muted-foreground/20 bg-muted/20 text-foreground hover:bg-muted/30'
+                                    "
+                                    class="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-md border px-2 py-1 text-xs transition"
+                                    rel="noreferrer"
+                                    target="_blank"
+                                >
+                                    <Paperclip class="h-3 w-3 shrink-0 opacity-80" />
+                                    <span class="min-w-0 truncate">{{ attachment.original_filename }}</span>
+                                </component>
+                            </div>
+                            <div
+                                v-if="message.pending || message.failed"
+                                class="mt-2 flex items-center justify-end gap-2 text-xs text-white"
+                                role="status"
                             >
-                                <ContextMenuItem
-                                    v-if="!message.isYou"
-                                    class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.copyEntireMessage(message)"
+                                <LoaderCircle v-if="message.pending" class="size-3 animate-spin" aria-hidden="true" />
+                                <span>{{ message.pending ? 'Sending...' : 'Failed to send' }}</span>
+                                <button
+                                    v-if="message.failed"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-white underline-offset-2 hover:bg-white/15 hover:underline"
+                                    :data-testid="`retry-comment-${message.clientId}`"
+                                    @click="state.retryThreadSend(message)"
                                 >
-                                    Copy
-                                </ContextMenuItem>
-                                <ContextMenuItem
-                                    v-if="state.shouldShowCopySelection(message)"
-                                    class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.copySelectedMessage"
-                                >
-                                    Copy selection
-                                </ContextMenuItem>
-                                <ContextMenuItem
-                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
-                                    class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.startReplyToMessage(message)"
-                                >
-                                    Reply
-                                </ContextMenuItem>
-                                <ContextMenuSeparator
-                                    v-if="state.canComment && !message.isYou && message.id && !message.pending"
-                                    class="bg-border -mx-1 my-1 h-px"
-                                />
-                                <ContextMenuItem
-                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
-                                    class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    @select="state.startThreadEdit(message)"
-                                >
-                                    Edit
-                                </ContextMenuItem>
-                                <ContextMenuSeparator
-                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
-                                    class="bg-border -mx-1 my-1 h-px"
-                                />
-                                <ContextMenuItem
-                                    v-if="state.canComment && message.isYou && message.id && !message.pending"
-                                    class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
-                                    data-testid="delete-thread-message"
-                                    @select="requestDeleteThreadMessage(message)"
-                                >
-                                    Delete
-                                </ContextMenuItem>
-                            </ContextMenuContent>
-                        </ContextMenuPortal>
-                    </ContextMenuRoot>
+                                    <RotateCcw class="size-3" aria-hidden="true" /> Retry
+                                </button>
+                            </div>
+                        </div>
+                        <template #items>
+                            <ContextMenuItem
+                                v-if="!message.isYou"
+                                class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                @select="state.copyEntireMessage(message)"
+                            >
+                                Copy
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                v-if="state.shouldShowCopySelection(message)"
+                                class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                @select="state.copySelectedMessage"
+                            >
+                                Copy selection
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                v-if="state.canComment && !message.isYou && message.id && !message.pending"
+                                class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                data-comment-focus-action="editor"
+                                @select="state.startReplyToMessage(message)"
+                            >
+                                Reply
+                            </ContextMenuItem>
+                            <ContextMenuSeparator
+                                v-if="state.canComment && !message.isYou && message.id && !message.pending"
+                                class="bg-border -mx-1 my-1 h-px"
+                            />
+                            <ContextMenuItem
+                                v-if="state.canComment && message.isYou && message.id && !message.pending"
+                                class="hover:bg-accent hover:text-accent-foreground relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                data-comment-focus-action="editor"
+                                @select="state.startThreadEdit(message)"
+                            >
+                                Edit
+                            </ContextMenuItem>
+                            <ContextMenuSeparator
+                                v-if="state.canComment && message.isYou && message.id && !message.pending"
+                                class="bg-border -mx-1 my-1 h-px"
+                            />
+                            <ContextMenuItem
+                                v-if="state.canComment && message.isYou && message.id && !message.pending"
+                                class="text-destructive hover:bg-accent hover:text-destructive relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-none select-none"
+                                data-testid="delete-thread-message"
+                                data-comment-focus-action="dialog"
+                                @select="requestDeleteThreadMessage(message)"
+                            >
+                                Delete
+                            </ContextMenuItem>
+                        </template>
+                    </TaskCommentMenu>
                     <div v-if="message.isDraft" class="mt-1 flex flex-col items-end gap-1">
                         <Button
                             type="button"
@@ -347,6 +351,7 @@ watch(deleteDialogOpen, (open) => {
                 :temp-identifier="state.threadTempIdentifier"
                 data-testid="comments-editor"
                 class="task-comment-composer"
+                :accessible-label="state.threadEditingId ? 'Edit comment' : 'Write a comment'"
                 :placeholder="state.threadEditingId ? 'Edit your comment...' : 'Write a comment...'"
                 @cancel="state.cancelThreadEdit"
                 @mention-add-request="requestMentionCollaboratorAddition"

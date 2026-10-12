@@ -64,6 +64,7 @@ const horizontalSheetWidthPreset = computed(() => horizontalSheetWidthPresets[pr
     <SheetOverlay />
     <DialogContent
       data-slot="sheet-content"
+      :data-task-sheet="widthPreset === 'task' ? '' : undefined"
       :style="side === 'right' || side === 'left' ? horizontalSheetWidthPreset.style : undefined"
       :class="cn(
         'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 overflow-hidden shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',

@@ -51,7 +51,8 @@ export function useTaskThreadRichInteraction(options: RichInteractionOptions) {
         const withinComments = options.commentsScrollRef.value?.querySelector(`#comment-${commentId}`) as HTMLElement | null;
         const target = withinComments ?? (document.getElementById(`comment-${commentId}`) as HTMLElement | null);
         if (!target) return false;
-        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+        target.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center', inline: 'nearest' });
         highlightReplyTargetBubble(target);
         return true;
     }

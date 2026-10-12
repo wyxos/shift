@@ -5,15 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import axios, { type AxiosInstance } from 'axios';
 import 'emoji-picker-element';
-import cssLang from 'highlight.js/lib/languages/css';
-import jsLang from 'highlight.js/lib/languages/javascript';
-import jsonLang from 'highlight.js/lib/languages/json';
-import phpLang from 'highlight.js/lib/languages/php';
-import pythonLang from 'highlight.js/lib/languages/python';
-import tsLang from 'highlight.js/lib/languages/typescript';
-import htmlLang from 'highlight.js/lib/languages/xml';
 import 'highlight.js/styles/github.css';
-import { createLowlight } from 'lowlight';
 import { Paperclip, Send, Smile, Sparkles, X } from 'lucide-vue-next';
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue';
 import ImageUpload from '../extensions/imageUpload';
@@ -22,11 +14,13 @@ import ShiftMention from '../extensions/mention';
 import ReplyQuote from '../extensions/replyQuote';
 import type { UploadEndpoints } from '../lib/chunkedUpload';
 import { imageTiles } from '../tasks/image-tile';
+import { createEditorLowlight } from './shift-editor/codeHighlighting';
 import { isInRichBlockNeedingEnter, resolveEditorContent } from './shift-editor/editorContent';
 import ShiftEditorAiPreviewDrawer from './shift-editor/ShiftEditorAiPreviewDrawer.vue';
 import ShiftEditorAttachmentList from './shift-editor/ShiftEditorAttachmentList.vue';
 import ShiftEditorMentionSuggestions from './shift-editor/ShiftEditorMentionSuggestions.vue';
 import type { MentionCandidate, MentionIdentity, SentAttachment } from './shift-editor/types';
+import { editorAccessibilityAttributes, useShiftEditorAccessibility } from './shift-editor/useShiftEditorAccessibility';
 import { containsAiImprovableText, useShiftEditorAiImprove } from './shift-editor/useShiftEditorAiImprove';
 import { useShiftEditorAttachments } from './shift-editor/useShiftEditorAttachments';
 import { useShiftEditorEmoji } from './shift-editor/useShiftEditorEmoji';
@@ -60,6 +54,7 @@ const props = withDefaults(
         tempIdentifier?: string;
         modelValue?: string;
         placeholder?: string;
+        accessibleLabel?: string;
         minHeight?: number | string;
         axiosInstance?: AxiosInstance | typeof axios;
         uploadEndpoints?: UploadEndpoints;
@@ -89,6 +84,7 @@ const props = withDefaults(
         mentionLoading: false,
         sendDisabled: false,
         slashCommands: () => [],
+        accessibleLabel: 'Rich text editor',
     },
 );
 
@@ -115,15 +111,7 @@ const {
     removeTempUrl: props.removeTempUrl,
 });
 
-// Configure lowlight with a few common languages
-const lowlight = createLowlight();
-lowlight.register({ javascript: jsLang, js: jsLang });
-lowlight.register({ typescript: tsLang, ts: tsLang });
-lowlight.register({ json: jsonLang });
-lowlight.register({ css: cssLang });
-lowlight.register({ php: phpLang });
-lowlight.register({ html: htmlLang, xml: htmlLang });
-lowlight.register({ python: pythonLang, py: pythonLang });
+const lowlight = createEditorLowlight();
 
 function setFileInput(element: Element | ComponentPublicInstance | null): void {
     fileInput.value = element instanceof HTMLInputElement ? element : null;
@@ -204,7 +192,7 @@ const editor = useEditor({
         refreshMentionSuggestions(editorInstance);
     },
     editorProps: {
-        attributes: { class: 'shift-scrollbar' },
+        attributes: () => editorAccessibilityAttributes(props.accessibleLabel),
         handleDrop: (_view: any, event: DragEvent) => {
             const dt = event.dataTransfer;
             if (dt?.files?.length) {
@@ -366,6 +354,8 @@ const editorStyle = computed(() => {
     const value = typeof props.minHeight === 'number' ? `${props.minHeight}px` : props.minHeight;
     return { '--editor-min-height': value };
 });
+
+useShiftEditorAccessibility(editor, () => props.accessibleLabel);
 
 function reset() {
     editor.value?.commands.clearContent();

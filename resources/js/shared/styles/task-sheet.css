@@ -1,6 +1,63 @@
+.task-comment-own {
+    background-color: oklch(0.55 0.15 242);
+    color: white;
+}
+
+.task-comment-own blockquote[data-reply-to],
+.task-comment-own :not(pre) > code {
+    background-color: rgb(0 0 0 / 10%);
+}
+
+.task-comment-own blockquote[data-reply-to]:hover {
+    background-color: rgb(0 0 0 / 15%);
+}
+
+.task-comment-own blockquote[data-reply-to] a {
+    opacity: 1;
+}
+
+[data-task-menu] [data-highlighted] {
+    background-color: var(--accent);
+}
+
+.task-comment-actions:focus-visible,
+.task-comment-actions[data-state='open'] {
+    position: absolute;
+    top: 0.25rem;
+    right: -3rem;
+    z-index: 10;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: 0;
+    clip: auto;
+    clip-path: none;
+    overflow: visible;
+    white-space: normal;
+}
+
+.task-comment-menu-own .task-comment-actions:focus-visible,
+.task-comment-menu-own .task-comment-actions[data-state='open'] {
+    left: -3rem;
+    right: auto;
+}
+
 .task-comment-composer .ProseMirror {
     min-height: min(8.75rem, 18dvh);
     max-height: min(15rem, 25dvh);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+    [data-task-list] button,
+    [data-task-sheet] button,
+    [data-task-sheet] [role='radio'],
+    [data-task-sheet] [role='combobox'] {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+
+    [data-task-menu] [role^='menuitem'] {
+        min-height: 2.75rem;
+    }
 }
 
 /* Short viewports need a way to reach the composer after the fixed sheet header. */
