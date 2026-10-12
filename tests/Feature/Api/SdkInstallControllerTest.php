@@ -487,3 +487,24 @@ function configureInstallReverb(): void
         'reverb.apps.apps.0.options.scheme' => 'https',
     ]);
 }
+
+test('installer Feedback opt in enables only its environment while legacy finalize preserves defaults', function () {
+    $manager = User::factory()->create();
+    $project = Project::factory()->create([
+        'author_id' => $manager->id, 'client_id' => null, 'external_widget_enabled' => false,
+    ]);
+    foreach (['local' => true, 'staging' => null] as $name => $enabled) {
+        $session = $this->service->create($name, 'https://client-app.test');
+        $this->service->approve($session['user_code'], $manager);
+        $payload = ['device_code' => $session['device_code'], 'project_id' => $project->id];
+        if ($enabled !== null) {
+            $payload['feedback_enabled'] = $enabled;
+        }
+        $this->postJson(route('api.sdk-install.finalize'), $payload)->assertOk()
+            ->assertJsonPath('feedback_enabled', $enabled ?? false)
+            ->assertJsonPath('connection_url', route('connection.index', ['project_id' => $project->id]));
+    }
+    expect($project->fresh()->external_widget_enabled)->toBeFalse()
+        ->and($project->environments()->where('environment', 'local')->sole()->external_widget_enabled)->toBeTrue()
+        ->and($project->environments()->where('environment', 'staging')->sole()->external_widget_enabled)->toBeFalse();
+});

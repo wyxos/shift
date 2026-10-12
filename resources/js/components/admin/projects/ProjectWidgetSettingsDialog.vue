@@ -78,8 +78,10 @@ function updateEnvironmentWidgetEnabled(environment: WidgetEnvironmentSettings, 
                         @update:model-value="updateWidgetEnabled(Boolean($event))"
                     />
                     <span class="grid gap-1">
-                        <span class="font-medium">Embedded widget</span>
-                        <span class="text-muted-foreground">Available outside the SHIFT dashboard.</span>
+                        <span class="font-medium">Feedback for new environments</span>
+                        <span class="text-muted-foreground"
+                            >Default for environments registered after this change. Existing environments have their own switches below.</span
+                        >
                     </span>
                 </label>
 
@@ -94,15 +96,17 @@ function updateEnvironmentWidgetEnabled(environment: WidgetEnvironmentSettings, 
                         @update:model-value="form.external_widget_guest_submissions_enabled = Boolean($event)"
                     />
                     <span class="grid gap-1">
-                        <span class="font-medium">Guest submissions</span>
-                        <span class="text-muted-foreground">Allow anonymous and manually identified reports.</span>
+                        <span class="font-medium">Guest submissions for new environments</span>
+                        <span class="text-muted-foreground">Default for new environments where Feedback is enabled.</span>
                     </span>
                 </label>
 
                 <div v-if="form.environments.length" class="space-y-2">
                     <div>
-                        <h3 class="text-sm font-medium">Environment overrides</h3>
-                        <p class="text-muted-foreground text-xs">Tune widget availability for registered consuming app environments.</p>
+                        <h3 class="text-sm font-medium">Existing environments</h3>
+                        <p class="text-muted-foreground text-xs">
+                            Each registered environment has independent Feedback settings. Changing the defaults above does not change these switches.
+                        </p>
                     </div>
 
                     <div v-for="environment in form.environments" :key="environment.id" class="space-y-2 rounded-lg border p-3">
@@ -118,8 +122,12 @@ function updateEnvironmentWidgetEnabled(environment: WidgetEnvironmentSettings, 
                                 @update:model-value="updateEnvironmentWidgetEnabled(environment, Boolean($event))"
                             />
                             <span class="grid gap-1">
-                                <span class="font-medium">Embedded widget</span>
-                                <span class="text-muted-foreground">Use this environment-specific setting instead of the project default.</span>
+                                <span class="font-medium"
+                                    >Feedback for this environment: {{ environment.external_widget_enabled ? 'Enabled' : 'Disabled' }}</span
+                                >
+                                <span class="text-muted-foreground"
+                                    >Controls whether people can open the embedded Feedback form in this application environment.</span
+                                >
                             </span>
                         </label>
 

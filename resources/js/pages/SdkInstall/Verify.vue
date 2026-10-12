@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 interface InstallSession {
@@ -113,8 +113,16 @@ const approveInstall = () => {
                     <form class="flex flex-col gap-4 sm:flex-row sm:items-end" @submit.prevent="findInstall">
                         <div class="flex-1 space-y-2">
                             <Label for="user_code">Install code</Label>
-                            <Input id="user_code" v-model="lookupForm.user_code" autocomplete="off" class="uppercase" placeholder="ABCD-EFGH" />
-                            <InputError :message="lookupError ?? approveForm.errors.user_code" />
+                            <Input
+                                id="user_code"
+                                v-model="lookupForm.user_code"
+                                autocomplete="off"
+                                class="uppercase"
+                                placeholder="ABCD-EFGH"
+                                :aria-invalid="Boolean(lookupError ?? approveForm.errors.user_code)"
+                                :aria-describedby="(lookupError ?? approveForm.errors.user_code) ? 'install-code-error' : undefined"
+                            />
+                            <div id="install-code-error" role="alert"><InputError :message="lookupError ?? approveForm.errors.user_code" /></div>
                         </div>
 
                         <Button type="submit" variant="outline">Find install</Button>
@@ -159,7 +167,12 @@ const approveInstall = () => {
                     </div>
 
                     <div v-else-if="approvedByCurrentUser" class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
-                        This install has been approved from your account. Return to the terminal to choose a project and finish the setup.
+                        <p>This install has been approved from your account. Return to the terminal to choose a project and finish the setup.</p>
+                        <p class="mt-2">
+                            Then enable Feedback and automatic error reporting in the app, submit a report through each path, and check that both
+                            arrive in SHIFT.
+                        </p>
+                        <Button as-child class="mt-3" size="sm" variant="outline"><Link href="/connect">Open connection guide</Link></Button>
                     </div>
 
                     <div v-else-if="approvedByAnotherUser" class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

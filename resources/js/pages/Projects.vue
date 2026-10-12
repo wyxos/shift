@@ -15,8 +15,8 @@ import { type NullableOption, type Option, type ProjectFilters, type ProjectPagi
 import { Button } from '@/components/ui/button';
 import { useProjectsPageState } from '@/composables/useProjectsPageState';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head } from '@inertiajs/vue3';
-import { Plus } from 'lucide-vue-next';
+import { Head, Link } from '@inertiajs/vue3';
+import { PlugZap, Plus } from 'lucide-vue-next';
 
 const props = withDefaults(
     defineProps<{
@@ -133,6 +133,9 @@ const {
                 </template>
 
                 <template #actions>
+                    <Button as-child size="sm" variant="outline">
+                        <Link href="/connect"><PlugZap class="mr-2 h-4 w-4" />Connect application</Link>
+                    </Button>
                     <Button v-if="props.canCreateProject" data-testid="open-create-project" size="sm" @click="openCreateModal">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Project

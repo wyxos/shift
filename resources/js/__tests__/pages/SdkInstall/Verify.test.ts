@@ -137,6 +137,15 @@ describe('SdkInstall/Verify.vue', () => {
         );
     });
 
+    it('associates a failed lookup with its install code field', () => {
+        const wrapper = mount(Verify, {
+            props: { userCode: 'BAD-CODE', lookupError: 'This install code is invalid or has expired.', session: null },
+        });
+        expect(wrapper.get('#user_code').attributes('aria-invalid')).toBe('true');
+        expect(wrapper.get('#user_code').attributes('aria-describedby')).toBe('install-code-error');
+        expect(wrapper.get('#install-code-error').text()).toContain('invalid or has expired');
+    });
+
     it('renders pending install details and approves the active session code', async () => {
         const wrapper = mount(Verify, {
             props: {

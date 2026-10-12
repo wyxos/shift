@@ -99,12 +99,14 @@ class SdkInstallController extends Controller
         $attributes = $request->validate([
             'device_code' => ['required', 'string', 'max:255'],
             'project_id' => ['required', 'integer'],
+            'feedback_enabled' => ['sometimes', 'boolean'],
         ]);
 
         try {
             $credentials = $this->sdkInstallSessionService->finalize(
                 $attributes['device_code'],
                 (int) $attributes['project_id'],
+                array_key_exists('feedback_enabled', $attributes) ? (bool) $attributes['feedback_enabled'] : null,
             );
         } catch (HttpExceptionInterface $exception) {
             return $this->errorResponse($exception);

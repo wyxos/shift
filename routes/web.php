@@ -41,6 +41,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('connect', [\App\Http\Controllers\ApplicationConnectionController::class, 'index'])->name('connection.index');
+    Route::patch('projects/{project}/connection/environments/{environment}', [\App\Http\Controllers\ApplicationConnectionController::class, 'update'])->name('connection.update');
     Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('organisation/{organisation}')->name('organisation.')->group(function () {
