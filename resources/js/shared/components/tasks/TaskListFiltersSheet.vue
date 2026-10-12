@@ -132,7 +132,7 @@ const sortByModel = computed({
             </Button>
         </SheetTrigger>
 
-        <SheetContent class="flex h-full flex-col p-0" side="right">
+        <SheetContent class="flex h-full flex-col p-0" side="right" data-task-sheet>
             <SheetHeader class="p-0">
                 <div class="px-6 pt-6 pb-3">
                     <SheetTitle>Filters</SheetTitle>

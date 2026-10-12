@@ -134,6 +134,8 @@ it('keeps the mobile report close to the conversation without losing a comment d
     $this->actingAs($user);
 
     $page = visit("/tasks?task={$task->id}")->resize(390, 844)
+        ->assertVisible('[data-testid="task-edit-description"] .ProseMirror')
+        ->assertScript('document.querySelector("[data-testid=task-edit-description] .ProseMirror").getAttribute("aria-label") === "Task description"')
         ->assertVisible('[data-testid="task-edit-description"]')
         ->assertScript('document.querySelector("[data-testid=task-edit-description]").getBoundingClientRect().top < 500')
         ->assertScript('getComputedStyle(document.querySelector("[data-testid=edit-task-meta]")).gridTemplateColumns.split(" ").length === 2')
@@ -141,6 +143,8 @@ it('keeps the mobile report close to the conversation without losing a comment d
     captureTaskClarityReview($page, 'task-details-density-mobile.png');
 
     $page->click('[data-testid="edit-mobile-pane-comments"]')
+        ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").getAttribute("role") === "textbox"')
+        ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").getAttribute("aria-label") === "Write a comment"')
         ->fill('[data-testid="comments-editor"] .ProseMirror', 'Keep this reply while reading the report')
         ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane]")).borderLeftWidth === "0px"')
         ->assertScript('getComputedStyle(document.querySelector("[data-testid=task-comments-pane] > div:nth-child(2)")).paddingLeft === "0px"')
@@ -152,6 +156,13 @@ it('keeps the mobile report close to the conversation without losing a comment d
         ->assertSee('Keep the date range and selected columns when downloading a report.')
         ->assertScript('document.querySelector("[data-testid=comments-editor] .ProseMirror").textContent === "Keep this reply while reading the report"');
     captureTaskClarityReview($page, 'task-report-context-mobile.png');
+
+    $messageId = $task->threads()->latest('id')->firstOrFail()->id;
+    $page->keys("[data-testid=comment-actions-{$messageId}]", 'Enter')
+        ->assertSee('Edit')
+        ->assertSee('Delete')
+        ->keys('[role=menuitem]:has-text("Edit")', 'Escape')
+        ->assertScript('document.activeElement.getAttribute("data-testid") === "comment-actions-'.$messageId.'"');
 
     $page->fill('[data-testid="comments-editor"] .ProseMirror', str_repeat('Long review note. ', 1200))
         ->assertScript('document.querySelector("[data-testid=comments-editor]").getBoundingClientRect().bottom <= innerHeight')

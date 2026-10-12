@@ -10,6 +10,9 @@ colors:
   popover-foreground: "hsl(222 47% 11%)"
   primary: "hsl(221 83% 53%)"
   primary-foreground: "hsl(210 40% 98%)"
+  task-comment: "oklch(0.55 0.15 242)"
+  task-comment-inset: "rgb(0 0 0 / 10%)"
+  task-comment-inset-hover: "rgb(0 0 0 / 15%)"
   secondary: "hsl(214 100% 97%)"
   secondary-foreground: "hsl(222 47% 18%)"
   muted: "hsl(214 60% 96%)"
@@ -262,6 +265,10 @@ and `destructive-hover` with `destructive-foreground`. In dark mode the text red
 lightens while the filled control retains its solid crimson treatment.
 The five `chart-*` roles are the dashboard's data palette, with separate dark values.
 
+Sent comments use `task-comment` blue with white text in both themes. The darker
+shade keeps small reply text above 4.5:1 contrast. Insets use the translucent black
+comment colors so quotes, team labels, and attachments retain readable white text.
+
 **The Semantic Color Rule.** Use existing theme roles for controls, surfaces, and text. Keep the logo color tied to the approved assets; it is a distinct value from the action color.
 
 **The Theme Pair Rule.** Apply the matching dark role when the dark theme is active. Danger text and filled danger controls use separate roles in dark mode.
@@ -416,6 +423,10 @@ or horizontal inset. Discussion history and bounded reply editors use the shared
 themed scrollbar. Short viewports allow the discussion pane to scroll so the reply
 controls remain reachable.
 
+Task list and sheet controls have at least 44px hit areas on phones and coarse
+pointers. Comment action buttons appear on keyboard focus and remain visible while
+their menus are open. Description and comment editors have explicit accessible names.
+
 Error reports add Task / Events tabs, with Events initially selected. Rich-text
 content preserves paragraph/list spacing, bordered code blocks, and inset reply
 quotes. Reply quotes use a stronger left border and a subtle tonal fill.
@@ -425,7 +436,9 @@ quotes. Reply quotes use a stronger left border and a subtle tonal fill.
 Ordinary state transitions use the installed 150ms default. Sidebar width/location
 transitions use 200ms linear easing; dialogs use 200ms; sheets specify 500ms opening
 and 300ms closing with ease-in-out. These are observed values, not a new timing policy.
-Reduced-motion overrides shorten transitions/animations and remove smooth scrolling.
+Reduced motion uses 120ms opening/closing fades, removes spatial transitions,
+and keeps loading icons still beside their status labels. Reply navigation scrolls
+immediately while retaining its target highlight.
 
 Row actions retain their layout space and tab order while concealed on fine-pointer
 devices; hover or focus-within reveals them. Touch users retain visible actions.

@@ -4,6 +4,7 @@
 
 @import '../js/shared/styles/scrollbars.css';
 @import '../js/shared/styles/task-sheet.css';
+@import '../js/shared/styles/motion.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -199,23 +200,6 @@
 
     body {
         @apply bg-background text-foreground;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html:focus-within {
-        scroll-behavior: auto;
-    }
-
-    *,
-    *::before,
-    *::after {
-        animation-delay: 0ms !important;
-        animation-duration: 1ms !important;
-        animation-iteration-count: 1 !important;
-        scroll-behavior: auto !important;
-        transition-delay: 0ms !important;
-        transition-duration: 1ms !important;
     }
 }
 

@@ -33,7 +33,7 @@ const selected = computed(() => props.options.find((option) => option.value === 
                 <ChevronDown data-icon="inline-end" />
             </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" class="min-w-56">
+        <DropdownMenuContent align="start" class="min-w-56" data-task-menu>
             <DropdownMenuRadioGroup :model-value="modelValue" @update:model-value="emit('update:modelValue', String($event))">
                 <DropdownMenuRadioItem
                     v-for="option in options"
