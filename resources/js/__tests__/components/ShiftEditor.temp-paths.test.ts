@@ -131,7 +131,7 @@ describe('ShiftEditor temp path rendering', () => {
         let srcOk = false;
         const expected = '/attachments/temp/TEMP123/foo.png';
         while (Date.now() - start < 800) {
-            const img = editorEl.find('img');
+            const img = editorEl.find('[data-node-view-wrapper] img');
             if (img.exists()) {
                 const src = img.attributes('src') || '';
                 if (src.includes(expected)) {
