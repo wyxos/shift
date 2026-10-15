@@ -227,7 +227,7 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
         await nextTick();
         await new Promise((r) => setTimeout(r, 0));
 
-        const imgs = editorEl.findAll('img');
+        const imgs = editorEl.findAll('[data-node-view-wrapper] img');
         expect(imgs.length).toBeGreaterThan(0);
         expect(imgs[0].element.getAttribute('src') || '').toContain('data:image/png');
         expect((imgs[0].element as HTMLImageElement).classList.contains('editor-tile')).toBe(true);
@@ -297,7 +297,7 @@ describe('ShiftEditor TipTap behaviours via commands', () => {
         await nextTick();
         await new Promise((r) => setTimeout(r, 0));
 
-        const imgs = editorEl.findAll('img');
+        const imgs = editorEl.findAll('[data-node-view-wrapper] img');
         expect(imgs.length).toBeGreaterThan(0);
         expect(imgs[0].element.getAttribute('src') || '').toContain('data:image/png');
 

@@ -131,6 +131,19 @@ function buildTempUrl(data: any, resolveTempUrl?: (data: any) => string): string
     return '';
 }
 
+function deferImageUpdate(editor: Editor, uploadId: string, changes: Record<string, unknown>) {
+    // Wait until the active transaction finishes, then build from the latest document and upload identity.
+    setTimeout(() => {
+        if (editor.isDestroyed) return;
+        const pos = findImagePosByTitle(editor, uploadId);
+        if (pos === null) return;
+        const { state } = editor;
+        const node = state.doc.nodeAt(pos);
+        if (node?.type.name !== 'image' || node.attrs.title !== uploadId) return;
+        editor.view.dispatch(state.tr.setNodeMarkup(pos, node.type, { ...node.attrs, ...changes }, node.marks));
+    }, 0);
+}
+
 async function uploadImage(
     editor: Editor,
     file: File,
@@ -144,16 +157,7 @@ async function uploadImage(
     insertUploadPlaceholderImage(editor, uploadId, file.name);
 
     const updateProgress = (percent: number) => {
-        const pos = findImagePosByTitle(editor, uploadId);
-        if (pos != null) {
-            const { state, dispatch } = (editor as any).view;
-            const imageType = state.schema.nodes.image;
-            const node = state.doc.nodeAt(pos);
-            if (node) {
-                const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: renderProgressTile(percent) }, node.marks);
-                setTimeout(() => dispatch(tr), 0);
-            }
-        }
+        deferImageUpdate(editor, uploadId, { src: renderProgressTile(percent) });
     };
 
     await uploadChunkedFile({
@@ -173,16 +177,9 @@ async function uploadImage(
             };
             const trySwap = () => {
                 if (done) return;
-                const pos = findImagePosByTitle(editor, uploadId);
-                if (pos != null) {
-                    const { state, dispatch } = (editor as any).view;
-                    const imageType = state.schema.nodes.image;
-                    const node = state.doc.nodeAt(pos);
-                    if (node) {
-                        const tr = state.tr.setNodeMarkup(pos, imageType, { ...node.attrs, src: finalUrl, title: '' }, node.marks);
-                        setTimeout(() => dispatch(tr), 0);
-                        finishSwap();
-                    }
+                if (findImagePosByTitle(editor, uploadId) !== null) {
+                    deferImageUpdate(editor, uploadId, { src: finalUrl, title: '' });
+                    finishSwap();
                 }
             };
             const ImgCtor: any = (globalThis as any).Image;
@@ -199,21 +196,7 @@ async function uploadImage(
             img.src = finalUrl;
         })
         .catch(() => {
-            const pos = findImagePosByTitle(editor, uploadId);
-            if (pos != null) {
-                const { state, dispatch } = (editor as any).view;
-                const imageType = state.schema.nodes.image;
-                const node = state.doc.nodeAt(pos);
-                if (node) {
-                    const tr = state.tr.setNodeMarkup(
-                        pos,
-                        imageType,
-                        { ...node.attrs, src: renderProgressTile(0, 'Upload failed'), title: '' },
-                        node.marks,
-                    );
-                    setTimeout(() => dispatch(tr), 0);
-                }
-            }
+            deferImageUpdate(editor, uploadId, { src: renderProgressTile(0, 'Upload failed'), title: '' });
         });
 }
 

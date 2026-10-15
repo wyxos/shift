@@ -134,7 +134,7 @@ watch(
         hasAiImprovableText.value = containsAiImprovableText(next);
         aiNotice.value = '';
         if (next !== current) {
-            editor.value?.commands.setContent(next, false);
+            editor.value?.chain().setContent(next).setMeta('preventUpdate', true).run();
         }
     },
 );
@@ -147,9 +147,12 @@ function resolveAiImproveUrl(): string | null {
     return null;
 }
 
+// Keep the established schema when a consumer upgrades from Tiptap 2 to 3.
+const starterKitOptions = { codeBlock: false, link: false, underline: false, listKeymap: false, trailingNode: false } as const;
+
 const editor = useEditor({
     extensions: [
-        StarterKit.configure({ codeBlock: false }),
+        StarterKit.configure(starterKitOptions),
         ReplyQuote,
         Placeholder.configure({
             placeholder: props.placeholder ?? 'Type a message...',
@@ -358,7 +361,7 @@ const editorStyle = computed(() => {
 useShiftEditorAccessibility(editor, () => props.accessibleLabel);
 
 function reset() {
-    editor.value?.commands.clearContent();
+    editor.value?.commands.clearContent(false);
     hasAiImprovableText.value = false;
     aiNotice.value = '';
     emit('update:modelValue', '');
