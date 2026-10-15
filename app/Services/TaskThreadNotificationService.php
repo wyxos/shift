@@ -88,6 +88,8 @@ class TaskThreadNotificationService
             SendTaskThreadNotification::dispatch(
                 $thread->id,
                 [
+                    'external_identity_id' => $externalIdentity->id,
+                    'environment' => $externalIdentity->environment,
                     'url' => $externalIdentity->url,
                     'email' => $externalIdentity->email,
                     'external_id' => $externalIdentity->external_id,

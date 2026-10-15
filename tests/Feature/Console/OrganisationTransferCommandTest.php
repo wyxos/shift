@@ -137,7 +137,7 @@ test('an organisation transfer round trips only public tenant data and attachmen
 
     $manifest = json_decode(File::get($this->transferDirectory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
     expect($manifest['format'])->toBe('shift-public-organisation-transfer')
-        ->and($manifest['version'])->toBe(3)
+        ->and($manifest['version'])->toBe(4)
         ->and($manifest['tables']['users']['rows'])->toBe(2)
         ->and($manifest['tables']['projects']['rows'])->toBe(1)
         ->and($manifest['tables']['tasks']['rows'])->toBe(1)
@@ -303,6 +303,9 @@ test('participant identities and references survive current and legacy organisat
     insertActivity($task, $owner);
     DB::table('activity_log')->update(['causer_type' => ExternalIdentity::class, 'causer_id' => $identity->id]);
     insertNotification($owner, ['task_id' => $task->id, 'url' => 'https://shift.source.test/tasks?task='.$task->id]);
+    $unreadInboxId = insertExternalInboxNotification($identity, $task, $thread);
+    $readAt = now()->subMinute()->format('Y-m-d H:i:s');
+    $readInboxId = insertExternalInboxNotification($identity, $task, null, $readAt);
 
     config()->set('app.url', 'https://shift.source.test');
     $this->transferDirectory = storage_path('framework/testing/organisation-transfer-'.Str::uuid());
@@ -311,6 +314,8 @@ test('participant identities and references survive current and legacy organisat
     ])->assertSuccessful();
     if ($version === 2) {
         convertParticipantArchiveToLegacyVersion($this->transferDirectory);
+    } elseif ($version === 3) {
+        convertParticipantArchiveToVersion3($this->transferDirectory);
     }
     $manifestContents = File::get($this->transferDirectory.'/manifest.json');
     $manifest = json_decode($manifestContents, true, flags: JSON_THROW_ON_ERROR);
@@ -341,6 +346,15 @@ test('participant identities and references survive current and legacy organisat
         ->and($receipt['manifest_sha256'])->toBe(hash('sha256', $manifestContents))
         ->and($receipt['verification']['tables'][$archiveIdentityTable])->toBe(1)
         ->and(File::get($this->transferDirectory.'/manifest.json'))->toBe($manifestContents);
+    expect(DB::table('external_inbox_notifications')->count())->toBe($version === 4 ? 2 : 0)
+        ->and(array_key_exists('external_inbox_notifications', $receipt['verification']['tables']))->toBe($version === 4);
+    if ($version === 4) {
+        $this->assertDatabaseHas('external_inbox_notifications', [
+            'id' => $unreadInboxId, 'external_identity_id' => $identity->id, 'task_id' => $task->id,
+            'task_thread_id' => $thread->id, 'read_at' => null,
+        ]);
+        $this->assertDatabaseHas('external_inbox_notifications', ['id' => $readInboxId, 'read_at' => $readAt]);
+    }
     foreach ($archiveHashes as $table => $hash) {
         expect(hash_file('sha256', $this->transferDirectory.'/data/'.$table.'.jsonl'))->toBe($hash);
     }
@@ -351,10 +365,11 @@ test('participant identities and references survive current and legacy organisat
     expect($report['tables']['external_identities'])->toBe(1)->and($report['tables']['project_participants'])->toBe(1);
     $purger->purge($importedOrganisation, true, $report['fingerprint']);
     expect(ExternalIdentity::query()->count())->toBe(0)
+        ->and(DB::table('external_inbox_notifications')->count())->toBe(0)
         ->and(ProjectParticipant::query()->count())->toBe(0)
         ->and(Organisation::query()->count())->toBe(0)
         ->and(Storage::exists($attachment->path))->toBeFalse();
-})->with(['pre-refactor version 2' => 2, 'current version 3' => 3]);
+})->with(['pre-refactor version 2' => 2, 'pre-inbox version 3' => 3, 'current version 4' => 4]);
 
 test('participant audit transfers include their actors and scoped source purges retain unrelated audits', function (int $version) {
     $owner = User::factory()->create();
@@ -384,6 +399,8 @@ test('participant audit transfers include their actors and scoped source purges 
     ])->assertSuccessful();
     if ($version === 2) {
         convertParticipantArchiveToLegacyVersion($this->transferDirectory);
+    } elseif ($version === 3) {
+        convertParticipantArchiveToVersion3($this->transferDirectory);
     }
     $manifest = json_decode(File::get($this->transferDirectory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
     expect($manifest['tables']['activity_log']['rows'])->toBe(2)
@@ -428,8 +445,46 @@ test('legacy archives retain checksum validation before compatibility transforma
     expect(Organisation::query()->count())->toBe(0)->and(ExternalIdentity::query()->count())->toBe(0);
 });
 
+test('inbox transfers and source purges retain unrelated organisations notifications', function () {
+    $organisations = [];
+    $notificationIds = [];
+    foreach (range(1, 2) as $index) {
+        $owner = User::factory()->create();
+        $organisation = Organisation::factory()->create(['author_id' => $owner->id]);
+        $project = Project::factory()->create([
+            'author_id' => $owner->id, 'organisation_id' => $organisation->id, 'client_id' => null,
+        ]);
+        $participant = ProjectParticipant::query()->create(['project_id' => $project->id]);
+        $identity = ExternalIdentity::factory()->create([
+            'project_id' => $project->id, 'project_participant_id' => $participant->id,
+        ]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+        $organisations[] = $organisation;
+        $notificationIds[] = insertExternalInboxNotification($identity, $task);
+    }
+
+    $selection = new OrganisationTransferSelection($organisations[0]);
+    expect($selection->rows('external_inbox_notifications')->pluck('id')->all())->toBe([$notificationIds[0]]);
+
+    $this->transferDirectory = storage_path('framework/testing/organisation-transfer-'.Str::uuid());
+    $this->artisan('shift:organisation-transfer:export', [
+        'organisation' => (string) $organisations[0]->id, '--output' => $this->transferDirectory,
+    ])->assertSuccessful();
+    $manifest = json_decode(File::get($this->transferDirectory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    expect($manifest['tables']['external_inbox_notifications']['rows'])->toBe(1);
+
+    $purger = app(OrganisationTransferPurger::class);
+    $report = $purger->inspect($organisations[0], true);
+    expect($report['row_ids']['external_inbox_notifications'])->toBe([$notificationIds[0]]);
+    $purger->purge($organisations[0], true, $report['fingerprint']);
+
+    expect(DB::table('external_inbox_notifications')->pluck('id')->all())->toBe([$notificationIds[1]])
+        ->and(Organisation::query()->whereKey($organisations[1]->id)->exists())->toBeTrue();
+});
+
 function convertParticipantArchiveToLegacyVersion(string $directory): void
 {
+    convertParticipantArchiveToVersion3($directory);
     $manifest = json_decode(File::get($directory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
     $tables = [];
     foreach ($manifest['tables'] as $table => $metadata) {
@@ -468,6 +523,32 @@ function convertParticipantArchiveToLegacyVersion(string $directory): void
     $manifest['version'] = 2;
     $manifest['tables'] = $tables;
     File::put($directory.'/manifest.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+}
+
+function convertParticipantArchiveToVersion3(string $directory): void
+{
+    $manifest = json_decode(File::get($directory.'/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    unset($manifest['tables']['external_inbox_notifications']);
+    File::delete($directory.'/data/external_inbox_notifications.jsonl');
+    $manifest['version'] = 3;
+    File::put($directory.'/manifest.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+}
+
+function insertExternalInboxNotification(ExternalIdentity $identity, Task $task, ?TaskThread $thread = null, ?string $readAt = null): int
+{
+    return DB::table('external_inbox_notifications')->insertGetId([
+        'project_id' => $task->project_id,
+        'external_identity_id' => $identity->id,
+        'task_id' => $task->id,
+        'task_thread_id' => $thread?->id,
+        'event_key' => 'test:'.Str::uuid(),
+        'type' => $thread ? 'thread.reply' : 'collaborator.added',
+        'title' => 'Voidcare follow-up',
+        'body' => 'A project reply is available.',
+        'read_at' => $readAt,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 }
 
 function insertActivity(Task $task, User $causer): void

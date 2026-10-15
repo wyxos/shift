@@ -68,6 +68,10 @@ class OrganisationTransferImporter
 
             DB::transaction(function () use ($directory, $manifest): void {
                 foreach (OrganisationTransferSelection::TABLES as $table) {
+                    if (! $this->archiveIncludesTable($table, $manifest)) {
+                        continue;
+                    }
+
                     $targetColumns = Schema::getColumnListing($table);
 
                     $archiveTable = $this->archiveTable($table, $manifest);
@@ -128,12 +132,15 @@ class OrganisationTransferImporter
         foreach (OrganisationTransferSelection::TABLES as $table) {
             $actual = DB::table($table)->count();
             $archiveTable = $this->archiveTable($table, $manifest);
-            $expected = (int) $manifest['tables'][$archiveTable]['rows'];
+            $included = $this->archiveIncludesTable($table, $manifest);
+            $expected = $included ? (int) $manifest['tables'][$archiveTable]['rows'] : 0;
             if ($actual !== $expected) {
                 throw new RuntimeException("Imported table [{$table}] has [{$actual}] rows; expected [{$expected}].");
             }
 
-            $counts[$archiveTable] = $actual;
+            if ($included) {
+                $counts[$archiveTable] = $actual;
+            }
         }
 
         $bytes = 0;
@@ -183,7 +190,7 @@ class OrganisationTransferImporter
     private function assertManifestContract(array $manifest): void
     {
         if (($manifest['format'] ?? null) !== OrganisationTransferExporter::FORMAT
-            || ! in_array($manifest['version'] ?? null, [2, OrganisationTransferExporter::VERSION], true)) {
+            || ! in_array($manifest['version'] ?? null, [2, 3, OrganisationTransferExporter::VERSION], true)) {
             throw new RuntimeException('Unsupported SHIFT organisation-transfer format or version.');
         }
 
@@ -194,7 +201,10 @@ class OrganisationTransferImporter
         }
 
         $manifestTables = array_keys($manifest['tables']);
-        $expectedTables = array_map(fn (string $table): string => $this->archiveTable($table, $manifest), OrganisationTransferSelection::TABLES);
+        $expectedTables = array_values(array_map(
+            fn (string $table): string => $this->archiveTable($table, $manifest),
+            array_filter(OrganisationTransferSelection::TABLES, fn (string $table): bool => $this->archiveIncludesTable($table, $manifest)),
+        ));
         if ($manifestTables !== $expectedTables) {
             throw new RuntimeException('Transfer manifest tables do not match the public SHIFT transfer contract.');
         }
@@ -408,6 +418,12 @@ class OrganisationTransferImporter
             'external_identities' => 'external_users',
             default => $table,
         };
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function archiveIncludesTable(string $table, array $manifest): bool
+    {
+        return $table !== 'external_inbox_notifications' || $manifest['version'] >= 4;
     }
 
     /**

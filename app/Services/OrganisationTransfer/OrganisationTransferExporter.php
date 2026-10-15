@@ -12,7 +12,7 @@ class OrganisationTransferExporter
 {
     public const FORMAT = 'shift-public-organisation-transfer';
 
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     /**
      * @return array<string, mixed>

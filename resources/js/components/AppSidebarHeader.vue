@@ -9,10 +9,12 @@ withDefaults(
     defineProps<{
         breadcrumbs?: BreadcrumbItemType[];
         showAppearanceToggle?: boolean;
+        showNotifications?: boolean;
     }>(),
     {
         breadcrumbs: () => [],
         showAppearanceToggle: false,
+        showNotifications: true,
     },
 );
 </script>
@@ -30,7 +32,7 @@ withDefaults(
         <div class="flex items-center gap-2">
             <slot name="actions" />
             <AppearanceTabs v-if="showAppearanceToggle" compact />
-            <NotificationBadge />
+            <NotificationBadge v-if="showNotifications" />
         </div>
     </header>
 </template>

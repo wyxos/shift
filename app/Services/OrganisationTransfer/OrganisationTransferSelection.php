@@ -38,6 +38,7 @@ class OrganisationTransferSelection
         'task_collaborator_notifications',
         'task_thread_mentions',
         'external_notification_deliveries',
+        'external_inbox_notifications',
         'attachments',
         'activity_log',
         'notifications',
@@ -134,6 +135,18 @@ class OrganisationTransferSelection
 
                     if ($this->threadIds !== []) {
                         $scope->orWhereIn('task_thread_id', $this->threadIds);
+                    }
+                });
+            }),
+            'external_inbox_notifications' => $this->tableRows('external_inbox_notifications', function (Builder $query) use ($externalIdentityIds): void {
+                $this->whereIds($query, 'project_id', $this->projectIds);
+                $this->whereIds($query, 'external_identity_id', $externalIdentityIds);
+                $this->whereIds($query, 'task_id', $this->taskIds);
+                $query->where(function (Builder $threads): void {
+                    $threads->whereNull('task_thread_id');
+
+                    if ($this->threadIds !== []) {
+                        $threads->orWhereIn('task_thread_id', $this->threadIds);
                     }
                 });
             }),
