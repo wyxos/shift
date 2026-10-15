@@ -29,7 +29,7 @@ type LinkedAccount = {
     canUnlink?: boolean | null;
     links?: { unlink?: string | null };
 };
-type ExternalUserRow = {
+type ExternalIdentityRow = {
     id: number;
     name: string;
     email?: string | null;
@@ -45,8 +45,8 @@ type ExternalUserRow = {
     links?: { link_accounts?: string | null; linkAccounts?: string | null };
     project?: { id: number; name: string } | null;
 };
-type ExternalUsersPage = {
-    data: ExternalUserRow[];
+type ExternalIdentitiesPage = {
+    data: ExternalIdentityRow[];
     current_page: number;
     last_page: number;
     total: number;
@@ -62,7 +62,7 @@ type Filters = {
 type SortBy = 'newest' | 'oldest' | 'name';
 type EditErrors = Partial<Record<'name' | 'email' | 'role', string>>;
 const props = defineProps<{
-    externalUsers: ExternalUsersPage;
+    externalIdentities: ExternalIdentitiesPage;
     filters: Filters;
     projects?: { id: number; name: string }[];
     roles?: SelectOption[];
@@ -93,7 +93,7 @@ const appliedSortBy = ref<SortBy>(normalizeSortBy(props.filters.sort_by));
 const draftSearchTerm = ref(appliedSearchTerm.value);
 const draftProjectId = ref(appliedProjectId.value);
 const draftSortBy = ref<SortBy>(appliedSortBy.value);
-const editingExternalUser = ref<ExternalUserRow | null>(null);
+const editingExternalIdentity = ref<ExternalIdentityRow | null>(null);
 const editSaving = ref(false);
 const editError = ref<string | null>(null);
 const editErrors = ref<EditErrors>({});
@@ -102,23 +102,25 @@ const editForm = ref({
     email: '',
     role: '',
 });
-const indexPath = computed(() => (props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/external-users` : '/dashboard'));
-const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'External Users', href: indexPath.value }]);
+const indexPath = computed(() =>
+    props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/project-participants` : '/dashboard',
+);
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'Project participants', href: indexPath.value }]);
 const projectFilterOptions = computed<SelectOption[]>(() => [
     { value: '', label: 'All projects' },
     ...(props.projects ?? []).map((project) => ({ value: String(project.id), label: project.name })),
 ]);
 const roleOptions = computed<SelectOption[]>(() => props.roleOptions ?? props.role_options ?? props.roles ?? []);
-const editSheetOpen = computed(() => Boolean(editingExternalUser.value));
+const editSheetOpen = computed(() => Boolean(editingExternalIdentity.value));
 const editDisabled = computed(() => editSaving.value || !editForm.value.name.trim());
 const canManageExternalRoles = computed(() => props.canManageExternalRoles === true || props.can_manage_external_roles === true);
 const canManageLinkedAccounts = computed(() => props.canManageLinkedAccounts === true || props.can_manage_linked_accounts === true);
-const canEditExternalUserRole = computed(() => {
-    if (!editingExternalUser.value || !canManageExternalRoles.value || roleOptions.value.length === 0) {
+const canEditExternalIdentityRole = computed(() => {
+    if (!editingExternalIdentity.value || !canManageExternalRoles.value || roleOptions.value.length === 0) {
         return false;
     }
 
-    return editingExternalUser.value.canManageRole !== false && editingExternalUser.value.can_manage_role !== false;
+    return editingExternalIdentity.value.canManageRole !== false && editingExternalIdentity.value.can_manage_role !== false;
 });
 watch(
     () => props.filters,
@@ -167,18 +169,18 @@ function resetFilters() {
     filtersOpen.value = false;
     visitIndex();
 }
-function openEditSheet(externalUser: ExternalUserRow) {
-    editingExternalUser.value = externalUser;
+function openEditSheet(externalIdentity: ExternalIdentityRow) {
+    editingExternalIdentity.value = externalIdentity;
     editForm.value = {
-        name: externalUser.name,
-        email: externalUser.email ?? '',
-        role: externalUser.role ?? '',
+        name: externalIdentity.name,
+        email: externalIdentity.email ?? '',
+        role: externalIdentity.role ?? '',
     };
     editErrors.value = {};
     editError.value = null;
 }
 function closeEditSheet() {
-    editingExternalUser.value = null;
+    editingExternalIdentity.value = null;
     editForm.value = {
         name: '',
         email: '',
@@ -191,18 +193,18 @@ function normalizeValidationErrors(errors: Record<string, string[] | string> | u
     if (!errors) return {};
     return Object.fromEntries(Object.entries(errors).map(([key, value]) => [key, Array.isArray(value) ? (value[0] ?? '') : value])) as EditErrors;
 }
-function reloadExternalUsers() {
-    router.reload({ only: ['externalUsers'] });
+function reloadProjectParticipants() {
+    router.reload({ only: ['externalIdentities'] });
 }
-function handleLinkedAccountsChanged(externalUser: ExternalUserRow) {
-    if (editingExternalUser.value?.id === externalUser.id) {
-        editingExternalUser.value = externalUser;
+function handleLinkedAccountsChanged(externalIdentity: ExternalIdentityRow) {
+    if (editingExternalIdentity.value?.id === externalIdentity.id) {
+        editingExternalIdentity.value = externalIdentity;
     }
 
-    reloadExternalUsers();
+    reloadProjectParticipants();
 }
-async function saveExternalUser() {
-    if (!editingExternalUser.value || editDisabled.value) return;
+async function saveExternalIdentity() {
+    if (!editingExternalIdentity.value || editDisabled.value) return;
     editSaving.value = true;
     editErrors.value = {};
     editError.value = null;
@@ -211,12 +213,12 @@ async function saveExternalUser() {
             name: editForm.value.name.trim(),
             email: editForm.value.email.trim() || null,
         };
-        if (canEditExternalUserRole.value) {
+        if (canEditExternalIdentityRole.value) {
             payload.role = editForm.value.role || null;
         }
-        await axios.put(`/external-users/${editingExternalUser.value.id}`, payload, jsonHeaders);
+        await axios.put(`/project-participants/${editingExternalIdentity.value.id}`, payload, jsonHeaders);
         closeEditSheet();
-        reloadExternalUsers();
+        reloadProjectParticipants();
     } catch (error) {
         const response = (error as { response?: { status?: number; data?: { errors?: Record<string, string[] | string>; message?: string } } })
             .response;
@@ -224,7 +226,7 @@ async function saveExternalUser() {
             editErrors.value = normalizeValidationErrors(response.data?.errors);
             editError.value = response.data?.message ?? null;
         } else {
-            editError.value = 'Unable to save external user right now.';
+            editError.value = 'Unable to save this application account right now.';
         }
     } finally {
         editSaving.value = false;
@@ -233,16 +235,16 @@ async function saveExternalUser() {
 function environmentLabel(environment?: string | null) {
     return environment?.trim() || 'Unknown';
 }
-function roleLabel(externalUser: ExternalUserRow) {
-    const label = externalUser.role_label?.trim();
-    if (label && !(externalUser.role === 'owner' && label.toLowerCase() === 'owner')) {
+function roleLabel(externalIdentity: ExternalIdentityRow) {
+    const label = externalIdentity.role_label?.trim();
+    if (label && !(externalIdentity.role === 'owner' && label.toLowerCase() === 'owner')) {
         return label;
     }
-    const optionLabel = roleOptions.value.find((option) => option.value === externalUser.role)?.label;
-    if (optionLabel && !(externalUser.role === 'owner' && optionLabel.toLowerCase() === 'owner')) {
+    const optionLabel = roleOptions.value.find((option) => option.value === externalIdentity.role)?.label;
+    if (optionLabel && !(externalIdentity.role === 'owner' && optionLabel.toLowerCase() === 'owner')) {
         return optionLabel;
     }
-    if (externalUser.role === 'owner') {
+    if (externalIdentity.role === 'owner') {
         return 'Client Owner';
     }
     return label || optionLabel || 'User';
@@ -250,18 +252,18 @@ function roleLabel(externalUser: ExternalUserRow) {
 </script>
 
 <template>
-    <Head title="External Users" />
+    <Head title="Project participants" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
             <AdminListShell
                 v-model:filtersOpen="filtersOpen"
                 :active-filter-count="activeFilterCount"
-                description="External contacts grouped by project and environment."
-                filter-description="Search and sort the external users list."
-                items-label="external users"
-                :page="props.externalUsers"
-                title="External Users"
+                description="Each application account keeps its own role and profile. Link accounts to share ticket visibility within a project."
+                filter-description="Search and sort application accounts."
+                items-label="application accounts"
+                :page="props.externalIdentities"
+                title="Project participants"
                 @page-change="visitIndex"
             >
                 <template #filters>
@@ -287,7 +289,7 @@ function roleLabel(externalUser: ExternalUserRow) {
                         <label class="text-muted-foreground text-sm leading-none font-medium">Sort By</label>
                         <ButtonGroup
                             v-model="draftSortBy"
-                            aria-label="Sort external users"
+                            aria-label="Sort application accounts"
                             :columns="3"
                             :options="sortOptions"
                             test-id-prefix="sort-by"
@@ -303,43 +305,43 @@ function roleLabel(externalUser: ExternalUserRow) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Project</TableHead>
+                            <TableHead>Application account</TableHead>
+                            <TableHead>Project and environment</TableHead>
                             <TableHead>Role</TableHead>
                             <TableHead class="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <template v-if="props.externalUsers.data.length">
+                        <template v-if="props.externalIdentities.data.length">
                             <TableRow
-                                v-for="externalUser in props.externalUsers.data"
-                                :key="externalUser.id"
+                                v-for="externalIdentity in props.externalIdentities.data"
+                                :key="externalIdentity.id"
                                 data-list-row
-                                :data-testid="`external-user-row-${externalUser.id}`"
+                                :data-testid="`external-identity-row-${externalIdentity.id}`"
                             >
-                                <TableCell class="min-w-[14rem] whitespace-normal" :data-testid="`external-user-identity-${externalUser.id}`">
+                                <TableCell class="min-w-[14rem] whitespace-normal" :data-testid="`external-identity-profile-${externalIdentity.id}`">
                                     <div class="min-w-0">
-                                        <div class="truncate font-medium">{{ externalUser.name }}</div>
-                                        <div class="text-muted-foreground truncate text-sm">{{ externalUser.email || 'No email' }}</div>
+                                        <div class="truncate font-medium">{{ externalIdentity.name }}</div>
+                                        <div class="text-muted-foreground truncate text-sm">{{ externalIdentity.email || 'No email' }}</div>
                                     </div>
                                 </TableCell>
                                 <TableCell>
                                     <div
                                         class="flex flex-col items-start gap-1"
-                                        :data-testid="`external-user-project-environment-${externalUser.id}`"
+                                        :data-testid="`external-identity-project-environment-${externalIdentity.id}`"
                                     >
-                                        <Badge v-if="externalUser.project" class="bg-sky-100 text-sky-900 hover:bg-sky-100" variant="secondary">
-                                            {{ externalUser.project.name }}
+                                        <Badge v-if="externalIdentity.project" class="bg-sky-100 text-sky-900 hover:bg-sky-100" variant="secondary">
+                                            {{ externalIdentity.project.name }}
                                         </Badge>
                                         <span v-else class="text-muted-foreground text-sm">No project assigned</span>
                                         <Badge variant="secondary">
-                                            {{ environmentLabel(externalUser.environment) }}
+                                            {{ environmentLabel(externalIdentity.environment) }}
                                         </Badge>
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant="outline" :data-testid="`external-user-role-${externalUser.id}`">
-                                        {{ roleLabel(externalUser) }}
+                                    <Badge variant="outline" :data-testid="`external-identity-role-${externalIdentity.id}`">
+                                        {{ roleLabel(externalIdentity) }}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -348,18 +350,18 @@ function roleLabel(externalUser: ExternalUserRow) {
                                             size="sm"
                                             variant="outline"
                                             data-row-action
-                                            :data-testid="`external-user-edit-${externalUser.id}`"
-                                            title="Edit external user"
-                                            @click="openEditSheet(externalUser)"
+                                            :data-testid="`external-identity-edit-${externalIdentity.id}`"
+                                            title="Edit application account"
+                                            @click="openEditSheet(externalIdentity)"
                                         >
                                             <Pencil class="h-4 w-4" />
-                                            <span class="sr-only">Edit external user</span>
+                                            <span class="sr-only">Edit application account</span>
                                         </Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
                         </template>
-                        <TableEmpty v-else :colspan="4">No external users found.</TableEmpty>
+                        <TableEmpty v-else :colspan="4">No application accounts found.</TableEmpty>
                     </TableBody>
                 </Table>
             </AdminListShell>
@@ -368,21 +370,21 @@ function roleLabel(externalUser: ExternalUserRow) {
         <Sheet :open="editSheetOpen" @update:open="(open) => !open && closeEditSheet()">
             <SheetContent class="p-0" side="right">
                 <SheetHeader class="border-b px-6 py-5">
-                    <SheetTitle>Edit external user</SheetTitle>
-                    <SheetDescription v-if="editingExternalUser">
-                        {{ editingExternalUser.name }}
-                        <span v-if="editingExternalUser.email">({{ editingExternalUser.email }})</span>
+                    <SheetTitle>Edit application account</SheetTitle>
+                    <SheetDescription v-if="editingExternalIdentity">
+                        {{ editingExternalIdentity.name }}
+                        <span v-if="editingExternalIdentity.email">({{ editingExternalIdentity.email }})</span>
                     </SheetDescription>
                 </SheetHeader>
 
-                <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="saveExternalUser">
+                <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="saveExternalIdentity">
                     <div class="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
                         <div class="space-y-2">
-                            <label class="text-muted-foreground text-sm leading-none font-medium" for="external-user-edit-name">Name</label>
+                            <label class="text-muted-foreground text-sm leading-none font-medium" for="external-identity-edit-name">Name</label>
                             <Input
-                                id="external-user-edit-name"
+                                id="external-identity-edit-name"
                                 v-model="editForm.name"
-                                data-testid="external-user-edit-name"
+                                data-testid="external-identity-edit-name"
                                 :disabled="editSaving"
                                 required
                             />
@@ -390,11 +392,11 @@ function roleLabel(externalUser: ExternalUserRow) {
                         </div>
 
                         <div class="space-y-2">
-                            <label class="text-muted-foreground text-sm leading-none font-medium" for="external-user-edit-email">Email</label>
+                            <label class="text-muted-foreground text-sm leading-none font-medium" for="external-identity-edit-email">Email</label>
                             <Input
-                                id="external-user-edit-email"
+                                id="external-identity-edit-email"
                                 v-model="editForm.email"
-                                data-testid="external-user-edit-email"
+                                data-testid="external-identity-edit-email"
                                 :disabled="editSaving"
                                 type="email"
                             />
@@ -403,33 +405,33 @@ function roleLabel(externalUser: ExternalUserRow) {
 
                         <div class="space-y-2">
                             <label class="text-muted-foreground text-sm leading-none font-medium">Project</label>
-                            <div class="rounded-lg border p-3 text-sm" data-testid="external-user-project-context">
-                                <div class="font-medium">{{ editingExternalUser?.project?.name ?? 'No project assigned' }}</div>
-                                <div class="text-muted-foreground mt-1">{{ environmentLabel(editingExternalUser?.environment) }}</div>
+                            <div class="rounded-lg border p-3 text-sm" data-testid="external-identity-project-context">
+                                <div class="font-medium">{{ editingExternalIdentity?.project?.name ?? 'No project assigned' }}</div>
+                                <div class="text-muted-foreground mt-1">{{ environmentLabel(editingExternalIdentity?.environment) }}</div>
                             </div>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-muted-foreground text-sm leading-none font-medium">Role</label>
                             <Select
-                                v-if="canEditExternalUserRole"
+                                v-if="canEditExternalIdentityRole"
                                 v-model="editForm.role"
                                 :disabled="editSaving"
                                 empty-label="No roles found."
                                 :options="roleOptions"
                                 placeholder="Select a role"
-                                test-id="external-user-edit-role"
+                                test-id="external-identity-edit-role"
                             />
-                            <div v-else class="rounded-lg border p-3 text-sm" data-testid="external-user-role-readonly">
-                                <span class="font-medium">{{ editingExternalUser ? roleLabel(editingExternalUser) : 'User' }}</span>
+                            <div v-else class="rounded-lg border p-3 text-sm" data-testid="external-identity-role-readonly">
+                                <span class="font-medium">{{ editingExternalIdentity ? roleLabel(editingExternalIdentity) : 'User' }}</span>
                             </div>
                             <p v-if="editErrors.role" class="text-destructive text-sm">{{ editErrors.role }}</p>
                         </div>
 
                         <LinkedAccountsManager
-                            v-if="editingExternalUser"
+                            v-if="editingExternalIdentity"
                             :can-manage-linked-accounts="canManageLinkedAccounts"
-                            :external-user="editingExternalUser"
+                            :external-identity="editingExternalIdentity"
                             @changed="handleLinkedAccountsChanged"
                         />
 
@@ -438,7 +440,7 @@ function roleLabel(externalUser: ExternalUserRow) {
 
                     <SheetFooter class="border-t sm:flex-row sm:justify-end">
                         <Button type="button" variant="outline" :disabled="editSaving" @click="closeEditSheet">Cancel</Button>
-                        <Button type="submit" :disabled="editDisabled" data-testid="external-user-edit-save">
+                        <Button type="submit" :disabled="editDisabled" data-testid="external-identity-edit-save">
                             {{ editSaving ? 'Saving...' : 'Save changes' }}
                         </Button>
                     </SheetFooter>

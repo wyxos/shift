@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\ExternalUserRole;
+use App\Enums\ExternalIdentityRole;
 use App\Http\Controllers\Controller;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
-use App\Services\ExternalUserService;
+use App\Services\ExternalCollaboratorService;
+use App\Services\ExternalIdentityService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,8 @@ use RuntimeException;
 class ExternalRoleController extends Controller
 {
     public function __construct(
-        private readonly ExternalUserService $externalUserService,
+        private readonly ExternalIdentityService $externalIdentityService,
+        private readonly ExternalCollaboratorService $externalCollaborators,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly ShiftPermissionService $permissions,
     ) {}
@@ -71,7 +73,7 @@ class ExternalRoleController extends Controller
 
         $environment = $this->environment($attributes);
         try {
-            $lookup = $this->externalUserService->searchCollaborators(
+            $lookup = $this->externalCollaborators->searchCollaborators(
                 $project,
                 $environment,
                 $attributes['search'] ?? null,
@@ -114,7 +116,7 @@ class ExternalRoleController extends Controller
             'external_user.id' => 'required',
             'external_user.name' => 'required|string|max:255',
             'external_user.email' => 'required|email',
-            'role' => ['required', Rule::in(ExternalUserRole::values())],
+            'role' => ['required', Rule::in(ExternalIdentityRole::values())],
             'environment' => 'nullable|string|max:255',
         ]);
 
@@ -128,7 +130,7 @@ class ExternalRoleController extends Controller
         $environment = $this->environment($attributes);
         $url = $this->urlForEnvironment($project, $environment, $attributes);
 
-        $externalUser = $this->externalUserService->upsert($project, [
+        $externalIdentity = $this->externalIdentityService->upsert($project, [
             'external_id' => data_get($attributes, 'external_user.id'),
             'name' => data_get($attributes, 'external_user.name'),
             'email' => data_get($attributes, 'external_user.email'),
@@ -138,7 +140,7 @@ class ExternalRoleController extends Controller
         ]);
 
         return response()->json([
-            'user' => $this->serializeExternalUser($externalUser),
+            'user' => $this->serializeExternalIdentity($externalIdentity),
             'roles' => $this->roles(),
         ]);
     }
@@ -179,9 +181,9 @@ class ExternalRoleController extends Controller
 
     private function serializeCandidate(Project $project, ?string $environment, ?string $url, array $user): array
     {
-        $externalUser = ExternalUser::query()
+        $externalIdentity = ExternalIdentity::query()
             ->where('project_id', $project->id)
-            ->where('external_id', $this->externalUserService->normalizeExternalId($user['id'] ?? null))
+            ->where('external_id', $this->externalIdentityService->normalizeExternalId($user['id'] ?? null))
             ->when($environment !== null, fn ($query) => $query->where('environment', $environment))
             ->when($url !== null, fn ($query) => $query->where('url', $url))
             ->first();
@@ -190,19 +192,19 @@ class ExternalRoleController extends Controller
             'id' => $user['id'],
             'name' => $user['name'],
             'email' => $user['email'],
-            'role' => $externalUser?->role?->value ?? ExternalUserRole::User->value,
+            'role' => $externalIdentity?->role?->value ?? ExternalIdentityRole::User->value,
         ];
     }
 
-    private function serializeExternalUser(ExternalUser $externalUser): array
+    private function serializeExternalIdentity(ExternalIdentity $externalIdentity): array
     {
         return [
-            'id' => $externalUser->external_id,
-            'name' => $externalUser->name,
-            'email' => $externalUser->email,
-            'environment' => $externalUser->environment,
-            'url' => $externalUser->url,
-            'role' => $externalUser->role?->value ?? ExternalUserRole::User->value,
+            'id' => $externalIdentity->external_id,
+            'name' => $externalIdentity->name,
+            'email' => $externalIdentity->email,
+            'environment' => $externalIdentity->environment,
+            'url' => $externalIdentity->url,
+            'role' => $externalIdentity->role?->value ?? ExternalIdentityRole::User->value,
         ];
     }
 
@@ -211,8 +213,8 @@ class ExternalRoleController extends Controller
      */
     private function roles(): array
     {
-        return collect(ExternalUserRole::consumingAppCases())
-            ->map(fn (ExternalUserRole $role) => [
+        return collect(ExternalIdentityRole::consumingAppCases())
+            ->map(fn (ExternalIdentityRole $role) => [
                 'value' => $role->value,
                 'label' => $role->consumingAppLabel(),
                 'group' => $role->consumingAppGroup(),

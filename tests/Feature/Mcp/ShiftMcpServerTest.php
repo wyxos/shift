@@ -14,7 +14,7 @@ use App\Mcp\Tools\ListNotificationsTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListTaskThreadsTool;
 use App\Mcp\Tools\SearchTasksTool;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
 use App\Models\Task;
@@ -269,7 +269,7 @@ test('get task returns task details and collaborators', function () {
         'name' => 'Internal Collaborator',
         'email' => 'internal@example.com',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'name' => 'External Collaborator',
         'email' => 'external@example.com',
     ]);
@@ -290,7 +290,7 @@ test('get task returns task details and collaborators', function () {
     TaskCollaborator::query()->create([
         'task_id' => $task->id,
         'kind' => TaskCollaboratorKind::External,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
     ]);
 
     ShiftServer::actingAs($internalUser)->tool(GetTaskTool::class, [

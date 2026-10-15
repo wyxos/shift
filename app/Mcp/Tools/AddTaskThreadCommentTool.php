@@ -76,7 +76,7 @@ class AddTaskThreadCommentTool extends Tool
         app(TaskThreadAudienceService::class)->assertContentMayBeShared($task, $audience, $content);
         $content = app(TaskThreadMentionService::class)->normalizeContent($content, [
             'user_ids' => [],
-            'external_user_ids' => [],
+            'external_identity_ids' => [],
         ]);
 
         $thread = TaskThread::query()->create([
@@ -89,7 +89,7 @@ class AddTaskThreadCommentTool extends Tool
             'is_draft' => $this->draft,
         ]);
 
-        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
+        $thread->load(['sender', 'attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name']);
 
         if (! $thread->is_draft) {
             app(TaskThreadNotificationService::class)->send($task, $thread);

@@ -27,8 +27,8 @@ class TaskCollaborator extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function externalUser(): BelongsTo
+    public function externalIdentity(): BelongsTo
     {
-        return $this->belongsTo(ExternalUser::class);
+        return $this->belongsTo(ExternalIdentity::class);
     }
 }

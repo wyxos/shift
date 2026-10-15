@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -33,7 +33,7 @@ beforeEach(function () {
     ]);
 
     // Create an external user
-    $this->externalUser = ExternalUser::factory()->create([
+    $this->externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'ext-123',
         'environment' => 'testing',
@@ -44,7 +44,7 @@ beforeEach(function () {
 
     // Create a task submitted by the external user
     $this->task = Task::factory()->for($this->project)->create();
-    $this->task->submitter()->associate($this->externalUser)->save();
+    $this->task->submitter()->associate($this->externalIdentity)->save();
 });
 
 test('internal thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
@@ -93,7 +93,7 @@ test('internal thread with 2 embedded images and 1 non-embedded PDF returns only
 test('external thread creation sends notification to external collaborator in non production', function () {
     Notification::fake();
 
-    $this->task->externalCollaborators()->attach($this->externalUser);
+    $this->task->externalCollaborators()->attach($this->externalIdentity);
 
     // Mock the HTTP call to the external system
     Http::fake([
@@ -116,7 +116,7 @@ test('external thread creation sends notification to external collaborator in no
     Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) {
-            return $notifiable->routes['mail'] === $this->externalUser->email
+            return $notifiable->routes['mail'] === $this->externalIdentity->email
                 && ($notification->data['url'] ?? null) === 'https://example.com/shift/tasks?task='.$this->task->id;
         }
     );
@@ -125,7 +125,7 @@ test('external thread creation sends notification to external collaborator in no
 test('external thread creation does not send notification in production', function () {
     Notification::fake();
 
-    $this->task->externalCollaborators()->attach($this->externalUser);
+    $this->task->externalCollaborators()->attach($this->externalIdentity);
 
     // Mock the HTTP call to the external system
     Http::fake([
@@ -181,7 +181,7 @@ test('external thread creation with non external submitter sends notification to
     $task->submitter()->associate($regularUser)->save();
 
     // Add an external user with access to the task
-    $task->externalUsers()->attach($this->externalUser);
+    $task->externalIdentities()->attach($this->externalIdentity);
 
     // Mock the HTTP call to the external system
     Http::fake([
@@ -204,7 +204,7 @@ test('external thread creation with non external submitter sends notification to
     Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) {
-            return $notifiable->routes['mail'] === $this->externalUser->email;
+            return $notifiable->routes['mail'] === $this->externalIdentity->email;
         }
     );
 });
@@ -219,7 +219,7 @@ test('external thread creation sends notification to multiple external users', f
     ]);
 
     // Create another external user
-    $anotherExternalUser = ExternalUser::factory()->create([
+    $anotherExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'ext-456',
         'environment' => 'testing',
@@ -229,7 +229,7 @@ test('external thread creation sends notification to multiple external users', f
     ]);
 
     // Add both external users to the task
-    $this->task->externalUsers()->attach([$this->externalUser->id, $anotherExternalUser->id]);
+    $this->task->externalIdentities()->attach([$this->externalIdentity->id, $anotherExternalIdentity->id]);
 
     // Mock the HTTP calls to both external systems
     Http::fake([
@@ -256,14 +256,14 @@ test('external thread creation sends notification to multiple external users', f
     Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
         function ($notification, $channels, $notifiable) {
-            return $notifiable->routes['mail'] === $this->externalUser->email;
+            return $notifiable->routes['mail'] === $this->externalIdentity->email;
         }
     );
 
     Notification::assertSentOnDemand(
         TaskThreadUpdated::class,
-        function ($notification, $channels, $notifiable) use ($anotherExternalUser) {
-            return $notifiable->routes['mail'] === $anotherExternalUser->email;
+        function ($notification, $channels, $notifiable) use ($anotherExternalIdentity) {
+            return $notifiable->routes['mail'] === $anotherExternalIdentity->email;
         }
     );
 });

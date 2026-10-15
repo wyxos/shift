@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Enums\TaskThreadAudience;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
-use App\Services\ExternalUserService;
+use App\Services\ExternalActorResolver;
+use App\Services\ExternalTaskAccess;
 use App\Services\TaskThreadAudienceService;
 use App\Services\TaskThreadMentionService;
 use App\Services\TaskThreadNotificationService;
@@ -22,7 +23,8 @@ use Illuminate\Support\Facades\Storage;
 class ExternalTaskThreadController extends Controller
 {
     public function __construct(
-        private readonly ExternalUserService $externalUserService,
+        private readonly ExternalActorResolver $actors,
+        private readonly ExternalTaskAccess $externalTaskAccess,
         private readonly TaskThreadAudienceService $audiences,
         private readonly TaskThreadMentionService $mentions,
         private readonly TaskThreadNotificationService $taskThreadNotificationService,
@@ -37,26 +39,9 @@ class ExternalTaskThreadController extends Controller
             ->first();
     }
 
-    private function currentExternalUser(Project $project, bool $create = false): ?ExternalUser
+    private function currentExternalIdentity(Project $project, bool $create = false): ?ExternalIdentity
     {
-        $attributes = [
-            'external_id' => request('user.id'),
-            'name' => request('user.name') ?? 'External User',
-            'email' => request('user.email') ?? null,
-            'environment' => request('user.environment'),
-            'url' => request('user.url'),
-        ];
-
-        if ($create) {
-            return $this->externalUserService->upsert($project, $attributes);
-        }
-
-        return $this->externalUserService->find(
-            $project,
-            $attributes['external_id'],
-            $attributes['environment'],
-            $attributes['url'],
-        );
+        return $this->actors->fromRequest($project, request(), $create)?->identity;
     }
 
     private function ensureTaskBelongsToProject(Task $task): ?Project
@@ -70,9 +55,9 @@ class ExternalTaskThreadController extends Controller
         return $project;
     }
 
-    private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
+    private function externalIdentityHasAccess(Task $task, ExternalIdentity $externalIdentity): bool
     {
-        return $this->externalUserService->canCommentOnProjectItem($task, $externalUser);
+        return $this->externalTaskAccess->canCommentOnProjectItem($task, $externalIdentity);
     }
 
     /**
@@ -88,12 +73,12 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $externalUser = $this->currentExternalUser($project);
-        if (! $externalUser) {
+        $externalIdentity = $this->currentExternalIdentity($project);
+        if (! $externalIdentity) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        if (! $this->externalUserHasAccess($task, $externalUser)) {
+        if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -140,12 +125,12 @@ class ExternalTaskThreadController extends Controller
 
                 // Determine if the current user is the sender
                 $isCurrentUser = false;
-                if ($thread->sender_type === ExternalUser::class) {
-                    $externalUser = $thread->sender;
-                    $isCurrentUser = $externalUser &&
-                        $externalUser->external_id == request('user.id') &&
-                        $externalUser->environment == request('user.environment') &&
-                        $externalUser->url == request('user.url');
+                if ($thread->sender_type === ExternalIdentity::class) {
+                    $externalIdentity = $thread->sender;
+                    $isCurrentUser = $externalIdentity &&
+                        $externalIdentity->external_id == request('user.id') &&
+                        $externalIdentity->environment == request('user.environment') &&
+                        $externalIdentity->url == request('user.url');
                 }
 
                 return [
@@ -184,9 +169,9 @@ class ExternalTaskThreadController extends Controller
             'temp_identifier' => ['nullable', 'string', TemporaryAttachmentStorage::IDENTIFIER_RULE],
         ]);
 
-        $externalUser = $this->currentExternalUser($project, true);
+        $externalIdentity = $this->currentExternalIdentity($project, true);
 
-        if (! $this->externalUserHasAccess($task, $externalUser)) {
+        if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to comment on this task'], 403);
         }
 
@@ -194,13 +179,13 @@ class ExternalTaskThreadController extends Controller
             ? strtolower($request->string('client_request_id')->toString())
             : null;
 
-        $thread = DB::transaction(function () use ($request, $task, $externalUser, $clientRequestId): TaskThread {
+        $thread = DB::transaction(function () use ($request, $task, $externalIdentity, $clientRequestId): TaskThread {
             if ($clientRequestId !== null) {
                 Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
                 $existing = TaskThread::query()
                     ->where('task_id', $task->id)
-                    ->where('sender_type', ExternalUser::class)
-                    ->where('sender_id', $externalUser->id)
+                    ->where('sender_type', ExternalIdentity::class)
+                    ->where('sender_id', $externalIdentity->id)
                     ->where('client_request_id', $clientRequestId)
                     ->first();
 
@@ -213,17 +198,17 @@ class ExternalTaskThreadController extends Controller
             $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
             $content = $this->mentions->normalizeContent($content, [
                 'user_ids' => [],
-                'external_user_ids' => [],
+                'external_identity_ids' => [],
             ]);
             $thread = new TaskThread([
                 'task_id' => $task->id,
                 'type' => 'external',
                 'content' => $content,
-                'sender_name' => $externalUser->name,
+                'sender_name' => $externalIdentity->name,
                 'client_request_id' => $clientRequestId,
             ]);
 
-            $thread->sender()->associate($externalUser);
+            $thread->sender()->associate($externalIdentity);
             $thread->save();
 
             if ($request->has('temp_identifier')) {
@@ -354,12 +339,12 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $externalUser = $this->currentExternalUser($project);
-        if (! $externalUser) {
+        $externalIdentity = $this->currentExternalIdentity($project);
+        if (! $externalIdentity) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        if (! $this->externalUserHasAccess($task, $externalUser)) {
+        if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -387,12 +372,12 @@ class ExternalTaskThreadController extends Controller
 
         // Determine if the current user is the sender
         $isCurrentUser = false;
-        if ($thread->sender_type === ExternalUser::class) {
-            $externalUser = $thread->sender;
-            $isCurrentUser = $externalUser &&
-                $externalUser->external_id == request('user.id') &&
-                $externalUser->environment == request('user.environment') &&
-                $externalUser->url == request('user.url');
+        if ($thread->sender_type === ExternalIdentity::class) {
+            $externalIdentity = $thread->sender;
+            $isCurrentUser = $externalIdentity &&
+                $externalIdentity->external_id == request('user.id') &&
+                $externalIdentity->environment == request('user.environment') &&
+                $externalIdentity->url == request('user.url');
         }
 
         return response()->json([
@@ -424,12 +409,12 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $externalUser = $this->currentExternalUser($project);
-        if (! $externalUser) {
+        $externalIdentity = $this->currentExternalIdentity($project);
+        if (! $externalIdentity) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        if (! $this->externalUserHasAccess($task, $externalUser)) {
+        if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -448,7 +433,7 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
         }
 
-        if (! $this->isThreadOwnedByCurrentExternalUser($project, $thread)) {
+        if (! $this->isThreadOwnedByCurrentExternalIdentity($project, $thread)) {
             return response()->json(['error' => 'You can only edit your own messages'], 403);
         }
 
@@ -461,7 +446,7 @@ class ExternalTaskThreadController extends Controller
         $this->audiences->assertContentMayBeShared($task, TaskThreadAudience::All, $content);
         $content = $this->mentions->normalizeContent($content, [
             'user_ids' => [],
-            'external_user_ids' => [],
+            'external_identity_ids' => [],
         ]);
         $thread->content = $content;
         $thread->save();
@@ -528,12 +513,12 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Task not found in the specified project'], 404);
         }
 
-        $externalUser = $this->currentExternalUser($project);
-        if (! $externalUser) {
+        $externalIdentity = $this->currentExternalIdentity($project);
+        if (! $externalIdentity) {
             return response()->json(['error' => 'External user not found'], 404);
         }
 
-        if (! $this->externalUserHasAccess($task, $externalUser)) {
+        if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
@@ -546,7 +531,7 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Thread does not belong to this task'], 403);
         }
 
-        if (! $this->isThreadOwnedByCurrentExternalUser($project, $thread)) {
+        if (! $this->isThreadOwnedByCurrentExternalIdentity($project, $thread)) {
             return response()->json(['error' => 'You can only delete your own messages'], 403);
         }
 
@@ -637,16 +622,16 @@ class ExternalTaskThreadController extends Controller
         return $out;
     }
 
-    private function isThreadOwnedByCurrentExternalUser(Project $project, TaskThread $thread): bool
+    private function isThreadOwnedByCurrentExternalIdentity(Project $project, TaskThread $thread): bool
     {
-        if ($thread->sender_type !== ExternalUser::class) {
+        if ($thread->sender_type !== ExternalIdentity::class) {
             return false;
         }
 
-        $externalUser = $this->currentExternalUser($project);
+        $externalIdentity = $this->currentExternalIdentity($project);
 
-        return (bool) ($externalUser &&
-            $thread->sender_id === $externalUser->id);
+        return (bool) ($externalIdentity &&
+            $thread->sender_id === $externalIdentity->id);
     }
 
     /**

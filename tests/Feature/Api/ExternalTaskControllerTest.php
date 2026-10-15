@@ -1,9 +1,9 @@
 <?php
 
 use App\Models\Attachment;
-use App\Models\ExternalContact;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
+use App\Models\ProjectParticipant;
 use App\Models\Task;
 use App\Models\User;
 
@@ -24,7 +24,7 @@ beforeEach(function () {
     ]);
 
     // External user data
-    $this->externalUserData = [
+    $this->externalIdentityData = [
         'id' => 'ext-123',
         'name' => 'External User',
         'email' => 'external@example.com',
@@ -33,17 +33,17 @@ beforeEach(function () {
     ];
 
     // Create an external user
-    $this->externalUser = ExternalUser::create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $this->externalIdentity = ExternalIdentity::create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
-    $this->createRoleExternalUser = function (string $externalId, string $role, array $overrides = []): ExternalUser {
-        return ExternalUser::create([
+    $this->createRoleExternalIdentity = function (string $externalId, string $role, array $overrides = []): ExternalIdentity {
+        return ExternalIdentity::create([
             'external_id' => $externalId,
             'name' => $overrides['name'] ?? 'External '.$externalId,
             'email' => $overrides['email'] ?? $externalId.'@example.com',
@@ -54,15 +54,15 @@ beforeEach(function () {
         ]);
     };
 
-    $this->externalPayload = fn (ExternalUser $externalUser): array => [
-        'id' => $externalUser->external_id,
-        'name' => $externalUser->name,
-        'email' => $externalUser->email,
-        'environment' => $externalUser->environment,
-        'url' => $externalUser->url,
+    $this->externalPayload = fn (ExternalIdentity $externalIdentity): array => [
+        'id' => $externalIdentity->external_id,
+        'name' => $externalIdentity->name,
+        'email' => $externalIdentity->email,
+        'environment' => $externalIdentity->environment,
+        'url' => $externalIdentity->url,
     ];
 
-    $this->createSubmittedTask = function (ExternalUser $submitter, array $attributes = []): Task {
+    $this->createSubmittedTask = function (ExternalIdentity $submitter, array $attributes = []): Task {
         $task = Task::factory()->create([
             'project_id' => $this->project->id,
             ...$attributes,
@@ -74,12 +74,12 @@ beforeEach(function () {
 });
 
 test('external task visibility follows the role matrix', function () {
-    $owner = ($this->createRoleExternalUser)('owner-1', 'owner');
-    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-1', 'client_developer');
-    $shiftLeadDeveloper = ($this->createRoleExternalUser)('shift-lead-1', 'shift_lead_developer');
-    $shiftDeveloper = ($this->createRoleExternalUser)('shift-developer-1', 'shift_developer');
-    $user = ($this->createRoleExternalUser)('user-1', 'user');
-    $guest = ($this->createRoleExternalUser)('guest-1', 'guest');
+    $owner = ($this->createRoleExternalIdentity)('owner-1', 'owner');
+    $clientDeveloper = ($this->createRoleExternalIdentity)('client-developer-1', 'client_developer');
+    $shiftLeadDeveloper = ($this->createRoleExternalIdentity)('shift-lead-1', 'shift_lead_developer');
+    $shiftDeveloper = ($this->createRoleExternalIdentity)('shift-developer-1', 'shift_developer');
+    $user = ($this->createRoleExternalIdentity)('user-1', 'user');
+    $guest = ($this->createRoleExternalIdentity)('guest-1', 'guest');
 
     $ownerTask = ($this->createSubmittedTask)($owner, ['title' => 'Owner task']);
     $clientDeveloperTask = ($this->createSubmittedTask)($clientDeveloper, ['title' => 'Client developer task']);
@@ -87,13 +87,13 @@ test('external task visibility follows the role matrix', function () {
     $userTask = ($this->createSubmittedTask)($user, ['title' => 'User task']);
     $guestTask = ($this->createSubmittedTask)($guest, ['title' => 'Guest task']);
     $assignedTask = ($this->createSubmittedTask)($guest, ['title' => 'Assigned guest task']);
-    $assignedTask->externalUsers()->attach($clientDeveloper->id);
+    $assignedTask->externalIdentities()->attach($clientDeveloper->id);
 
-    $idsFor = function (ExternalUser $externalUser): array {
+    $idsFor = function (ExternalIdentity $externalIdentity): array {
         $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
             ->getJson('/api/tasks?'.http_build_query([
                 'project' => $this->project->token,
-                'user' => ($this->externalPayload)($externalUser),
+                'user' => ($this->externalPayload)($externalIdentity),
             ]));
 
         $response->assertOk();
@@ -143,28 +143,28 @@ test('linked external contacts can view tasks submitted by or assigned to linked
     $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
     $productionEnvironment = $this->project->environments()->where('environment', 'production')->firstOrFail();
 
-    $contact = ExternalContact::create([
+    $contact = ProjectParticipant::create([
         'project_id' => $this->project->id,
     ]);
 
-    $primaryAccount = ($this->createRoleExternalUser)('linked-primary', 'user', [
+    $primaryAccount = ($this->createRoleExternalIdentity)('linked-primary', 'user', [
         'environment' => 'testing',
         'url' => 'https://example.com',
         'email' => 'shared-contact@example.com',
     ]);
-    $secondaryAccount = ($this->createRoleExternalUser)('linked-secondary', 'user', [
+    $secondaryAccount = ($this->createRoleExternalIdentity)('linked-secondary', 'user', [
         'environment' => 'production',
         'url' => 'https://example.com/production',
         'email' => 'shared-contact@example.com',
     ]);
-    $unlinkedAccount = ($this->createRoleExternalUser)('unlinked-user', 'user');
+    $unlinkedAccount = ($this->createRoleExternalIdentity)('unlinked-user', 'user');
 
     $primaryAccount->forceFill([
-        'external_contact_id' => $contact->id,
+        'project_participant_id' => $contact->id,
         'project_environment_id' => $testingEnvironment->id,
     ])->save();
     $secondaryAccount->forceFill([
-        'external_contact_id' => $contact->id,
+        'project_participant_id' => $contact->id,
         'project_environment_id' => $productionEnvironment->id,
     ])->save();
     $unlinkedAccount->forceFill([
@@ -177,7 +177,7 @@ test('linked external contacts can view tasks submitted by or assigned to linked
     $assignedToSecondary = ($this->createSubmittedTask)($unlinkedAccount, [
         'title' => 'Assigned to linked production account',
     ]);
-    $assignedToSecondary->externalUsers()->attach($secondaryAccount->id);
+    $assignedToSecondary->externalIdentities()->attach($secondaryAccount->id);
     $unlinkedTask = ($this->createSubmittedTask)($unlinkedAccount, [
         'title' => 'Unlinked account task',
     ]);
@@ -206,15 +206,15 @@ test('linked external contacts can view tasks submitted by or assigned to linked
 
 test('project environment identity rejects an external account when the request url changes', function () {
     $testingEnvironment = $this->project->environments()->where('environment', 'testing')->firstOrFail();
-    $this->externalUser->forceFill([
+    $this->externalIdentity->forceFill([
         'project_environment_id' => $testingEnvironment->id,
     ])->save();
 
-    $task = ($this->createSubmittedTask)($this->externalUser, [
+    $task = ($this->createSubmittedTask)($this->externalIdentity, [
         'title' => 'Task visible after client URL changes',
     ]);
 
-    $payload = $this->externalUserData;
+    $payload = $this->externalIdentityData;
     $payload['url'] = 'https://renamed-client.example.com';
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -231,7 +231,7 @@ test('project environment identity rejects an external account when the request 
 });
 
 test('ordinary external traffic cannot overwrite a registered environment url', function () {
-    $payload = $this->externalUserData;
+    $payload = $this->externalIdentityData;
     $payload['url'] = 'https://attacker.example';
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -251,7 +251,7 @@ test('ordinary external traffic cannot overwrite a registered environment url', 
 
 test('partially configured clients cannot promote request metadata into callback trust', function () {
     $payload = [
-        ...$this->externalUserData,
+        ...$this->externalIdentityData,
         'id' => 'unregistered-environment-user',
         'environment' => 'manual',
         'url' => 'http://127.0.0.1:8080',
@@ -269,7 +269,7 @@ test('partially configured clients cannot promote request metadata into callback
         'environment' => 'manual',
     ]);
 
-    $this->assertDatabaseHas('external_users', [
+    $this->assertDatabaseHas('external_identities', [
         'project_id' => $this->project->id,
         'external_id' => 'unregistered-environment-user',
         'project_environment_id' => null,
@@ -281,15 +281,15 @@ test('index returns tasks for external user', function () {
     $task1 = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task1->submitter()->associate($this->externalUser)->save();
+    $task1->submitter()->associate($this->externalIdentity)->save();
 
     $task2 = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task2->submitter()->associate($this->externalUser)->save();
+    $task2->submitter()->associate($this->externalIdentity)->save();
 
     // Create a task by another user (should not be returned)
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -301,12 +301,12 @@ test('index returns tasks for external user', function () {
     $task3 = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task3->submitter()->associate($otherExternalUser)->save();
+    $task3->submitter()->associate($otherExternalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(200);
@@ -319,7 +319,7 @@ test('index and show expose task type metadata for app error tasks', function ()
         'title' => 'Normal customer task',
         'updated_at' => now()->subMinute(),
     ]);
-    $normalTask->submitter()->associate($this->externalUser)->save();
+    $normalTask->submitter()->associate($this->externalIdentity)->save();
 
     $errorTask = Task::factory()->create([
         'project_id' => $this->project->id,
@@ -328,12 +328,12 @@ test('index and show expose task type metadata for app error tasks', function ()
         'error_source' => 'backend',
         'updated_at' => now(),
     ]);
-    $errorTask->submitter()->associate($this->externalUser)->save();
+    $errorTask->submitter()->associate($this->externalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertOk()
@@ -347,7 +347,7 @@ test('index and show expose task type metadata for app error tasks', function ()
     $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson("/api/tasks/{$errorTask->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]))
         ->assertOk()
         ->assertJsonPath('type', 'app_error')
@@ -361,7 +361,7 @@ test('project token API calls require authenticated user project access', functi
     $this->withHeader('Authorization', 'Bearer '.$otherToken)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]))
         ->assertNotFound();
 
@@ -375,7 +375,7 @@ test('project token API calls require authenticated user project access', functi
         ->postJson('/api/tasks', [
             'title' => 'Blocked Cross Token Task',
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'metadata' => [
                 'url' => 'https://example.com/task/blocked',
                 'environment' => 'testing',
@@ -394,7 +394,7 @@ test('index supports environment filtering and priority sorting', function () {
         'project_id' => $this->project->id,
         'priority' => 'low',
     ]);
-    $stagingLow->submitter()->associate($this->externalUser)->save();
+    $stagingLow->submitter()->associate($this->externalIdentity)->save();
     $stagingLow->metadata()->create([
         'environment' => 'staging',
         'url' => 'https://example.com/staging-low',
@@ -404,7 +404,7 @@ test('index supports environment filtering and priority sorting', function () {
         'project_id' => $this->project->id,
         'priority' => 'high',
     ]);
-    $stagingHigh->submitter()->associate($this->externalUser)->save();
+    $stagingHigh->submitter()->associate($this->externalIdentity)->save();
     $stagingHigh->metadata()->create([
         'environment' => 'staging',
         'url' => 'https://example.com/staging-high',
@@ -414,7 +414,7 @@ test('index supports environment filtering and priority sorting', function () {
         'project_id' => $this->project->id,
         'priority' => 'high',
     ]);
-    $productionTask->submitter()->associate($this->externalUser)->save();
+    $productionTask->submitter()->associate($this->externalIdentity)->save();
     $productionTask->metadata()->create([
         'environment' => 'production',
         'url' => 'https://example.com/production',
@@ -423,7 +423,7 @@ test('index supports environment filtering and priority sorting', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'environment' => 'staging',
             'sort_by' => 'priority',
         ]));
@@ -446,7 +446,7 @@ test('index exposes registered project environment keys and labels without urls'
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response
@@ -462,7 +462,7 @@ test('show returns task details', function () {
         'project_id' => $this->project->id,
         'title' => 'Test Task',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
 
     $task->metadata()->create([
         'url' => 'https://example.com/task/123',
@@ -472,7 +472,7 @@ test('show returns task details', function () {
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(200);
@@ -493,7 +493,7 @@ test('show rewrites attachment urls without duplicating the client host', functi
         'project_id' => $this->project->id,
         'title' => 'Task With Inline Image',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
 
     $attachment = Attachment::create([
         'attachable_id' => $task->id,
@@ -509,7 +509,7 @@ test('show rewrites attachment urls without duplicating the client host', functi
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(200);
@@ -528,22 +528,22 @@ test('show returns 404 for task in different project', function () {
     $task = Task::factory()->create([
         'project_id' => $otherProject->id,
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token, // Using the original project token
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(404);
 });
 
 test('store creates new task', function () {
-    $sameUserInAnotherEnvironment = ExternalUser::create([
-        'external_id' => $this->externalUser->external_id,
-        'name' => $this->externalUser->name,
-        'email' => $this->externalUser->email,
+    $sameUserInAnotherEnvironment = ExternalIdentity::create([
+        'external_id' => $this->externalIdentity->external_id,
+        'name' => $this->externalIdentity->name,
+        'email' => $this->externalIdentity->email,
         'environment' => 'production',
         'url' => 'https://production.example.com',
         'project_id' => $this->project->id,
@@ -555,7 +555,7 @@ test('store creates new task', function () {
         'project' => $this->project->token,
         'priority' => 'high',
         'status' => 'pending',
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'metadata' => [
             'url' => 'https://example.com/task/new',
             'environment' => 'testing',
@@ -589,17 +589,17 @@ test('store creates new task', function () {
     $task = Task::query()->where('title', 'New External Task')->firstOrFail();
 
     $response
-        ->assertJsonPath('external_collaborators.0.id', $this->externalUser->external_id)
-        ->assertJsonPath('external_collaborators.0.email', $this->externalUser->email);
+        ->assertJsonPath('external_collaborators.0.id', $this->externalIdentity->external_id)
+        ->assertJsonPath('external_collaborators.0.email', $this->externalIdentity->email);
 
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $sameUserInAnotherEnvironment->id,
+        'external_identity_id' => $sameUserInAnotherEnvironment->id,
     ]);
 });
 
@@ -608,7 +608,7 @@ test('store respects a submitter opting out before task creation', function () {
         ->postJson('/api/tasks', [
             'title' => 'No submitter follow ups',
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'metadata' => [
                 'url' => 'https://example.com/task/new',
                 'environment' => 'testing',
@@ -619,19 +619,19 @@ test('store respects a submitter opting out before task creation', function () {
 
     $response
         ->assertCreated()
-        ->assertJsonPath('submitter.email', $this->externalUser->email)
+        ->assertJsonPath('submitter.email', $this->externalIdentity->email)
         ->assertJsonCount(0, 'external_collaborators');
 
     $task = Task::query()->where('title', 'No submitter follow ups')->firstOrFail();
 
     $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
     ]);
 });
 
 test('store rejects a changed external user destination before creating a task', function () {
-    $payload = $this->externalUserData;
+    $payload = $this->externalIdentityData;
     $payload['url'] = 'https://attacker.example';
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -673,7 +673,7 @@ test('store schedules create notification jobs for tagged external collaborators
     $taskData = [
         'title' => 'New External Task With Collaborator',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'metadata' => [
             'url' => 'https://example.com/task/new-collaborator',
             'environment' => 'testing',
@@ -693,13 +693,13 @@ test('store schedules create notification jobs for tagged external collaborators
     $response->assertCreated();
 
     $task = Task::query()->where('title', 'New External Task With Collaborator')->firstOrFail();
-    $externalUser = ExternalUser::query()->where('email', 'other-collaborator@example.com')->firstOrFail();
+    $externalIdentity = ExternalIdentity::query()->where('email', 'other-collaborator@example.com')->firstOrFail();
 
     $pending = \App\Models\TaskCollaboratorNotification::query()
         ->where('task_id', $task->id)
         ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
         ->where('kind', 'external')
-        ->where('external_user_id', $externalUser->id)
+        ->where('external_identity_id', $externalIdentity->id)
         ->whereNull('sent_at')
         ->whereNull('cancelled_at')
         ->firstOrFail();
@@ -713,7 +713,7 @@ test('store schedules create notification jobs for tagged external collaborators
         'task_id' => $task->id,
         'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
         'kind' => 'external',
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
     ]);
 });
 
@@ -737,7 +737,7 @@ test('store does not dispatch create notification job for the external creator w
     $taskData = [
         'title' => 'New External Task With Self Collaborator',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'metadata' => [
             'url' => 'https://example.com/task/self-notification',
             'environment' => 'testing',
@@ -764,7 +764,7 @@ test('store does not dispatch create notification job for the external creator w
         'task_id' => $task->id,
         'event' => \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED,
         'kind' => 'external',
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
     ]);
 });
 
@@ -776,7 +776,7 @@ test('update updates task', function () {
         'status' => 'pending',
         'priority' => 'low',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
 
     $updateData = [
         'title' => 'Updated Title',
@@ -785,9 +785,9 @@ test('update updates task', function () {
         'priority' => 'high',
         'project' => $this->project->token,
         'user' => [
-            'id' => $this->externalUser->external_id,
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
+            'id' => $this->externalIdentity->external_id,
+            'environment' => $this->externalIdentity->environment,
+            'url' => $this->externalIdentity->url,
         ],
     ];
 
@@ -813,7 +813,7 @@ test('update updates task', function () {
 
 test('update returns 403 for unauthorized user', function () {
     // Create a task submitted by a different external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -825,15 +825,15 @@ test('update returns 403 for unauthorized user', function () {
     $task = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     $updateData = [
         'title' => 'Updated Title',
         'project' => $this->project->token,
         'user' => [
-            'id' => $this->externalUser->external_id, // Different user than the submitter
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
+            'id' => $this->externalIdentity->external_id, // Different user than the submitter
+            'environment' => $this->externalIdentity->environment,
+            'url' => $this->externalIdentity->url,
         ],
     ];
 
@@ -848,7 +848,7 @@ test('destroy deletes task', function () {
     $task = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
 
     // Create attachments for the task
     $attachment1 = \App\Models\Attachment::create([
@@ -877,9 +877,9 @@ test('destroy deletes task', function () {
         ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
             'user' => [
-                'id' => $this->externalUser->external_id,
-                'environment' => $this->externalUser->environment,
-                'url' => $this->externalUser->url,
+                'id' => $this->externalIdentity->external_id,
+                'environment' => $this->externalIdentity->environment,
+                'url' => $this->externalIdentity->url,
             ],
         ]));
 
@@ -908,7 +908,7 @@ test('destroy deletes task', function () {
 
 test('destroy returns 403 for unauthorized user', function () {
     // Create a task submitted by a different external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -920,15 +920,15 @@ test('destroy returns 403 for unauthorized user', function () {
     $task = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
             'user' => [
-                'id' => $this->externalUser->external_id, // Different user than the submitter
-                'environment' => $this->externalUser->environment,
-                'url' => $this->externalUser->url,
+                'id' => $this->externalIdentity->external_id, // Different user than the submitter
+                'environment' => $this->externalIdentity->environment,
+                'url' => $this->externalIdentity->url,
             ],
         ]));
 
@@ -936,18 +936,18 @@ test('destroy returns 403 for unauthorized user', function () {
 });
 
 test('destroy is forbidden for non submitter with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
-    $owner = ($this->createRoleExternalUser)('owner-delete-1', 'owner');
+    $owner = ($this->createRoleExternalIdentity)('owner-delete-1', 'owner');
     $task = ($this->createSubmittedTask)($owner, [
         'title' => 'Owner task visible to assigned developer',
     ]);
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->deleteJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => ($this->externalPayload)($this->externalUser->fresh()),
+            'user' => ($this->externalPayload)($this->externalIdentity->fresh()),
         ]));
 
     $response->assertStatus(403);
@@ -959,8 +959,8 @@ test('destroy is forbidden for non submitter with granted access', function () {
 });
 
 test('requirement item mutation is submitter only for visible non submitters', function () {
-    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-requirement-edit', 'client_developer');
-    $owner = ($this->createRoleExternalUser)('owner-requirement-edit', 'owner');
+    $clientDeveloper = ($this->createRoleExternalIdentity)('client-developer-requirement-edit', 'client_developer');
+    $owner = ($this->createRoleExternalIdentity)('owner-requirement-edit', 'owner');
     $requirement = ($this->createSubmittedTask)($owner, [
         'title' => 'Owner submitted requirement',
         'description' => 'Original requirement details.',
@@ -1025,7 +1025,7 @@ test('store rejects tagged external collaborators when the environment is not re
         ->postJson('/api/tasks', [
             'title' => 'Task With Unregistered Environment',
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'metadata' => [
                 'url' => 'https://example.com/task/unregistered-environment',
                 'environment' => 'production',
@@ -1076,7 +1076,7 @@ test('external task creation only notifies explicitly tagged internal collaborat
         'project' => $this->project->token,
         'priority' => 'high',
         'status' => 'pending',
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'metadata' => [
             'url' => 'https://example.com/task/notification-policy',
             'environment' => 'testing',
@@ -1114,10 +1114,10 @@ test('external task creation only notifies explicitly tagged internal collaborat
     ]);
 });
 test('index returns tasks with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
     // Create another external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1131,15 +1131,15 @@ test('index returns tasks with granted access', function () {
         'project_id' => $this->project->id,
         'title' => 'Task by other user',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     // Grant access to our external user
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(200);
@@ -1147,10 +1147,10 @@ test('index returns tasks with granted access', function () {
 });
 
 test('show returns task with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
     // Create another external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1164,15 +1164,15 @@ test('show returns task with granted access', function () {
         'project_id' => $this->project->id,
         'title' => 'Task by other user',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     // Grant access to our external user
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson("/api/tasks/{$task->id}?".http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response->assertStatus(200);
@@ -1188,10 +1188,10 @@ test('show returns task with granted access', function () {
 });
 
 test('update is forbidden for non submitter with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
     // Create another external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1207,10 +1207,10 @@ test('update is forbidden for non submitter with granted access', function () {
         'status' => 'pending',
         'priority' => 'low',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     // Grant access to our external user
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $updateData = [
         'title' => 'Updated By Access',
@@ -1219,9 +1219,9 @@ test('update is forbidden for non submitter with granted access', function () {
         'priority' => 'high',
         'project' => $this->project->token,
         'user' => [
-            'id' => $this->externalUser->external_id,
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
+            'id' => $this->externalIdentity->external_id,
+            'environment' => $this->externalIdentity->environment,
+            'url' => $this->externalIdentity->url,
         ],
     ];
 
@@ -1240,10 +1240,10 @@ test('update is forbidden for non submitter with granted access', function () {
 });
 
 test('toggle status is forbidden for non submitter with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
     // Create another external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1257,19 +1257,19 @@ test('toggle status is forbidden for non submitter with granted access', functio
         'project_id' => $this->project->id,
         'status' => 'pending',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     // Grant access to our external user
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/toggle-status", [
             'status' => 'completed',
             'project' => $this->project->token,
             'user' => [
-                'id' => $this->externalUser->external_id,
-                'environment' => $this->externalUser->environment,
-                'url' => $this->externalUser->url,
+                'id' => $this->externalIdentity->external_id,
+                'environment' => $this->externalIdentity->environment,
+                'url' => $this->externalIdentity->url,
             ],
         ]);
 
@@ -1279,9 +1279,9 @@ test('toggle status is forbidden for non submitter with granted access', functio
 });
 
 test('toggle status rejects awaiting feedback for non submitter with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-456',
         'name' => 'Other User',
         'email' => 'other2@example.com',
@@ -1294,18 +1294,18 @@ test('toggle status rejects awaiting feedback for non submitter with granted acc
         'project_id' => $this->project->id,
         'status' => 'pending',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/toggle-status", [
             'status' => 'awaiting-feedback',
             'project' => $this->project->token,
             'user' => [
-                'id' => $this->externalUser->external_id,
-                'environment' => $this->externalUser->environment,
-                'url' => $this->externalUser->url,
+                'id' => $this->externalIdentity->external_id,
+                'environment' => $this->externalIdentity->environment,
+                'url' => $this->externalIdentity->url,
             ],
         ]);
 
@@ -1315,10 +1315,10 @@ test('toggle status rejects awaiting feedback for non submitter with granted acc
 });
 
 test('toggle priority is forbidden for non submitter with granted access', function () {
-    $this->externalUser->update(['role' => 'client_developer']);
+    $this->externalIdentity->update(['role' => 'client_developer']);
 
     // Create another external user
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1332,19 +1332,19 @@ test('toggle priority is forbidden for non submitter with granted access', funct
         'project_id' => $this->project->id,
         'priority' => 'low',
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
+    $task->submitter()->associate($otherExternalIdentity)->save();
 
     // Grant access to our external user
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/toggle-priority", [
             'priority' => 'high',
             'project' => $this->project->token,
             'user' => [
-                'id' => $this->externalUser->external_id,
-                'environment' => $this->externalUser->environment,
-                'url' => $this->externalUser->url,
+                'id' => $this->externalIdentity->external_id,
+                'environment' => $this->externalIdentity->environment,
+                'url' => $this->externalIdentity->url,
             ],
         ]);
 
@@ -1394,7 +1394,7 @@ test('external submitter can update collaborators through collaborator endpoint'
         'project_id' => $this->project->id,
         'title' => 'External collaborator update',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
     $task->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -1403,7 +1403,7 @@ test('external submitter can update collaborators through collaborator endpoint'
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/collaborators", [
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'internal_collaborator_ids' => [$internalCollaborator->id],
         ]);
 
@@ -1455,7 +1455,7 @@ test('external submitter can explicitly remain a collaborator without self notif
         'project_id' => $this->project->id,
         'title' => 'External self collaborator update',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
     $task->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -1464,7 +1464,7 @@ test('external submitter can explicitly remain a collaborator without self notif
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/collaborators", [
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'external_collaborators' => [
                 [
                     'id' => 'ext-123',
@@ -1480,7 +1480,7 @@ test('external submitter can explicitly remain a collaborator without self notif
 
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
         'kind' => 'external',
     ]);
 
@@ -1490,7 +1490,7 @@ test('external submitter can explicitly remain a collaborator without self notif
         'task_id' => $task->id,
         'event' => \App\Models\TaskCollaboratorNotification::EVENT_COLLABORATOR_ADDED,
         'kind' => 'external',
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
     ]);
 });
 
@@ -1501,8 +1501,8 @@ test('external submitter can remove their default collaboration to opt out of fo
         'project_id' => $this->project->id,
         'title' => 'External submitter opt out',
     ]);
-    $task->submitter()->associate($this->externalUser)->save();
-    $task->externalCollaborators()->attach($this->externalUser->id);
+    $task->submitter()->associate($this->externalIdentity)->save();
+    $task->externalCollaborators()->attach($this->externalIdentity->id);
     $task->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -1511,7 +1511,7 @@ test('external submitter can remove their default collaboration to opt out of fo
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/collaborators", [
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'environment' => 'testing',
             'internal_collaborator_ids' => [],
             'external_collaborators' => [],
@@ -1520,19 +1520,19 @@ test('external submitter can remove their default collaboration to opt out of fo
     $response
         ->assertOk()
         ->assertJsonCount(0, 'external_collaborators')
-        ->assertJsonPath('submitter.email', $this->externalUser->email)
+        ->assertJsonPath('submitter.email', $this->externalIdentity->email)
         ->assertJsonPath('can_manage_collaborators', true);
 
     $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $this->externalUser->id,
+        'external_identity_id' => $this->externalIdentity->id,
     ]);
 
     \Illuminate\Support\Facades\Queue::assertNothingPushed();
 });
 
 test('non submitter external collaborator cannot update collaborators', function () {
-    $otherExternalUser = ExternalUser::create([
+    $otherExternalIdentity = ExternalIdentity::create([
         'external_id' => 'other-123',
         'name' => 'Other User',
         'email' => 'other@example.com',
@@ -1544,13 +1544,13 @@ test('non submitter external collaborator cannot update collaborators', function
     $task = Task::factory()->create([
         'project_id' => $this->project->id,
     ]);
-    $task->submitter()->associate($otherExternalUser)->save();
-    $task->externalUsers()->attach($this->externalUser->id);
+    $task->submitter()->associate($otherExternalIdentity)->save();
+    $task->externalIdentities()->attach($this->externalIdentity->id);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->patchJson("/api/tasks/{$task->id}/collaborators", [
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'internal_collaborator_ids' => [],
         ]);
 
@@ -1589,7 +1589,7 @@ test('store sanitizes dangerous external description html', function () {
             'project' => $this->project->token,
             'priority' => 'high',
             'status' => 'pending',
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
             'metadata' => [
                 'url' => 'https://example.com/task/sanitized',
                 'environment' => 'testing',
@@ -1619,9 +1619,9 @@ test('SDK collaborator updates preserve missing task metadata and source-qualifi
         'users' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
     ])]);
     $task = Task::factory()->for($this->project)->create();
-    $task->submitter()->associate($this->externalUser)->save();
+    $task->submitter()->associate($this->externalIdentity)->save();
     $this->withHeader('Authorization', 'Bearer '.$this->token)->patchJson("/api/tasks/{$task->id}/collaborators", [
-        'project' => $this->project->token, 'user' => $this->externalUserData, 'environment' => 'production',
+        'project' => $this->project->token, 'user' => $this->externalIdentityData, 'environment' => 'production',
         'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test', 'environment' => 'production']],
     ])->assertOk()->assertJsonPath('external_collaborators.0.environment', 'production')->assertJsonPath('environment', null);
     expect($task->fresh()->metadata)->toBeNull()
@@ -1632,20 +1632,20 @@ test('older SDK selections retain existing cross-environment accounts and reject
     \Illuminate\Support\Facades\Queue::fake();
     \Illuminate\Support\Facades\Http::preventStrayRequests();
     $task = Task::factory()->for($this->project)->create();
-    $task->submitter()->associate($this->externalUser)->save();
-    $productionUser = ExternalUser::factory()->create([
+    $task->submitter()->associate($this->externalIdentity)->save();
+    $productionUser = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'production', 'url' => 'https://production.test',
     ]);
     $task->externalCollaborators()->attach($productionUser->id);
     $payload = [
-        'project' => $this->project->token, 'user' => $this->externalUserData,
+        'project' => $this->project->token, 'user' => $this->externalIdentityData,
         'external_collaborators' => [['id' => '7', 'name' => 'Alex', 'email' => 'alex@example.test']],
     ];
     $this->withHeader('Authorization', 'Bearer '.$this->token)->patchJson("/api/tasks/{$task->id}/collaborators", $payload)
         ->assertOk()->assertJsonPath('external_collaborators.0.environment', 'production');
     expect($task->externalCollaborators()->sole()->id)->toBe($productionUser->id);
 
-    $testingUser = ExternalUser::factory()->create([
+    $testingUser = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id, 'external_id' => '7', 'environment' => 'testing', 'url' => 'https://example.com',
     ]);
     $task->externalCollaborators()->attach($testingUser->id);

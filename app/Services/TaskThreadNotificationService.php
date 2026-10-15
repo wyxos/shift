@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\TaskThreadAudience;
 use App\Jobs\SendTaskThreadNotification;
 use App\Jobs\SendTaskThreadNotifications;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\User;
@@ -80,21 +80,21 @@ class TaskThreadNotificationService
             return;
         }
 
-        $externalSenderId = $thread->sender_type === ExternalUser::class
+        $externalSenderId = $thread->sender_type === ExternalIdentity::class
             ? (int) $thread->sender_id
             : null;
 
-        foreach ($this->taskCollaboratorService->externalReplyAudience($task, $externalSenderId) as $externalUser) {
+        foreach ($this->taskCollaboratorService->externalReplyAudience($task, $externalSenderId) as $externalIdentity) {
             SendTaskThreadNotification::dispatch(
                 $thread->id,
                 [
-                    'url' => $externalUser->url,
-                    'email' => $externalUser->email,
-                    'external_id' => $externalUser->external_id,
+                    'url' => $externalIdentity->url,
+                    'email' => $externalIdentity->email,
+                    'external_id' => $externalIdentity->external_id,
                 ],
                 [
                     'type' => 'task_thread',
-                    'user_id' => $externalUser->external_id,
+                    'user_id' => $externalIdentity->external_id,
                     'task_id' => $task->id,
                     'task_title' => $task->title,
                     'thread_id' => $thread->id,

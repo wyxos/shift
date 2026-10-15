@@ -3,7 +3,7 @@
 use App\Enums\OrganisationRole;
 use App\Enums\TaskCollaboratorKind;
 use App\Models\Client;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\Task;
@@ -106,7 +106,7 @@ test('widget submission alerts assigned internal roles once and preserves extern
     expect(widgetPendingRecipientIds($task))->toBe($recipients->pluck('id')->sort()->values()->all())
         ->and(TaskCollaboratorNotification::query()->where('task_id', $task->id)->count())->toBe(3)
         ->and(TaskCollaboratorNotification::query()->where('kind', TaskCollaboratorKind::External->value)->exists())->toBeFalse()
-        ->and($task->submitter)->toBeInstanceOf(ExternalUser::class)
+        ->and($task->submitter)->toBeInstanceOf(ExternalIdentity::class)
         ->and(app(TaskCollaboratorService::class)->externalReplyAudience($task)->pluck('id')->all())->toBe([$task->submitter_id]);
 
     foreach ($recipients as $recipient) {

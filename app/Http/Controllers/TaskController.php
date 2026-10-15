@@ -7,7 +7,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Requests\SearchTaskCollaboratorsRequest;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\RequirementBatch;
@@ -17,7 +17,7 @@ use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Notifications\TaskThreadUpdated;
-use App\Services\ExternalUserService;
+use App\Services\ExternalCollaboratorService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\ShiftPermissionService;
 use App\Services\TaskCollaboratorNotificationScheduler;
@@ -39,9 +39,9 @@ class TaskController extends Controller
     public const TASK_NOT_FOUND_MESSAGE = 'This task is no longer available or you do not have access to it.';
 
     public function __construct(
+        private readonly ExternalCollaboratorService $externalCollaborators,
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly TaskCollaboratorNotificationScheduler $collaboratorNotifications,
-        private readonly ExternalUserService $externalUserService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly ShiftPermissionService $permissions,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
@@ -282,7 +282,7 @@ class TaskController extends Controller
 
     private function resolveExternalCollaboratorsForProject(Project $project, ?string $environment, array $attributes, Task $task): \Illuminate\Support\Collection
     {
-        return $this->externalUserService->resolveCollaborators(
+        return $this->externalCollaborators->resolveCollaborators(
             $project,
             $environment,
             $attributes['external_collaborators'] ?? [],
@@ -303,14 +303,14 @@ class TaskController extends Controller
             $attributes['internal_collaborator_ids'] ?? [],
         );
         try {
-            $externalUsers = $this->resolveExternalCollaboratorsForProject($project, $environment, $attributes, $task);
+            $externalIdentities = $this->resolveExternalCollaboratorsForProject($project, $environment, $attributes, $task);
         } catch (\RuntimeException $exception) {
             throw ValidationException::withMessages([
                 'external_collaborators' => $exception->getMessage(),
             ]);
         }
 
-        return $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalUsers);
+        return $this->taskCollaboratorService->syncWithResult($task, $internalIds, $externalIdentities);
     }
 
     private function sendCollaboratorAddedNotifications(Task $task, array $syncResult): void
@@ -503,7 +503,7 @@ class TaskController extends Controller
                 ->values()
                 ->all(),
             'external_collaborators' => $task->externalCollaborators
-                ->map(fn (ExternalUser $user) => [
+                ->map(fn (ExternalIdentity $user) => [
                     'id' => $user->external_id,
                     'environment' => $user->environment,
                     'name' => $user->name,
@@ -929,7 +929,7 @@ class TaskController extends Controller
         $externalError = null;
 
         if ($search !== '') {
-            $lookup = $this->externalUserService->searchProjectCollaborators($project, $environment, $search);
+            $lookup = $this->externalCollaborators->searchProjectCollaborators($project, $environment, $search);
             $external = $lookup['users'];
             $externalAvailable = $lookup['available'];
             $externalError = $lookup['error'];

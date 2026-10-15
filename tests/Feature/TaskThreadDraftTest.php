@@ -8,7 +8,7 @@ use App\Mcp\Tools\EditTaskThreadCommentTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListTaskThreadsTool;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -131,7 +131,7 @@ test('author can edit and delete a draft without publishing it', function () {
 });
 
 test('publishing a draft once exposes it and notifies the audience exactly once', function () {
-    $external = ExternalUser::factory()->create(['project_id' => $this->project->id]);
+    $external = ExternalIdentity::factory()->create(['project_id' => $this->project->id]);
     $this->task->externalCollaborators()->attach($external);
     $this->travel(5)->minutes();
     $url = route('task-threads.publish', [$this->task, $this->draft]);
@@ -172,7 +172,7 @@ test('notification service refuses to send an unpublished draft', function () {
 });
 
 test('publishing Team drafts preserves their audience and sends no external callback', function () {
-    $external = ExternalUser::factory()->create(['project_id' => $this->project->id]);
+    $external = ExternalIdentity::factory()->create(['project_id' => $this->project->id]);
     $this->task->externalCollaborators()->attach($external);
     $this->draft->update(['type' => 'internal']);
 
@@ -220,7 +220,7 @@ test('draft attachments remain private and the owner can download them', functio
 test('external API cannot list read edit delete or download unpublished drafts', function () {
     Storage::fake('local');
     Sanctum::actingAs($this->author);
-    $external = ExternalUser::factory()->create([
+    $external = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'environment' => 'testing',
         'url' => 'https://consumer.example.test',

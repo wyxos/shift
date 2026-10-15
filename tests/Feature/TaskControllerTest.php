@@ -2,7 +2,7 @@
 
 use App\Enums\OrganisationRole;
 use App\Enums\RequirementStatus;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
@@ -736,7 +736,7 @@ test('task detail includes an external requirement submitter when they are a col
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
-    $externalUser = ExternalUser::query()->create([
+    $externalIdentity = ExternalIdentity::query()->create([
         'external_id' => 'client-123',
         'name' => 'Client User',
         'email' => 'client@example.com',
@@ -750,8 +750,8 @@ test('task detail includes an external requirement submitter when they are a col
         'title' => 'Requirement item',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
-    $requirement->externalCollaborators()->attach($externalUser->id);
+    $requirement->submitter()->associate($externalIdentity)->save();
+    $requirement->externalCollaborators()->attach($externalIdentity->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -775,7 +775,7 @@ test('task detail does not synthesize an external submitter after they leave the
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
-    $externalUser = ExternalUser::query()->create([
+    $externalIdentity = ExternalIdentity::query()->create([
         'external_id' => 'client-opted-out',
         'name' => 'Opted Out Client',
         'email' => 'opted-out@example.com',
@@ -788,7 +788,7 @@ test('task detail does not synthesize an external submitter after they leave the
         'project_id' => $project->id,
         'title' => 'Opted out task',
     ]);
-    $task->submitter()->associate($externalUser)->save();
+    $task->submitter()->associate($externalIdentity)->save();
 
     $this->actingAs($this->user)
         ->getJson(route('tasks.show', $task))
@@ -861,7 +861,7 @@ test('can finalize ready requirement items in a visible batch without promoting 
         'author_id' => $this->user->id,
     ]);
 
-    $externalUser = ExternalUser::query()->create([
+    $externalIdentity = ExternalIdentity::query()->create([
         'external_id' => 'client-123',
         'name' => 'Client User',
         'email' => 'client@example.com',
@@ -872,17 +872,17 @@ test('can finalize ready requirement items in a visible batch without promoting 
 
     $batch = RequirementBatch::query()->create([
         'project_id' => $project->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'title' => 'June client requirements',
     ]);
 
-    $requirements = collect(['Renewal report', 'CSV export'])->map(function (string $title) use ($project, $externalUser, $batch) {
+    $requirements = collect(['Renewal report', 'CSV export'])->map(function (string $title) use ($project, $externalIdentity, $batch) {
         $requirement = Task::factory()->create([
             'project_id' => $project->id,
             'title' => $title,
             'status' => 'pending',
         ]);
-        $requirement->submitter()->associate($externalUser)->save();
+        $requirement->submitter()->associate($externalIdentity)->save();
         $requirement->metadata()->create([
             'environment' => 'production',
             'url' => 'https://example.com/requirement',
@@ -898,9 +898,9 @@ test('can finalize ready requirement items in a visible batch without promoting 
         $thread = new TaskThread([
             'type' => 'external',
             'content' => '<p>Can you clarify scope?</p>',
-            'sender_name' => $externalUser->name,
+            'sender_name' => $externalIdentity->name,
         ]);
-        $thread->sender()->associate($externalUser);
+        $thread->sender()->associate($externalIdentity);
         $requirement->threads()->save($thread);
 
         return $requirement;
@@ -910,7 +910,7 @@ test('can finalize ready requirement items in a visible batch without promoting 
         'title' => 'Budget dependent workflow',
         'status' => 'pending',
     ]);
-    $parkedRequirement->submitter()->associate($externalUser)->save();
+    $parkedRequirement->submitter()->associate($externalIdentity)->save();
     $parkedRequirement->metadata()->create([
         'environment' => 'production',
         'url' => 'https://example.com/requirement',
@@ -1293,11 +1293,11 @@ test('store syncs grouped collaborators and returns them in the response', funct
 
     $task = Task::where('title', 'Task with collaborators')->firstOrFail();
     expect($task->metadata?->environment)->toBe('production');
-    $externalUser = ExternalUser::where('project_id', $project->id)
+    $externalIdentity = ExternalIdentity::where('project_id', $project->id)
         ->where('external_id', 'client-7')
         ->first();
 
-    expect($externalUser)->not->toBeNull();
+    expect($externalIdentity)->not->toBeNull();
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
         'user_id' => $internalCollaborator->id,
@@ -1305,7 +1305,7 @@ test('store syncs grouped collaborators and returns them in the response', funct
     ]);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'kind' => 'external',
     ]);
 
@@ -1950,13 +1950,13 @@ test('store schedules create notification jobs for tagged external collaborators
     $response->assertCreated();
 
     $task = Task::query()->where('title', 'Tagged external collaborator task')->firstOrFail();
-    $externalUser = ExternalUser::query()->where('email', 'client@example.com')->firstOrFail();
+    $externalIdentity = ExternalIdentity::query()->where('email', 'client@example.com')->firstOrFail();
 
     $pending = \App\Models\TaskCollaboratorNotification::query()
         ->where('task_id', $task->id)
         ->where('event', \App\Models\TaskCollaboratorNotification::EVENT_TASK_CREATED)
         ->where('kind', 'external')
-        ->where('external_user_id', $externalUser->id)
+        ->where('external_identity_id', $externalIdentity->id)
         ->whereNull('sent_at')
         ->whereNull('cancelled_at')
         ->firstOrFail();
@@ -1973,12 +1973,12 @@ test('edit route redirects for internal task', function () {
     ]);
 
     // Create external users with different environments
-    $externalUser1 = ExternalUser::factory()->create([
+    $externalIdentity1 = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
         'name' => 'Production User',
     ]);
-    $externalUser2 = ExternalUser::factory()->create([
+    $externalIdentity2 = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'staging',
         'name' => 'Staging User',
@@ -2002,17 +2002,17 @@ test('edit route redirects for external submitted task', function () {
     ]);
 
     // Create external users with different environments
-    $externalUser1 = ExternalUser::factory()->create([
+    $externalIdentity1 = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
         'name' => 'Production User',
     ]);
-    $externalUser2 = ExternalUser::factory()->create([
+    $externalIdentity2 = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'staging',
         'name' => 'Staging User',
     ]);
-    $externalUser3 = ExternalUser::factory()->create([
+    $externalIdentity3 = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
         'name' => 'Another Production User',
@@ -2022,7 +2022,7 @@ test('edit route redirects for external submitted task', function () {
     $task = Task::factory()->create([
         'project_id' => $project->id,
     ]);
-    $task->submitter()->associate($externalUser1)->save();
+    $task->submitter()->associate($externalIdentity1)->save();
 
     $response = $this->actingAs($this->user)
         ->get(route('tasks.edit', $task));

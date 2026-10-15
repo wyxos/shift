@@ -1,8 +1,8 @@
 <?php
 
-use App\Enums\ExternalUserRole;
+use App\Enums\ExternalIdentityRole;
 use App\Enums\OrganisationRole;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
@@ -36,7 +36,7 @@ test('internal technical managers can assign external roles', function () {
                 'name' => 'Client Owner',
                 'email' => 'owner@example.com',
             ],
-            'role' => ExternalUserRole::Owner->value,
+            'role' => ExternalIdentityRole::Owner->value,
             'environment' => 'testing',
             'metadata' => [
                 'environment' => 'testing',
@@ -47,26 +47,26 @@ test('internal technical managers can assign external roles', function () {
     $response
         ->assertOk()
         ->assertJsonPath('user.id', 'client-owner-1')
-        ->assertJsonPath('user.role', ExternalUserRole::Owner->value);
+        ->assertJsonPath('user.role', ExternalIdentityRole::Owner->value);
 
-    $this->assertDatabaseHas('external_users', [
+    $this->assertDatabaseHas('external_identities', [
         'project_id' => $this->project->id,
         'external_id' => 'client-owner-1',
-        'role' => ExternalUserRole::Owner->value,
+        'role' => ExternalIdentityRole::Owner->value,
     ]);
 });
 
 test('embedded shift developers cannot assign external roles', function () {
     $untrustedInternalUser = User::factory()->create();
     $untrustedToken = $untrustedInternalUser->createToken('untrusted')->plainTextToken;
-    $shiftDeveloper = ExternalUser::query()->create([
+    $shiftDeveloper = ExternalIdentity::query()->create([
         'project_id' => $this->project->id,
         'external_id' => 'shift-dev-1',
         'name' => 'SHIFT Developer',
         'email' => 'shift-dev@example.com',
         'environment' => 'testing',
         'url' => 'https://consumer.test',
-        'role' => ExternalUserRole::ShiftDeveloper->value,
+        'role' => ExternalIdentityRole::ShiftDeveloper->value,
     ]);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$untrustedToken)
@@ -84,7 +84,7 @@ test('embedded shift developers cannot assign external roles', function () {
                 'name' => 'Client Developer',
                 'email' => 'client-dev@example.com',
             ],
-            'role' => ExternalUserRole::ClientDeveloper->value,
+            'role' => ExternalIdentityRole::ClientDeveloper->value,
             'environment' => 'testing',
             'metadata' => [
                 'environment' => 'testing',
@@ -94,21 +94,21 @@ test('embedded shift developers cannot assign external roles', function () {
 
     $response->assertForbidden();
 
-    $this->assertDatabaseMissing('external_users', [
+    $this->assertDatabaseMissing('external_identities', [
         'project_id' => $this->project->id,
         'external_id' => 'client-dev-1',
     ]);
 });
 
 test('developer internal users cannot assign external roles', function () {
-    $viewer = ExternalUser::query()->create([
+    $viewer = ExternalIdentity::query()->create([
         'project_id' => $this->project->id,
         'external_id' => 'viewer-1',
         'name' => 'Viewer',
         'email' => 'viewer@example.com',
         'environment' => 'testing',
         'url' => 'https://consumer.test',
-        'role' => ExternalUserRole::User->value,
+        'role' => ExternalIdentityRole::User->value,
     ]);
     $plainInternalUser = User::factory()->create();
     OrganisationUser::query()->create([
@@ -142,7 +142,7 @@ test('developer internal users cannot assign external roles', function () {
                 'name' => 'Client Developer',
                 'email' => 'client-dev-2@example.com',
             ],
-            'role' => ExternalUserRole::ClientDeveloper->value,
+            'role' => ExternalIdentityRole::ClientDeveloper->value,
             'environment' => 'testing',
             'metadata' => [
                 'environment' => 'testing',
@@ -178,7 +178,7 @@ test('client project managers can assign external roles for accessible projects'
                 'name' => 'Client Owner',
                 'email' => 'owner-2@example.com',
             ],
-            'role' => ExternalUserRole::Owner->value,
+            'role' => ExternalIdentityRole::Owner->value,
             'environment' => 'testing',
             'metadata' => [
                 'environment' => 'testing',
@@ -189,12 +189,12 @@ test('client project managers can assign external roles for accessible projects'
     $response
         ->assertOk()
         ->assertJsonPath('user.id', 'client-owner-2')
-        ->assertJsonPath('user.role', ExternalUserRole::Owner->value);
+        ->assertJsonPath('user.role', ExternalIdentityRole::Owner->value);
 
-    $this->assertDatabaseHas('external_users', [
+    $this->assertDatabaseHas('external_identities', [
         'project_id' => $this->project->id,
         'external_id' => 'client-owner-2',
-        'role' => ExternalUserRole::Owner->value,
+        'role' => ExternalIdentityRole::Owner->value,
     ]);
 });
 
@@ -208,10 +208,10 @@ test('external role options use consuming app labels without changing role value
             ],
         ]))
         ->assertOk()
-        ->assertJsonPath('roles.0.value', ExternalUserRole::Owner->value)
+        ->assertJsonPath('roles.0.value', ExternalIdentityRole::Owner->value)
         ->assertJsonPath('roles.0.label', 'Owner')
         ->assertJsonPath('roles.0.group', 'App roles')
-        ->assertJsonPath('roles.1.value', ExternalUserRole::ClientDeveloper->value)
+        ->assertJsonPath('roles.1.value', ExternalIdentityRole::ClientDeveloper->value)
         ->assertJsonPath('roles.1.label', 'Developer')
         ->assertJsonPath('roles.1.group', 'App roles')
         ->assertJsonPath('roles.2.label', 'User')
@@ -221,8 +221,8 @@ test('external role options use consuming app labels without changing role value
         ->assertJsonPath('roles.5.label', 'SHIFT Developer')
         ->assertJsonPath('roles.5.group', 'SHIFT roles');
 
-    expect(ExternalUserRole::Owner->label())->toBe('Client Owner')
-        ->and(ExternalUserRole::ClientDeveloper->label())->toBe('Client Developer');
+    expect(ExternalIdentityRole::Owner->label())->toBe('Client Owner')
+        ->and(ExternalIdentityRole::ClientDeveloper->label())->toBe('Client Developer');
 });
 
 test('external role index returns collaborator candidates with stored roles', function () {
@@ -240,14 +240,14 @@ test('external role index returns collaborator candidates with stored roles', fu
         ]),
     ]);
 
-    ExternalUser::query()->create([
+    ExternalIdentity::query()->create([
         'project_id' => $this->project->id,
         'external_id' => 'client-owner-1',
         'name' => 'Client Owner',
         'email' => 'owner@example.com',
         'environment' => 'testing',
         'url' => 'https://consumer.test',
-        'role' => ExternalUserRole::Owner->value,
+        'role' => ExternalIdentityRole::Owner->value,
     ]);
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -259,7 +259,7 @@ test('external role index returns collaborator candidates with stored roles', fu
         ->assertOk()
         ->assertJsonPath('capabilities.can_manage_external_roles', true)
         ->assertJsonPath('users.0.id', 'client-owner-1')
-        ->assertJsonPath('users.0.role', ExternalUserRole::Owner->value);
+        ->assertJsonPath('users.0.role', ExternalIdentityRole::Owner->value);
 });
 
 test('external role index preserves a consumer resolver configuration message', function () {

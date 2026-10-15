@@ -256,12 +256,12 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         router.get(path, { project_id: project.id });
     }
 
-    function openProjectExternalUsers(project: ProjectRow) {
+    function openProjectParticipants(project: ProjectRow) {
         const organisationId = isScopedOrganisationRoute.value ? appliedOrganisationId.value : project.organisation_id;
 
         if (!organisationId) return;
 
-        router.get(`/organisation/${organisationId}/external-users`, { project_id: project.id });
+        router.get(`/organisation/${organisationId}/project-participants`, { project_id: project.id });
     }
 
     function closeEditModal() {
@@ -443,7 +443,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         openEditModal,
         openManageUsersModal,
         openMcpSettingsModal,
-        openProjectExternalUsers,
+        openProjectParticipants,
         openProjectTasks,
         openWidgetSettingsModal,
         otherEditErrors,

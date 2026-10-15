@@ -1,22 +1,39 @@
 <?php
 
-use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+beforeEach(function () {
+    $rename = require database_path('migrations/2026_10_15_120000_rename_external_accounts_to_project_participants.php');
+    $rename->down();
+});
+
+function historicalEnvironmentIdentity(array $attributes): object
+{
+    $id = DB::table('external_users')->insertGetId(array_merge([
+        'name' => 'Client',
+        'email' => 'client@example.com',
+        'role' => 'user',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $attributes));
+
+    return (object) ['id' => $id];
+}
+
 test('task collaborator migration backfills project environments from external users', function () {
     $project = Project::factory()->create();
 
-    ExternalUser::factory()->create([
+    historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'client-1',
         'environment' => 'production',
         'url' => 'https://client-production.test',
     ]);
-    ExternalUser::factory()->create([
+    historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'client-2',
         'environment' => 'staging',
@@ -47,13 +64,13 @@ test('task collaborator migration backfills project environments from external u
 test('follow-up project environment migration backfills existing installs', function () {
     $project = Project::factory()->create();
 
-    ExternalUser::factory()->create([
+    historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'client-1',
         'environment' => 'production',
         'url' => 'https://client-production.test',
     ]);
-    ExternalUser::factory()->create([
+    historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'client-2',
         'environment' => 'staging',
@@ -82,7 +99,7 @@ test('external account identity migration backfills contacts and environment ref
 
     $project = Project::factory()->create();
 
-    $firstExternalUser = ExternalUser::factory()->create([
+    $firstExternalUser = historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'shared-client-id',
         'name' => 'Shared Client',
@@ -90,7 +107,7 @@ test('external account identity migration backfills contacts and environment ref
         'environment' => 'production',
         'url' => 'https://client-production.test/',
     ]);
-    $secondExternalUser = ExternalUser::factory()->create([
+    $secondExternalUser = historicalEnvironmentIdentity([
         'project_id' => $project->id,
         'external_id' => 'shared-client-id',
         'name' => 'Shared Client',

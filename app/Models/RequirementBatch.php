@@ -18,9 +18,9 @@ class RequirementBatch extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function externalUser(): BelongsTo
+    public function externalIdentity(): BelongsTo
     {
-        return $this->belongsTo(ExternalUser::class);
+        return $this->belongsTo(ExternalIdentity::class);
     }
 
     public function metadata(): HasMany

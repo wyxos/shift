@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\User;
 
@@ -25,12 +25,12 @@ test('external user edit page is retired', function () {
     $project = Project::factory()->create([
         'author_id' => $user->id,
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
     ]);
 
     $this->actingAs($user)
-        ->get("/external-users/{$externalUser->id}/edit")
+        ->get("/external-users/{$externalIdentity->id}/edit")
         ->assertNotFound();
 });
 

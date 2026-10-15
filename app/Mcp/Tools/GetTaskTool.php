@@ -44,7 +44,7 @@ class GetTaskTool extends Tool
                 'metadata',
                 'attachments',
                 'collaborators.user',
-                'collaborators.externalUser',
+                'collaborators.externalIdentity',
             ])
             ->withCount(['threads', 'internalCollaborators', 'externalCollaborators'])
             ->find($validated['task_id']);

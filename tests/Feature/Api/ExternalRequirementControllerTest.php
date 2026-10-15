@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\RequirementBatch;
 use App\Models\Task;
@@ -24,7 +24,7 @@ beforeEach(function () {
         'callback_trusted_at' => now(),
     ]);
 
-    $this->externalUserData = [
+    $this->externalIdentityData = [
         'id' => 'client-123',
         'name' => 'Client User',
         'email' => 'client@example.com',
@@ -32,8 +32,8 @@ beforeEach(function () {
         'url' => 'https://example.com',
     ];
 
-    $this->createRoleExternalUser = function (string $externalId, string $role, array $overrides = []): ExternalUser {
-        return ExternalUser::query()->create([
+    $this->createRoleExternalIdentity = function (string $externalId, string $role, array $overrides = []): ExternalIdentity {
+        return ExternalIdentity::query()->create([
             'external_id' => $externalId,
             'name' => $overrides['name'] ?? 'External '.$externalId,
             'email' => $overrides['email'] ?? $externalId.'@example.com',
@@ -44,15 +44,15 @@ beforeEach(function () {
         ]);
     };
 
-    $this->externalPayload = fn (ExternalUser $externalUser): array => [
-        'id' => $externalUser->external_id,
-        'name' => $externalUser->name,
-        'email' => $externalUser->email,
-        'environment' => $externalUser->environment,
-        'url' => $externalUser->url,
+    $this->externalPayload = fn (ExternalIdentity $externalIdentity): array => [
+        'id' => $externalIdentity->external_id,
+        'name' => $externalIdentity->name,
+        'email' => $externalIdentity->email,
+        'environment' => $externalIdentity->environment,
+        'url' => $externalIdentity->url,
     ];
 
-    $this->createRequirement = function (ExternalUser $submitter, array $attributes = []): Task {
+    $this->createRequirement = function (ExternalIdentity $submitter, array $attributes = []): Task {
         $task = Task::factory()->create([
             'project_id' => $this->project->id,
             'title' => $attributes['title'] ?? 'Requirement item',
@@ -76,7 +76,7 @@ beforeEach(function () {
 });
 
 test('permitted external roles can create a requirement batch with multiple task shaped items', function () {
-    $externalUser = ($this->createRoleExternalUser)('client-123', 'client_developer', [
+    $externalIdentity = ($this->createRoleExternalIdentity)('client-123', 'client_developer', [
         'name' => 'Client User',
         'email' => 'client@example.com',
     ]);
@@ -85,7 +85,7 @@ test('permitted external roles can create a requirement batch with multiple task
         ->postJson('/api/requirements/batches', [
             'project' => $this->project->token,
             'title' => 'June client requirements',
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -137,14 +137,14 @@ test('permitted external roles can create a requirement batch with multiple task
 
         $this->assertDatabaseHas('task_collaborators', [
             'task_id' => $item['id'],
-            'external_user_id' => $externalUser->id,
+            'external_identity_id' => $externalIdentity->id,
             'kind' => 'external',
         ]);
     }
 });
 
 test('requirement submitter can opt out of follow ups before submitting a batch', function () {
-    $externalUser = ($this->createRoleExternalUser)('client-opt-out', 'client_developer', [
+    $externalIdentity = ($this->createRoleExternalIdentity)('client-opt-out', 'client_developer', [
         'name' => 'Opted Out Client',
         'email' => 'opted-out@example.com',
     ]);
@@ -153,7 +153,7 @@ test('requirement submitter can opt out of follow ups before submitting a batch'
         ->postJson('/api/requirements/batches', [
             'project' => $this->project->token,
             'title' => 'No follow ups',
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -175,7 +175,7 @@ test('requirement submitter can opt out of follow ups before submitting a batch'
 
     $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $requirement->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
     ]);
 });
 
@@ -200,7 +200,7 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
         ], 200),
     ]);
 
-    $externalUser = ($this->createRoleExternalUser)('client-123', 'client_developer', [
+    $externalIdentity = ($this->createRoleExternalIdentity)('client-123', 'client_developer', [
         'name' => 'Client User',
         'email' => 'client@example.com',
     ]);
@@ -227,7 +227,7 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
         ->postJson('/api/requirements/batches', [
             'project' => $this->project->token,
             'title' => 'Collaborator scoped requirements',
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -265,11 +265,11 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
 
     $globalRequirement = Task::query()->where('title', 'Global collaborator item')->firstOrFail();
     $itemRequirement = Task::query()->where('title', 'Per item collaborator item')->firstOrFail();
-    $globalExternalCollaborator = ExternalUser::query()
+    $globalExternalCollaborator = ExternalIdentity::query()
         ->where('project_id', $this->project->id)
         ->where('external_id', 'client-456')
         ->firstOrFail();
-    $itemExternalCollaborator = ExternalUser::query()
+    $itemExternalCollaborator = ExternalIdentity::query()
         ->where('project_id', $this->project->id)
         ->where('external_id', 'client-789')
         ->firstOrFail();
@@ -281,12 +281,12 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
     ]);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $globalRequirement->id,
-        'external_user_id' => $globalExternalCollaborator->id,
+        'external_identity_id' => $globalExternalCollaborator->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $globalRequirement->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseHas('task_collaborators', [
@@ -296,12 +296,12 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
     ]);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $itemRequirement->id,
-        'external_user_id' => $itemExternalCollaborator->id,
+        'external_identity_id' => $itemExternalCollaborator->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $itemRequirement->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'kind' => 'external',
     ]);
     $this->assertDatabaseMissing('task_collaborators', [
@@ -323,7 +323,7 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
     $listResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/requirements?'.http_build_query([
             'project' => $this->project->token,
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -339,12 +339,12 @@ test('requirement batch submission syncs collaborators and rich editor temp atta
 });
 
 test('requirement visibility follows the external role matrix', function () {
-    $owner = ($this->createRoleExternalUser)('owner-requirement-1', 'owner');
-    $clientDeveloper = ($this->createRoleExternalUser)('client-developer-requirement-1', 'client_developer');
-    $shiftLeadDeveloper = ($this->createRoleExternalUser)('shift-lead-requirement-1', 'shift_lead_developer');
-    $shiftDeveloper = ($this->createRoleExternalUser)('shift-developer-requirement-1', 'shift_developer');
-    $user = ($this->createRoleExternalUser)('user-requirement-1', 'user');
-    $guest = ($this->createRoleExternalUser)('guest-requirement-1', 'guest');
+    $owner = ($this->createRoleExternalIdentity)('owner-requirement-1', 'owner');
+    $clientDeveloper = ($this->createRoleExternalIdentity)('client-developer-requirement-1', 'client_developer');
+    $shiftLeadDeveloper = ($this->createRoleExternalIdentity)('shift-lead-requirement-1', 'shift_lead_developer');
+    $shiftDeveloper = ($this->createRoleExternalIdentity)('shift-developer-requirement-1', 'shift_developer');
+    $user = ($this->createRoleExternalIdentity)('user-requirement-1', 'user');
+    $guest = ($this->createRoleExternalIdentity)('guest-requirement-1', 'guest');
 
     $ownerRequirement = ($this->createRequirement)($owner, ['title' => 'Owner requirement']);
     $clientDeveloperRequirement = ($this->createRequirement)($clientDeveloper, ['title' => 'Client developer requirement']);
@@ -352,13 +352,13 @@ test('requirement visibility follows the external role matrix', function () {
     $userRequirement = ($this->createRequirement)($user, ['title' => 'User requirement']);
     $guestRequirement = ($this->createRequirement)($guest, ['title' => 'Guest requirement']);
     $assignedRequirement = ($this->createRequirement)($guest, ['title' => 'Assigned guest requirement']);
-    $assignedRequirement->externalUsers()->attach($clientDeveloper->id);
+    $assignedRequirement->externalIdentities()->attach($clientDeveloper->id);
 
-    $idsFor = function (ExternalUser $externalUser): array {
+    $idsFor = function (ExternalIdentity $externalIdentity): array {
         $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
             ->getJson('/api/requirements?'.http_build_query([
                 'project' => $this->project->token,
-                'user' => ($this->externalPayload)($externalUser),
+                'user' => ($this->externalPayload)($externalIdentity),
             ]));
 
         $response->assertOk();
@@ -400,7 +400,7 @@ test('requirement visibility follows the external role matrix', function () {
 });
 
 test('requirement index exposes registered project environment keys and labels without urls', function () {
-    $externalUser = ($this->createRoleExternalUser)('environment-reader', 'client_developer');
+    $externalIdentity = ($this->createRoleExternalIdentity)('environment-reader', 'client_developer');
     $this->project->environments()->create([
         'environment' => 'pre-production',
         'url' => 'https://pre-production.example.com',
@@ -410,7 +410,7 @@ test('requirement index exposes registered project environment keys and labels w
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/requirements?'.http_build_query([
             'project' => $this->project->token,
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
         ]));
 
     $response
@@ -421,13 +421,13 @@ test('requirement index exposes registered project environment keys and labels w
 });
 
 test('requirement submission is restricted to external requirement contributor roles', function (string $role, int $status) {
-    $externalUser = ($this->createRoleExternalUser)('submission-'.$role, $role);
+    $externalIdentity = ($this->createRoleExternalIdentity)('submission-'.$role, $role);
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/requirements/batches', [
             'project' => $this->project->token,
             'title' => 'Submission role check',
-            'user' => ($this->externalPayload)($externalUser),
+            'user' => ($this->externalPayload)($externalIdentity),
             'metadata' => [
                 'environment' => 'testing',
                 'url' => 'https://example.com/portal',
@@ -462,17 +462,17 @@ test('requirement submission is restricted to external requirement contributor r
 ]);
 
 test('external users can list their requirement items including finalized requirements', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
     $batch = RequirementBatch::query()->create([
         'project_id' => $this->project->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'title' => 'June client requirements',
     ]);
 
@@ -481,7 +481,7 @@ test('external users can list their requirement items including finalized requir
         'title' => 'Open requirement',
         'status' => 'pending',
     ]);
-    $openRequirement->submitter()->associate($externalUser)->save();
+    $openRequirement->submitter()->associate($externalIdentity)->save();
     $openRequirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/open',
@@ -498,7 +498,7 @@ test('external users can list their requirement items including finalized requir
         'title' => 'Finalized requirement',
         'status' => 'pending',
     ]);
-    $finalizedRequirement->submitter()->associate($externalUser)->save();
+    $finalizedRequirement->submitter()->associate($externalIdentity)->save();
     $finalizedRequirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/finalized',
@@ -517,12 +517,12 @@ test('external users can list their requirement items including finalized requir
         'title' => 'Normal task',
         'status' => 'pending',
     ]);
-    $normalTask->submitter()->associate($externalUser)->save();
+    $normalTask->submitter()->associate($externalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/requirements?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response
@@ -552,12 +552,12 @@ test('external users can list their requirement items including finalized requir
 });
 
 test('normal external task index excludes requirement phase items', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
@@ -566,8 +566,8 @@ test('normal external task index excludes requirement phase items', function () 
         'title' => 'Requirement item',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
-    $requirement->externalCollaborators()->attach($externalUser->id);
+    $requirement->submitter()->associate($externalIdentity)->save();
+    $requirement->externalCollaborators()->attach($externalIdentity->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -581,12 +581,12 @@ test('normal external task index excludes requirement phase items', function () 
         'title' => 'Normal task',
         'status' => 'pending',
     ]);
-    $task->submitter()->associate($externalUser)->save();
+    $task->submitter()->associate($externalIdentity)->save();
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response
@@ -596,12 +596,12 @@ test('normal external task index excludes requirement phase items', function () 
 });
 
 test('external submitter can open a requirement item through the task detail endpoint with phase metadata', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
@@ -611,8 +611,8 @@ test('external submitter can open a requirement item through the task detail end
         'description' => 'Accepted through intake.',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
-    $requirement->externalCollaborators()->attach($externalUser->id);
+    $requirement->submitter()->associate($externalIdentity)->save();
+    $requirement->externalCollaborators()->attach($externalIdentity->id);
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -626,7 +626,7 @@ test('external submitter can open a requirement item through the task detail end
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->getJson('/api/tasks/'.$requirement->id.'?'.http_build_query([
             'project' => $this->project->token,
-            'user' => $this->externalUserData,
+            'user' => $this->externalIdentityData,
         ]));
 
     $response
@@ -643,12 +643,12 @@ test('external submitter can open a requirement item through the task detail end
 });
 
 test('finalizing a requirement preserves the task id and existing threads', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
@@ -658,7 +658,7 @@ test('finalizing a requirement preserves the task id and existing threads', func
         'description' => 'Initial requirement details.',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
+    $requirement->submitter()->associate($externalIdentity)->save();
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -673,9 +673,9 @@ test('finalizing a requirement preserves the task id and existing threads', func
     $thread = new TaskThread([
         'type' => 'external',
         'content' => '<p>Can you confirm the export columns?</p>',
-        'sender_name' => $externalUser->name,
+        'sender_name' => $externalIdentity->name,
     ]);
-    $thread->sender()->associate($externalUser);
+    $thread->sender()->associate($externalIdentity);
     $requirement->threads()->save($thread);
 
     $response = $this->actingAs($this->user)
@@ -705,12 +705,12 @@ test('finalizing a requirement preserves the task id and existing threads', func
 });
 
 test('parked requirement items cannot be finalized until they are ready', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
@@ -720,7 +720,7 @@ test('parked requirement items cannot be finalized until they are ready', functi
         'description' => 'Too early for this work.',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
+    $requirement->submitter()->associate($externalIdentity)->save();
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',
@@ -748,12 +748,12 @@ test('parked requirement items cannot be finalized until they are ready', functi
 });
 
 test('external users cannot finalize requirements', function () {
-    $externalUser = ExternalUser::query()->create([
-        'external_id' => $this->externalUserData['id'],
-        'name' => $this->externalUserData['name'],
-        'email' => $this->externalUserData['email'],
-        'environment' => $this->externalUserData['environment'],
-        'url' => $this->externalUserData['url'],
+    $externalIdentity = ExternalIdentity::query()->create([
+        'external_id' => $this->externalIdentityData['id'],
+        'name' => $this->externalIdentityData['name'],
+        'email' => $this->externalIdentityData['email'],
+        'environment' => $this->externalIdentityData['environment'],
+        'url' => $this->externalIdentityData['url'],
         'project_id' => $this->project->id,
     ]);
 
@@ -762,7 +762,7 @@ test('external users cannot finalize requirements', function () {
         'title' => 'Client requirement',
         'status' => 'pending',
     ]);
-    $requirement->submitter()->associate($externalUser)->save();
+    $requirement->submitter()->associate($externalIdentity)->save();
     $requirement->metadata()->create([
         'environment' => 'testing',
         'url' => 'https://example.com/requirement',

@@ -51,7 +51,7 @@ class EditTaskTool extends Tool
         }
 
         $task = $access->tasksFor($principal)
-            ->with(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalUser'])
+            ->with(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalIdentity'])
             ->find($validated['task_id']);
 
         if (! $task instanceof Task) {
@@ -97,7 +97,7 @@ class EditTaskTool extends Tool
             $this->syncMcpTaskEnvironment($task, $environment);
         }
 
-        $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalUser']);
+        $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalIdentity']);
 
         return Response::structured([
             'task' => $this->taskDetails($task),

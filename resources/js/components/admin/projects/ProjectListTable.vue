@@ -16,7 +16,7 @@ const { projects, showOrganisationColumn = true } = defineProps<{
 const emit = defineEmits<{
     'open-edit': [project: ProjectRow];
     'open-delete': [project: ProjectRow];
-    'open-external-users': [project: ProjectRow];
+    'open-project-participants': [project: ProjectRow];
     'open-manage-users': [project: ProjectRow];
     'open-api-token': [project: ProjectRow];
     'open-tasks': [project: ProjectRow];
@@ -131,10 +131,10 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                                         <ListTodo class="h-4 w-4" />
                                     </ActionIconButton>
                                     <ActionIconButton
-                                        label="View external users"
-                                        title="External users"
-                                        :data-testid="`project-external-users-${project.id}`"
-                                        @click="emit('open-external-users', project)"
+                                        label="View project participants"
+                                        title="Project participants"
+                                        :data-testid="`project-project-participants-${project.id}`"
+                                        @click="emit('open-project-participants', project)"
                                     >
                                         <UserSearch class="h-4 w-4" />
                                     </ActionIconButton>
@@ -268,10 +268,10 @@ function hasGuestSubmissionsEnabled(project: ProjectRow) {
                         <ListTodo class="h-4 w-4" />
                     </ActionIconButton>
                     <ActionIconButton
-                        label="View external users"
-                        title="External users"
-                        :data-testid="`project-compact-external-users-${project.id}`"
-                        @click="emit('open-external-users', project)"
+                        label="View project participants"
+                        title="Project participants"
+                        :data-testid="`project-compact-project-participants-${project.id}`"
+                        @click="emit('open-project-participants', project)"
                     >
                         <UserSearch class="h-4 w-4" />
                     </ActionIconButton>

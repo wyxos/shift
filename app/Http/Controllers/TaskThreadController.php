@@ -72,7 +72,7 @@ class TaskThreadController extends Controller
             ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
-            ->with(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name'])
+            ->with(['attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name'])
             ->get()
             ->map(function (TaskThread $thread) use ($task) {
                 // Filter out attachments that are already embedded in the content
@@ -205,7 +205,7 @@ class TaskThreadController extends Controller
         });
 
         // Get the thread with attachments
-        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name']);
 
         if ($clientRequestId !== null) {
             $this->taskThreadNotificationService->schedule($thread);
@@ -489,7 +489,7 @@ class TaskThreadController extends Controller
             $thread->save();
         }
 
-        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
+        $thread->load(['attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name']);
 
         // Filter out attachments already embedded in the content for response
         $content = (string) ($thread->content ?? '');

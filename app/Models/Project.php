@@ -77,9 +77,9 @@ class Project extends Model
     /**
      * Get the external users associated with this project.
      */
-    public function externalUsers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function externalIdentities(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(ExternalUser::class);
+        return $this->hasMany(ExternalIdentity::class);
     }
 
     public function isManagedByUser(?int $userId): bool
