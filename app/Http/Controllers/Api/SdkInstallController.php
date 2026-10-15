@@ -66,12 +66,14 @@ class SdkInstallController extends Controller
                 ->projects($attributes['device_code'])
                 ->values()
                 ->all();
+            $organisations = $this->sdkInstallSessionService->organisations($attributes['device_code'])->values()->all();
         } catch (HttpExceptionInterface $exception) {
             return $this->errorResponse($exception);
         }
 
         return response()->json([
             'projects' => $projects,
+            'organisations' => $organisations,
         ]);
     }
 
@@ -80,12 +82,14 @@ class SdkInstallController extends Controller
         $attributes = $request->validate([
             'device_code' => ['required', 'string', 'max:255'],
             'name' => ['required', 'string', 'max:255'],
+            'organisation_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         try {
             $project = $this->sdkInstallSessionService->createProject(
                 $attributes['device_code'],
                 $attributes['name'],
+                isset($attributes['organisation_id']) ? (int) $attributes['organisation_id'] : null,
             );
         } catch (HttpExceptionInterface $exception) {
             return $this->errorResponse($exception);
