@@ -86,7 +86,7 @@ const {
     openEditModal,
     openManageUsersModal,
     openMcpSettingsModal,
-    openProjectExternalUsers,
+    openProjectParticipants,
     openProjectTasks,
     openWidgetSettingsModal,
     otherCreateErrors,
@@ -148,7 +148,7 @@ const {
                     @open-api-token="openApiTokenModal"
                     @open-delete="openDeleteModal"
                     @open-edit="openEditModal"
-                    @open-external-users="openProjectExternalUsers"
+                    @open-project-participants="openProjectParticipants"
                     @open-manage-users="openManageUsersModal"
                     @open-app-error-notifications="openAppErrorNotificationsModal"
                     @open-mcp-settings="openMcpSettingsModal"

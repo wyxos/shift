@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Enums\TaskCollaboratorKind;
 use App\Enums\TaskThreadAudience;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Models\TaskThreadMention;
@@ -18,7 +18,7 @@ use RuntimeException;
 class TaskThreadMentionService
 {
     public function __construct(
-        private readonly ExternalUserService $externalUsers,
+        private readonly ExternalCollaboratorService $externalCollaborators,
         private readonly ShiftPermissionService $permissions,
         private readonly TaskCollaboratorService $collaborators,
     ) {}
@@ -59,8 +59,8 @@ class TaskThreadMentionService
             $existing = $existing
                 ->concat(
                     $task->externalCollaborators
-                        ->filter(fn (ExternalUser $user): bool => $matches($user->name, $user->email))
-                        ->map(fn (ExternalUser $user): array => $this->externalCandidate($user, true))
+                        ->filter(fn (ExternalIdentity $user): bool => $matches($user->name, $user->email))
+                        ->map(fn (ExternalIdentity $user): array => $this->externalCandidate($user, true))
                 )
                 ->values();
         }
@@ -84,14 +84,14 @@ class TaskThreadMentionService
 
         if ($audience === TaskThreadAudience::All && mb_strlen($term) >= 2) {
             try {
-                $externalLookup = $this->externalUsers->searchProjectCollaborators(
+                $externalLookup = $this->externalCollaborators->searchProjectCollaborators(
                     $task->project,
                     $task->metadata?->environment,
                     $term,
                 );
                 $addableError = $externalLookup['error'];
                 $existingExternalIds = $task->externalCollaborators
-                    ->map(fn (ExternalUser $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
+                    ->map(fn (ExternalIdentity $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
 
                 $addable = $addable
                     ->concat(
@@ -121,7 +121,7 @@ class TaskThreadMentionService
     /**
      * @param  array<int, array<string, mixed>>  $mentions
      * @param  array<int, array<string, mixed>>  $addCollaborators
-     * @return array{user_ids: array<int, int>, external_user_ids: array<int, int>, add_user_ids: array<int, int>, add_external_users: Collection<int, ExternalUser>}
+     * @return array{user_ids: array<int, int>, external_identity_ids: array<int, int>, add_user_ids: array<int, int>, add_external_identities: Collection<int, ExternalIdentity>}
      */
     public function resolve(
         Task $task,
@@ -172,9 +172,9 @@ class TaskThreadMentionService
             $normalizedAdditions['internal']->all(),
         );
 
-        $addExternalUsers = $normalizedAdditions['external']->isEmpty()
+        $addExternalIdentities = $normalizedAdditions['external']->isEmpty()
             ? collect()
-            : $this->externalUsers->resolveCollaborators(
+            : $this->externalCollaborators->resolveCollaborators(
                 $task->project,
                 $task->metadata?->environment,
                 $normalizedAdditions['external']
@@ -189,19 +189,19 @@ class TaskThreadMentionService
             ->unique()
             ->values();
 
-        $availableExternalUsers = $task->externalCollaborators
-            ->concat($addExternalUsers)
+        $availableExternalIdentities = $task->externalCollaborators
+            ->concat($addExternalIdentities)
             ->unique('id')
             ->values();
-        $sourceIdentities = $availableExternalUsers->keyBy(fn (ExternalUser $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
-        $legacyIdentities = $availableExternalUsers->groupBy('external_id')
+        $sourceIdentities = $availableExternalIdentities->keyBy(fn (ExternalIdentity $user): string => $this->externalIdentity($user->environment, (string) $user->external_id));
+        $legacyIdentities = $availableExternalIdentities->groupBy('external_id')
             ->filter(fn (Collection $users): bool => $users->count() === 1)
-            ->map(fn (Collection $users): ExternalUser => $users->first());
-        $availableExternalUsers = $sourceIdentities->union($legacyIdentities);
+            ->map(fn (Collection $users): ExternalIdentity => $users->first());
+        $availableExternalIdentities = $sourceIdentities->union($legacyIdentities);
 
         $missingInternal = $normalizedMentions['internal']->diff($availableInternalIds);
         $missingExternal = $normalizedMentions['external']->reject(
-            fn (string $id): bool => $availableExternalUsers->has($id)
+            fn (string $id): bool => $availableExternalIdentities->has($id)
         );
 
         if ($missingInternal->isNotEmpty() || $missingExternal->isNotEmpty()) {
@@ -212,20 +212,20 @@ class TaskThreadMentionService
 
         return [
             'user_ids' => $normalizedMentions['internal']->map(fn ($id) => (int) $id)->all(),
-            'external_user_ids' => $normalizedMentions['external']
-                ->map(fn (string $id): int => (int) $availableExternalUsers->get($id)->id)
+            'external_identity_ids' => $normalizedMentions['external']
+                ->map(fn (string $id): int => (int) $availableExternalIdentities->get($id)->id)
                 ->all(),
             'add_user_ids' => $addInternalIds,
-            'add_external_users' => $addExternalUsers,
+            'add_external_identities' => $addExternalIdentities,
         ];
     }
 
     /**
-     * @param  array{user_ids: array<int, int>, external_user_ids: array<int, int>, add_user_ids: array<int, int>, add_external_users: Collection<int, ExternalUser>}  $resolved
+     * @param  array{user_ids: array<int, int>, external_identity_ids: array<int, int>, add_user_ids: array<int, int>, add_external_identities: Collection<int, ExternalIdentity>}  $resolved
      */
     public function persist(Task $task, TaskThread $thread, array $resolved): void
     {
-        $this->collaborators->add($task, $resolved['add_user_ids'], $resolved['add_external_users']);
+        $this->collaborators->add($task, $resolved['add_user_ids'], $resolved['add_external_identities']);
 
         $now = now();
         $records = collect($resolved['user_ids'])
@@ -233,16 +233,16 @@ class TaskThreadMentionService
                 'task_thread_id' => $thread->id,
                 'kind' => TaskCollaboratorKind::Internal->value,
                 'user_id' => $userId,
-                'external_user_id' => null,
+                'external_identity_id' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ])
             ->concat(
-                collect($resolved['external_user_ids'])->map(fn (int $externalUserId): array => [
+                collect($resolved['external_identity_ids'])->map(fn (int $externalIdentityId): array => [
                     'task_thread_id' => $thread->id,
                     'kind' => TaskCollaboratorKind::External->value,
                     'user_id' => null,
-                    'external_user_id' => $externalUserId,
+                    'external_identity_id' => $externalIdentityId,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ])
@@ -256,7 +256,7 @@ class TaskThreadMentionService
     }
 
     /**
-     * @param  array{user_ids: array<int, int>, external_user_ids: array<int, int>}  $resolved
+     * @param  array{user_ids: array<int, int>, external_identity_ids: array<int, int>}  $resolved
      */
     public function replace(TaskThread $thread, array $resolved): void
     {
@@ -264,12 +264,12 @@ class TaskThreadMentionService
         $this->persist($thread->task, $thread, [
             ...$resolved,
             'add_user_ids' => [],
-            'add_external_users' => collect(),
+            'add_external_identities' => collect(),
         ]);
     }
 
     /**
-     * @return array{user_ids: array<int, int>, external_user_ids: array<int, int>, add_user_ids: array<int, int>, add_external_users: Collection<int, ExternalUser>}
+     * @return array{user_ids: array<int, int>, external_identity_ids: array<int, int>, add_user_ids: array<int, int>, add_external_identities: Collection<int, ExternalIdentity>}
      */
     public function resolvedForThread(TaskThread $thread): array
     {
@@ -283,15 +283,15 @@ class TaskThreadMentionService
                 ->map(fn ($id): int => (int) $id)
                 ->values()
                 ->all(),
-            'external_user_ids' => $thread->mentions
+            'external_identity_ids' => $thread->mentions
                 ->where('kind', TaskCollaboratorKind::External)
-                ->pluck('external_user_id')
+                ->pluck('external_identity_id')
                 ->filter()
                 ->map(fn ($id): int => (int) $id)
                 ->values()
                 ->all(),
             'add_user_ids' => [],
-            'add_external_users' => collect(),
+            'add_external_identities' => collect(),
         ];
     }
 
@@ -299,20 +299,20 @@ class TaskThreadMentionService
      * Canonicalize rendered labels while verifying that markup exactly matches
      * the already-authorized structured mention identities.
      *
-     * @param  array{user_ids: array<int, int>, external_user_ids: array<int, int>}  $resolved
+     * @param  array{user_ids: array<int, int>, external_identity_ids: array<int, int>}  $resolved
      */
     public function normalizeContent(string $content, array $resolved): string
     {
-        $externalUsers = ExternalUser::query()->whereIn('id', $resolved['external_user_ids'])
+        $externalIdentities = ExternalIdentity::query()->whereIn('id', $resolved['external_identity_ids'])
             ->get(['id', 'external_id', 'environment', 'name']);
-        $legacyIdentities = $externalUsers->groupBy('external_id')
+        $legacyIdentities = $externalIdentities->groupBy('external_id')
             ->filter(fn (Collection $users): bool => $users->count() === 1)
             ->map(fn (Collection $users): string => $this->externalIdentity($users->first()->environment, (string) $users->first()->external_id));
         $labels = User::query()
             ->whereIn('id', $resolved['user_ids'])
             ->pluck('name', 'id')
             ->mapWithKeys(fn (string $name, int|string $id): array => ['internal:'.(int) $id => $name])
-            ->merge($externalUsers->mapWithKeys(fn (ExternalUser $user): array => [
+            ->merge($externalIdentities->mapWithKeys(fn (ExternalIdentity $user): array => [
                 'external:'.$this->externalIdentity($user->environment, (string) $user->external_id) => $user->name,
             ]));
 
@@ -381,7 +381,7 @@ class TaskThreadMentionService
     {
         $content = (string) $thread->content;
         $resolved = $this->resolvedForThread($thread);
-        if ($resolved['external_user_ids'] === []) {
+        if ($resolved['external_identity_ids'] === []) {
             return $content;
         }
 
@@ -397,7 +397,7 @@ class TaskThreadMentionService
      */
     public function serialize(TaskThread $thread): array
     {
-        $thread->loadMissing(['mentions.user:id,name', 'mentions.externalUser:id,external_id,environment,name']);
+        $thread->loadMissing(['mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name']);
 
         return $thread->mentions
             ->map(function (TaskThreadMention $mention): ?array {
@@ -409,11 +409,11 @@ class TaskThreadMentionService
                     ];
                 }
 
-                if ($mention->kind === TaskCollaboratorKind::External && $mention->externalUser instanceof ExternalUser) {
+                if ($mention->kind === TaskCollaboratorKind::External && $mention->externalIdentity instanceof ExternalIdentity) {
                     return [
                         'kind' => TaskCollaboratorKind::External->value,
-                        'id' => $this->externalIdentity($mention->externalUser->environment, (string) $mention->externalUser->external_id),
-                        'name' => $mention->externalUser->name,
+                        'id' => $this->externalIdentity($mention->externalIdentity->environment, (string) $mention->externalIdentity->external_id),
+                        'name' => $mention->externalIdentity->name,
                     ];
                 }
 
@@ -495,7 +495,7 @@ class TaskThreadMentionService
     /**
      * @return array{kind: string, id: string, name: string, email: ?string, is_collaborator: bool}
      */
-    private function externalCandidate(ExternalUser $user, bool $isCollaborator): array
+    private function externalCandidate(ExternalIdentity $user, bool $isCollaborator): array
     {
         return [
             'kind' => TaskCollaboratorKind::External->value,

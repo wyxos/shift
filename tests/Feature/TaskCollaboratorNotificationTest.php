@@ -4,8 +4,8 @@ use App\Enums\TaskCollaboratorKind;
 use App\Exceptions\ExternalNotificationException;
 use App\Jobs\SendExternalNotificationFallbackEmail;
 use App\Jobs\SendPendingTaskCollaboratorNotification;
+use App\Models\ExternalIdentity;
 use App\Models\ExternalNotificationDelivery;
-use App\Models\ExternalUser;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
 use App\Models\Task;
@@ -100,7 +100,7 @@ test('pending external collaborator notification posts to the consuming app when
         'callback_trusted_at' => now(),
     ]);
 
-    $externalUser = ExternalUser::query()->create([
+    $externalIdentity = ExternalIdentity::query()->create([
         'external_id' => 'client-1',
         'project_id' => $project->id,
         'name' => 'Client User',
@@ -113,13 +113,13 @@ test('pending external collaborator notification posts to the consuming app when
         'project_id' => $project->id,
     ]);
     $task->submitter()->associate($owner)->save();
-    $task->externalCollaborators()->attach($externalUser->id);
+    $task->externalCollaborators()->attach($externalIdentity->id);
 
     $pending = TaskCollaboratorNotification::query()->create([
         'task_id' => $task->id,
         'event' => TaskCollaboratorNotification::EVENT_TASK_CREATED,
         'kind' => TaskCollaboratorKind::External->value,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'scheduled_at' => now()->subSecond(),
     ]);
 
@@ -230,13 +230,13 @@ test('retrying a removed collaborator records cancellation instead of delivery',
         'https://client-app.test/shift/api/notifications' => Http::response(['message' => 'Unavailable'], 503),
     ]);
 
-    ['pending' => $pending, 'externalUser' => $externalUser, 'task' => $task] = externalCollaboratorNotificationFixture();
+    ['pending' => $pending, 'externalIdentity' => $externalIdentity, 'task' => $task] = externalCollaboratorNotificationFixture();
     $job = new SendPendingTaskCollaboratorNotification($pending->id);
 
     expect(fn () => $job->handle(app(ExternalNotificationService::class)))
         ->toThrow(ExternalNotificationException::class);
 
-    $task->externalCollaborators()->detach($externalUser->id);
+    $task->externalCollaborators()->detach($externalIdentity->id);
     $job->handle(app(ExternalNotificationService::class));
 
     $delivery = ExternalNotificationDelivery::findForTaskCollaborator($pending->id);
@@ -383,7 +383,7 @@ test('fallback email failure is recorded once without risking duplicate mail', f
 });
 
 /**
- * @return array{pending: TaskCollaboratorNotification, externalUser: ExternalUser, task: Task}
+ * @return array{pending: TaskCollaboratorNotification, externalIdentity: ExternalIdentity, task: Task}
  */
 function externalCollaboratorNotificationFixture(): array
 {
@@ -398,7 +398,7 @@ function externalCollaboratorNotificationFixture(): array
         'url' => 'https://client-app.test',
         'callback_trusted_at' => now(),
     ]);
-    $externalUser = ExternalUser::query()->create([
+    $externalIdentity = ExternalIdentity::query()->create([
         'external_id' => 'client-1',
         'project_id' => $project->id,
         'name' => 'Client User',
@@ -410,14 +410,14 @@ function externalCollaboratorNotificationFixture(): array
         'project_id' => $project->id,
     ]);
     $task->submitter()->associate($owner)->save();
-    $task->externalCollaborators()->attach($externalUser->id);
+    $task->externalCollaborators()->attach($externalIdentity->id);
     $pending = TaskCollaboratorNotification::query()->create([
         'task_id' => $task->id,
         'event' => TaskCollaboratorNotification::EVENT_TASK_CREATED,
         'kind' => TaskCollaboratorKind::External->value,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'scheduled_at' => now()->subSecond(),
     ]);
 
-    return compact('pending', 'externalUser', 'task');
+    return compact('pending', 'externalIdentity', 'task');
 }

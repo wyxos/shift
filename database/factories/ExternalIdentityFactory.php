@@ -2,20 +2,20 @@
 
 namespace Database\Factories;
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ExternalUser>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ExternalIdentity>
  */
-class ExternalUserFactory extends Factory
+class ExternalIdentityFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
      *
      * @var string
      */
-    protected $model = ExternalUser::class;
+    protected $model = ExternalIdentity::class;
 
     /**
      * Define the model's default state.

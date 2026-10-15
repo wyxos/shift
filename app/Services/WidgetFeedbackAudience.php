@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\OrganisationRole;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -20,7 +20,7 @@ class WidgetFeedbackAudience
             return collect();
         }
 
-        $submitterEmail = $task->submitter instanceof ExternalUser ? $task->submitter->email : null;
+        $submitterEmail = $task->submitter instanceof ExternalIdentity ? $task->submitter->email : null;
         $users = User::query()->when(filled($submitterEmail), fn ($query) => $query
             ->whereRaw('LOWER(email) != ?', [mb_strtolower(trim($submitterEmail))]));
 

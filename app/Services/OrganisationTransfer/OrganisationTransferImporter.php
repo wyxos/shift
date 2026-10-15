@@ -70,7 +70,8 @@ class OrganisationTransferImporter
                 foreach (OrganisationTransferSelection::TABLES as $table) {
                     $targetColumns = Schema::getColumnListing($table);
 
-                    foreach ($this->readRows($directory, $table, $manifest['tables'][$table])->chunk(50) as $chunk) {
+                    $archiveTable = $this->archiveTable($table, $manifest);
+                    foreach ($this->readRows($directory, $archiveTable, $manifest['tables'][$archiveTable])->chunk(50) as $chunk) {
                         $transformed = [];
                         foreach ($chunk as $row) {
                             $row = $this->transformRow($table, $row, $manifest);
@@ -101,7 +102,7 @@ class OrganisationTransferImporter
         $verification = $this->verifyImported($manifest);
         $receipt = [
             'format' => OrganisationTransferExporter::FORMAT,
-            'version' => OrganisationTransferExporter::VERSION,
+            'version' => $manifest['version'],
             'manifest_sha256' => hash_file('sha256', "{$directory}/manifest.json"),
             'imported_at' => now()->utc()->toIso8601String(),
             'organisation' => $manifest['organisation'],
@@ -126,12 +127,13 @@ class OrganisationTransferImporter
         $counts = [];
         foreach (OrganisationTransferSelection::TABLES as $table) {
             $actual = DB::table($table)->count();
-            $expected = (int) $manifest['tables'][$table]['rows'];
+            $archiveTable = $this->archiveTable($table, $manifest);
+            $expected = (int) $manifest['tables'][$archiveTable]['rows'];
             if ($actual !== $expected) {
                 throw new RuntimeException("Imported table [{$table}] has [{$actual}] rows; expected [{$expected}].");
             }
 
-            $counts[$table] = $actual;
+            $counts[$archiveTable] = $actual;
         }
 
         $bytes = 0;
@@ -181,7 +183,7 @@ class OrganisationTransferImporter
     private function assertManifestContract(array $manifest): void
     {
         if (($manifest['format'] ?? null) !== OrganisationTransferExporter::FORMAT
-            || ($manifest['version'] ?? null) !== OrganisationTransferExporter::VERSION) {
+            || ! in_array($manifest['version'] ?? null, [2, OrganisationTransferExporter::VERSION], true)) {
             throw new RuntimeException('Unsupported SHIFT organisation-transfer format or version.');
         }
 
@@ -192,7 +194,8 @@ class OrganisationTransferImporter
         }
 
         $manifestTables = array_keys($manifest['tables']);
-        if ($manifestTables !== OrganisationTransferSelection::TABLES) {
+        $expectedTables = array_map(fn (string $table): string => $this->archiveTable($table, $manifest), OrganisationTransferSelection::TABLES);
+        if ($manifestTables !== $expectedTables) {
             throw new RuntimeException('Transfer manifest tables do not match the public SHIFT transfer contract.');
         }
     }
@@ -200,7 +203,7 @@ class OrganisationTransferImporter
     /** @param array<string, mixed> $manifest */
     private function verifyTransferFiles(string $directory, array $manifest): void
     {
-        foreach (OrganisationTransferSelection::TABLES as $table) {
+        foreach (array_keys($manifest['tables']) as $table) {
             $path = "{$directory}/data/{$table}.jsonl";
             if (! File::isFile($path)) {
                 throw new RuntimeException("Transfer data file for [{$table}] is missing.");
@@ -365,6 +368,10 @@ class OrganisationTransferImporter
      */
     private function transformRow(string $table, array $row, array $manifest): array
     {
+        if ($manifest['version'] === 2) {
+            $row = $this->upgradeLegacyRow($table, $row);
+        }
+
         if ($table !== 'notifications') {
             return $row;
         }
@@ -385,6 +392,61 @@ class OrganisationTransferImporter
         }
 
         $row['data'] = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return $row;
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function archiveTable(string $table, array $manifest): string
+    {
+        if ($manifest['version'] !== 2) {
+            return $table;
+        }
+
+        return match ($table) {
+            'project_participants' => 'external_contacts',
+            'external_identities' => 'external_users',
+            default => $table,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function upgradeLegacyRow(string $table, array $row): array
+    {
+        $columns = match ($table) {
+            'external_identities' => ['external_contact_id' => 'project_participant_id'],
+            'requirement_batches', 'task_collaborators', 'task_collaborator_notifications', 'task_thread_mentions' => ['external_user_id' => 'external_identity_id'],
+            default => [],
+        };
+        foreach ($columns as $old => $new) {
+            if (array_key_exists($old, $row)) {
+                if (array_key_exists($new, $row)) {
+                    throw new RuntimeException("Legacy table [{$table}] contains both [{$old}] and [{$new}].");
+                }
+
+                $row[$new] = $row[$old];
+                unset($row[$old]);
+            }
+        }
+
+        $morphColumns = match ($table) {
+            'tasks' => ['submitter_type'],
+            'task_threads' => ['sender_type'],
+            'activity_log' => ['subject_type', 'causer_type'],
+            'notifications' => ['notifiable_type'],
+            'attachments' => ['attachable_type'],
+            default => [],
+        };
+        foreach ($morphColumns as $column) {
+            $row[$column] = match ($row[$column] ?? null) {
+                'App\\Models\\ExternalUser' => 'App\\Models\\ExternalIdentity',
+                'App\\Models\\ExternalContact' => 'App\\Models\\ProjectParticipant',
+                default => $row[$column] ?? null,
+            };
+        }
 
         return $row;
     }

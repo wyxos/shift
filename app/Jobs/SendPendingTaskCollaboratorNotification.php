@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use App\Enums\TaskCollaboratorKind;
 use App\Exceptions\ExternalNotificationException;
+use App\Models\ExternalIdentity;
 use App\Models\ExternalNotificationDelivery;
-use App\Models\ExternalUser;
 use App\Models\TaskCollaborator;
 use App\Models\TaskCollaboratorNotification;
 use App\Models\User;
@@ -42,7 +42,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
     public function handle(ExternalNotificationService $notificationService): void
     {
         $pending = TaskCollaboratorNotification::query()
-            ->with(['task.project', 'user', 'externalUser'])
+            ->with(['task.project', 'user', 'externalIdentity'])
             ->whereKey($this->notificationId)
             ->whereNull('sent_at')
             ->whereNull('cancelled_at')
@@ -95,10 +95,10 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
 
     private function sendExternal(TaskCollaboratorNotification $pending, ExternalNotificationService $notificationService): bool
     {
-        $externalUser = $pending->externalUser;
+        $externalIdentity = $pending->externalIdentity;
         $task = $pending->task;
 
-        if (! $externalUser || ! $task || ! $task->project || ! filled($externalUser->url)) {
+        if (! $externalIdentity || ! $task || ! $task->project || ! filled($externalIdentity->url)) {
             $pending->markCancelled();
 
             return false;
@@ -106,7 +106,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
 
         $payload = [
             'type' => 'task',
-            'user_id' => $externalUser->external_id,
+            'user_id' => $externalIdentity->external_id,
             'task_id' => $task->id,
             'task_title' => $task->title,
             'task_description' => $task->description,
@@ -123,7 +123,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
             try {
                 $response = $notificationService->sendNotification(
                     $task->project,
-                    $externalUser->url,
+                    $externalIdentity->url,
                     $handler,
                     $payload,
                     [],
@@ -151,13 +151,13 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
             );
         }
 
-        if ($delivery->production === false && filled($externalUser->email)) {
+        if ($delivery->production === false && filled($externalIdentity->email)) {
             if (! $delivery->fallback_dispatched_at) {
-                $editUrl = rtrim($externalUser->url, '/').'/shift/tasks?task='.$task->id;
+                $editUrl = rtrim($externalIdentity->url, '/').'/shift/tasks?task='.$task->id;
 
                 SendExternalNotificationFallbackEmail::dispatch(
                     $delivery->id,
-                    (string) $externalUser->email,
+                    (string) $externalIdentity->email,
                     $this->notificationFor($pending, $editUrl),
                 );
 
@@ -202,7 +202,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
             ->when(
                 $pending->kind === TaskCollaboratorKind::Internal,
                 fn ($query) => $query->where('user_id', $pending->user_id),
-                fn ($query) => $query->where('external_user_id', $pending->external_user_id),
+                fn ($query) => $query->where('external_identity_id', $pending->external_identity_id),
             )
             ->exists();
     }
@@ -228,7 +228,7 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
             return $task->submitter_type === User::class && (int) $task->submitter_id === (int) $pending->user_id;
         }
 
-        return $task->submitter_type === ExternalUser::class && (int) $task->submitter_id === (int) $pending->external_user_id;
+        return $task->submitter_type === ExternalIdentity::class && (int) $task->submitter_id === (int) $pending->external_identity_id;
     }
 
     private function externalHandler(TaskCollaboratorNotification $pending): string

@@ -2,7 +2,7 @@
 
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
-use App\Services\ExternalUserService;
+use App\Services\ExternalCollaboratorService;
 use App\Services\OutboundUrlPolicy;
 use Illuminate\Support\Facades\Http;
 
@@ -16,7 +16,7 @@ test('collaborator lookup refuses historical registrations without trust provena
     ]);
     Http::fake();
 
-    expect(fn () => app(ExternalUserService::class)->searchCollaborators($project, 'production'))
+    expect(fn () => app(ExternalCollaboratorService::class)->searchCollaborators($project, 'production'))
         ->toThrow(\RuntimeException::class, 'has not been trusted');
 
     Http::assertNothingSent();
@@ -37,7 +37,7 @@ test('collaborator lookup refuses private dns before sending the project token',
     ]);
     Http::fake();
 
-    expect(fn () => app(ExternalUserService::class)->searchCollaborators($project, 'production'))
+    expect(fn () => app(ExternalCollaboratorService::class)->searchCollaborators($project, 'production'))
         ->toThrow(\RuntimeException::class, 'not trusted');
 
     Http::assertNothingSent();
@@ -63,7 +63,7 @@ test('collaborator lookup refuses redirects without forwarding the project token
         'http://127.0.0.1/*' => Http::response(['unexpected' => true]),
     ]);
 
-    expect(fn () => app(ExternalUserService::class)->searchCollaborators($project, 'production'))
+    expect(fn () => app(ExternalCollaboratorService::class)->searchCollaborators($project, 'production'))
         ->toThrow(\RuntimeException::class, 'attempted a redirect');
 
     Http::assertSentCount(1);
@@ -82,7 +82,7 @@ test('collaborator lookup requires a project callback token', function () {
     ]);
     Http::fake();
 
-    expect(fn () => app(ExternalUserService::class)->searchCollaborators($project, 'production'))
+    expect(fn () => app(ExternalCollaboratorService::class)->searchCollaborators($project, 'production'))
         ->toThrow(\RuntimeException::class, 'does not have a callback token');
 
     Http::assertNothingSent();
@@ -111,7 +111,7 @@ test('collaborator lookup supports a valid public production destination', funct
         ]),
     ]);
 
-    $result = app(ExternalUserService::class)->searchCollaborators($project, 'production');
+    $result = app(ExternalCollaboratorService::class)->searchCollaborators($project, 'production');
 
     expect($result['users'])->toBe([
         ['id' => 'client-1', 'name' => 'Client User', 'email' => 'client@example.com'],
@@ -141,7 +141,7 @@ test('collaborator lookup supports intentional local destinations only in local 
         ]);
     });
 
-    $result = app(ExternalUserService::class)->searchCollaborators($project, 'local');
+    $result = app(ExternalCollaboratorService::class)->searchCollaborators($project, 'local');
 
     expect($result['users'])->toBe([])
         ->and($capturedOptions['verify'] ?? null)->toBeFalse()

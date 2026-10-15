@@ -2,7 +2,7 @@
 
 use App\Jobs\SendTaskThreadNotifications;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -27,7 +27,7 @@ beforeEach(function () {
     $this->task->internalCollaborators()->attach($this->other);
     $this->key = (string) Str::uuid();
     $this->payload = ['content' => '<p>Send once</p>', 'type' => 'external', 'client_request_id' => $this->key];
-    $this->external = ExternalUser::factory()->create([
+    $this->external = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id, 'external_id' => 'external-idempotency-author',
         'environment' => 'testing', 'url' => 'https://consumer.example.test',
     ]);

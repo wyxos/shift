@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\ProjectEnvironment;
 use App\Models\Task;
-use App\Services\ExternalUserService;
+use App\Services\ExternalIdentityService;
 use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorNotificationScheduler;
 use App\Services\TaskCollaboratorService;
@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 class ExternalWidgetController extends Controller
 {
     public function __construct(
-        private readonly ExternalUserService $externalUserService,
+        private readonly ExternalIdentityService $externalIdentityService,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly TaskCollaboratorNotificationScheduler $notifications,
@@ -93,8 +93,8 @@ class ExternalWidgetController extends Controller
             : null;
         $widget = $this->widgetSettings($project, $environment);
 
-        $isAuthenticatedExternalUser = (bool) data_get($attributes, 'user.authenticated', false);
-        $isGuestSubmission = $attributes['anonymous'] || ! $isAuthenticatedExternalUser;
+        $isAuthenticatedExternalIdentity = (bool) data_get($attributes, 'user.authenticated', false);
+        $isGuestSubmission = $attributes['anonymous'] || ! $isAuthenticatedExternalIdentity;
 
         if (! $widget['enabled']) {
             return response()->json([
@@ -113,7 +113,7 @@ class ExternalWidgetController extends Controller
         }
 
         $sourceUrl = $this->sourceUrl($attributes);
-        $submitter = $attributes['anonymous'] ? null : $this->externalUser($project, $attributes);
+        $submitter = $attributes['anonymous'] ? null : $this->externalIdentity($project, $attributes);
 
         $task = DB::transaction(function () use ($attributes, $project, $submitter, $selectedEnvironment, $sourceUrl): Task {
             $task = Task::query()->create([
@@ -124,7 +124,7 @@ class ExternalWidgetController extends Controller
                 'priority' => TaskPriority::Medium->value,
             ]);
 
-            if ($submitter instanceof ExternalUser) {
+            if ($submitter instanceof ExternalIdentity) {
                 $task->submitter()->associate($submitter)->save();
                 $this->taskCollaboratorService->initialize($task);
             }
@@ -217,7 +217,7 @@ class ExternalWidgetController extends Controller
         ) ?? (string) config('app.url');
     }
 
-    private function externalUser(Project $project, array $attributes): ExternalUser
+    private function externalIdentity(Project $project, array $attributes): ExternalIdentity
     {
         $email = (string) data_get($attributes, 'user.email');
         $environment = $this->projectEnvironmentService->normalizeEnvironment(
@@ -227,7 +227,7 @@ class ExternalWidgetController extends Controller
             ? $project->environments->firstWhere('environment', $environment)
             : null;
 
-        return $this->externalUserService->upsert($project, [
+        return $this->externalIdentityService->upsert($project, [
             'external_id' => data_get($attributes, 'user.id') ?? 'guest:'.hash('sha256', strtolower($email)),
             'name' => data_get($attributes, 'user.name'),
             'email' => $email,

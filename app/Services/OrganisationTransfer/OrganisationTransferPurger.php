@@ -214,6 +214,7 @@ class OrganisationTransferPurger
             ['task_thread_mentions', 'user_id', null, null],
             ['tasks', 'submitter_id', 'submitter_type', User::class],
             ['task_threads', 'sender_id', 'sender_type', User::class],
+            ['activity_log', 'causer_id', 'causer_type', User::class],
         ];
         $preserved = [];
 
@@ -227,6 +228,18 @@ class OrganisationTransferPurger
                 if ($typeColumn !== null) {
                     $query->where($typeColumn, $type);
                 }
+                if ($table === 'activity_log') {
+                    $query->where(function (Builder $subjects): void {
+                        foreach (['tasks' => 'App\\Models\\Task', 'project_participants' => 'App\\Models\\ProjectParticipant'] as $subjectTable => $subjectType) {
+                            $subjects->orWhere(function (Builder $subject) use ($subjectTable, $subjectType): void {
+                                $subject->where('subject_type', $subjectType)->whereExists(function (Builder $existing) use ($subjectTable): void {
+                                    $existing->selectRaw('1')->from($subjectTable)->whereColumn($subjectTable.'.id', 'activity_log.subject_id');
+                                });
+                            });
+                        }
+                    });
+                }
+
                 if (($rowIds[$table] ?? []) !== []) {
                     $query->whereNotIn('id', $rowIds[$table]);
                 }

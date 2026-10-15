@@ -51,7 +51,7 @@ class GetTaskWriteContextTool extends Tool
 
         if (isset($validated['task_id'])) {
             $task = $access->tasksFor($principal)
-                ->with(['project.environments', 'submitter', 'metadata', 'collaborators.user', 'collaborators.externalUser'])
+                ->with(['project.environments', 'submitter', 'metadata', 'collaborators.user', 'collaborators.externalIdentity'])
                 ->find($validated['task_id']);
 
             if (! $task instanceof Task) {

@@ -84,7 +84,7 @@ class CreateTaskTool extends Tool
             $this->syncMcpTaskEnvironment($task, $environment);
         }
 
-        $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalUser']);
+        $task->load(['project', 'submitter', 'metadata', 'attachments', 'collaborators.user', 'collaborators.externalIdentity']);
 
         return Response::structured([
             'task' => $this->taskDetails($task),

@@ -125,7 +125,7 @@ class Task extends Model
      */
     public function scopeExternallySubmitted(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
-        return $query->where('submitter_type', ExternalUser::class);
+        return $query->where('submitter_type', ExternalIdentity::class);
     }
 
     /**
@@ -154,7 +154,7 @@ class Task extends Model
 
     /**
      * Get the submitter of the task (polymorphic relationship).
-     * This can be either a User or an ExternalUser.
+     * This can be either a User or an ExternalIdentity.
      */
     public function submitter(): MorphTo
     {
@@ -180,7 +180,7 @@ class Task extends Model
      */
     public function isExternallySubmitted(): bool
     {
-        return $this->submitter instanceof ExternalUser;
+        return $this->submitter instanceof ExternalIdentity;
     }
 
     /**
@@ -222,7 +222,7 @@ class Task extends Model
 
     public function externalCollaborators(): BelongsToMany
     {
-        return $this->belongsToMany(ExternalUser::class, 'task_collaborators', 'task_id', 'external_user_id')
+        return $this->belongsToMany(ExternalIdentity::class, 'task_collaborators', 'task_id', 'external_identity_id')
             ->wherePivot('kind', TaskCollaboratorKind::External->value)
             ->withPivotValue('kind', TaskCollaboratorKind::External->value)
             ->withTimestamps();
@@ -231,7 +231,7 @@ class Task extends Model
     /**
      * Keep the legacy name while pointing at the canonical collaborator table.
      */
-    public function externalUsers(): BelongsToMany
+    public function externalIdentities(): BelongsToMany
     {
         return $this->externalCollaborators();
     }

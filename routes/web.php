@@ -3,12 +3,12 @@
 use App\Http\Controllers\AiRewriteController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\ClientController;
-use App\Http\Controllers\ExternalUserController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationUserController;
 use App\Http\Controllers\ProjectAppErrorNotificationController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectParticipantController;
 use App\Http\Controllers\ProjectUserController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEmailImportController;
@@ -52,7 +52,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('requirements', [TaskController::class, 'requirements'])->name('requirements');
         Route::get('clients', [ClientController::class, 'index'])->name('clients');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects');
-        Route::get('external-users', [ExternalUserController::class, 'index'])->name('external-users');
+        Route::get('project-participants', [ProjectParticipantController::class, 'index'])->name('project-participants');
+        Route::get('external-users', [ProjectParticipantController::class, 'index'])->name('external-users');
         Route::get('team', [OrganisationController::class, 'team'])->name('team');
         Route::get('settings', [OrganisationController::class, 'settings'])->name('settings');
     });
@@ -138,11 +139,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('attachments/temp/{temp}/{filename}', [AttachmentController::class, 'showTemp'])->where('filename', '.*')->name('attachments.temp');
     Route::post('ai/improve', [AiRewriteController::class, 'improve'])->middleware('throttle:ai-rewrite')->name('ai.improve');
 
-    // External Users
+    // Project participants and legacy external account routes.
+    Route::get('project-participants', fn () => abort(404));
+    Route::put('project-participants/{externalIdentity}', [ProjectParticipantController::class, 'update'])->name('project-participants.update');
+    Route::post('project-participants/{externalIdentity}/linked-accounts', [ProjectParticipantController::class, 'linkAccount'])->name('project-participants.linked-accounts.store');
+    Route::delete('project-participants/{externalIdentity}/linked-accounts/{linkedExternalIdentity}', [ProjectParticipantController::class, 'unlinkAccount'])->name('project-participants.linked-accounts.destroy');
     Route::get('external-users', fn () => abort(404));
-    Route::put('external-users/{externalUser}', [ExternalUserController::class, 'update'])->name('external-users.update');
-    Route::post('external-users/{externalUser}/linked-accounts', [ExternalUserController::class, 'linkAccount'])->name('external-users.linked-accounts.store');
-    Route::delete('external-users/{externalUser}/linked-accounts/{linkedExternalUser}', [ExternalUserController::class, 'unlinkAccount'])->name('external-users.linked-accounts.destroy');
+    Route::put('external-users/{externalIdentity}', [ProjectParticipantController::class, 'update'])->name('external-users.update');
+    Route::post('external-users/{externalIdentity}/linked-accounts', [ProjectParticipantController::class, 'linkAccount'])->name('external-users.linked-accounts.store');
+    Route::delete('external-users/{externalIdentity}/linked-accounts/{linkedExternalIdentity}', [ProjectParticipantController::class, 'unlinkAccount'])->name('external-users.linked-accounts.destroy');
 
     // Users
     Route::get('users', fn () => abort(404));

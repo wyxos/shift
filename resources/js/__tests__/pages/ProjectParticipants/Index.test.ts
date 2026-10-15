@@ -1,5 +1,5 @@
-import ExternalUsersIndex from '@/pages/ExternalUsers/Index.vue';
-import LinkedAccountsManager from '@/pages/ExternalUsers/LinkedAccountsManager.vue';
+import ProjectParticipantsIndex from '@/pages/ProjectParticipants/Index.vue';
+import LinkedAccountsManager from '@/pages/ProjectParticipants/LinkedAccountsManager.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
@@ -124,7 +124,7 @@ vi.mock('@/components/ui/sheet', () => ({
         props: ['open'],
         emits: ['update:open'],
         render() {
-            return this.open ? h('div', { class: 'sheet-stub', 'data-testid': 'external-user-edit-sheet' }, this.$slots.default?.()) : null;
+            return this.open ? h('div', { class: 'sheet-stub', 'data-testid': 'external-identity-edit-sheet' }, this.$slots.default?.()) : null;
         },
     },
     SheetContent: {
@@ -222,8 +222,8 @@ vi.mock('lucide-vue-next', () => ({
     Pencil: { render: () => h('span') },
 }));
 
-describe('ExternalUsers/Index.vue', () => {
-    const externalUsers = {
+describe('ProjectParticipants/Index.vue', () => {
+    const externalIdentities = {
         data: [
             {
                 id: 7,
@@ -240,7 +240,7 @@ describe('ExternalUsers/Index.vue', () => {
                         email: 'linked@example.com',
                         environment: 'Development',
                         url: 'https://portal-v3.example.com',
-                        unlink_url: '/external-users/7/linked-accounts/12',
+                        unlink_url: '/project-participants/7/linked-accounts/12',
                         can_unlink: true,
                     },
                 ],
@@ -254,7 +254,7 @@ describe('ExternalUsers/Index.vue', () => {
                     },
                 ],
                 links: {
-                    link_accounts: '/external-users/7/linked-accounts',
+                    link_accounts: '/project-participants/7/linked-accounts',
                 },
             },
             {
@@ -275,20 +275,20 @@ describe('ExternalUsers/Index.vue', () => {
     };
 
     it('renders combined identity and project context columns with unambiguous role labels', () => {
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
-                externalUsers,
+                externalIdentities,
                 filters: { search: '', sort_by: null, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
         });
 
-        expect(wrapper.findAll('th').map((header) => header.text())).toEqual(['Name', 'Project', 'Role', 'Actions']);
-        expect(wrapper.find('[data-testid="external-user-identity-7"]').text()).toContain('Client QA');
-        expect(wrapper.find('[data-testid="external-user-identity-7"]').text()).toContain('qa@example.com');
-        expect(wrapper.find('[data-testid="external-user-project-environment-7"]').text()).toContain('Portal');
-        expect(wrapper.find('[data-testid="external-user-project-environment-7"]').text()).toContain('Staging');
-        expect(wrapper.find('[data-testid="external-user-role-7"]').text()).toContain('Client Owner');
+        expect(wrapper.findAll('th').map((header) => header.text())).toEqual(['Application account', 'Project and environment', 'Role', 'Actions']);
+        expect(wrapper.find('[data-testid="external-identity-profile-7"]').text()).toContain('Client QA');
+        expect(wrapper.find('[data-testid="external-identity-profile-7"]').text()).toContain('qa@example.com');
+        expect(wrapper.find('[data-testid="external-identity-project-environment-7"]').text()).toContain('Portal');
+        expect(wrapper.find('[data-testid="external-identity-project-environment-7"]').text()).toContain('Staging');
+        expect(wrapper.find('[data-testid="external-identity-role-7"]').text()).toContain('Client Owner');
         expect(wrapper.text()).toContain('Portal');
         expect(wrapper.text()).toContain('No project assigned');
     });
@@ -296,9 +296,9 @@ describe('ExternalUsers/Index.vue', () => {
     it('applies search and sort filters', async () => {
         routerGetMock.mockReset();
 
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
-                externalUsers,
+                externalIdentities,
                 filters: { search: '', sort_by: null, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
@@ -310,7 +310,7 @@ describe('ExternalUsers/Index.vue', () => {
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/organisation/3/external-users',
+            '/organisation/3/project-participants',
             {
                 page: 1,
                 project_id: '2',
@@ -324,9 +324,9 @@ describe('ExternalUsers/Index.vue', () => {
     it('keeps filters on the organisation scoped route', async () => {
         routerGetMock.mockReset();
 
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
-                externalUsers,
+                externalIdentities,
                 filters: { search: '', sort_by: null, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
@@ -336,7 +336,7 @@ describe('ExternalUsers/Index.vue', () => {
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/organisation/3/external-users',
+            '/organisation/3/project-participants',
             expect.objectContaining({
                 page: 1,
                 project_id: '2',
@@ -349,11 +349,11 @@ describe('ExternalUsers/Index.vue', () => {
         routerVisitMock.mockReset();
         routerReloadMock.mockReset();
         axiosPutMock.mockReset();
-        axiosPutMock.mockResolvedValue({ data: { external_user: { id: 7 } } });
+        axiosPutMock.mockResolvedValue({ data: { external_identity: { id: 7 } } });
 
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
-                externalUsers,
+                externalIdentities,
                 filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [
                     { id: 2, name: 'Portal' },
@@ -362,23 +362,23 @@ describe('ExternalUsers/Index.vue', () => {
             },
         });
 
-        await wrapper.get('[data-testid="external-user-edit-7"]').trigger('click');
+        await wrapper.get('[data-testid="external-identity-edit-7"]').trigger('click');
 
         expect(routerVisitMock).not.toHaveBeenCalled();
-        expect(wrapper.get('[data-testid="external-user-edit-sheet"]').text()).toContain('Edit external user');
-        expect((wrapper.get('[data-testid="external-user-edit-name"]').element as HTMLInputElement).value).toBe('Client QA');
-        expect(wrapper.find('[data-testid="external-user-edit-project"]').exists()).toBe(false);
-        expect(wrapper.get('[data-testid="external-user-project-context"]').text()).toContain('Portal');
-        expect(wrapper.get('[data-testid="external-user-project-context"]').text()).toContain('Staging');
-        expect(wrapper.get('[data-testid="external-user-role-readonly"]').text()).toContain('Client Owner');
+        expect(wrapper.get('[data-testid="external-identity-edit-sheet"]').text()).toContain('Edit application account');
+        expect((wrapper.get('[data-testid="external-identity-edit-name"]').element as HTMLInputElement).value).toBe('Client QA');
+        expect(wrapper.find('[data-testid="external-identity-edit-project"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="external-identity-project-context"]').text()).toContain('Portal');
+        expect(wrapper.get('[data-testid="external-identity-project-context"]').text()).toContain('Staging');
+        expect(wrapper.get('[data-testid="external-identity-role-readonly"]').text()).toContain('Client Owner');
 
-        await wrapper.get('[data-testid="external-user-edit-name"]').setValue('Client QA Lead');
-        await wrapper.get('[data-testid="external-user-edit-email"]').setValue('lead@example.com');
+        await wrapper.get('[data-testid="external-identity-edit-name"]').setValue('Client QA Lead');
+        await wrapper.get('[data-testid="external-identity-edit-email"]').setValue('lead@example.com');
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith(
-            '/external-users/7',
+            '/project-participants/7',
             {
                 email: 'lead@example.com',
                 name: 'Client QA Lead',
@@ -387,7 +387,7 @@ describe('ExternalUsers/Index.vue', () => {
         );
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                only: ['externalUsers'],
+                only: ['externalIdentities'],
             }),
         );
     });
@@ -395,13 +395,13 @@ describe('ExternalUsers/Index.vue', () => {
     it('edits roles and applies refreshed linked-account state without closing the sheet', async () => {
         routerReloadMock.mockReset();
         axiosPutMock.mockReset();
-        axiosPutMock.mockResolvedValue({ data: { external_user: { id: 7 } } });
+        axiosPutMock.mockResolvedValue({ data: { external_identity: { id: 7 } } });
 
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
                 canManageExternalRoles: true,
                 canManageLinkedAccounts: true,
-                externalUsers,
+                externalIdentities,
                 filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
                 roles: [
@@ -411,26 +411,26 @@ describe('ExternalUsers/Index.vue', () => {
             },
         });
 
-        await wrapper.get('[data-testid="external-user-edit-7"]').trigger('click');
+        await wrapper.get('[data-testid="external-identity-edit-7"]').trigger('click');
 
-        expect(wrapper.get('[data-testid="external-user-edit-role"]').exists()).toBe(true);
-        expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('Production Login');
-        expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('portal.example.com');
-        expect(wrapper.get('[data-testid="external-user-linked-accounts"]').text()).toContain('Portal SSO');
-        expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('linked@example.com');
-        expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('portal-v3.example.com');
+        expect(wrapper.get('[data-testid="external-identity-edit-role"]').exists()).toBe(true);
+        expect(wrapper.get('[data-testid="external-identity-link-account-select"]').text()).toContain('Production Login');
+        expect(wrapper.get('[data-testid="external-identity-link-account-select"]').text()).toContain('portal.example.com');
+        expect(wrapper.get('[data-testid="external-identity-linked-accounts"]').text()).toContain('Portal SSO');
+        expect(wrapper.get('[data-testid="external-identity-linked-account-12"]').text()).toContain('linked@example.com');
+        expect(wrapper.get('[data-testid="external-identity-linked-account-12"]').text()).toContain('portal-v3.example.com');
 
         wrapper.getComponent(LinkedAccountsManager).vm.$emit('changed', {
-            ...externalUsers.data[0],
+            ...externalIdentities.data[0],
             linked_accounts: [
-                ...externalUsers.data[0].linked_accounts,
+                ...externalIdentities.data[0].linked_accounts,
                 {
                     id: 13,
                     label: 'Production Login',
                     email: 'prod@example.com',
                     environment: 'Production',
                     url: 'https://portal.example.com',
-                    unlink_url: '/external-users/7/linked-accounts/13',
+                    unlink_url: '/project-participants/7/linked-accounts/13',
                     can_unlink: true,
                 },
             ],
@@ -438,20 +438,20 @@ describe('ExternalUsers/Index.vue', () => {
         });
         await wrapper.vm.$nextTick();
 
-        expect(wrapper.get('[data-testid="external-user-linked-account-13"]').text()).toContain('portal.example.com');
-        expect(wrapper.find('[data-testid="external-user-link-account-select"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="external-identity-linked-account-13"]').text()).toContain('portal.example.com');
+        expect(wrapper.find('[data-testid="external-identity-link-account-select"]').exists()).toBe(false);
         expect(routerReloadMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                only: ['externalUsers'],
+                only: ['externalIdentities'],
             }),
         );
 
-        await wrapper.get('[data-testid="external-user-edit-role"]').setValue('guest');
+        await wrapper.get('[data-testid="external-identity-edit-role"]').setValue('guest');
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 
         expect(axiosPutMock).toHaveBeenCalledWith(
-            '/external-users/7',
+            '/project-participants/7',
             {
                 email: 'qa@example.com',
                 name: 'Client QA',
@@ -465,9 +465,9 @@ describe('ExternalUsers/Index.vue', () => {
         routerVisitMock.mockReset();
         routerGetMock.mockReset();
 
-        const wrapper = mount(ExternalUsersIndex, {
+        const wrapper = mount(ProjectParticipantsIndex, {
             props: {
-                externalUsers,
+                externalIdentities,
                 filters: { search: 'qa', sort_by: 'name', project_id: 2, organisation_id: 3 },
                 projects: [{ id: 2, name: 'Portal' }],
             },
@@ -475,7 +475,7 @@ describe('ExternalUsers/Index.vue', () => {
 
         await wrapper.get('[data-testid="emit-page-change"]').trigger('click');
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/organisation/3/external-users',
+            '/organisation/3/project-participants',
             {
                 page: 2,
                 project_id: '2',

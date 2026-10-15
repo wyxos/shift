@@ -1,8 +1,8 @@
 <?php
 
-use App\Enums\ExternalUserRole;
+use App\Enums\ExternalIdentityRole;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -463,19 +463,19 @@ test('external role-visible users can download task attachments', function () {
         'token' => 'attachment-role-project',
         'author_id' => $this->user->id,
     ]);
-    $owner = ExternalUser::factory()->create([
+    $owner = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'external_id' => 'owner-1',
         'environment' => 'testing',
         'url' => 'https://consumer.test',
-        'role' => ExternalUserRole::Owner,
+        'role' => ExternalIdentityRole::Owner,
     ]);
-    $shiftLeadDeveloper = ExternalUser::factory()->create([
+    $shiftLeadDeveloper = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'external_id' => 'shift-lead-1',
         'environment' => 'testing',
         'url' => 'https://consumer.test',
-        'role' => ExternalUserRole::ShiftLeadDeveloper,
+        'role' => ExternalIdentityRole::ShiftLeadDeveloper,
     ]);
     $task = Task::factory()->create([
         'project_id' => $project->id,

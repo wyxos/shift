@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Enums\TaskCollaboratorKind;
 use App\Jobs\SendPendingTaskCollaboratorNotification;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Task;
 use App\Models\TaskCollaboratorNotification;
 use App\Models\User;
@@ -68,7 +68,7 @@ class TaskCollaboratorNotificationScheduler
         );
 
         $addedExternal = ($syncResult['added_external'] ?? collect())
-            ->reject(fn (ExternalUser $externalUser): bool => $task->submitter_type === ExternalUser::class && (int) $task->submitter_id === $externalUser->id)
+            ->reject(fn (ExternalIdentity $externalIdentity): bool => $task->submitter_type === ExternalIdentity::class && (int) $task->submitter_id === $externalIdentity->id)
             ->values();
 
         $this->scheduleExternal(
@@ -85,14 +85,14 @@ class TaskCollaboratorNotificationScheduler
         }
     }
 
-    private function scheduleExternal(Task $task, Collection $externalUsers, string $event): void
+    private function scheduleExternal(Task $task, Collection $externalIdentities, string $event): void
     {
-        foreach ($externalUsers as $externalUser) {
-            if ($externalUser->email === null && $externalUser->url === null) {
+        foreach ($externalIdentities as $externalIdentity) {
+            if ($externalIdentity->email === null && $externalIdentity->url === null) {
                 continue;
             }
 
-            $this->schedule($task, $event, TaskCollaboratorKind::External, null, (int) $externalUser->id, null);
+            $this->schedule($task, $event, TaskCollaboratorKind::External, null, (int) $externalIdentity->id, null);
         }
     }
 
@@ -101,7 +101,7 @@ class TaskCollaboratorNotificationScheduler
         string $event,
         TaskCollaboratorKind $kind,
         ?int $userId,
-        ?int $externalUserId,
+        ?int $externalIdentityId,
         ?string $url,
     ): void {
         $scheduledAt = now()->addSeconds($this->gracePeriodSeconds());
@@ -111,7 +111,7 @@ class TaskCollaboratorNotificationScheduler
             'event' => $event,
             'kind' => $kind->value,
             'user_id' => $userId,
-            'external_user_id' => $externalUserId,
+            'external_identity_id' => $externalIdentityId,
             'url' => $url,
             'scheduled_at' => $scheduledAt,
         ]);
@@ -135,7 +135,7 @@ class TaskCollaboratorNotificationScheduler
                 ->when(
                     $kind === TaskCollaboratorKind::Internal,
                     fn ($query) => $query->where('user_id', (int) $recipientId),
-                    fn ($query) => $query->where('external_user_id', (int) $recipientId),
+                    fn ($query) => $query->where('external_identity_id', (int) $recipientId),
                 )
                 ->whereNull('sent_at')
                 ->whereNull('cancelled_at')

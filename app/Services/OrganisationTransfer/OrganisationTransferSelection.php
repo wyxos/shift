@@ -26,8 +26,8 @@ class OrganisationTransferSelection
         'projects',
         'project_users',
         'project_environments',
-        'external_contacts',
-        'external_users',
+        'project_participants',
+        'external_identities',
         'requirement_batches',
         'tasks',
         'task_metadata',
@@ -102,12 +102,12 @@ class OrganisationTransferSelection
         $this->taskIds = $this->idsFor('tasks', 'project_id', $this->projectIds);
         $this->threadIds = $this->idsFor('task_threads', 'task_id', $this->taskIds);
 
-        $externalContactIds = $this->idsFor('external_contacts', 'project_id', $this->projectIds);
-        $externalUserIds = $this->idsFor('external_users', 'project_id', $this->projectIds);
+        $projectParticipantIds = $this->idsFor('project_participants', 'project_id', $this->projectIds);
+        $externalIdentityIds = $this->idsFor('external_identities', 'project_id', $this->projectIds);
         $requirementBatchIds = $this->idsFor('requirement_batches', 'project_id', $this->projectIds);
         $collaboratorNotificationIds = $this->idsFor('task_collaborator_notifications', 'task_id', $this->taskIds);
 
-        $this->userIds = $this->referencedUserIds($organisationId);
+        $this->userIds = $this->referencedUserIds($organisationId, $projectParticipantIds);
 
         $this->rows = [
             'users' => $this->tableRows('users', fn (Builder $query) => $this->whereIds($query, 'id', $this->userIds)),
@@ -117,8 +117,8 @@ class OrganisationTransferSelection
             'projects' => $this->tableRows('projects', fn (Builder $query) => $this->whereIds($query, 'id', $this->projectIds)),
             'project_users' => $this->tableRows('project_users', fn (Builder $query) => $this->whereIds($query, 'project_id', $this->projectIds)),
             'project_environments' => $this->tableRows('project_environments', fn (Builder $query) => $this->whereIds($query, 'project_id', $this->projectIds)),
-            'external_contacts' => $this->tableRows('external_contacts', fn (Builder $query) => $this->whereIds($query, 'id', $externalContactIds)),
-            'external_users' => $this->tableRows('external_users', fn (Builder $query) => $this->whereIds($query, 'id', $externalUserIds)),
+            'project_participants' => $this->tableRows('project_participants', fn (Builder $query) => $this->whereIds($query, 'id', $projectParticipantIds)),
+            'external_identities' => $this->tableRows('external_identities', fn (Builder $query) => $this->whereIds($query, 'id', $externalIdentityIds)),
             'requirement_batches' => $this->tableRows('requirement_batches', fn (Builder $query) => $this->whereIds($query, 'id', $requirementBatchIds)),
             'tasks' => $this->tableRows('tasks', fn (Builder $query) => $this->whereIds($query, 'id', $this->taskIds)),
             'task_metadata' => $this->tableRows('task_metadata', fn (Builder $query) => $this->whereIds($query, 'task_id', $this->taskIds)),
@@ -148,13 +148,16 @@ class OrganisationTransferSelection
                     }
                 });
             }),
-            'activity_log' => $this->tableRows('activity_log', fn (Builder $query) => $this->whereMorphIds($query, 'App\\Models\\Task', $this->taskIds, 'subject')),
+            'activity_log' => $this->tableRows('activity_log', fn (Builder $query) => $this->scopeActivity($query, $projectParticipantIds)),
             'notifications' => $this->notificationRows($organisationId),
         ];
     }
 
-    /** @return list<int> */
-    private function referencedUserIds(int $organisationId): array
+    /**
+     * @param  list<int>  $projectParticipantIds
+     * @return list<int>
+     */
+    private function referencedUserIds(int $organisationId, array $projectParticipantIds): array
     {
         $ids = collect([(int) $this->organisation->author_id]);
 
@@ -193,7 +196,23 @@ class OrganisationTransferSelection
                 ->pluck('sender_id'));
         }
 
+        $activityActors = DB::table('activity_log')->where('causer_type', User::class)->whereNotNull('causer_id');
+        $this->scopeActivity($activityActors, $projectParticipantIds);
+        $ids->push(...$activityActors->pluck('causer_id'));
+
         return $ids->filter()->map(fn (mixed $id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /** @param list<int> $projectParticipantIds */
+    private function scopeActivity(Builder $query, array $projectParticipantIds): Builder
+    {
+        return $query->where(function (Builder $scope) use ($projectParticipantIds): void {
+            $scope->where(function (Builder $tasks): void {
+                $this->whereMorphIds($tasks, 'App\\Models\\Task', $this->taskIds, 'subject');
+            })->orWhere(function (Builder $participants) use ($projectParticipantIds): void {
+                $this->whereMorphIds($participants, 'App\\Models\\ProjectParticipant', $projectParticipantIds, 'subject');
+            });
+        });
     }
 
     /** @return LazyCollection<int, array<string, mixed>> */

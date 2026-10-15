@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\TaskCollaboratorKind;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCollaborator;
@@ -95,14 +95,14 @@ class TaskCollaboratorService
         return $normalizedIds->all();
     }
 
-    public function sync(Task $task, array $internalUserIds = [], iterable $externalUsers = []): void
+    public function sync(Task $task, array $internalUserIds = [], iterable $externalIdentities = []): void
     {
-        [$normalizedInternalIds, $normalizedExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
+        [$normalizedInternalIds, $normalizedExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalIdentities);
 
         $this->persistSelection($task, $normalizedInternalIds, $normalizedExternalIds);
     }
 
-    public function syncWithResult(Task $task, array $internalUserIds = [], iterable $externalUsers = []): array
+    public function syncWithResult(Task $task, array $internalUserIds = [], iterable $externalIdentities = []): array
     {
         $task->loadMissing(['submitter', 'internalCollaborators:id', 'externalCollaborators:id']);
 
@@ -116,7 +116,7 @@ class TaskCollaboratorService
             ->map(fn ($id) => (int) $id)
             ->values();
 
-        [$afterInternalIds, $afterExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
+        [$afterInternalIds, $afterExternalIds] = $this->normalizedSelection($task, $internalUserIds, $externalIdentities);
 
         $this->persistSelection($task, $afterInternalIds, $afterExternalIds);
 
@@ -135,30 +135,30 @@ class TaskCollaboratorService
                 : User::query()->whereIn('id', $addedInternalIds)->get(),
             'added_external' => $addedExternalIds->isEmpty()
                 ? new EloquentCollection
-                : ExternalUser::query()->whereIn('id', $addedExternalIds)->get(),
+                : ExternalIdentity::query()->whereIn('id', $addedExternalIds)->get(),
         ];
     }
 
     public function initialize(
         Task $task,
         array $internalUserIds = [],
-        iterable $externalUsers = [],
+        iterable $externalIdentities = [],
         bool $includeSubmitter = true,
     ): array {
         $task->loadMissing('submitter');
 
-        $initialExternalUsers = collect($externalUsers);
+        $initialExternalIdentities = collect($externalIdentities);
 
-        if ($includeSubmitter && $task->submitter instanceof ExternalUser) {
-            $initialExternalUsers->push($task->submitter);
+        if ($includeSubmitter && $task->submitter instanceof ExternalIdentity) {
+            $initialExternalIdentities->push($task->submitter);
         }
 
-        return $this->syncWithResult($task, $internalUserIds, $initialExternalUsers);
+        return $this->syncWithResult($task, $internalUserIds, $initialExternalIdentities);
     }
 
-    public function add(Task $task, array $internalUserIds = [], iterable $externalUsers = []): void
+    public function add(Task $task, array $internalUserIds = [], iterable $externalIdentities = []): void
     {
-        [$internalIds, $externalIds] = $this->normalizedSelection($task, $internalUserIds, $externalUsers);
+        [$internalIds, $externalIds] = $this->normalizedSelection($task, $internalUserIds, $externalIdentities);
         $now = now();
 
         foreach ($internalIds as $userId) {
@@ -169,18 +169,18 @@ class TaskCollaboratorService
                 ],
                 [
                     'kind' => TaskCollaboratorKind::Internal->value,
-                    'external_user_id' => null,
+                    'external_identity_id' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],
             );
         }
 
-        foreach ($externalIds as $externalUserId) {
+        foreach ($externalIds as $externalIdentityId) {
             TaskCollaborator::query()->firstOrCreate(
                 [
                     'task_id' => $task->id,
-                    'external_user_id' => $externalUserId,
+                    'external_identity_id' => $externalIdentityId,
                 ],
                 [
                     'kind' => TaskCollaboratorKind::External->value,
@@ -207,13 +207,13 @@ class TaskCollaboratorService
         return $task->internalCollaborators->contains('id', $userId);
     }
 
-    public function canManageForExternalUser(Task $task, ?ExternalUser $externalUser): bool
+    public function canManageForExternalIdentity(Task $task, ?ExternalIdentity $externalIdentity): bool
     {
-        if ($externalUser === null) {
+        if ($externalIdentity === null) {
             return false;
         }
 
-        return $task->submitter_type === ExternalUser::class && $task->submitter_id === $externalUser->id;
+        return $task->submitter_type === ExternalIdentity::class && $task->submitter_id === $externalIdentity->id;
     }
 
     public function internalTaskCreateAudience(Task $task): Collection
@@ -241,7 +241,7 @@ class TaskCollaboratorService
         $task->loadMissing(['submitter', 'externalCollaborators']);
 
         $users = collect();
-        $submitterId = $task->submitter instanceof ExternalUser ? $task->submitter->id : null;
+        $submitterId = $task->submitter instanceof ExternalIdentity ? $task->submitter->id : null;
 
         foreach ($task->externalCollaborators as $collaborator) {
             if ($collaborator->id === $submitterId) {
@@ -264,11 +264,11 @@ class TaskCollaboratorService
             ->values();
     }
 
-    public function externalReplyAudience(Task $task, ?int $excludingExternalUserId = null): Collection
+    public function externalReplyAudience(Task $task, ?int $excludingExternalIdentityId = null): Collection
     {
         return $task->externalCollaborators()
             ->get()
-            ->reject(fn (ExternalUser $collaborator) => $collaborator->id === $excludingExternalUserId)
+            ->reject(fn (ExternalIdentity $collaborator) => $collaborator->id === $excludingExternalIdentityId)
             ->values();
     }
 
@@ -284,16 +284,16 @@ class TaskCollaboratorService
                     'task_id' => $task->id,
                     'kind' => TaskCollaboratorKind::Internal->value,
                     'user_id' => $userId,
-                    'external_user_id' => null,
+                    'external_identity_id' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ])
                 ->concat(
-                    $externalIds->map(fn (int $externalUserId) => [
+                    $externalIds->map(fn (int $externalIdentityId) => [
                         'task_id' => $task->id,
                         'kind' => TaskCollaboratorKind::External->value,
                         'user_id' => null,
-                        'external_user_id' => $externalUserId,
+                        'external_identity_id' => $externalIdentityId,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ])
@@ -310,7 +310,7 @@ class TaskCollaboratorService
         $task->unsetRelation('externalCollaborators');
     }
 
-    private function normalizedSelection(Task $task, array $internalUserIds, iterable $externalUsers): array
+    private function normalizedSelection(Task $task, array $internalUserIds, iterable $externalIdentities): array
     {
         $normalizedInternalIds = collect($internalUserIds)
             ->map(fn ($id) => (int) $id)
@@ -318,18 +318,18 @@ class TaskCollaboratorService
             ->unique()
             ->values();
 
-        $normalizedExternalIds = collect($externalUsers)
-            ->map(function ($externalUser) {
-                if ($externalUser instanceof ExternalUser) {
-                    return $externalUser->id;
+        $normalizedExternalIds = collect($externalIdentities)
+            ->map(function ($externalIdentity) {
+                if ($externalIdentity instanceof ExternalIdentity) {
+                    return $externalIdentity->id;
                 }
 
-                if (is_array($externalUser)) {
-                    return $externalUser['id'] ?? null;
+                if (is_array($externalIdentity)) {
+                    return $externalIdentity['id'] ?? null;
                 }
 
-                if (is_int($externalUser) || is_string($externalUser)) {
-                    return $externalUser;
+                if (is_int($externalIdentity) || is_string($externalIdentity)) {
+                    return $externalIdentity;
                 }
 
                 return null;

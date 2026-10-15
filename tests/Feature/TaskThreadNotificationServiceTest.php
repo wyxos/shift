@@ -1,7 +1,7 @@
 <?php
 
 use App\Jobs\SendTaskThreadNotification;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
@@ -32,14 +32,14 @@ beforeEach(function () {
         'registration_status' => 'registered',
     ]);
 
-    $this->externalSender = ExternalUser::factory()->create([
+    $this->externalSender = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'external-sender',
         'environment' => 'testing',
         'url' => 'https://sender.example.com',
         'email' => 'sender@example.com',
     ]);
-    $this->externalCollaborator = ExternalUser::factory()->create([
+    $this->externalCollaborator = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'external-collaborator',
         'environment' => 'testing',
@@ -114,11 +114,11 @@ test('client-visible replies do not notify an external submitter after they leav
     Queue::assertNotPushed(
         SendTaskThreadNotification::class,
         function (SendTaskThreadNotification $job): bool {
-            $externalUserData = (function (): array {
+            $externalIdentityData = (function (): array {
                 return $this->externalUserData;
             })->call($job);
 
-            return $externalUserData['external_id'] === $this->externalSender->external_id;
+            return $externalIdentityData['external_id'] === $this->externalSender->external_id;
         },
     );
 });

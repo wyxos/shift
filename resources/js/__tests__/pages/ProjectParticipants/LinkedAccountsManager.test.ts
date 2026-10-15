@@ -1,4 +1,4 @@
-import LinkedAccountsManager from '@/pages/ExternalUsers/LinkedAccountsManager.vue';
+import LinkedAccountsManager from '@/pages/ProjectParticipants/LinkedAccountsManager.vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
@@ -62,14 +62,14 @@ vi.mock('vue-sonner', () => ({
     },
 }));
 
-describe('ExternalUsers/LinkedAccountsManager.vue', () => {
+describe('ProjectParticipants/LinkedAccountsManager.vue', () => {
     const linkedAccount = {
         id: 12,
         label: 'Portal SSO',
         email: 'linked@example.com',
         environment: 'Development',
         url: 'https://portal-v3.example.com',
-        unlink_url: '/external-users/7/linked-accounts/12',
+        unlink_url: '/project-participants/7/linked-accounts/12',
         can_unlink: true,
     };
     const productionAccount = {
@@ -79,7 +79,7 @@ describe('ExternalUsers/LinkedAccountsManager.vue', () => {
         environment: 'Production',
         url: 'https://portal.example.com',
     };
-    const externalUser = {
+    const externalIdentity = {
         id: 7,
         name: 'Client QA',
         email: 'qa@example.com',
@@ -90,7 +90,7 @@ describe('ExternalUsers/LinkedAccountsManager.vue', () => {
         linked_accounts: [linkedAccount],
         linkable_accounts: [productionAccount],
         links: {
-            link_accounts: '/external-users/7/linked-accounts',
+            link_accounts: '/project-participants/7/linked-accounts',
         },
     };
 
@@ -100,53 +100,55 @@ describe('ExternalUsers/LinkedAccountsManager.vue', () => {
         toastSuccessMock.mockReset();
 
         const linkedState = {
-            ...externalUser,
+            ...externalIdentity,
             linked_accounts: [
                 linkedAccount,
                 {
                     ...productionAccount,
-                    unlink_url: '/external-users/7/linked-accounts/13',
+                    unlink_url: '/project-participants/7/linked-accounts/13',
                     can_unlink: true,
                 },
             ],
             linkable_accounts: [],
         };
         const unlinkedState = {
-            ...externalUser,
+            ...externalIdentity,
             linked_accounts: linkedState.linked_accounts.slice(1),
             linkable_accounts: [linkedAccount],
         };
-        axiosPostMock.mockResolvedValue({ data: { external_user: linkedState } });
-        axiosDeleteMock.mockResolvedValue({ data: { external_user: unlinkedState } });
+        axiosPostMock.mockResolvedValue({ data: { external_identity: linkedState } });
+        axiosDeleteMock.mockResolvedValue({ data: { external_identity: unlinkedState } });
 
         const wrapper = mount(LinkedAccountsManager, {
             props: {
                 canManageLinkedAccounts: true,
-                externalUser,
+                externalIdentity,
             },
         });
 
-        expect(wrapper.get('[data-testid="external-user-link-account-select"]').text()).toContain('portal.example.com');
-        expect(wrapper.get('[data-testid="external-user-linked-account-12"]').text()).toContain('portal-v3.example.com');
+        expect(wrapper.get('[data-testid="external-identity-link-account-select"]').text()).toContain('portal.example.com');
+        expect(wrapper.get('[data-testid="external-identity-linked-account-12"]').text()).toContain('portal-v3.example.com');
+        expect(wrapper.text()).toContain('Linking joins both accounts’ existing groups');
+        expect(wrapper.text()).toContain('original ticket ownership stays with its account');
 
-        await wrapper.get('[data-testid="external-user-link-account-select"]').setValue('13');
-        await wrapper.get('[data-testid="external-user-link-account-submit"]').trigger('click');
+        await wrapper.get('[data-testid="external-identity-link-account-select"]').setValue('13');
+        await wrapper.get('[data-testid="external-identity-link-account-submit"]').trigger('click');
         await flushPromises();
 
         expect(axiosPostMock).toHaveBeenCalledWith(
-            '/external-users/7/linked-accounts',
-            { linked_external_user_id: '13' },
+            '/project-participants/7/linked-accounts',
+            { linked_external_identity_id: '13' },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
         expect(wrapper.emitted('changed')?.[0]).toEqual([linkedState]);
         expect(toastSuccessMock).toHaveBeenCalledWith('Account linked');
 
-        await wrapper.setProps({ externalUser: linkedState });
-        await wrapper.get('[data-testid="external-user-linked-account-unlink-12"]').trigger('click');
+        await wrapper.setProps({ externalIdentity: linkedState });
+        await wrapper.get('[data-testid="external-identity-linked-account-unlink-12"]').trigger('click');
         await flushPromises();
 
         expect(axiosDeleteMock).toHaveBeenCalledWith(
-            '/external-users/7/linked-accounts/12',
+            '/project-participants/7/linked-accounts/12',
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );
         expect(wrapper.emitted('changed')?.[1]).toEqual([unlinkedState]);
@@ -168,14 +170,14 @@ describe('ExternalUsers/LinkedAccountsManager.vue', () => {
         const wrapper = mount(LinkedAccountsManager, {
             props: {
                 canManageLinkedAccounts: true,
-                externalUser: {
-                    ...externalUser,
+                externalIdentity: {
+                    ...externalIdentity,
                     linkable_accounts: [
                         {
-                            id: externalUser.id,
+                            id: externalIdentity.id,
                             label: 'Current account',
-                            email: externalUser.email,
-                            environment: externalUser.environment,
+                            email: externalIdentity.email,
+                            environment: externalIdentity.environment,
                             url: 'https://staging.example.com',
                         },
                         productionAccount,
@@ -185,13 +187,13 @@ describe('ExternalUsers/LinkedAccountsManager.vue', () => {
         });
 
         const linkOptions = wrapper
-            .get('[data-testid="external-user-link-account-select"]')
+            .get('[data-testid="external-identity-link-account-select"]')
             .findAll('option')
             .map((option) => option.attributes('value'));
-        expect(linkOptions).not.toContain(String(externalUser.id));
+        expect(linkOptions).not.toContain(String(externalIdentity.id));
 
-        await wrapper.get('[data-testid="external-user-link-account-select"]').setValue('13');
-        await wrapper.get('[data-testid="external-user-link-account-submit"]').trigger('click');
+        await wrapper.get('[data-testid="external-identity-link-account-select"]').setValue('13');
+        await wrapper.get('[data-testid="external-identity-link-account-submit"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.get('[role="alert"]').text()).toBe('These accounts cannot be linked.');

@@ -1,12 +1,12 @@
 <?php
 
-use App\Enums\ExternalUserRole;
+use App\Enums\ExternalIdentityRole;
 use App\Enums\OrganisationRole;
-use App\Models\ExternalContact;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Organisation;
 use App\Models\OrganisationUser;
 use App\Models\Project;
+use App\Models\ProjectParticipant;
 use App\Models\ProjectUser;
 use App\Models\User;
 
@@ -26,7 +26,7 @@ test('user can only see external users for owned projects', function () {
     ]);
 
     // Create an external user for the owned project
-    $ownedExternalUser = ExternalUser::factory()->create([
+    $ownedExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $ownedProject->id,
         'name' => 'Owned External User',
         'email' => 'owned@example.com',
@@ -43,7 +43,7 @@ test('user can only see external users for owned projects', function () {
     ]);
 
     // Create an external user for the other project
-    $otherExternalUser = ExternalUser::factory()->create([
+    $otherExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $otherProject->id,
         'name' => 'Other External User',
         'email' => 'other@example.com',
@@ -51,7 +51,7 @@ test('user can only see external users for owned projects', function () {
 
     // Access the external users index page as the authenticated user
     $response = $this->actingAs($this->user)
-        ->get(route('organisation.external-users', $ownedOrganisation));
+        ->get(route('organisation.project-participants', $ownedOrganisation));
 
     $response->assertStatus(200);
 
@@ -79,33 +79,33 @@ test('external users index can filter by project and includes role labels', func
         'name' => 'Retail Dashboard',
     ]);
 
-    $billingExternalUser = ExternalUser::factory()->create([
+    $billingExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $billingProject->id,
         'name' => 'Billing Owner',
         'email' => 'billing@example.com',
-        'role' => ExternalUserRole::Owner,
+        'role' => ExternalIdentityRole::Owner,
     ]);
-    ExternalUser::factory()->create([
+    ExternalIdentity::factory()->create([
         'project_id' => $retailProject->id,
         'name' => 'Retail Guest',
         'email' => 'retail@example.com',
-        'role' => ExternalUserRole::Guest,
+        'role' => ExternalIdentityRole::Guest,
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('organisation.external-users', [
+        ->get(route('organisation.project-participants', [
             'organisation' => $organisation,
             'project_id' => $billingProject->id,
         ]));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('ExternalUsers/Index')
-        ->has('externalUsers.data', 1)
-        ->where('externalUsers.data.0.id', $billingExternalUser->id)
-        ->where('externalUsers.data.0.project.id', $billingProject->id)
-        ->where('externalUsers.data.0.role', ExternalUserRole::Owner->value)
-        ->where('externalUsers.data.0.role_label', 'Client Owner')
+        ->component('ProjectParticipants/Index')
+        ->has('externalIdentities.data', 1)
+        ->where('externalIdentities.data.0.id', $billingExternalIdentity->id)
+        ->where('externalIdentities.data.0.project.id', $billingProject->id)
+        ->where('externalIdentities.data.0.role', ExternalIdentityRole::Owner->value)
+        ->where('externalIdentities.data.0.role_label', 'Client Owner')
         ->where('filters.project_id', $billingProject->id)
         ->has('projects', 2)
     );
@@ -120,25 +120,25 @@ test('external users index includes linked and linkable account management data'
         'organisation_id' => $organisation->id,
         'name' => 'Portal',
     ]);
-    $contact = ExternalContact::create([
+    $contact = ProjectParticipant::create([
         'project_id' => $project->id,
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
-        'external_contact_id' => $contact->id,
+        'project_participant_id' => $contact->id,
         'name' => 'Alpha Sandbox Client',
         'email' => 'sandbox@example.com',
-        'role' => ExternalUserRole::Owner,
+        'role' => ExternalIdentityRole::Owner,
     ]);
-    $linkedUser = ExternalUser::factory()->create([
+    $linkedUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
-        'external_contact_id' => $contact->id,
+        'project_participant_id' => $contact->id,
         'name' => 'Bravo Staging Client',
         'email' => 'staging@example.com',
         'environment' => 'staging',
         'url' => 'https://portal-staging.example.com',
     ]);
-    $linkableUser = ExternalUser::factory()->create([
+    $linkableUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'name' => 'Charlie Production Client',
         'email' => 'production@example.com',
@@ -147,7 +147,7 @@ test('external users index includes linked and linkable account management data'
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('organisation.external-users', [
+        ->get(route('organisation.project-participants', [
             'organisation' => $organisation,
             'project_id' => $project->id,
             'sort_by' => 'name',
@@ -155,18 +155,18 @@ test('external users index includes linked and linkable account management data'
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
-        ->component('ExternalUsers/Index')
+        ->component('ProjectParticipants/Index')
         ->where('canManageExternalRoles', true)
         ->where('canManageLinkedAccounts', true)
-        ->where('externalUsers.data.0.id', $externalUser->id)
-        ->has('externalUsers.data.0.linked_accounts', 1)
-        ->where('externalUsers.data.0.linked_accounts.0.id', $linkedUser->id)
-        ->where('externalUsers.data.0.linked_accounts.0.url', 'https://portal-staging.example.com')
-        ->where('externalUsers.data.0.linkable_accounts.0.id', $linkableUser->id)
-        ->where('externalUsers.data.0.linkable_accounts.0.url', 'https://portal.example.com')
-        ->where('externalUsers.data.0.can_manage_role', true)
-        ->where('externalUsers.data.0.links.link_accounts', route('external-users.linked-accounts.store', $externalUser))
-        ->where('externalUsers.data.0.linked_accounts.0.unlink_url', route('external-users.linked-accounts.destroy', [$externalUser, $linkedUser]))
+        ->where('externalIdentities.data.0.id', $externalIdentity->id)
+        ->has('externalIdentities.data.0.linked_accounts', 1)
+        ->where('externalIdentities.data.0.linked_accounts.0.id', $linkedUser->id)
+        ->where('externalIdentities.data.0.linked_accounts.0.url', 'https://portal-staging.example.com')
+        ->where('externalIdentities.data.0.linkable_accounts.0.id', $linkableUser->id)
+        ->where('externalIdentities.data.0.linkable_accounts.0.url', 'https://portal.example.com')
+        ->where('externalIdentities.data.0.can_manage_role', true)
+        ->where('externalIdentities.data.0.links.link_accounts', route('project-participants.linked-accounts.store', $externalIdentity))
+        ->where('externalIdentities.data.0.linked_accounts.0.unlink_url', route('project-participants.linked-accounts.destroy', [$externalIdentity, $linkedUser]))
     );
 });
 
@@ -188,29 +188,29 @@ test('organisation external users route scopes projects and external users', fun
         'name' => 'Retail Dashboard',
     ]);
 
-    $billingExternalUser = ExternalUser::factory()->create([
+    $billingExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $billingProject->id,
         'name' => 'Billing Owner',
         'email' => 'billing@example.com',
     ]);
-    ExternalUser::factory()->create([
+    ExternalIdentity::factory()->create([
         'project_id' => $retailProject->id,
         'name' => 'Retail Guest',
         'email' => 'retail@example.com',
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('organisation.external-users', [
+        ->get(route('organisation.project-participants', [
             'organisation' => $billingOrganisation,
             'project_id' => $billingProject->id,
         ]));
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('ExternalUsers/Index')
-        ->has('externalUsers.data', 1)
-        ->where('externalUsers.data.0.id', $billingExternalUser->id)
-        ->where('externalUsers.data.0.project.id', $billingProject->id)
+        ->component('ProjectParticipants/Index')
+        ->has('externalIdentities.data', 1)
+        ->where('externalIdentities.data.0.id', $billingExternalIdentity->id)
+        ->where('externalIdentities.data.0.project.id', $billingProject->id)
         ->where('filters.project_id', $billingProject->id)
         ->where('filters.organisation_id', $billingOrganisation->id)
         ->has('projects', 1)
@@ -223,29 +223,29 @@ test('external user update can return json for sheet edits', function () {
         'author_id' => $this->user->id,
         'name' => 'Portal',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'name' => 'Client QA',
         'email' => 'qa@example.com',
-        'role' => ExternalUserRole::ClientDeveloper,
+        'role' => ExternalIdentityRole::ClientDeveloper,
     ]);
 
     $response = $this->actingAs($this->user)
-        ->putJson(route('external-users.update', $externalUser), [
+        ->putJson(route('project-participants.update', $externalIdentity), [
             'name' => 'Client QA Lead',
             'email' => 'lead@example.com',
             'project_id' => $project->id,
         ]);
 
     $response->assertOk();
-    $response->assertJsonPath('external_user.id', $externalUser->id);
-    $response->assertJsonPath('external_user.name', 'Client QA Lead');
-    $response->assertJsonPath('external_user.email', 'lead@example.com');
-    $response->assertJsonPath('external_user.role', ExternalUserRole::ClientDeveloper->value);
-    $response->assertJsonPath('external_user.project.id', $project->id);
+    $response->assertJsonPath('external_identity.id', $externalIdentity->id);
+    $response->assertJsonPath('external_identity.name', 'Client QA Lead');
+    $response->assertJsonPath('external_identity.email', 'lead@example.com');
+    $response->assertJsonPath('external_identity.role', ExternalIdentityRole::ClientDeveloper->value);
+    $response->assertJsonPath('external_identity.project.id', $project->id);
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $externalUser->id,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $externalIdentity->id,
         'name' => 'Client QA Lead',
         'email' => 'lead@example.com',
     ]);
@@ -260,25 +260,25 @@ test('external user form update redirects to the organisation external users pag
         'organisation_id' => $organisation->id,
         'name' => 'Portal',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'name' => 'Client QA',
         'email' => 'qa@example.com',
-        'role' => ExternalUserRole::ClientDeveloper,
+        'role' => ExternalIdentityRole::ClientDeveloper,
     ]);
 
     $this->actingAs($this->user)
-        ->put(route('external-users.update', $externalUser), [
+        ->put(route('project-participants.update', $externalIdentity), [
             'name' => 'Client QA Lead',
             'email' => 'lead@example.com',
         ])
-        ->assertRedirect(route('organisation.external-users', [
+        ->assertRedirect(route('organisation.project-participants', [
             'organisation' => $organisation,
             'project_id' => $project->id,
         ]));
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $externalUser->id,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $externalIdentity->id,
         'name' => 'Client QA Lead',
         'email' => 'lead@example.com',
     ]);
@@ -294,28 +294,28 @@ test('trusted internal roles can update external account roles from the portal b
         'client_id' => null,
         'name' => 'Portal',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'name' => 'Client Contact',
         'email' => 'client@example.com',
-        'role' => ExternalUserRole::User,
+        'role' => ExternalIdentityRole::User,
     ]);
 
     $this->actingAs($this->user)
-        ->putJson(route('external-users.update', $externalUser), [
+        ->putJson(route('project-participants.update', $externalIdentity), [
             'name' => 'Client Contact',
             'email' => 'client@example.com',
-            'role' => ExternalUserRole::Owner->value,
+            'role' => ExternalIdentityRole::Owner->value,
         ])
         ->assertOk()
-        ->assertJsonPath('external_user.role', ExternalUserRole::Owner->value)
-        ->assertJsonPath('external_user.role_label', 'Client Owner')
-        ->assertJsonPath('external_user.project.id', $project->id);
+        ->assertJsonPath('external_identity.role', ExternalIdentityRole::Owner->value)
+        ->assertJsonPath('external_identity.role_label', 'Client Owner')
+        ->assertJsonPath('external_identity.project.id', $project->id);
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $externalUser->id,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $externalIdentity->id,
         'project_id' => $project->id,
-        'role' => ExternalUserRole::Owner->value,
+        'role' => ExternalIdentityRole::Owner->value,
     ]);
 });
 
@@ -344,22 +344,22 @@ test('developer project members cannot update external account roles', function 
         'user_name' => $developer->name,
         'registration_status' => 'registered',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
-        'role' => ExternalUserRole::User,
+        'role' => ExternalIdentityRole::User,
     ]);
 
     $this->actingAs($developer)
-        ->putJson(route('external-users.update', $externalUser), [
+        ->putJson(route('project-participants.update', $externalIdentity), [
             'name' => 'Escalated User',
             'email' => 'escalated@example.com',
-            'role' => ExternalUserRole::Owner->value,
+            'role' => ExternalIdentityRole::Owner->value,
         ])
         ->assertForbidden();
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $externalUser->id,
-        'role' => ExternalUserRole::User->value,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $externalIdentity->id,
+        'role' => ExternalIdentityRole::User->value,
     ]);
 });
 
@@ -372,28 +372,28 @@ test('external user updates keep project assignment read only', function () {
         'author_id' => $this->user->id,
         'name' => 'Target Portal',
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $sourceProject->id,
         'name' => 'Client QA',
         'email' => 'qa@example.com',
-        'role' => ExternalUserRole::User,
+        'role' => ExternalIdentityRole::User,
     ]);
 
     $this->actingAs($this->user)
-        ->putJson(route('external-users.update', $externalUser), [
+        ->putJson(route('project-participants.update', $externalIdentity), [
             'name' => 'Client QA',
             'email' => 'qa@example.com',
             'project_id' => $targetProject->id,
-            'role' => ExternalUserRole::ClientDeveloper->value,
+            'role' => ExternalIdentityRole::ClientDeveloper->value,
         ])
         ->assertOk()
-        ->assertJsonPath('external_user.project.id', $sourceProject->id)
-        ->assertJsonPath('external_user.role', ExternalUserRole::ClientDeveloper->value);
+        ->assertJsonPath('external_identity.project.id', $sourceProject->id)
+        ->assertJsonPath('external_identity.role', ExternalIdentityRole::ClientDeveloper->value);
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $externalUser->id,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $externalIdentity->id,
         'project_id' => $sourceProject->id,
-        'role' => ExternalUserRole::ClientDeveloper->value,
+        'role' => ExternalIdentityRole::ClientDeveloper->value,
     ]);
 });
 
@@ -401,55 +401,55 @@ test('trusted internal users can link and unlink same project external accounts'
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
-    $sandboxUser = ExternalUser::factory()->create([
+    $sandboxUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'sandbox',
     ]);
-    $productionUser = ExternalUser::factory()->create([
+    $productionUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('external-users.linked-accounts.store', $sandboxUser), [
-            'linked_external_user_id' => $productionUser->id,
+        ->postJson(route('project-participants.linked-accounts.store', $sandboxUser), [
+            'linked_external_identity_id' => $productionUser->id,
         ])
         ->assertOk()
-        ->assertJsonPath('external_user.id', $sandboxUser->id)
-        ->assertJsonPath('external_user.linked_accounts.0.id', $productionUser->id);
+        ->assertJsonPath('external_identity.id', $sandboxUser->id)
+        ->assertJsonPath('external_identity.linked_accounts.0.id', $productionUser->id);
 
     $sandboxUser->refresh();
     $productionUser->refresh();
-    expect($sandboxUser->external_contact_id)->not()->toBeNull()
-        ->and($productionUser->external_contact_id)->toBe($sandboxUser->external_contact_id);
+    expect($sandboxUser->project_participant_id)->not()->toBeNull()
+        ->and($productionUser->project_participant_id)->toBe($sandboxUser->project_participant_id);
 
     $this->actingAs($this->user)
-        ->deleteJson(route('external-users.linked-accounts.destroy', [$sandboxUser, $productionUser]))
+        ->deleteJson(route('project-participants.linked-accounts.destroy', [$sandboxUser, $productionUser]))
         ->assertOk()
-        ->assertJsonPath('external_user.id', $sandboxUser->id)
-        ->assertJsonCount(0, 'external_user.linked_accounts');
+        ->assertJsonPath('external_identity.id', $sandboxUser->id)
+        ->assertJsonCount(0, 'external_identity.linked_accounts');
 
     $sandboxUser->refresh();
     $productionUser->refresh();
-    expect($productionUser->external_contact_id)->not()->toBe($sandboxUser->external_contact_id);
+    expect($productionUser->project_participant_id)->not()->toBe($sandboxUser->project_participant_id);
 });
 
 test('an external account cannot be linked to itself', function () {
     $project = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
-    $externalUser = ExternalUser::factory()->create([
+    $externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('external-users.linked-accounts.store', $externalUser), [
-            'linked_external_user_id' => $externalUser->id,
+        ->postJson(route('project-participants.linked-accounts.store', $externalIdentity), [
+            'linked_external_identity_id' => $externalIdentity->id,
         ])
         ->assertUnprocessable()
         ->assertJsonPath('message', 'An external account cannot be linked to itself.');
 
-    expect($externalUser->refresh()->external_contact_id)->toBeNull();
+    expect($externalIdentity->refresh()->project_participant_id)->toBeNull();
 });
 
 test('external account links stay within a project', function () {
@@ -459,21 +459,21 @@ test('external account links stay within a project', function () {
     $targetProject = Project::factory()->create([
         'author_id' => $this->user->id,
     ]);
-    $sourceUser = ExternalUser::factory()->create([
+    $sourceUser = ExternalIdentity::factory()->create([
         'project_id' => $sourceProject->id,
     ]);
-    $targetUser = ExternalUser::factory()->create([
+    $targetUser = ExternalIdentity::factory()->create([
         'project_id' => $targetProject->id,
     ]);
 
     $this->actingAs($this->user)
-        ->postJson(route('external-users.linked-accounts.store', $sourceUser), [
-            'linked_external_user_id' => $targetUser->id,
+        ->postJson(route('project-participants.linked-accounts.store', $sourceUser), [
+            'linked_external_identity_id' => $targetUser->id,
         ])
         ->assertNotFound();
 
-    expect($sourceUser->refresh()->external_contact_id)->toBeNull()
-        ->and($targetUser->refresh()->external_contact_id)->toBeNull();
+    expect($sourceUser->refresh()->project_participant_id)->toBeNull()
+        ->and($targetUser->refresh()->project_participant_id)->toBeNull();
 });
 
 test('developer project members cannot manage external account links', function () {
@@ -501,21 +501,21 @@ test('developer project members cannot manage external account links', function 
         'user_name' => $developer->name,
         'registration_status' => 'registered',
     ]);
-    $sourceUser = ExternalUser::factory()->create([
+    $sourceUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
     ]);
-    $targetUser = ExternalUser::factory()->create([
+    $targetUser = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
     ]);
 
     $this->actingAs($developer)
-        ->postJson(route('external-users.linked-accounts.store', $sourceUser), [
-            'linked_external_user_id' => $targetUser->id,
+        ->postJson(route('project-participants.linked-accounts.store', $sourceUser), [
+            'linked_external_identity_id' => $targetUser->id,
         ])
         ->assertForbidden();
 
-    expect($sourceUser->refresh()->external_contact_id)->toBeNull()
-        ->and($targetUser->refresh()->external_contact_id)->toBeNull();
+    expect($sourceUser->refresh()->project_participant_id)->toBeNull()
+        ->and($targetUser->refresh()->project_participant_id)->toBeNull();
 });
 
 test('user can only see external users for projects with access', function () {
@@ -539,7 +539,7 @@ test('user can only see external users for projects with access', function () {
     ]);
 
     // Create an external user for the accessible project
-    $accessibleExternalUser = ExternalUser::factory()->create([
+    $accessibleExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $accessibleProject->id,
         'name' => 'Accessible External User',
         'email' => 'accessible@example.com',
@@ -552,7 +552,7 @@ test('user can only see external users for projects with access', function () {
     ]);
 
     // Create an external user for the inaccessible project
-    $inaccessibleExternalUser = ExternalUser::factory()->create([
+    $inaccessibleExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $inaccessibleProject->id,
         'name' => 'Inaccessible External User',
         'email' => 'inaccessible@example.com',
@@ -560,7 +560,7 @@ test('user can only see external users for projects with access', function () {
 
     // Access the external users index page as the authenticated user
     $response = $this->actingAs($this->user)
-        ->get(route('organisation.external-users', $accessibleOrganisation));
+        ->get(route('organisation.project-participants', $accessibleOrganisation));
 
     $response->assertStatus(200);
 
@@ -581,7 +581,7 @@ test('user cannot update external user for inaccessible project', function () {
     ]);
 
     // Create an external user for the inaccessible project
-    $inaccessibleExternalUser = ExternalUser::factory()->create([
+    $inaccessibleExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $inaccessibleProject->id,
         'name' => 'Inaccessible External User',
         'email' => 'inaccessible@example.com',
@@ -589,7 +589,7 @@ test('user cannot update external user for inaccessible project', function () {
 
     // Try to update the inaccessible external user
     $response = $this->actingAs($this->user)
-        ->putJson(route('external-users.update', $inaccessibleExternalUser->id), [
+        ->putJson(route('project-participants.update', $inaccessibleExternalIdentity->id), [
             'name' => 'Updated Name',
             'email' => 'updated@example.com',
             'project_id' => $inaccessibleProject->id,
@@ -597,8 +597,8 @@ test('user cannot update external user for inaccessible project', function () {
 
     $response->assertNotFound();
 
-    $this->assertDatabaseHas('external_users', [
-        'id' => $inaccessibleExternalUser->id,
+    $this->assertDatabaseHas('external_identities', [
+        'id' => $inaccessibleExternalIdentity->id,
         'name' => 'Inaccessible External User',
         'email' => 'inaccessible@example.com',
     ]);

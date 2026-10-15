@@ -7,11 +7,13 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\RequirementBatch;
 use App\Models\Task;
-use App\Services\ExternalUserService;
+use App\Services\ExternalActorResolver;
+use App\Services\ExternalCollaboratorService;
+use App\Services\ExternalTaskAccess;
 use App\Services\ProjectEnvironmentService;
 use App\Services\TaskCollaboratorService;
 use App\Services\TemporaryAttachmentStorage;
@@ -26,7 +28,9 @@ use Illuminate\Validation\ValidationException;
 class ExternalRequirementController extends Controller
 {
     public function __construct(
-        private readonly ExternalUserService $externalUserService,
+        private readonly ExternalActorResolver $actors,
+        private readonly ExternalCollaboratorService $externalCollaborators,
+        private readonly ExternalTaskAccess $externalTaskAccess,
         private readonly ProjectEnvironmentService $projectEnvironmentService,
         private readonly TaskCollaboratorService $taskCollaboratorService,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
@@ -54,8 +58,8 @@ class ExternalRequirementController extends Controller
             ->where('token', $attributes['project'])
             ->firstOrFail();
 
-        $externalUser = $this->currentExternalUser($project, $attributes, false);
-        if (! $externalUser) {
+        $externalIdentity = $this->currentExternalIdentity($project, $attributes, false);
+        if (! $externalIdentity) {
             return response()->json([
                 'data' => [],
                 'current_page' => 1,
@@ -71,7 +75,7 @@ class ExternalRequirementController extends Controller
         $statuses = $this->normalizeRequirementStatusFilter($attributes['lifecycle'] ?? $attributes['status'] ?? null);
         $clientUrl = $this->sourceUrl($attributes);
 
-        $requirements = $this->visibleRequirementsQuery($project, $externalUser)
+        $requirements = $this->visibleRequirementsQuery($project, $externalIdentity)
             ->with(['metadata.requirementBatch', 'submitter'])
             ->when(
                 filled($attributes['search'] ?? null),
@@ -89,9 +93,9 @@ class ExternalRequirementController extends Controller
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
-        $batchSummaries = $this->requirementBatchSummaries($project, $externalUser, $requirements->getCollection());
+        $batchSummaries = $this->requirementBatchSummaries($project, $externalIdentity, $requirements->getCollection());
 
-        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser, $clientUrl));
+        $requirements->through(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalIdentity, $clientUrl));
 
         return response()->json([
             ...$requirements->toArray(),
@@ -138,21 +142,21 @@ class ExternalRequirementController extends Controller
 
         $environment = $this->resolveEnvironment($project, $attributes);
         $sourceUrl = $this->sourceUrl($attributes);
-        $externalUser = $this->currentExternalUser($project, $attributes, true);
+        $externalIdentity = $this->currentExternalIdentity($project, $attributes, true);
         $userId = $request->user()?->id;
 
-        if (! $this->externalUserService->canSubmitRequirements($externalUser)) {
+        if (! $this->externalTaskAccess->canSubmitRequirements($externalIdentity)) {
             return response()->json(['error' => 'Unauthorized to submit requirements for this project'], 403);
         }
 
-        $created = DB::transaction(function () use ($attributes, $project, $environment, $sourceUrl, $externalUser, $userId) {
+        $created = DB::transaction(function () use ($attributes, $project, $environment, $sourceUrl, $externalIdentity, $userId) {
             $batch = RequirementBatch::query()->create([
                 'project_id' => $project->id,
-                'external_user_id' => $externalUser?->id,
+                'external_identity_id' => $externalIdentity?->id,
                 'title' => $attributes['title'] ?? null,
             ]);
 
-            $items = collect($attributes['items'])->map(function (array $item) use ($attributes, $project, $environment, $sourceUrl, $externalUser, $batch, $userId) {
+            $items = collect($attributes['items'])->map(function (array $item) use ($attributes, $project, $environment, $sourceUrl, $externalIdentity, $batch, $userId) {
                 $description = $this->sanitizeRichContent($item['description']);
                 $task = Task::query()->create([
                     'title' => $item['title'],
@@ -162,8 +166,8 @@ class ExternalRequirementController extends Controller
                     'priority' => TaskPriority::Medium->value,
                 ]);
 
-                if ($externalUser instanceof ExternalUser) {
-                    $task->submitter()->associate($externalUser)->save();
+                if ($externalIdentity instanceof ExternalIdentity) {
+                    $task->submitter()->associate($externalIdentity)->save();
                 }
 
                 $task->metadata()->create([
@@ -207,7 +211,7 @@ class ExternalRequirementController extends Controller
         });
 
         [$batch, $items] = $created;
-        $batchSummaries = $this->requirementBatchSummaries($project, $externalUser, $items);
+        $batchSummaries = $this->requirementBatchSummaries($project, $externalIdentity, $items);
 
         return response()->json([
             'batch' => [
@@ -216,7 +220,7 @@ class ExternalRequirementController extends Controller
                 'title' => $batch->title,
                 'created_at' => $batch->created_at?->toIso8601String(),
             ],
-            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalUser, $sourceUrl))->values()->all(),
+            'items' => $items->map(fn (Task $task) => $this->serializeRequirement($task, $batchSummaries, $externalIdentity, $sourceUrl))->values()->all(),
         ], 201);
     }
 
@@ -244,7 +248,7 @@ class ExternalRequirementController extends Controller
         );
 
         try {
-            $externalUsers = $this->externalUserService->resolveCollaborators(
+            $externalIdentities = $this->externalCollaborators->resolveCollaborators(
                 $project,
                 $environment,
                 $attributes['external_collaborators'] ?? [],
@@ -259,14 +263,14 @@ class ExternalRequirementController extends Controller
             $this->taskCollaboratorService->initialize(
                 $task,
                 $internalIds,
-                $externalUsers,
+                $externalIdentities,
                 (bool) ($attributes['include_submitter_as_collaborator'] ?? true),
             );
 
             return;
         }
 
-        $this->taskCollaboratorService->sync($task, $internalIds, $externalUsers);
+        $this->taskCollaboratorService->sync($task, $internalIds, $externalIdentities);
     }
 
     private function persistTempAttachments(Task $task, ?string $tempIdentifier, ?int $userId): void
@@ -354,13 +358,13 @@ class ExternalRequirementController extends Controller
         return $out;
     }
 
-    private function visibleRequirementsQuery(Project $project, ExternalUser $externalUser): Builder
+    private function visibleRequirementsQuery(Project $project, ExternalIdentity $externalIdentity): Builder
     {
         $query = Task::query()
             ->where('project_id', $project->id)
             ->requirementIntake();
 
-        return $this->externalUserService->constrainVisibleProjectItems($query, $externalUser);
+        return $this->externalTaskAccess->constrainVisibleProjectItems($query, $externalIdentity);
     }
 
     private function normalizeRequirementStatusFilter(mixed $value): array
@@ -384,7 +388,7 @@ class ExternalRequirementController extends Controller
         });
     }
 
-    private function requirementBatchSummaries(Project $project, ExternalUser $externalUser, $tasks): array
+    private function requirementBatchSummaries(Project $project, ExternalIdentity $externalIdentity, $tasks): array
     {
         $batchIds = collect($tasks)
             ->pluck('metadata.requirement_batch_id')
@@ -402,7 +406,7 @@ class ExternalRequirementController extends Controller
             ->get(['id', 'title', 'created_at'])
             ->keyBy('id');
 
-        return $this->visibleRequirementsQuery($project, $externalUser)
+        return $this->visibleRequirementsQuery($project, $externalIdentity)
             ->with(['metadata:id,task_id,phase,requirement_status,requirement_batch_id'])
             ->whereHas('metadata', function (Builder $metadataQuery) use ($batchIds) {
                 $metadataQuery->whereIn('requirement_batch_id', $batchIds);
@@ -430,7 +434,7 @@ class ExternalRequirementController extends Controller
             ->all();
     }
 
-    private function currentExternalUser(Project $project, array $attributes, bool $create): ?ExternalUser
+    private function currentExternalIdentity(Project $project, array $attributes, bool $create): ?ExternalIdentity
     {
         $payload = [
             'external_id' => data_get($attributes, 'user.id'),
@@ -440,16 +444,7 @@ class ExternalRequirementController extends Controller
             'url' => data_get($attributes, 'user.url') ?? data_get($attributes, 'metadata.url'),
         ];
 
-        if ($create) {
-            return $this->externalUserService->upsert($project, $payload);
-        }
-
-        return $this->externalUserService->find(
-            $project,
-            $payload['external_id'],
-            $payload['environment'],
-            $payload['url'],
-        );
+        return $this->actors->resolve($project, $payload, $create)?->identity;
     }
 
     private function resolveEnvironment(Project $project, array $attributes): ?string
@@ -502,13 +497,13 @@ class ExternalRequirementController extends Controller
         return $out;
     }
 
-    private function serializeRequirement(Task $task, array $batchSummaries = [], ?ExternalUser $externalUser = null, ?string $clientUrl = null): array
+    private function serializeRequirement(Task $task, array $batchSummaries = [], ?ExternalIdentity $externalIdentity = null, ?string $clientUrl = null): array
     {
         $metadata = $task->metadata;
         $phase = $metadata?->phase ?: 'task';
         $batchId = $metadata?->requirement_batch_id;
-        $capabilities = $this->externalUserService->capabilityFlags($task, $externalUser);
-        $clientUrl ??= $metadata?->url ?? $externalUser?->url ?? (string) config('app.url');
+        $capabilities = $this->externalTaskAccess->capabilityFlags($task, $externalIdentity);
+        $clientUrl ??= $metadata?->url ?? $externalIdentity?->url ?? (string) config('app.url');
 
         return [
             'id' => $task->id,

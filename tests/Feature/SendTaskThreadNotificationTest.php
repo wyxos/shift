@@ -21,8 +21,8 @@ test('thread notification records callback success and does not send the same de
         'https://client-app.test/shift/api/notifications' => Http::response(['production' => true], 200),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
-    $job = new SendTaskThreadNotification($thread->id, $externalUserData, $payload);
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
+    $job = new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload);
 
     $job->handle(app(ExternalNotificationService::class));
     $job->handle(app(ExternalNotificationService::class));
@@ -46,10 +46,10 @@ test('thread notification handles legacy queued payloads without an environment 
         'https://client-app.test/shift/api/notifications' => Http::response(['production' => true], 200),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
-    expect($externalUserData)->not->toHaveKey('environment');
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
+    expect($externalIdentityData)->not->toHaveKey('environment');
 
-    $job = unserialize(serialize(new SendTaskThreadNotification($thread->id, $externalUserData, $payload)));
+    $job = unserialize(serialize(new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload)));
     $job->handle(app(ExternalNotificationService::class));
 
     $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
@@ -62,10 +62,10 @@ test('thread notification handles legacy queued payloads without an environment 
 test('thread notification records historical untrusted destinations as terminal failures', function () {
     Http::fake();
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
     $thread->task->project->environments()->update(['callback_trusted_at' => null]);
 
-    (new SendTaskThreadNotification($thread->id, $externalUserData, $payload))
+    (new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload))
         ->handle(app(ExternalNotificationService::class));
 
     $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
@@ -83,8 +83,8 @@ test('thread notification retries a transient callback and records eventual succ
             ->push(['production' => true], 200),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
-    $job = new SendTaskThreadNotification($thread->id, $externalUserData, $payload);
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
+    $job = new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload);
 
     expect(fn () => $job->handle(app(ExternalNotificationService::class)))
         ->toThrow(ExternalNotificationException::class);
@@ -108,8 +108,8 @@ test('thread notification records exhausted retries and cancels if the thread di
         'https://client-app.test/shift/api/notifications' => Http::response(['message' => 'Unavailable'], 503),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
-    $job = new SendTaskThreadNotification($thread->id, $externalUserData, $payload);
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
+    $job = new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload);
     $exception = null;
 
     for ($attempt = 1; $attempt <= $job->tries; $attempt++) {
@@ -149,9 +149,9 @@ test('thread notification records a permanent callback failure without logging s
         'https://client-app.test/shift/api/notifications' => Http::response(['message' => 'Invalid'], 422),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
 
-    (new SendTaskThreadNotification($thread->id, $externalUserData, $payload))
+    (new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload))
         ->handle(app(ExternalNotificationService::class));
 
     $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
@@ -173,9 +173,9 @@ test('thread non-production fallback completes only after the queued email succe
         'https://client-app.test/shift/api/notifications' => Http::response(['production' => false], 200),
     ]);
 
-    ['thread' => $thread, 'externalUserData' => $externalUserData, 'payload' => $payload] = threadNotificationFixture();
+    ['thread' => $thread, 'externalIdentityData' => $externalIdentityData, 'payload' => $payload] = threadNotificationFixture();
 
-    (new SendTaskThreadNotification($thread->id, $externalUserData, $payload))
+    (new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload))
         ->handle(app(ExternalNotificationService::class));
 
     $fallbackJob = null;
@@ -205,7 +205,7 @@ test('thread non-production fallback completes only after the queued email succe
 });
 
 /**
- * @return array{thread: TaskThread, externalUserData: array<string, string>, payload: array<string, mixed>}
+ * @return array{thread: TaskThread, externalIdentityData: array<string, string>, payload: array<string, mixed>}
  */
 function threadNotificationFixture(): array
 {
@@ -233,7 +233,7 @@ function threadNotificationFixture(): array
         'sender_type' => User::class,
         'sender_id' => $owner->id,
     ]);
-    $externalUserData = [
+    $externalIdentityData = [
         'url' => 'https://client-app.test',
         'email' => 'client@example.com',
         'external_id' => 'external-123',
@@ -247,5 +247,5 @@ function threadNotificationFixture(): array
         'content' => $thread->content,
     ];
 
-    return compact('thread', 'externalUserData', 'payload');
+    return compact('thread', 'externalIdentityData', 'payload');
 }

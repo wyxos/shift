@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -269,15 +269,15 @@ test('authenticated consuming app users can submit when guest submissions are di
         ->assertCreated()
         ->assertJsonPath('submitter.name', 'Session User');
 
-    $externalUser = ExternalUser::query()->where('email', 'session@example.com')->first();
-    expect($externalUser)->not->toBeNull();
+    $externalIdentity = ExternalIdentity::query()->where('email', 'session@example.com')->first();
+    expect($externalIdentity)->not->toBeNull();
 
     $task = Task::query()->firstOrFail();
-    expect($task->submitter_id)->toBe($externalUser->id);
-    expect($task->submitter_type)->toBe(ExternalUser::class);
+    expect($task->submitter_id)->toBe($externalIdentity->id);
+    expect($task->submitter_type)->toBe(ExternalIdentity::class);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'kind' => 'external',
     ]);
 });
@@ -316,17 +316,17 @@ test('manual guest submissions create or update external users', function () {
         ->assertJsonPath('submitter.name', 'Manual Guest')
         ->assertJsonPath('submitter.email', 'manual@example.com');
 
-    $externalUser = ExternalUser::query()->where('email', 'manual@example.com')->firstOrFail();
-    expect($externalUser->external_id)->toStartWith('guest:');
-    expect($externalUser->environment)->toBe('testing');
-    expect($externalUser->url)->toBe('https://example.com');
+    $externalIdentity = ExternalIdentity::query()->where('email', 'manual@example.com')->firstOrFail();
+    expect($externalIdentity->external_id)->toStartWith('guest:');
+    expect($externalIdentity->environment)->toBe('testing');
+    expect($externalIdentity->url)->toBe('https://example.com');
 
     $task = Task::query()->firstOrFail();
-    expect($task->submitter_id)->toBe($externalUser->id);
-    expect($task->submitter_type)->toBe(ExternalUser::class);
+    expect($task->submitter_id)->toBe($externalIdentity->id);
+    expect($task->submitter_type)->toBe(ExternalIdentity::class);
     $this->assertDatabaseHas('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $externalUser->id,
+        'external_identity_id' => $externalIdentity->id,
         'kind' => 'external',
     ]);
 });

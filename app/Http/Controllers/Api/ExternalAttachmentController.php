@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
 use App\Services\AttachmentResponseFactory;
-use App\Services\ExternalUserService;
+use App\Services\ExternalActorResolver;
+use App\Services\ExternalTaskAccess;
 use App\Services\TaskThreadAudienceService;
 use App\Services\TemporaryAttachmentStorage;
 use Illuminate\Http\Request;
@@ -21,7 +22,8 @@ use Symfony\Component\Mime\MimeTypes;
 class ExternalAttachmentController extends Controller
 {
     public function __construct(
-        private readonly ExternalUserService $externalUserService,
+        private readonly ExternalActorResolver $actors,
+        private readonly ExternalTaskAccess $externalTaskAccess,
         private readonly TaskThreadAudienceService $threadAudiences,
         private readonly TemporaryAttachmentStorage $temporaryAttachments,
         private readonly AttachmentResponseFactory $attachmentResponses,
@@ -35,22 +37,17 @@ class ExternalAttachmentController extends Controller
             ->first();
     }
 
-    private function currentExternalUser(Project $project): ?ExternalUser
+    private function currentExternalIdentity(Project $project): ?ExternalIdentity
     {
-        return $this->externalUserService->find(
-            $project,
-            request()->offsetGet('user.id'),
-            request()->offsetGet('user.environment'),
-            request()->offsetGet('user.url'),
-        );
+        return $this->actors->fromRequest($project, request())?->identity;
     }
 
-    private function externalUserHasAccess(Task $task, ExternalUser $externalUser): bool
+    private function externalIdentityHasAccess(Task $task, ExternalIdentity $externalIdentity): bool
     {
-        return $this->externalUserService->canViewProjectItem($task, $externalUser);
+        return $this->externalTaskAccess->canViewProjectItem($task, $externalIdentity);
     }
 
-    private function isExternalUserRequest(): bool
+    private function isExternalIdentityRequest(): bool
     {
         return request()->has('project') &&
             request()->offsetGet('user.id') !== null &&
@@ -456,27 +453,27 @@ class ExternalAttachmentController extends Controller
         }
 
         if ($attachment->attachable instanceof TaskThread
-            && ! $this->threadAudiences->isVisibleToExternalUsers($attachment->attachable)) {
+            && ! $this->threadAudiences->isVisibleToExternalIdentities($attachment->attachable)) {
             return response()->json(['error' => 'Attachment not found'], 404);
         }
 
         // Check if this is an external user request (has project parameter and user context)
-        $isExternalUserRequest = $this->isExternalUserRequest();
+        $isExternalIdentityRequest = $this->isExternalIdentityRequest();
 
-        if ($isExternalUserRequest) {
+        if ($isExternalIdentityRequest) {
             // External user access control
             $project = $this->resolveProjectFromRequest();
             if ($project === null || $task->project_id !== $project->id) {
                 return response()->json(['error' => 'Task not found in the specified project'], 404);
             }
 
-            $externalUser = $this->currentExternalUser($project);
+            $externalIdentity = $this->currentExternalIdentity($project);
 
-            if (! $externalUser) {
+            if (! $externalIdentity) {
                 return response()->json(['error' => 'External user not found'], 404);
             }
 
-            if (! $this->externalUserHasAccess($task, $externalUser)) {
+            if (! $this->externalIdentityHasAccess($task, $externalIdentity)) {
                 return response()->json(['error' => 'Unauthorized to access this attachment'], 403);
             }
 

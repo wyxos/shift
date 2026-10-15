@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools\Concerns;
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\TaskCollaborator;
@@ -102,7 +102,7 @@ trait FormatsShiftRecords
             'id' => $collaborator->id,
             'kind' => $collaborator->kind?->value ?? $collaborator->kind,
             'user' => $this->person($collaborator->user),
-            'external_user' => $this->person($collaborator->externalUser),
+            'external_user' => $this->person($collaborator->externalIdentity),
             'created_at' => $this->date($collaborator->created_at),
         ];
     }
@@ -258,7 +258,7 @@ trait FormatsShiftRecords
         return [
             'type' => match ($model::class) {
                 User::class => 'internal_user',
-                ExternalUser::class => 'external_user',
+                ExternalIdentity::class => 'external_user',
                 ProjectUser::class => 'project_user',
                 default => Str::snake(class_basename($model)),
             },

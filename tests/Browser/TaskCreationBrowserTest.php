@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -24,7 +24,7 @@ it('redirects legacy create route to the tasks list', function () {
 it('lets a task manager remove an external submitter from follow up collaborators', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create();
-    $externalSubmitter = ExternalUser::factory()->create([
+    $externalSubmitter = ExternalIdentity::factory()->create([
         'project_id' => $project->id,
         'environment' => 'production',
         'name' => 'External Submitter',
@@ -54,7 +54,7 @@ it('lets a task manager remove an external submitter from follow up collaborator
     expect($task->refresh()->submitter_id)->toBe($externalSubmitter->id);
     $this->assertDatabaseMissing('task_collaborators', [
         'task_id' => $task->id,
-        'external_user_id' => $externalSubmitter->id,
+        'external_identity_id' => $externalSubmitter->id,
     ]);
 });
 

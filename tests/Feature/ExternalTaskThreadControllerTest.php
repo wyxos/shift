@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
@@ -13,7 +13,7 @@ beforeEach(function () {
 
     $this->project = Project::factory()->withAuthor($this->user->id)->create();
 
-    $this->externalUser = ExternalUser::factory()->create([
+    $this->externalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'ext-123',
         'environment' => 'testing',
@@ -23,7 +23,7 @@ beforeEach(function () {
     ]);
 
     $this->task = Task::factory()->for($this->project)->create();
-    $this->task->submitter()->associate($this->externalUser)->save();
+    $this->task->submitter()->associate($this->externalIdentity)->save();
     $this->projectToken = $this->task->project->generateApiToken();
 });
 
@@ -32,24 +32,24 @@ test('external thread creator can update their message via api', function () {
         'task_id' => $this->task->id,
         'type' => 'external',
         'content' => '<p>Before</p>',
-        'sender_name' => $this->externalUser->name,
+        'sender_name' => $this->externalIdentity->name,
     ]);
-    $thread->sender()->associate($this->externalUser);
+    $thread->sender()->associate($this->externalIdentity);
     $thread->save();
 
     $response = $this->putJson(route('api.task-threads.update', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'content' => '<p>After</p>',
         'project' => $this->projectToken,
         'user' => [
-            'id' => $this->externalUser->external_id,
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
-            'name' => $this->externalUser->name,
-            'email' => $this->externalUser->email,
+            'id' => $this->externalIdentity->external_id,
+            'environment' => $this->externalIdentity->environment,
+            'url' => $this->externalIdentity->url,
+            'name' => $this->externalIdentity->name,
+            'email' => $this->externalIdentity->email,
         ],
         'metadata' => [
-            'url' => $this->externalUser->url,
-            'environment' => $this->externalUser->environment,
+            'url' => $this->externalIdentity->url,
+            'environment' => $this->externalIdentity->environment,
         ],
     ]);
 
@@ -63,35 +63,35 @@ test('external thread update is forbidden for non owner', function () {
         'task_id' => $this->task->id,
         'type' => 'external',
         'content' => '<p>Before</p>',
-        'sender_name' => $this->externalUser->name,
+        'sender_name' => $this->externalIdentity->name,
     ]);
-    $thread->sender()->associate($this->externalUser);
+    $thread->sender()->associate($this->externalIdentity);
     $thread->save();
 
-    $otherExternalUser = ExternalUser::factory()->create([
+    $otherExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'different-user',
-        'environment' => $this->externalUser->environment,
-        'url' => $this->externalUser->url,
+        'environment' => $this->externalIdentity->environment,
+        'url' => $this->externalIdentity->url,
         'name' => 'Different',
         'email' => 'different@example.com',
     ]);
 
-    $this->task->externalUsers()->attach($otherExternalUser);
+    $this->task->externalIdentities()->attach($otherExternalIdentity);
 
     $response = $this->putJson(route('api.task-threads.update', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'content' => '<p>Hack</p>',
         'project' => $this->projectToken,
         'user' => [
-            'id' => $otherExternalUser->external_id,
-            'environment' => $otherExternalUser->environment,
-            'url' => $otherExternalUser->url,
-            'name' => $otherExternalUser->name,
-            'email' => $otherExternalUser->email,
+            'id' => $otherExternalIdentity->external_id,
+            'environment' => $otherExternalIdentity->environment,
+            'url' => $otherExternalIdentity->url,
+            'name' => $otherExternalIdentity->name,
+            'email' => $otherExternalIdentity->email,
         ],
         'metadata' => [
-            'url' => $this->externalUser->url,
-            'environment' => $this->externalUser->environment,
+            'url' => $this->externalIdentity->url,
+            'environment' => $this->externalIdentity->environment,
         ],
     ]);
 
@@ -103,17 +103,17 @@ test('external thread creator can delete their message via api', function () {
         'task_id' => $this->task->id,
         'type' => 'external',
         'content' => '<p>To delete</p>',
-        'sender_name' => $this->externalUser->name,
+        'sender_name' => $this->externalIdentity->name,
     ]);
-    $thread->sender()->associate($this->externalUser);
+    $thread->sender()->associate($this->externalIdentity);
     $thread->save();
 
     $response = $this->deleteJson(route('api.task-threads.destroy', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'project' => $this->projectToken,
         'user' => [
-            'id' => $this->externalUser->external_id,
-            'environment' => $this->externalUser->environment,
-            'url' => $this->externalUser->url,
+            'id' => $this->externalIdentity->external_id,
+            'environment' => $this->externalIdentity->environment,
+            'url' => $this->externalIdentity->url,
         ],
     ]);
 
@@ -126,28 +126,28 @@ test('external thread delete is forbidden for non owner', function () {
         'task_id' => $this->task->id,
         'type' => 'external',
         'content' => '<p>To delete</p>',
-        'sender_name' => $this->externalUser->name,
+        'sender_name' => $this->externalIdentity->name,
     ]);
-    $thread->sender()->associate($this->externalUser);
+    $thread->sender()->associate($this->externalIdentity);
     $thread->save();
 
-    $otherExternalUser = ExternalUser::factory()->create([
+    $otherExternalIdentity = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'different-user',
-        'environment' => $this->externalUser->environment,
-        'url' => $this->externalUser->url,
+        'environment' => $this->externalIdentity->environment,
+        'url' => $this->externalIdentity->url,
         'name' => 'Different',
         'email' => 'different@example.com',
     ]);
 
-    $this->task->externalUsers()->attach($otherExternalUser);
+    $this->task->externalIdentities()->attach($otherExternalIdentity);
 
     $response = $this->deleteJson(route('api.task-threads.destroy', ['task' => $this->task->id, 'threadId' => $thread->id]), [
         'project' => $this->projectToken,
         'user' => [
-            'id' => $otherExternalUser->external_id,
-            'environment' => $otherExternalUser->environment,
-            'url' => $otherExternalUser->url,
+            'id' => $otherExternalIdentity->external_id,
+            'environment' => $otherExternalIdentity->environment,
+            'url' => $otherExternalIdentity->url,
         ],
     ]);
 

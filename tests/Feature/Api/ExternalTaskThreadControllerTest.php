@@ -1,7 +1,7 @@
 <?php
 
 use App\Jobs\SendTaskThreadNotification;
-use App\Models\ExternalUser;
+use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\Task;
@@ -21,7 +21,7 @@ beforeEach(function () {
     $this->token = $this->user->createToken('test-token')->plainTextToken;
 
     // Create an external user
-    $this->externalUser = ExternalUser::factory()->create([
+    $this->externalIdentity = ExternalIdentity::factory()->create([
         'external_id' => 'ext-123',
         'environment' => 'testing',
         'url' => 'https://example.com',
@@ -30,12 +30,12 @@ beforeEach(function () {
         'project_id' => $this->project->id,
     ]);
 
-    $this->externalUserData = [
-        'id' => $this->externalUser->external_id,
-        'environment' => $this->externalUser->environment,
-        'url' => $this->externalUser->url,
-        'name' => $this->externalUser->name,
-        'email' => $this->externalUser->email,
+    $this->externalIdentityData = [
+        'id' => $this->externalIdentity->external_id,
+        'environment' => $this->externalIdentity->environment,
+        'url' => $this->externalIdentity->url,
+        'name' => $this->externalIdentity->name,
+        'email' => $this->externalIdentity->email,
     ];
 
     // Create a task
@@ -43,7 +43,7 @@ beforeEach(function () {
         'project_id' => $this->project->id,
         'title' => 'Test Task',
     ]);
-    $this->task->submitter()->associate($this->externalUser)->save();
+    $this->task->submitter()->associate($this->externalIdentity)->save();
 });
 
 test('external thread with 2 embedded images and 1 non-embedded PDF returns only PDF in attachments list', function () {
@@ -72,7 +72,7 @@ test('external thread with 2 embedded images and 1 non-embedded PDF returns only
         'content' => $content,
         'type' => 'external',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'temp_identifier' => $tempIdentifier,
     ];
 
@@ -127,7 +127,7 @@ test('external thread creation does not notify untagged project users', function
         'content' => 'This is a test message from an external user',
         'type' => 'external',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
     ];
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -146,7 +146,7 @@ test('external thread creation only notifies tagged internal and external collab
     $internalCollaborator = User::factory()->create();
     $this->task->internalCollaborators()->attach($internalCollaborator->id);
 
-    $externalCollaborator = ExternalUser::factory()->create([
+    $externalCollaborator = ExternalIdentity::factory()->create([
         'project_id' => $this->project->id,
         'external_id' => 'ext-456',
         'environment' => 'testing',
@@ -154,7 +154,7 @@ test('external thread creation only notifies tagged internal and external collab
         'email' => 'collaborator@example.com',
     ]);
     $this->task->externalCollaborators()->attach([
-        $this->externalUser->id,
+        $this->externalIdentity->id,
         $externalCollaborator->id,
     ]);
 
@@ -162,7 +162,7 @@ test('external thread creation only notifies tagged internal and external collab
         'content' => 'External collaborator update',
         'type' => 'external',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
     ];
 
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -195,7 +195,7 @@ test('external API thread replaces temp URLs in content with final download URLs
         'content' => $content,
         'type' => 'external',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'temp_identifier' => $tempIdentifier,
     ];
 
@@ -234,7 +234,7 @@ test('external API thread replaces encoded-space temp URLs with final API downlo
         'content' => '<p><img src="'.$tempUrl.'"></p>',
         'type' => 'external',
         'project' => $this->project->token,
-        'user' => $this->externalUserData,
+        'user' => $this->externalIdentityData,
         'temp_identifier' => $tempIdentifier,
     ];
 

@@ -18,7 +18,7 @@ class TaskThreadAudienceService
         return TaskThreadAudience::fromStoredType((string) $thread->type);
     }
 
-    public function isVisibleToExternalUsers(TaskThread $thread): bool
+    public function isVisibleToExternalIdentities(TaskThread $thread): bool
     {
         return ! $thread->is_draft && $this->audience($thread) === TaskThreadAudience::All;
     }
@@ -46,7 +46,7 @@ class TaskThreadAudienceService
 
                 if (! $thread instanceof TaskThread
                     || (int) $thread->task_id !== (int) $task->id
-                    || ! $this->isVisibleToExternalUsers($thread)) {
+                    || ! $this->isVisibleToExternalIdentities($thread)) {
                     throw ValidationException::withMessages([
                         'content' => 'Remove Team reply references before sending this message to All.',
                     ]);
@@ -90,7 +90,7 @@ class TaskThreadAudienceService
 
             if ($attachable instanceof TaskThread
                 && (int) $attachable->task_id === (int) $task->id
-                && $this->isVisibleToExternalUsers($attachable)) {
+                && $this->isVisibleToExternalIdentities($attachable)) {
                 continue;
             }
 

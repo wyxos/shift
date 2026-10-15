@@ -310,7 +310,7 @@ describe('Projects.vue', () => {
         expect(wrapper.find('[data-testid="project-scope-1"]').text()).toContain('Acme Org');
         expect(wrapper.find('[data-testid="project-grant-1"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-tasks-1"]').exists()).toBe(true);
-        expect(wrapper.find('[data-testid="project-external-users-1"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="project-project-participants-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-manage-1"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="project-manage-2"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-widget-1"]').exists()).toBe(true);
@@ -360,14 +360,14 @@ describe('Projects.vue', () => {
         );
     });
 
-    it('links project rows to filtered task and external-user lists', async () => {
+    it('links project rows to filtered task and external-identity lists', async () => {
         const wrapper = mountPage();
 
         await wrapper.get('[data-testid="project-tasks-1"]').trigger('click');
         expect(inertiaMocks.routerGet).toHaveBeenCalledWith('/tasks', { project_id: 1 });
 
-        await wrapper.get('[data-testid="project-external-users-1"]').trigger('click');
-        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/1/external-users', { project_id: 1 });
+        await wrapper.get('[data-testid="project-project-participants-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/1/project-participants', { project_id: 1 });
     });
 
     it('keeps project row links scoped when opened from an organisation projects route', async () => {
@@ -384,8 +384,8 @@ describe('Projects.vue', () => {
         await wrapper.get('[data-testid="project-tasks-1"]').trigger('click');
         expect(inertiaMocks.routerGet).toHaveBeenCalledWith('/organisation/3/tasks', { project_id: 1 });
 
-        await wrapper.get('[data-testid="project-external-users-1"]').trigger('click');
-        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/3/external-users', { project_id: 1 });
+        await wrapper.get('[data-testid="project-project-participants-1"]').trigger('click');
+        expect(inertiaMocks.routerGet).toHaveBeenLastCalledWith('/organisation/3/project-participants', { project_id: 1 });
     });
 
     it('preserves create, edit, delete, and manage access add flows', async () => {
