@@ -1,12 +1,12 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
-const key = import.meta.env.VITE_REVERB_APP_KEY;
+const key = typeof document === 'undefined' ? undefined : document.querySelector<HTMLMetaElement>('meta[name="reverb-key"]')?.content;
 
 if (typeof window !== 'undefined' && typeof key === 'string' && key !== '') {
-    const scheme = String(import.meta.env.VITE_REVERB_SCHEME || window.location.protocol.replace(':', '') || 'https');
-    const host = String(import.meta.env.VITE_REVERB_HOST || window.location.hostname);
-    const port = Number(import.meta.env.VITE_REVERB_PORT || (scheme === 'https' ? 443 : 80));
+    const scheme = document.querySelector<HTMLMetaElement>('meta[name="reverb-scheme"]')?.content || window.location.protocol.replace(':', '');
+    const host = document.querySelector<HTMLMetaElement>('meta[name="reverb-host"]')?.content || window.location.hostname;
+    const port = Number(document.querySelector<HTMLMetaElement>('meta[name="reverb-port"]')?.content || (scheme === 'https' ? 443 : 80));
     const PusherConstructor = ((Pusher as unknown as { Pusher?: typeof Pusher; default?: typeof Pusher }).Pusher ??
         (Pusher as unknown as { default?: typeof Pusher }).default ??
         Pusher) as typeof Pusher;
