@@ -88,7 +88,7 @@ test('a serialized queued notification keeps its historical property and destina
     Http::assertSentCount(1);
     Http::assertSent(fn ($request): bool => $request->url() === 'https://production.sample-app.test/shift/api/notifications'
         && $request['payload']['user_id'] === '42');
-    expect(ExternalNotificationDelivery::findForTaskThread($thread->id, '42')->completed_at)->not->toBeNull();
+    expect(ExternalNotificationDelivery::findForTaskThread($thread->id, 'identity:'.$identities['production']->id)->completed_at)->not->toBeNull();
 });
 
 test('the SDK external role API still accepts the external_user payload and returns its original contract', function () {

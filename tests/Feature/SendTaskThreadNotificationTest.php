@@ -11,6 +11,7 @@ use App\Models\TaskThread;
 use App\Models\User;
 use App\Notifications\TaskThreadUpdated;
 use App\Services\ExternalNotificationService;
+use App\Services\ExternalThreadRecipient;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -32,7 +33,7 @@ test('thread notification records callback success and does not send the same de
         && $request['handler'] === 'thread.update'
         && $request['payload']['thread_id'] === $thread->id);
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery)->not->toBeNull()
         ->and($delivery->attempts)->toBe(1)
@@ -52,7 +53,7 @@ test('thread notification handles legacy queued payloads without an environment 
     $job = unserialize(serialize(new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload)));
     $job->handle(app(ExternalNotificationService::class));
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->callback_delivered_at)->not->toBeNull()
         ->and($delivery->completed_at)->not->toBeNull();
@@ -68,7 +69,7 @@ test('thread notification records historical untrusted destinations as terminal 
     (new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload))
         ->handle(app(ExternalNotificationService::class));
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->last_failure_type)->toBe('untrusted_destination')
         ->and($delivery->failed_at)->not->toBeNull()
@@ -89,7 +90,7 @@ test('thread notification retries a transient callback and records eventual succ
     expect(fn () => $job->handle(app(ExternalNotificationService::class)))
         ->toThrow(ExternalNotificationException::class);
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->completed_at)->toBeNull()
         ->and($delivery->failed_at)->toBeNull()
@@ -127,7 +128,7 @@ test('thread notification records exhausted retries and cancels if the thread di
 
     $job->failed($exception);
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->attempts)->toBe(3)
         ->and($delivery->last_failure_type)->toBe('retryable_response')
@@ -154,7 +155,7 @@ test('thread notification records a permanent callback failure without logging s
     (new SendTaskThreadNotification($thread->id, $externalIdentityData, $payload))
         ->handle(app(ExternalNotificationService::class));
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->failed_at)->not->toBeNull()
         ->and($delivery->last_failure_type)->toBe('permanent_response')
@@ -189,7 +190,7 @@ test('thread non-production fallback completes only after the queued email succe
         },
     );
 
-    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, 'external-123');
+    $delivery = ExternalNotificationDelivery::findForTaskThread($thread->id, app(ExternalThreadRecipient::class)->key($externalIdentityData));
 
     expect($delivery->completed_at)->toBeNull()
         ->and($delivery->fallback_dispatched_at)->not->toBeNull();

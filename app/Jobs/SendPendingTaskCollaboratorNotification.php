@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Notifications\TaskCollaboratorAddedNotification;
 use App\Notifications\TaskCreationNotification;
 use App\Notifications\WidgetFeedbackNotification;
+use App\Services\ExternalInboxService;
 use App\Services\ExternalNotificationService;
 use App\Services\WidgetFeedbackAudience;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -98,7 +99,15 @@ class SendPendingTaskCollaboratorNotification implements ShouldQueue
         $externalIdentity = $pending->externalIdentity;
         $task = $pending->task;
 
-        if (! $externalIdentity || ! $task || ! $task->project || ! filled($externalIdentity->url)) {
+        if (! $externalIdentity || ! $task || ! $task->project) {
+            $pending->markCancelled();
+
+            return false;
+        }
+
+        app(ExternalInboxService::class)->recordCollaborator($pending);
+
+        if (! filled($externalIdentity->url)) {
             $pending->markCancelled();
 
             return false;

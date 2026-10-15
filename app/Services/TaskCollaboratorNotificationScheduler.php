@@ -88,10 +88,6 @@ class TaskCollaboratorNotificationScheduler
     private function scheduleExternal(Task $task, Collection $externalIdentities, string $event): void
     {
         foreach ($externalIdentities as $externalIdentity) {
-            if ($externalIdentity->email === null && $externalIdentity->url === null) {
-                continue;
-            }
-
             $this->schedule($task, $event, TaskCollaboratorKind::External, null, (int) $externalIdentity->id, null);
         }
     }

@@ -18,6 +18,9 @@ Route::get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     // Prefix API route names to avoid collisions with web/shift routes
     Route::name('api.')->group(function () {
+        Route::get('/inbox', [\App\Http\Controllers\Api\ExternalInboxController::class, 'index'])->name('inbox.index');
+        Route::patch('/inbox/read-all', [\App\Http\Controllers\Api\ExternalInboxController::class, 'readAll'])->name('inbox.read-all');
+        Route::patch('/inbox/{notification}/read', [\App\Http\Controllers\Api\ExternalInboxController::class, 'read'])->whereNumber('notification')->name('inbox.read');
         // embedded widget intake
         Route::get('/widget/config', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'config'])->name('widget.config');
         Route::post('/widget/tasks', [\App\Http\Controllers\Api\ExternalWidgetController::class, 'store'])->name('widget.tasks.store');

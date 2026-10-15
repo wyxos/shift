@@ -3,10 +3,11 @@
 namespace App\Jobs;
 
 use App\Exceptions\ExternalNotificationException;
-use App\Models\ExternalNotificationDelivery;
 use App\Models\TaskThread;
 use App\Notifications\TaskThreadUpdated;
+use App\Services\ExternalInboxService;
 use App\Services\ExternalNotificationService;
+use App\Services\ExternalThreadRecipient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -49,11 +50,8 @@ class SendTaskThreadNotification implements ShouldQueue
     {
         $thread = TaskThread::find($this->threadId);
 
-        if (! $thread) {
-            ExternalNotificationDelivery::findForTaskThread(
-                $this->threadId,
-                $this->recipientKey(),
-            )?->markCancelled();
+        if (! $thread || $thread->type !== 'external') {
+            app(ExternalThreadRecipient::class)->findDelivery($this->threadId, $this->externalUserData)?->markCancelled();
 
             Log::info('Thread notification cancelled - thread no longer exists', [
                 'thread_id' => $this->threadId,
@@ -64,17 +62,22 @@ class SendTaskThreadNotification implements ShouldQueue
 
         $thread->loadMissing('task.project');
 
-        $delivery = ExternalNotificationDelivery::forTaskThread(
-            $thread,
-            $this->recipientKey(),
-            'thread.update',
-        );
+        $recipients = app(ExternalThreadRecipient::class);
+        $identity = $recipients->identity($thread, $this->externalUserData);
+        if ($identity) {
+            $this->externalUserData['external_identity_id'] = $identity->id;
+        }
+        $delivery = $recipients->delivery($thread, $this->externalUserData, $identity);
         $project = $thread->task?->project;
 
         if (! $project) {
             $delivery->markFailed('missing_project');
 
             return;
+        }
+
+        if ($identity) {
+            app(ExternalInboxService::class)->recordThread($thread, $identity);
         }
 
         if (! $delivery->callback_delivered_at) {
@@ -146,10 +149,7 @@ class SendTaskThreadNotification implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        $delivery = ExternalNotificationDelivery::findForTaskThread(
-            $this->threadId,
-            $this->recipientKey(),
-        );
+        $delivery = app(ExternalThreadRecipient::class)->findDelivery($this->threadId, $this->externalUserData);
 
         if (! $delivery || $delivery->completed_at || $delivery->cancelled_at) {
             return;
@@ -162,15 +162,5 @@ class SendTaskThreadNotification implements ShouldQueue
         }
 
         $delivery->markFailed('job_exhausted');
-    }
-
-    private function recipientKey(): string
-    {
-        return (string) (
-            $this->externalUserData['external_id']
-            ?? $this->externalUserData['email']
-            ?? $this->externalUserData['url']
-            ?? 'unknown'
-        );
     }
 }
