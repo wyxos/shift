@@ -1725,16 +1725,16 @@
         },
         {
             "name": "laravel/framework",
-            "version": "v12.64.0",
+            "version": "v12.70.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/framework.git",
-                "reference": "727a8ea2949c23ca8b5316b86a00984b6017b7a0"
+                "reference": "4a4554f4d81f4095c8ff1911ec8a58144b0ed71b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/framework/zipball/727a8ea2949c23ca8b5316b86a00984b6017b7a0",
-                "reference": "727a8ea2949c23ca8b5316b86a00984b6017b7a0",
+                "url": "https://api.github.com/repos/laravel/framework/zipball/4a4554f4d81f4095c8ff1911ec8a58144b0ed71b",
+                "reference": "4a4554f4d81f4095c8ff1911ec8a58144b0ed71b",
                 "shasum": ""
             },
             "require": {
@@ -1847,10 +1847,10 @@
                 "league/flysystem-sftp-v3": "^3.25.1",
                 "mockery/mockery": "^1.6.10",
                 "opis/json-schema": "^2.4.1",
-                "orchestra/testbench-core": "^10.9.0",
+                "orchestra/testbench-core": "^10.15.0",
                 "pda/pheanstalk": "^5.0.6|^7.0.0",
                 "php-http/discovery": "^1.15",
-                "phpstan/phpstan": "^2.1.41",
+                "phpstan/phpstan": "2.2.13",
                 "phpunit/phpunit": "^10.5.35|^11.5.3|^12.0.1",
                 "predis/predis": "^2.3|^3.0",
                 "resend/resend-php": "^0.10.0|^1.0",
@@ -1943,7 +1943,7 @@
                 "issues": "https://github.com/laravel/framework/issues",
                 "source": "https://github.com/laravel/framework"
             },
-            "time": "2026-07-14T14:25:37+00:00"
+            "time": "2026-10-13T13:24:10+00:00"
         },
         {
             "name": "laravel/mcp",
@@ -2744,16 +2744,16 @@
         },
         {
             "name": "league/flysystem",
-            "version": "3.35.2",
+            "version": "3.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/thephpleague/flysystem.git",
-                "reference": "b277b5dc3d56650b68904117124e79c851e12376"
+                "reference": "f7fb152932f30072d573510cbd4dd657d6475b25"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/thephpleague/flysystem/zipball/b277b5dc3d56650b68904117124e79c851e12376",
-                "reference": "b277b5dc3d56650b68904117124e79c851e12376",
+                "url": "https://api.github.com/repos/thephpleague/flysystem/zipball/f7fb152932f30072d573510cbd4dd657d6475b25",
+                "reference": "f7fb152932f30072d573510cbd4dd657d6475b25",
                 "shasum": ""
             },
             "require": {
@@ -2821,9 +2821,9 @@
             ],
             "support": {
                 "issues": "https://github.com/thephpleague/flysystem/issues",
-                "source": "https://github.com/thephpleague/flysystem/tree/3.35.2"
+                "source": "https://github.com/thephpleague/flysystem/tree/3.36.0"
             },
-            "time": "2026-07-06T14:42:07+00:00"
+            "time": "2026-09-02T08:00:27+00:00"
         },
         {
             "name": "league/flysystem-local",
@@ -4139,16 +4139,16 @@
         },
         {
             "name": "phpseclib/phpseclib",
-            "version": "3.0.56",
+            "version": "3.0.57",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpseclib/phpseclib.git",
-                "reference": "7adbbe38cde25e2df2116dbf2673c407e24fa305"
+                "reference": "d17e0ddaeaf6f22f7e007cbb437d78792fe2a0e4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/7adbbe38cde25e2df2116dbf2673c407e24fa305",
-                "reference": "7adbbe38cde25e2df2116dbf2673c407e24fa305",
+                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/d17e0ddaeaf6f22f7e007cbb437d78792fe2a0e4",
+                "reference": "d17e0ddaeaf6f22f7e007cbb437d78792fe2a0e4",
                 "shasum": ""
             },
             "require": {
@@ -4229,7 +4229,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpseclib/phpseclib/issues",
-                "source": "https://github.com/phpseclib/phpseclib/tree/3.0.56"
+                "source": "https://github.com/phpseclib/phpseclib/tree/3.0.57"
             },
             "funding": [
                 {
@@ -4245,7 +4245,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-08-03T04:36:50+00:00"
+            "time": "2026-08-26T12:13:21+00:00"
         },
         {
             "name": "psr/clock",
@@ -6732,16 +6732,16 @@
         },
         {
             "name": "symfony/http-foundation",
-            "version": "v7.4.15",
+            "version": "v7.4.21",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-foundation.git",
-                "reference": "1f898ee8188adda9417fb52cf8425a8342c254e7"
+                "reference": "58c89144c7a36dd89c3d01917e9fa3a72d8aaf31"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/1f898ee8188adda9417fb52cf8425a8342c254e7",
-                "reference": "1f898ee8188adda9417fb52cf8425a8342c254e7",
+                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/58c89144c7a36dd89c3d01917e9fa3a72d8aaf31",
+                "reference": "58c89144c7a36dd89c3d01917e9fa3a72d8aaf31",
                 "shasum": ""
             },
             "require": {
@@ -6790,7 +6790,7 @@
             "description": "Defines an object-oriented layer for the HTTP specification",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/http-foundation/tree/v7.4.15"
+                "source": "https://github.com/symfony/http-foundation/tree/v7.4.21"
             },
             "funding": [
                 {
@@ -6810,7 +6810,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-29T07:12:33+00:00"
+            "time": "2026-10-08T16:56:12+00:00"
         },
         {
             "name": "symfony/http-kernel",
@@ -8888,12 +8888,12 @@
             "version": "v5.6.4",
             "source": {
                 "type": "git",
-                "url": "https://github.com/vlucas/phpdotenv.git",
+                "url": "https://github.com/phpdotenv/phpdotenv.git",
                 "reference": "416df702837983f8d5ff48c9c3fee4f5f57b980b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/416df702837983f8d5ff48c9c3fee4f5f57b980b",
+                "url": "https://api.github.com/repos/phpdotenv/phpdotenv/zipball/416df702837983f8d5ff48c9c3fee4f5f57b980b",
                 "reference": "416df702837983f8d5ff48c9c3fee4f5f57b980b",
                 "shasum": ""
             },
@@ -13890,16 +13890,16 @@
         },
         {
             "name": "symfony/yaml",
-            "version": "v7.4.13",
+            "version": "v7.4.21",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/yaml.git",
-                "reference": "a7ec3b1156faf8815db7683ec7c1e7338e6f977c"
+                "reference": "044907929c7999814378be22da34722c7a86bad4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/yaml/zipball/a7ec3b1156faf8815db7683ec7c1e7338e6f977c",
-                "reference": "a7ec3b1156faf8815db7683ec7c1e7338e6f977c",
+                "url": "https://api.github.com/repos/symfony/yaml/zipball/044907929c7999814378be22da34722c7a86bad4",
+                "reference": "044907929c7999814378be22da34722c7a86bad4",
                 "shasum": ""
             },
             "require": {
@@ -13942,7 +13942,7 @@
             "description": "Loads and dumps YAML files",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/yaml/tree/v7.4.13"
+                "source": "https://github.com/symfony/yaml/tree/v7.4.21"
             },
             "funding": [
                 {
@@ -13962,7 +13962,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-25T06:06:12+00:00"
+            "time": "2026-10-12T12:34:30+00:00"
         },
         {
             "name": "ta-tikoma/phpunit-architecture-test",

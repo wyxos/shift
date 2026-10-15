@@ -372,7 +372,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             if (hasContent) {
                 editor.chain().focus('end').insertContent(quoteHtml).run();
             } else {
-                editor.commands.setContent(quoteHtml, false);
+                editor.chain().setContent(quoteHtml).setMeta('preventUpdate', true).run();
             }
             threadComposerHtml.value = editor.getHTML();
         } else {

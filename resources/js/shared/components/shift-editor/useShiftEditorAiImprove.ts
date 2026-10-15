@@ -169,7 +169,7 @@ export function useShiftEditorAiImprove(options: UseShiftEditorAiImproveOptions)
 
     function acceptAiImprove() {
         if (!aiPreviewHtml.value) return;
-        options.editor.value?.commands.setContent(aiPreviewHtml.value, false);
+        options.editor.value?.chain().setContent(aiPreviewHtml.value).setMeta('preventUpdate', true).run();
         options.onAccept(options.editor.value?.getHTML() ?? aiPreviewHtml.value);
         aiPreviewOpen.value = false;
         aiPreviewHtml.value = '';
