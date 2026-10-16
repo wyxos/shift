@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\OrganisationRole;
 use App\Events\SdkInstallSessionApproved;
+use App\Models\Organisation;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -191,9 +193,18 @@ class SdkInstallSessionService
             ->map(fn (Project $project) => $this->projectPayload($project));
     }
 
-    public function createProject(string $deviceCode, string $name): array
+    public function organisations(string $deviceCode): Collection
     {
-        return $this->withLock($deviceCode, function () use ($deviceCode, $name) {
+        $session = $this->requireApprovedSession($deviceCode);
+
+        return $this->manageableOrganisationsQuery((int) $session['approved_user_id'])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    public function createProject(string $deviceCode, string $name, ?int $organisationId = null): array
+    {
+        return $this->withLock($deviceCode, function () use ($deviceCode, $name, $organisationId) {
             $session = $this->requireApprovedSession($deviceCode);
 
             if ($session['credentials_issued_at'] !== null) {
@@ -204,7 +215,7 @@ class SdkInstallSessionService
                 'name' => trim($name),
                 'author_id' => (int) $session['approved_user_id'],
                 'client_id' => null,
-                'organisation_id' => null,
+                'organisation_id' => $this->resolveOrganisationId((int) $session['approved_user_id'], $organisationId),
             ]);
 
             $project->loadMissing([
@@ -315,6 +326,40 @@ class SdkInstallSessionService
             });
     }
 
+    private function manageableOrganisationsQuery(int $userId): Builder
+    {
+        return Organisation::query()->where(function (Builder $query) use ($userId): void {
+            $query->where('author_id', $userId)
+                ->orWhereHas('organisationUsers', function (Builder $membership) use ($userId): void {
+                    $membership->where('user_id', $userId)
+                        ->where('role', OrganisationRole::Administrator->value);
+                });
+        });
+    }
+
+    private function resolveOrganisationId(int $userId, ?int $organisationId): ?int
+    {
+        $organisations = $this->manageableOrganisationsQuery($userId);
+
+        if ($organisationId !== null) {
+            if (! $organisations->whereKey($organisationId)->exists()) {
+                throw new AccessDeniedHttpException('You do not have permission to create projects in the selected organisation.');
+            }
+
+            return $organisationId;
+        }
+
+        $ids = $organisations->limit(2)->pluck('id');
+
+        if ($ids->count() > 1) {
+            throw ValidationException::withMessages([
+                'organisation_id' => 'Choose an organisation before creating this project. Update the SHIFT SDK if your installer does not offer this choice.',
+            ]);
+        }
+
+        return $ids->isEmpty() ? null : (int) $ids->first();
+    }
+
     private function requireApprovedSession(string $deviceCode): array
     {
         $session = $this->findByDeviceCode($deviceCode);
@@ -391,6 +436,7 @@ class SdkInstallSessionService
             'id' => $project->id,
             'name' => $project->name,
             'client_name' => $project->client?->name,
+            'organisation_id' => $project->organisation?->id ?? $project->client?->organisation?->id,
             'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
             'has_project_token' => filled($project->token),
         ];
