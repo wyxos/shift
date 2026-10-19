@@ -71,7 +71,7 @@ const listDescription = computed(() => {
     if (props.surface === 'app-errors') return 'Grouped application errors from connected projects, excluding completed and closed items.';
     if (props.surface === 'requirements') return 'Review submitted requirement items before they become active tasks.';
 
-    return 'Default view hides completed and closed tasks.';
+    return '';
 });
 const emptyLabel = computed(() => {
     if (props.surface === 'app-errors') return 'No app errors found';

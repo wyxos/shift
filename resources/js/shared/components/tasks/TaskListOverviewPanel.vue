@@ -84,7 +84,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
     title: 'Tasks',
-    description: 'Default view hides completed and closed tasks.',
+    description: '',
     emptyLabel: 'No tasks found',
     itemLabel: 'tasks',
     loading: false,
@@ -150,7 +150,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-lg font-semibold">{{ title }}</h1>
-                <p class="text-muted-foreground text-sm">{{ description }}</p>
+                <p v-if="description" class="text-muted-foreground text-sm">{{ description }}</p>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
@@ -436,7 +436,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                 </template>
             </ResponsiveRecordList>
 
-            <div v-if="!loading && !error && tasks.length === 0" class="mt-3 flex flex-wrap justify-center gap-2">
+            <div v-if="!loading && !error && tasks.length === 0 && activeFilterCount > 0" class="mt-3 flex flex-wrap justify-center gap-2">
                 <Button
                     v-if="searchTasks && searchTerm.trim()"
                     data-testid="task-list-clear-search"
