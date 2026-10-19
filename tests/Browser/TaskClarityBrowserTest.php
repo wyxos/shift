@@ -112,6 +112,33 @@ it('uses matching local timestamps and supports direct title search recovery', f
     captureTaskClarityReview($page, 'task-list-mobile.png');
 });
 
+it('only offers empty-state reset when task filters differ from defaults', function () {
+    $user = User::factory()->create(['name' => 'Alex Taylor']);
+    $project = Project::factory()->withAuthor($user->id)->create(['name' => 'Demo project']);
+    $task = Task::factory()->for($project)->create(['title' => 'Completed export review', 'status' => 'completed']);
+    $task->submitter()->associate($user)->save();
+    $this->actingAs($user);
+
+    $page = visit('/tasks')->resize(1440, 900)
+        ->assertSee('No tasks found')
+        ->assertDontSee('Default view hides completed and closed tasks.')
+        ->assertNotPresent('[data-testid="task-list-reset-filters"]');
+    captureTaskClarityReview($page, 'task-default-filters-desktop.png');
+
+    $page->resize(390, 844)
+        ->assertNotPresent('[data-testid="task-list-reset-filters"]')
+        ->assertScript('document.documentElement.scrollWidth <= innerWidth');
+    captureTaskClarityReview($page, 'task-default-filters-mobile.png');
+
+    $page->fill('[data-testid="task-list-search"]', 'No matching export')
+        ->click('[data-testid="task-list-search-submit"]')
+        ->assertVisible('[data-testid="task-list-reset-filters"]')
+        ->click('[data-testid="task-list-reset-filters"]')
+        ->assertValue('[data-testid="task-list-search"]', '')
+        ->assertNotPresent('[data-testid="task-list-reset-filters"]')
+        ->assertNoSmoke();
+});
+
 it('keeps the mobile report close to the conversation without losing a comment draft', function () {
     $user = User::factory()->create(['name' => 'Alex Taylor']);
     $project = Project::factory()->withAuthor($user->id)->create();

@@ -74,8 +74,10 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
 
     const activeFilterCount = computed(() => {
         let count = 0;
-        if (appliedStatuses.value.length && appliedStatuses.value.length < statusOptions.length) count += 1;
-        if (appliedPriorities.value.length && appliedPriorities.value.length < priorityOptions.length) count += 1;
+        if (appliedStatuses.value.length !== defaultStatuses.length || defaultStatuses.some((status) => !appliedStatuses.value.includes(status)))
+            count += 1;
+        if (appliedPriorities.value.length !== allPriorities.length || allPriorities.some((priority) => !appliedPriorities.value.includes(priority)))
+            count += 1;
         if (appliedSearchTerm.value.trim()) count += 1;
         if (appliedEnvironmentTerm.value.trim()) count += 1;
         if (appliedProjectId.value) count += 1;

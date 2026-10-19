@@ -61,6 +61,14 @@ function panel(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskListOverviewPanel title search', () => {
+    it('hides reset and the default description when filters are unchanged', () => {
+        const { wrapper } = panel({ activeFilterCount: 0, searchTerm: '' });
+
+        expect(wrapper.find('[data-testid="task-list-reset-filters"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Default view hides completed and closed tasks.');
+        expect(wrapper.find('h1 + p').exists()).toBe(false);
+    });
+
     it('submits only on Enter or Search and offers empty-state recovery', async () => {
         const { wrapper, searchTasks, resetFilters } = panel();
         const input = wrapper.get('[data-testid="task-list-search"]');
