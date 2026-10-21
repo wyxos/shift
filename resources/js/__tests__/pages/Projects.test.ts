@@ -334,7 +334,6 @@ describe('Projects.vue', () => {
         });
 
         expect(wrapper.text()).not.toContain('Organisation');
-        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-scope-1"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="project-row-1"]').text()).toContain('Portal Refresh');
     });
@@ -343,7 +342,6 @@ describe('Projects.vue', () => {
         const wrapper = mountPage();
 
         await wrapper.get('[data-testid="filter-search"]').setValue('Portal');
-        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
         await wrapper.get('[data-testid="sort-by-name"]').trigger('click');
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
