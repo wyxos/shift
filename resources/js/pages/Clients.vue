@@ -19,6 +19,7 @@ import { Select, type SelectOption } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ActionIconButton from '@/shared/components/ActionIconButton.vue';
+import FilterResetButton from '@/shared/components/FilterResetButton.vue';
 import RequestButton from '@/shared/components/RequestButton.vue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
@@ -83,10 +84,8 @@ function normalizeSortBy(value: string | null | undefined): SortBy {
     if (value === 'oldest' || value === 'name') {
         return value;
     }
-
     return defaultSortBy;
 }
-
 const filtersOpen = ref(false);
 const editDialogOpen = ref(false);
 const appliedSearchTerm = ref(typeof props.filters.search === 'string' ? props.filters.search : '');
@@ -136,6 +135,7 @@ const activeFilterCount = computed(() => {
 
     return count;
 });
+const canResetFilters = computed(() => activeFilterCount.value > 0 || Boolean(draftSearchTerm.value.trim()) || draftSortBy.value !== defaultSortBy);
 
 const createForm = useForm<{
     name: string;
@@ -336,8 +336,8 @@ function confirmDelete() {
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                    <Button data-testid="filters-apply" @click="applyFilters">Apply</Button>
+                    <FilterResetButton :visible="canResetFilters" @click="resetFilters" />
+                    <Button class="ml-auto" data-testid="filters-apply" @click="applyFilters">Apply</Button>
                 </template>
 
                 <template #actions>

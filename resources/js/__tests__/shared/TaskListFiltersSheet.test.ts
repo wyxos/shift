@@ -39,6 +39,22 @@ const sheetStubs = {
 };
 
 describe('TaskListFiltersSheet', () => {
+    it('only offers reset when applied or draft filters can be reset', async () => {
+        const resetFilters = vi.fn();
+        const wrapper = mount(TaskListFiltersSheet, {
+            props: props({ canResetFilters: false, resetFilters }),
+            global: { stubs: sheetStubs },
+        });
+
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="filters-apply"]').exists()).toBe(true);
+        await wrapper.setProps({ canResetFilters: true });
+        await wrapper.get('[data-testid="filters-reset"]').trigger('click');
+        expect(resetFilters).toHaveBeenCalledOnce();
+        await wrapper.setProps({ canResetFilters: false });
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+    });
+
     it('does not render redundant helper copy beneath the filter title', () => {
         const wrapper = mount(TaskListFiltersSheet, {
             props: props(),

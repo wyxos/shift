@@ -96,6 +96,9 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
 
         return count;
     });
+    const canResetFilters = computed(
+        () => activeFilterCount.value > 0 || Boolean(draftSearchTerm.value.trim()) || draftSortBy.value !== defaultSortBy,
+    );
 
     const editForm = useForm<{ id: number | null; name: string }>({ id: null, name: '' });
     const createForm = useForm<{
@@ -403,6 +406,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
 
     return {
         activeFilterCount,
+        canResetFilters,
         ...appErrorNotifications,
         ...projectCreate,
         apiTokenError,

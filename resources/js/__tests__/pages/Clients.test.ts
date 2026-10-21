@@ -228,6 +228,20 @@ describe('Clients.vue', () => {
         expect(wrapper.find('[data-testid="client-organisation-2"]').text()).toContain('No organisation assigned');
     });
 
+    it('shows Reset only for applied or draft filters, excluding organisation scope and whitespace search', async () => {
+        const wrapper = mountPage({ filters: { organisation_id: 1, search: '   ', sort_by: 'newest' } });
+
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="filters-apply"]').classes()).toContain('ml-auto');
+
+        await wrapper.get('[data-testid="filter-search"]').setValue('Acme');
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
+
+        await wrapper.get('[data-testid="filter-search"]').setValue('  ');
+        await wrapper.get('[data-testid="sort-by-name"]').trigger('click');
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
+    });
+
     it('hides the organisation column when scoped to an organisation', () => {
         const wrapper = mountPage({
             filters: {

@@ -15,6 +15,7 @@ import { type NullableOption, type Option, type ProjectFilters, type ProjectPagi
 import { Button } from '@/components/ui/button';
 import { useProjectsPageState } from '@/composables/useProjectsPageState';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FilterResetButton from '@/shared/components/FilterResetButton.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { PlugZap, Plus } from 'lucide-vue-next';
 
@@ -39,6 +40,7 @@ const props = withDefaults(
 );
 const {
     activeFilterCount,
+    canResetFilters,
     appErrorNotificationsError,
     appErrorNotificationsForm,
     appErrorNotificationsLoaded,
@@ -128,8 +130,8 @@ const {
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                    <Button data-testid="filters-apply" @click="applyFilters">Apply</Button>
+                    <FilterResetButton :visible="canResetFilters" @click="resetFilters" />
+                    <Button class="ml-auto" data-testid="filters-apply" @click="applyFilters">Apply</Button>
                 </template>
 
                 <template #actions>
