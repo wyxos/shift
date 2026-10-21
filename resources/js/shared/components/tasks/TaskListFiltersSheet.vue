@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import FilterResetButton from '@shared/components/FilterResetButton.vue';
 import { Filter } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -20,6 +21,7 @@ type Option = {
 interface Props {
     open: boolean;
     activeFilterCount: number;
+    canResetFilters?: boolean;
     draftStatuses: string[];
     draftPriorities: string[];
     draftSearchTerm: string;
@@ -232,8 +234,8 @@ const sortByModel = computed({
             </div>
 
             <SheetFooter class="flex flex-row items-center justify-between border-t px-6 py-4">
-                <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
+                <FilterResetButton :visible="canResetFilters ?? activeFilterCount > 0" @click="resetFilters" />
+                <Button class="ml-auto" data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
             </SheetFooter>
         </SheetContent>
     </Sheet>

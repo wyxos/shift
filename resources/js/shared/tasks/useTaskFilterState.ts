@@ -72,18 +72,51 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         syncAppliedToDraft();
     });
 
-    const activeFilterCount = computed(() => {
+    function countFilters(filters: {
+        statuses: string[];
+        priorities: string[];
+        search: string;
+        environment: string;
+        project: string;
+        type: string;
+        sort: string;
+    }) {
         let count = 0;
-        if (appliedStatuses.value.length !== defaultStatuses.length || defaultStatuses.some((status) => !appliedStatuses.value.includes(status)))
+        if (filters.statuses.length !== defaultStatuses.length || defaultStatuses.some((status) => !filters.statuses.includes(status))) count += 1;
+        if (filters.priorities.length !== allPriorities.length || allPriorities.some((priority) => !filters.priorities.includes(priority)))
             count += 1;
-        if (appliedPriorities.value.length !== allPriorities.length || allPriorities.some((priority) => !appliedPriorities.value.includes(priority)))
-            count += 1;
-        if (appliedSearchTerm.value.trim()) count += 1;
-        if (appliedEnvironmentTerm.value.trim()) count += 1;
-        if (appliedProjectId.value) count += 1;
-        if (includeTypeFilter && appliedType.value !== DEFAULT_TASK_TYPE_FILTER) count += 1;
-        if (appliedSortBy.value !== defaultSortBy) count += 1;
+        if (filters.search.trim()) count += 1;
+        if (filters.environment.trim()) count += 1;
+        if (filters.project) count += 1;
+        if (includeTypeFilter && filters.type !== DEFAULT_TASK_TYPE_FILTER) count += 1;
+        if (filters.sort !== defaultSortBy) count += 1;
         return count;
+    }
+
+    const activeFilterCount = computed(() =>
+        countFilters({
+            statuses: appliedStatuses.value,
+            priorities: appliedPriorities.value,
+            search: appliedSearchTerm.value,
+            environment: appliedEnvironmentTerm.value,
+            project: appliedProjectId.value,
+            type: appliedType.value,
+            sort: appliedSortBy.value,
+        }),
+    );
+    const canResetFilters = computed(() => {
+        return (
+            activeFilterCount.value > 0 ||
+            countFilters({
+                statuses: draftStatuses.value,
+                priorities: draftPriorities.value,
+                search: draftSearchTerm.value,
+                environment: draftEnvironmentTerm.value,
+                project: draftProjectId.value,
+                type: draftType.value,
+                sort: draftSortBy.value,
+            }) > 0
+        );
     });
 
     function syncAppliedToDraft() {
@@ -165,6 +198,7 @@ export function useTaskFilterState(options: UseTaskFilterStateOptions = {}) {
         appliedType,
         applyDraftToApplied,
         buildListQuery,
+        canResetFilters,
         defaultSortBy,
         defaultStatuses,
         draftEnvironmentTerm,

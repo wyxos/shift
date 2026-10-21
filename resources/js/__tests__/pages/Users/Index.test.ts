@@ -161,6 +161,19 @@ describe('Users/Index.vue', () => {
         to: 2,
     };
 
+    it('shows Reset for applied or draft filters and ignores whitespace-only search', async () => {
+        const wrapper = mount(UsersIndex, { props: { users, filters: { search: '   ', sort_by: null } } });
+
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="filters-apply"]').classes()).toContain('ml-auto');
+
+        await wrapper.get('[data-testid="filter-search"]').setValue('alice');
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
+
+        const filtered = mount(UsersIndex, { props: { users, filters: { search: '', sort_by: 'name' } } });
+        expect(filtered.find('[data-testid="filters-reset"]').exists()).toBe(true);
+    });
+
     it('renders user rows and verification badges', () => {
         const wrapper = mount(UsersIndex, {
             props: {

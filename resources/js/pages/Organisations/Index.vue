@@ -12,6 +12,7 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FilterResetButton from '@/shared/components/FilterResetButton.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Building2 } from 'lucide-vue-next';
@@ -135,6 +136,7 @@ const activeFilterCount = computed(() => {
 
     return count;
 });
+const canResetFilters = computed(() => activeFilterCount.value > 0 || Boolean(draftSearchTerm.value.trim()) || draftSortBy.value !== defaultSortBy);
 
 watch(
     () => props.filters,
@@ -418,8 +420,8 @@ watch(
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                    <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
+                    <FilterResetButton :visible="canResetFilters" @click="resetFilters" />
+                    <Button class="ml-auto" data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
                 </template>
 
                 <template #actions>

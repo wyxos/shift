@@ -6,6 +6,7 @@ import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FilterResetButton from '@/shared/components/FilterResetButton.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
@@ -86,6 +87,7 @@ const activeFilterCount = computed(() => {
 
     return count;
 });
+const canResetFilters = computed(() => activeFilterCount.value > 0 || Boolean(draftSearchTerm.value.trim()) || draftSortBy.value !== defaultSortBy);
 
 function queryParams(page = 1) {
     return {
@@ -163,8 +165,8 @@ function formatDate(value?: string | null) {
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                    <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
+                    <FilterResetButton :visible="canResetFilters" @click="resetFilters" />
+                    <Button class="ml-auto" data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
                 </template>
 
                 <Table>

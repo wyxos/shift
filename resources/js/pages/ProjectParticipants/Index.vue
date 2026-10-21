@@ -8,6 +8,7 @@ import { Select, type SelectOption } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
+import FilterResetButton from '@/shared/components/FilterResetButton.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -141,6 +142,10 @@ const activeFilterCount = computed(() => {
     if (appliedSortBy.value !== defaultSortBy) count += 1;
     return count;
 });
+const canResetFilters = computed(
+    () =>
+        activeFilterCount.value > 0 || Boolean(draftSearchTerm.value.trim()) || Boolean(draftProjectId.value) || draftSortBy.value !== defaultSortBy,
+);
 function queryParams(page = 1) {
     return {
         search: appliedSearchTerm.value.trim() || undefined,
@@ -298,8 +303,8 @@ function roleLabel(externalIdentity: ExternalIdentityRow) {
                 </template>
 
                 <template #filter-actions>
-                    <Button data-testid="filters-reset" variant="destructive" @click="resetFilters">Reset</Button>
-                    <Button data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
+                    <FilterResetButton :visible="canResetFilters" @click="resetFilters" />
+                    <Button class="ml-auto" data-testid="filters-apply" variant="default" @click="applyFilters">Apply</Button>
                 </template>
 
                 <Table>

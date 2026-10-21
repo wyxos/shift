@@ -4,6 +4,18 @@ import { describe, expect, it } from 'vitest';
 import { makeProps, routerGetMock } from './test-helpers';
 
 describe('Organisations/Index.vue', () => {
+    it('shows Reset for applied or draft filters and ignores whitespace-only search', async () => {
+        const wrapper = mount(Index, { props: makeProps({ filters: { search: '   ', sort_by: 'newest' } }) });
+
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="filters-apply"]').classes()).toContain('ml-auto');
+
+        await wrapper.get('[data-testid="filter-search"]').setValue('acme');
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
+
+        const filtered = mount(Index, { props: makeProps({ filters: { search: '', sort_by: 'oldest' } }) });
+        expect(filtered.find('[data-testid="filters-reset"]').exists()).toBe(true);
+    });
     it('renders organisation rows with access counts and unknown date fallback', () => {
         const wrapper = mount(Index, {
             props: makeProps(),

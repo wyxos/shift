@@ -42,6 +42,7 @@ interface Props {
     highlightedTaskId: number | null;
     filtersOpen: boolean;
     activeFilterCount: number;
+    canResetFilters?: boolean;
     searchTerm?: string;
     searchTasks?: (term: string) => void;
     draftStatuses: string[];
@@ -184,6 +185,7 @@ async function finalizeRequirementPack(group: RequirementGroup) {
                 <TaskListFiltersSheet
                     :open="filtersOpen"
                     :active-filter-count="activeFilterCount"
+                    :can-reset-filters="canResetFilters"
                     :draft-statuses="draftStatuses"
                     :draft-priorities="draftPriorities"
                     :draft-search-term="draftSearchTerm"

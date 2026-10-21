@@ -304,8 +304,11 @@ describe('ProjectParticipants/Index.vue', () => {
             },
         });
 
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="filters-apply"]').classes()).toContain('ml-auto');
         await wrapper.get('[data-testid="filter-search"]').setValue('qa');
         await wrapper.get('[data-testid="filter-project"]').setValue('2');
+        expect(wrapper.find('[data-testid="filters-reset"]').exists()).toBe(true);
         await wrapper.get('[data-testid="sort-by-name"]').trigger('click');
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
