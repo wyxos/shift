@@ -98,14 +98,21 @@ test('registers Cursor custom-scheme redirect URIs', function () {
         ->assertJsonMissing(['client_secret']);
 });
 
-test('completes a PKCE OAuth flow and uses the resulting token for MCP', function () {
+test('completes a PKCE OAuth flow and uses the resulting token for MCP', function (array $scopes) {
     $user = User::factory()->create();
     $project = Project::factory()->withAuthor($user->id)->create([
         'mcp_enabled' => true,
     ]);
-    Task::factory()->create([
+    $task = Task::factory()->create([
         'project_id' => $project->id,
         'title' => 'OAuth-visible MCP task',
+    ]);
+    $task->errorOccurrences()->create([
+        'number' => 1,
+        'source' => 'laravel',
+        'message' => 'OAuth diagnostic event',
+        'received_at' => now(),
+        'payload' => [],
     ]);
 
     $clientId = registerMcpOAuthClient();
@@ -115,7 +122,7 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
         'client_id' => $clientId,
         'redirect_uri' => 'http://127.0.0.1:43123/callback',
         'response_type' => 'code',
-        'scope' => 'mcp:read mcp:write',
+        'scope' => implode(' ', $scopes),
         'state' => 'oauth-state',
         'code_challenge' => $challenge,
         'code_challenge_method' => 'S256',
@@ -130,9 +137,9 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
         ->assertInertia(fn (Assert $page) => $page
             ->component('auth/OAuth/Authorize')
             ->where('client.name', 'Codex test client')
-            ->has('scopes', 2)
+            ->has('scopes', count($scopes))
             ->where('scopes.0.id', 'mcp:read')
-            ->where('scopes.1.id', 'mcp:write')
+
         );
 
     $authToken = $this->app['session']->get('authToken');
@@ -162,7 +169,7 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
 
     expect($claims['iss'])->toBe('https://shift.test')
         ->and($claims['aud'])->toContain($clientId, 'https://shift.test/mcp/shift')
-        ->and($claims['scopes'])->toBe(['mcp:read', 'mcp:write']);
+        ->and($claims['scopes'])->toBe($scopes);
 
     $this->withHeader('Authorization', 'Bearer '.$accessToken)
         ->postJson('/mcp/shift', [
@@ -181,6 +188,18 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
         ->assertOk()
         ->assertHeader('MCP-Session-Id');
 
+    $tools = $this->postJson('/mcp/shift', [
+        'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list',
+    ])->assertOk()->json('result.tools');
+    expect(collect($tools)->pluck('name'))->toContain('list_task_error_occurrences');
+    $eventTool = collect($tools)->firstWhere('name', 'list_task_error_occurrences');
+    expect($eventTool['annotations']['readOnlyHint'])->toBeTrue();
+
+    $this->postJson('/mcp/shift', [
+        'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call',
+        'params' => ['name' => 'list_task_error_occurrences', 'arguments' => ['task_id' => $task->id]],
+    ])->assertOk()->assertJsonPath('result.structuredContent.occurrences.0.message', 'OAuth diagnostic event');
+
     $this->postJson('/oauth/token', [
         'grant_type' => 'refresh_token',
         'client_id' => $clientId,
@@ -189,7 +208,10 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
     ])
         ->assertOk()
         ->assertJsonStructure(['access_token', 'refresh_token']);
-});
+})->with([
+    'read only' => [['mcp:read']],
+    'read and write' => [['mcp:read', 'mcp:write']],
+]);
 
 test('rejects authorization and token requests for another resource', function () {
     $user = User::factory()->create();

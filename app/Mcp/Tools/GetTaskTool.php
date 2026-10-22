@@ -22,7 +22,7 @@ class GetTaskTool extends Tool
 
     protected string $name = 'get_task';
 
-    protected string $description = 'Get full read-only details for a SHIFT task, including description, submitter, collaborators, metadata, and attachments.';
+    protected string $description = 'Get full read-only details for a SHIFT task, including description, submitter, collaborators, metadata, attachments, and app-error summary. Use list_task_error_occurrences for diagnostic events and stack traces.';
 
     public function handle(Request $request): Response|ResponseFactory
     {

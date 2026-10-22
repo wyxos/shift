@@ -26,7 +26,7 @@ class SearchTasksTool extends Tool
 
     protected string $name = 'search_tasks';
 
-    protected string $description = 'Search SHIFT tasks by text, project, status, priority, or external-submitter status. Results are summaries and omit full task descriptions.';
+    protected string $description = 'Search SHIFT tasks by text, project, status, priority, external-submitter status, or error_only for app-error reports. Results are summaries and omit full task descriptions.';
 
     public function handle(Request $request): Response|ResponseFactory
     {
@@ -36,6 +36,7 @@ class SearchTasksTool extends Tool
             'status' => ['nullable', 'string', Rule::in(TaskStatus::values())],
             'priority' => ['nullable', 'string', Rule::in(TaskPriority::values())],
             'external_only' => ['nullable', 'boolean'],
+            'error_only' => ['nullable', 'boolean'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
@@ -63,6 +64,7 @@ class SearchTasksTool extends Tool
             ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->when($validated['priority'] ?? null, fn ($query, string $priority) => $query->where('priority', $priority))
             ->when((bool) ($validated['external_only'] ?? false), fn ($query) => $query->externallySubmitted())
+            ->when((bool) ($validated['error_only'] ?? false), fn ($query) => $query->errorIntake())
             ->latest('updated_at')
             ->limit($limit)
             ->get()
@@ -91,6 +93,9 @@ class SearchTasksTool extends Tool
                 ->enum(TaskPriority::values()),
             'external_only' => $schema->boolean()
                 ->description('Only return tasks submitted by external users.')
+                ->default(false),
+            'error_only' => $schema->boolean()
+                ->description('Only return app-error reports, including their error summary.')
                 ->default(false),
             'limit' => $schema->integer()
                 ->description('Maximum number of tasks to return, between 1 and 50.')
