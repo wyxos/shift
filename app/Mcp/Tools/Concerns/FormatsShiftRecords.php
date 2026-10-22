@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskCollaborator;
 use App\Models\TaskThread;
 use App\Models\User;
+use App\Services\AppErrors\AppErrorScrubber;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
@@ -24,6 +25,7 @@ trait FormatsShiftRecords
             'title' => $task->title,
             'status' => $task->status,
             'priority' => $task->priority,
+            'error_report' => $this->errorReport($task),
             'due_date' => $this->date($task->due_date),
             'project' => $task->project ? [
                 'id' => $task->project->id,
@@ -266,6 +268,35 @@ trait FormatsShiftRecords
             'name' => $model->getAttribute('name') ?? $model->getAttribute('user_name'),
             'email' => $model->getAttribute('email') ?? $model->getAttribute('user_email'),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function errorReport(Task $task): ?array
+    {
+        if (! filled($task->error_signature)) {
+            return null;
+        }
+
+        return app(AppErrorScrubber::class)->scrubArray([
+            'signature' => $task->error_signature,
+            'source' => $task->error_source,
+            'environment' => $task->error_environment,
+            'release' => $task->error_release,
+            'git_sha' => $task->error_git_sha,
+            'exception_class' => $task->error_exception_class,
+            'error_name' => $task->error_name,
+            'culprit' => [
+                'file' => $task->error_culprit_file,
+                'line' => $task->error_culprit_line,
+                'function' => $task->error_culprit_function,
+            ],
+            'occurrences_count' => (int) $task->error_occurrences_count,
+            'first_seen_at' => $this->date($task->error_first_seen_at),
+            'last_seen_at' => $this->date($task->error_last_seen_at),
+            'events_tool' => 'list_task_error_occurrences',
+        ]);
     }
 
     protected function date(mixed $value): ?string

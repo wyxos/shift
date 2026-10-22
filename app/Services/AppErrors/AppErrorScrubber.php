@@ -90,6 +90,9 @@ class AppErrorScrubber
 
         return in_array($normalized, [
             'authorization',
+            'proxy_authorization',
+            'set_cookie',
+            'token',
             'x_authorization',
             'password',
             'passwd',
