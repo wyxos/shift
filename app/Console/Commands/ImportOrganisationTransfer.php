@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\OrganisationTransfer\OrganisationTransferImporter;
 use Illuminate\Console\Command;
+use Symfony\Component\Filesystem\Path;
 use Throwable;
 
 class ImportOrganisationTransfer extends Command
@@ -58,7 +59,7 @@ class ImportOrganisationTransfer extends Command
 
     private function resolveDirectory(string $directory): string
     {
-        return str_starts_with($directory, '/') ? $directory : base_path($directory);
+        return Path::isAbsolute($directory) ? $directory : base_path($directory);
     }
 
     /** @param array<string, mixed> $verification */

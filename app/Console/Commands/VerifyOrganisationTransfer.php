@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\OrganisationTransfer\OrganisationTransferImporter;
 use Illuminate\Console\Command;
+use Symfony\Component\Filesystem\Path;
 use Throwable;
 
 class VerifyOrganisationTransfer extends Command
@@ -30,7 +31,7 @@ class VerifyOrganisationTransfer extends Command
     {
         try {
             $requested = (string) $this->argument('directory');
-            $directory = str_starts_with($requested, '/') ? $requested : base_path($requested);
+            $directory = Path::isAbsolute($requested) ? $requested : base_path($requested);
             $manifest = $importer->inspect($directory);
             $verification = $importer->verifyImported($manifest);
 
