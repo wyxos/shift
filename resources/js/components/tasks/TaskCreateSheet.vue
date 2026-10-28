@@ -9,6 +9,7 @@ import type { TaskProjectOption } from '@/shared/tasks/projects';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
 import TaskCreateForm from '@shared/components/TaskCreateForm.vue';
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, LoaderCircle, Mail, Plus, UploadCloud } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -59,7 +60,7 @@ const createOpen = ref(false);
 const createLoading = ref(false);
 const createUploading = ref(false);
 const createError = ref<string | null>(null);
-const createTempIdentifier = ref(Date.now().toString());
+const createTempIdentifier = ref(createUploadIdentifier());
 const emailImportInput = ref<HTMLInputElement | null>(null);
 const emailImportLoading = ref(false);
 const emailImportDragging = ref(false);
@@ -110,7 +111,7 @@ function resetCreateForm() {
         environment: null,
         collaborators: emptyTaskCollaborators(),
     };
-    createTempIdentifier.value = Date.now().toString();
+    createTempIdentifier.value = createUploadIdentifier();
     createError.value = null;
     createUploading.value = false;
     emailImportError.value = null;

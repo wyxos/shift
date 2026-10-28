@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AttachmentCleanup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ class TaskThread extends Model
     protected static function booted(): void
     {
         static::addGlobalScope('published', fn (Builder $query) => $query->where('task_threads.is_draft', false));
+        static::deleting(fn (TaskThread $thread) => app(AttachmentCleanup::class)->forThread($thread));
     }
 
     public function scopeWithDraftsFor(Builder $query, User $user): Builder

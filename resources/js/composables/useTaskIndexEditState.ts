@@ -3,6 +3,7 @@ import { getTaskIdFromQuery, syncTaskQuery } from '@/shared/tasks/history';
 import { getTaskCreatorEmail, getTaskCreatorName, getTaskEnvironment } from '@/shared/tasks/metadata';
 import { projectEnvironmentOptions, type TaskProjectOption } from '@/shared/tasks/projects';
 import type { TaskDetail, TaskIndexEditSnapshot, TaskIndexOpenEditOptions } from '@/shared/tasks/types';
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref, watch, type ComputedRef } from 'vue';
 import { toast } from 'vue-sonner';
@@ -24,7 +25,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
     const editUploading = ref(false);
     const editTask = ref<TaskDetail | null>(null);
     const deletedAttachmentIds = ref<number[]>([]);
-    const editTempIdentifier = ref(Date.now().toString());
+    const editTempIdentifier = ref(createUploadIdentifier());
     const editForm = ref(defaultTaskEditForm());
     const confirmCloseOpen = ref(false);
     const initialEditSnapshot = ref<TaskIndexEditSnapshot | null>(null);
@@ -347,7 +348,7 @@ export function useTaskIndexEditState(options: UseTaskIndexEditStateOptions) {
                     external: data?.external_collaborators ?? [],
                 }),
             };
-            editTempIdentifier.value = Date.now().toString();
+            editTempIdentifier.value = createUploadIdentifier();
             initialEditSnapshot.value = currentTaskSnapshot(editForm.value);
             autosaveArmed.value = true;
             void thread.fetchThreads(taskId);

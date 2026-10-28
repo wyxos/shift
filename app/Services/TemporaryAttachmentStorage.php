@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Support\TemporaryAttachmentOwner;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
 
@@ -13,14 +15,26 @@ class TemporaryAttachmentStorage
 
     private const ROOT = 'temp_attachments';
 
-    public function claim(string $tempIdentifier, ?int $userId): ?string
+    public function __construct(private readonly TemporaryAttachmentOwnerResolver $owners) {}
+
+    public function ownerForRequest(Request $request): ?TemporaryAttachmentOwner
+    {
+        return $this->owners->resolve($request);
+    }
+
+    public function fingerprint(TemporaryAttachmentOwner|int|null $owner): ?string
+    {
+        return is_int($owner) ? TemporaryAttachmentOwner::portal($owner)->fingerprint : $owner?->fingerprint;
+    }
+
+    public function claim(string $tempIdentifier, TemporaryAttachmentOwner|int|null $owner): ?string
     {
         $directory = $this->canonicalDirectory($tempIdentifier);
-        if ($directory === null || $userId === null) {
+        if ($directory === null || $owner === null) {
             return null;
         }
 
-        if ($this->isOwnedBy($directory, $userId)) {
+        if ($this->isOwnedBy($directory, $owner)) {
             return $directory;
         }
 
@@ -35,7 +49,7 @@ class TemporaryAttachmentStorage
         }
 
         Storage::makeDirectory($directory);
-        $metadata = json_encode(['user_id' => $userId], JSON_THROW_ON_ERROR);
+        $metadata = json_encode(['version' => 2, 'owner' => $this->fingerprint($owner)], JSON_THROW_ON_ERROR);
         $ownerFile = @fopen(Storage::path($ownerPath), 'x');
         if ($ownerFile === false) {
             return null;
@@ -55,13 +69,13 @@ class TemporaryAttachmentStorage
             return null;
         }
 
-        return $this->isOwnedBy($directory, $userId) ? $directory : null;
+        return $this->isOwnedBy($directory, $owner) ? $directory : null;
     }
 
-    public function ownedDirectory(string $tempIdentifier, ?int $userId): ?string
+    public function ownedDirectory(string $tempIdentifier, TemporaryAttachmentOwner|int|null $owner): ?string
     {
         $directory = $this->canonicalDirectory($tempIdentifier);
-        if ($directory === null || $userId === null || ! $this->isOwnedBy($directory, $userId)) {
+        if ($directory === null || $owner === null || ! $this->isOwnedBy($directory, $owner)) {
             return null;
         }
 
@@ -79,7 +93,7 @@ class TemporaryAttachmentStorage
         return $canonicalPath === $path ? $canonicalPath : null;
     }
 
-    public function ownedFilePath(string $path, ?int $userId): ?string
+    public function ownedFilePath(string $path, TemporaryAttachmentOwner|int|null $owner): ?string
     {
         $canonicalPath = $this->canonicalFilePath($path);
         if ($canonicalPath === null) {
@@ -88,13 +102,13 @@ class TemporaryAttachmentStorage
 
         $tempIdentifier = explode('/', $canonicalPath, 3)[1];
 
-        return $this->ownedDirectory($tempIdentifier, $userId) === null ? null : $canonicalPath;
+        return $this->ownedDirectory($tempIdentifier, $owner) === null ? null : $canonicalPath;
     }
 
-    public function ownedRouteFilePath(string $tempIdentifier, string $filename, ?int $userId): ?string
+    public function ownedRouteFilePath(string $tempIdentifier, string $filename, TemporaryAttachmentOwner|int|null $owner): ?string
     {
         $path = $this->filePath($tempIdentifier, $filename);
-        if ($path === null || $this->ownedDirectory($tempIdentifier, $userId) === null) {
+        if ($path === null || $this->ownedDirectory($tempIdentifier, $owner) === null) {
             return null;
         }
 
@@ -104,9 +118,9 @@ class TemporaryAttachmentStorage
     /**
      * @return array<int, string>
      */
-    public function ownedFiles(string $tempIdentifier, ?int $userId): array
+    public function ownedFiles(string $tempIdentifier, TemporaryAttachmentOwner|int|null $owner): array
     {
-        $directory = $this->ownedDirectory($tempIdentifier, $userId);
+        $directory = $this->ownedDirectory($tempIdentifier, $owner);
         if ($directory === null) {
             return [];
         }
@@ -117,9 +131,9 @@ class TemporaryAttachmentStorage
         ));
     }
 
-    public function deleteOwnedDirectory(string $tempIdentifier, ?int $userId): void
+    public function deleteOwnedDirectory(string $tempIdentifier, TemporaryAttachmentOwner|int|null $owner): void
     {
-        $directory = $this->ownedDirectory($tempIdentifier, $userId);
+        $directory = $this->ownedDirectory($tempIdentifier, $owner);
         if ($directory !== null) {
             Storage::deleteDirectory($directory);
         }
@@ -157,7 +171,7 @@ class TemporaryAttachmentStorage
         return $directory.'/'.self::OWNER_METADATA;
     }
 
-    private function isOwnedBy(string $directory, int $userId): bool
+    private function isOwnedBy(string $directory, TemporaryAttachmentOwner|int $owner): bool
     {
         $ownerPath = $this->ownerPath($directory);
         if (! Storage::exists($ownerPath)) {
@@ -171,7 +185,8 @@ class TemporaryAttachmentStorage
         }
 
         return is_array($metadata)
-            && isset($metadata['user_id'])
-            && hash_equals((string) $userId, (string) $metadata['user_id']);
+            && ($metadata['version'] ?? null) === 2
+            && is_string($metadata['owner'] ?? null)
+            && hash_equals($this->fingerprint($owner), $metadata['owner']);
     }
 }

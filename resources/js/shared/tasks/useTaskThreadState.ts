@@ -1,3 +1,4 @@
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import { nextTick, ref, type Ref } from 'vue';
 import type { MentionIdentity } from '../components/shift-editor/types';
 import { resolveTouchTap, shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent } from './interaction';
@@ -39,7 +40,7 @@ type UseTaskThreadStateOptions<TTaskDetail> = {
 };
 
 export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptions<TTaskDetail>) {
-    const threadTempIdentifier = ref(Date.now().toString());
+    const threadTempIdentifier = ref(createUploadIdentifier());
     const threadLoading = ref(false);
     const threadSending = ref(false);
     const threadError = ref<string | null>(null);
@@ -111,7 +112,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     function resetThreadState() {
         fetchGeneration += 1;
         activeTaskId = null;
-        threadTempIdentifier.value = Date.now().toString();
+        threadTempIdentifier.value = createUploadIdentifier();
         threadLoading.value = false;
         threadSending.value = false;
         threadError.value = null;
@@ -285,7 +286,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
                 threadEditingId.value = null;
                 threadAudience.value = 'all';
                 threadAudienceError.value = null;
-                threadTempIdentifier.value = Date.now().toString();
+                threadTempIdentifier.value = createUploadIdentifier();
                 threadComposerHtml.value = '';
                 threadComposerRef.value?.reset?.();
                 scrollCommentsToBottomSoon();
@@ -328,7 +329,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         refreshThreadSending();
         threadComposerRef.value?.reset?.();
         threadComposerHtml.value = '';
-        threadTempIdentifier.value = `${Date.now()}-${localMessageSequence}`;
+        threadTempIdentifier.value = createUploadIdentifier();
         threadAudience.value = 'all';
         threadAudienceError.value = null;
         scrollCommentsToBottomSoon();
@@ -342,7 +343,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         threadEditError.value = null;
         threadAudience.value = message.audience;
         threadAudienceError.value = null;
-        threadTempIdentifier.value = Date.now().toString();
+        threadTempIdentifier.value = createUploadIdentifier();
         threadComposerHtml.value = message.content;
         void nextTick().then(() => {
             threadComposerRef.value?.editor?.chain().focus().run();
@@ -362,7 +363,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             threadAudience.value = 'team';
             threadAudienceError.value = null;
         }
-        threadTempIdentifier.value = Date.now().toString();
+        threadTempIdentifier.value = createUploadIdentifier();
         const quoteHtml = buildReplyQuoteHtml(message);
         const editor = threadComposerRef.value?.editor;
 
@@ -392,7 +393,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         threadComposerHtml.value = '';
         threadEditError.value = null;
         threadEditSaving.value = false;
-        threadTempIdentifier.value = Date.now().toString();
+        threadTempIdentifier.value = createUploadIdentifier();
         threadComposerRef.value?.reset?.();
         contextMenuMessageId.value = null;
         contextMenuSelectionText.value = '';

@@ -1,3 +1,4 @@
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import type { Editor } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
 import axiosDefault, { type AxiosInstance } from 'axios';
@@ -205,7 +206,7 @@ export const ImageUpload = Extension.create<ImageUploadOptions>({
 
     addOptions() {
         return {
-            getTempIdentifier: () => Date.now().toString(),
+            getTempIdentifier: () => createUploadIdentifier(),
             onNonImageFile: () => {},
             axios: axiosDefault,
             uploadEndpoints: undefined,

@@ -1,3 +1,4 @@
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import axios from 'axios';
 import { marked } from 'marked';
 import type { Ref } from 'vue';
@@ -32,8 +33,8 @@ export function useTaskThreads(taskId: number) {
     const externalMessagesContainer: Ref<HTMLElement | null> = ref(null);
 
     // Thread attachment state
-    const internalThreadTempIdentifier: Ref<string> = ref(Date.now().toString() + '_internal_thread');
-    const externalThreadTempIdentifier: Ref<string> = ref(Date.now().toString() + '_external_thread');
+    const internalThreadTempIdentifier: Ref<string> = ref(createUploadIdentifier() + '_internal_thread');
+    const externalThreadTempIdentifier: Ref<string> = ref(createUploadIdentifier() + '_external_thread');
     const internalThreadAttachments: Ref<ThreadFile[]> = ref([]);
     const externalThreadAttachments: Ref<ThreadFile[]> = ref([]);
     const isThreadUploading: Ref<boolean> = ref(false);
@@ -196,13 +197,13 @@ export function useTaskThreads(taskId: number) {
                 internalMessages.value.push(message);
                 internalNewMessage.value = '';
                 internalThreadAttachments.value = [];
-                internalThreadTempIdentifier.value = Date.now().toString() + '_internal_thread';
+                internalThreadTempIdentifier.value = createUploadIdentifier() + '_internal_thread';
                 scrollToBottom(internalMessagesContainer.value);
             } else {
                 externalMessages.value.push(message);
                 externalNewMessage.value = '';
                 externalThreadAttachments.value = [];
-                externalThreadTempIdentifier.value = Date.now().toString() + '_external_thread';
+                externalThreadTempIdentifier.value = createUploadIdentifier() + '_external_thread';
                 scrollToBottom(externalMessagesContainer.value);
             }
         } catch (error) {

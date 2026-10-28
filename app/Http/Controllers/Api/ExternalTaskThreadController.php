@@ -15,6 +15,7 @@ use App\Services\TaskThreadAudienceService;
 use App\Services\TaskThreadMentionService;
 use App\Services\TaskThreadNotificationService;
 use App\Services\TemporaryAttachmentStorage;
+use App\Support\TemporaryAttachmentOwner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -212,7 +213,7 @@ class ExternalTaskThreadController extends Controller
             $thread->save();
 
             if ($request->has('temp_identifier')) {
-                $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
+                $this->processTemporaryAttachments($request->temp_identifier, $thread, $this->temporaryAttachments->ownerForRequest($request));
             }
 
             if ($request->filled('temp_identifier')) {
@@ -273,7 +274,7 @@ class ExternalTaskThreadController extends Controller
     /**
      * Process temporary attachments and associate them with the thread.
      */
-    private function processTemporaryAttachments(?string $tempIdentifier, TaskThread $thread, ?int $userId): void
+    private function processTemporaryAttachments(?string $tempIdentifier, TaskThread $thread, TemporaryAttachmentOwner|int|null $userId): void
     {
         if ($tempIdentifier === null) {
             return;
@@ -453,7 +454,7 @@ class ExternalTaskThreadController extends Controller
 
         // Process any temporary attachments
         if ($request->has('temp_identifier')) {
-            $this->processTemporaryAttachments($request->temp_identifier, $thread, $request->user()?->id);
+            $this->processTemporaryAttachments($request->temp_identifier, $thread, $this->temporaryAttachments->ownerForRequest($request));
         }
 
         // After moving attachments, replace temp URLs in content with final URLs (internal download route)

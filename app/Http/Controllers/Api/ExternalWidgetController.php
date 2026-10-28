@@ -37,6 +37,7 @@ class ExternalWidgetController extends Controller
 
         $project = Project::query()
             ->with('environments')
+            ->visibleTo($request->user()?->id)
             ->where('token', $attributes['project'])
             ->firstOrFail();
         $environment = $this->environmentRegistration($project, $attributes['environment'] ?? null);
@@ -84,6 +85,7 @@ class ExternalWidgetController extends Controller
 
         $project = Project::query()
             ->with('environments')
+            ->visibleTo($request->user()?->id)
             ->where('token', $attributes['project'])
             ->firstOrFail();
 

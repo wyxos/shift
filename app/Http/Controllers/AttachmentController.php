@@ -56,7 +56,7 @@ class AttachmentController extends Controller
         $filename = $this->storedBaseName($originalFilename);
         $extension = $file->getClientOriginalExtension();
         $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
-        $storedFilename = $filename.'_'.uniqid().$extensionSuffix;
+        $storedFilename = $filename.'_'.Str::uuid().$extensionSuffix;
         $path = $file->storeAs($tempPath, $storedFilename);
 
         // Store metadata about the file
@@ -104,7 +104,8 @@ class AttachmentController extends Controller
             'chunk_size' => ChunkedUploadConfig::CHUNK_SIZE_BYTES,
             'total_chunks' => $totalChunks,
             'created_at' => now()->toIso8601String(),
-            'user_id' => $request->user()?->id,
+            'version' => 2,
+            'owner' => $this->temporaryAttachments->fingerprint($request->user()?->id),
         ];
 
         Storage::put("{$dir}/meta.json", json_encode($meta));
@@ -237,7 +238,7 @@ class AttachmentController extends Controller
         $baseName = $this->storedBaseName($originalFilename);
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
         $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
-        $storedFilename = $baseName.'_'.uniqid().$extensionSuffix;
+        $storedFilename = $baseName.'_'.Str::uuid().$extensionSuffix;
         $finalPath = "{$tempPath}/{$storedFilename}";
 
         $finalAbs = Storage::path($finalPath);
@@ -351,8 +352,10 @@ class AttachmentController extends Controller
 
         $metadata = json_decode(Storage::get($metaPath), true) ?: null;
         if (! is_array($metadata)
-            || ! isset($metadata['user_id'])
-            || ! hash_equals((string) auth()->id(), (string) $metadata['user_id'])) {
+            || ($metadata['version'] ?? null) !== 2
+            || ! is_string($metadata['owner'] ?? null)
+            || ($owner = $this->temporaryAttachments->fingerprint(auth()->id())) === null
+            || ! hash_equals($owner, $metadata['owner'])) {
             return null;
         }
 

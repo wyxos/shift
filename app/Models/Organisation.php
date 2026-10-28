@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AttachmentCleanup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,11 @@ class Organisation extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(fn (Organisation $organisation) => app(AttachmentCleanup::class)->forOrganisation($organisation));
+    }
 
     // user
     public function author()

@@ -71,14 +71,14 @@ class ExternalAttachmentController extends Controller
         $tempIdentifier = $request->input('temp_identifier');
         $originalFilename = $file->getClientOriginalName();
 
-        $tempPath = $this->temporaryAttachments->claim($tempIdentifier, $request->user()?->id);
+        $tempPath = $this->temporaryAttachments->claim($tempIdentifier, $this->temporaryAttachments->ownerForRequest($request));
         abort_if($tempPath === null, 404);
 
         // Generate a unique filename for storage
         $extension = $file->getClientOriginalExtension();
         $baseName = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) ?: 'upload';
         $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
-        $storedFilename = $baseName.'_'.uniqid().$extensionSuffix;
+        $storedFilename = $baseName.'_'.Str::uuid().$extensionSuffix;
         $filePath = "{$tempPath}/{$storedFilename}";
 
         // Store the file
@@ -115,7 +115,7 @@ class ExternalAttachmentController extends Controller
         $tempIdentifier = $request->input('temp_identifier');
         $results = [];
 
-        $tempPath = $this->temporaryAttachments->claim($tempIdentifier, $request->user()?->id);
+        $tempPath = $this->temporaryAttachments->claim($tempIdentifier, $this->temporaryAttachments->ownerForRequest($request));
         abort_if($tempPath === null, 404);
 
         foreach ($request->file('attachments') as $file) {
@@ -125,7 +125,7 @@ class ExternalAttachmentController extends Controller
             $extension = $file->getClientOriginalExtension();
             $baseName = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) ?: 'upload';
             $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
-            $storedFilename = $baseName.'_'.uniqid().$extensionSuffix;
+            $storedFilename = $baseName.'_'.Str::uuid().$extensionSuffix;
             $filePath = "{$tempPath}/{$storedFilename}";
 
             // Store the file
@@ -165,7 +165,7 @@ class ExternalAttachmentController extends Controller
             return response()->json(['error' => 'Invalid path'], 400);
         }
 
-        $path = $this->temporaryAttachments->ownedFilePath($clientPath, $request->user()?->id);
+        $path = $this->temporaryAttachments->ownedFilePath($clientPath, $this->temporaryAttachments->ownerForRequest($request));
         if ($path !== null && Storage::exists($path)) {
             Storage::delete($path);
 
@@ -193,7 +193,7 @@ class ExternalAttachmentController extends Controller
         ]);
 
         $tempIdentifier = $request->input('temp_identifier');
-        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $request->user()?->id);
+        $files = $this->temporaryAttachments->ownedFiles($tempIdentifier, $this->temporaryAttachments->ownerForRequest($request));
         $result = [];
 
         foreach ($files as $file) {
@@ -235,7 +235,7 @@ class ExternalAttachmentController extends Controller
             'mime_type' => 'nullable|string',
         ]);
 
-        abort_if($this->temporaryAttachments->claim($data['temp_identifier'], $request->user()?->id) === null, 404);
+        abort_if($this->temporaryAttachments->claim($data['temp_identifier'], $this->temporaryAttachments->ownerForRequest($request)) === null, 404);
 
         $uploadId = (string) Str::uuid();
         $dir = "temp_chunks/{$uploadId}";
@@ -252,7 +252,8 @@ class ExternalAttachmentController extends Controller
             'chunk_size' => ChunkedUploadConfig::CHUNK_SIZE_BYTES,
             'total_chunks' => $totalChunks,
             'created_at' => now()->toIso8601String(),
-            'user_id' => $request->user()?->id,
+            'version' => 2,
+            'owner' => $this->temporaryAttachments->fingerprint($this->temporaryAttachments->ownerForRequest($request)),
         ];
 
         Storage::put("{$dir}/meta.json", json_encode($meta));
@@ -376,7 +377,7 @@ class ExternalAttachmentController extends Controller
         }
 
         $tempIdentifier = (string) ($meta['temp_identifier'] ?? '');
-        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $request->user()?->id);
+        $tempPath = $this->temporaryAttachments->ownedDirectory($tempIdentifier, $this->temporaryAttachments->ownerForRequest($request));
         if ($tempPath === null) {
             return response()->json(['error' => 'Missing temp identifier'], 422);
         }
@@ -385,7 +386,7 @@ class ExternalAttachmentController extends Controller
         $baseName = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME)) ?: 'upload';
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
         $extensionSuffix = $extension !== '' && strtolower($extension) !== 'meta' ? '.'.$extension : '';
-        $storedFilename = $baseName.'_'.uniqid().$extensionSuffix;
+        $storedFilename = $baseName.'_'.Str::uuid().$extensionSuffix;
         $finalPath = "{$tempPath}/{$storedFilename}";
 
         $finalAbs = Storage::path($finalPath);
@@ -425,7 +426,7 @@ class ExternalAttachmentController extends Controller
      */
     public function showTemp(Request $request, string $temp, string $filename)
     {
-        $path = $this->temporaryAttachments->ownedRouteFilePath($temp, $filename, $request->user()?->id);
+        $path = $this->temporaryAttachments->ownedRouteFilePath($temp, $filename, $this->temporaryAttachments->ownerForRequest($request));
         if ($path === null || ! Storage::exists($path)) {
             abort(404, 'File not found');
         }
@@ -564,8 +565,10 @@ class ExternalAttachmentController extends Controller
 
         $metadata = json_decode(Storage::get($metaPath), true) ?: null;
         if (! is_array($metadata)
-            || ! isset($metadata['user_id'])
-            || ! hash_equals((string) request()->user()?->id, (string) $metadata['user_id'])) {
+            || ($metadata['version'] ?? null) !== 2
+            || ! is_string($metadata['owner'] ?? null)
+            || ($owner = $this->temporaryAttachments->ownerForRequest(request())) === null
+            || ! hash_equals($owner->fingerprint, $metadata['owner'])) {
             return null;
         }
 

@@ -170,11 +170,13 @@ test('portal retry after queue failure retains its persisted inline image', func
 
 test('external retries retain moved inline images and their SDK proxy URLs', function () {
     $identifier = 'external-thread-retry-'.Str::uuid();
-    $upload = $this->actingAs($this->author)->post(route('attachments.upload'), [
+    $token = $this->author->createToken('external-upload-retry')->plainTextToken;
+    $upload = $this->withToken($token)->post(route('api.attachments.upload'), [
+        ...$this->context,
         'file' => UploadedFile::fake()->image('external-proof.png'), 'temp_identifier' => $identifier,
     ])->assertOk();
-    Sanctum::actingAs($this->author);
-    $payload = [...$this->payload, ...$this->context, 'content' => '<p><img src="'.$upload->json('url').'"></p>', 'temp_identifier' => $identifier];
+    $tempUrl = '/shift/api/attachments/temp/'.$identifier.'/'.basename($upload->json('path'));
+    $payload = [...$this->payload, ...$this->context, 'content' => '<p><img src="'.$tempUrl.'"></p>', 'temp_identifier' => $identifier];
     $url = route('api.task-threads.store', $this->task);
     $first = $this->postJson($url, $payload)->assertCreated();
     $second = $this->postJson($url, $payload)->assertCreated();

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrganisationRole;
+use App\Services\AttachmentCleanup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,11 @@ class Project extends Model
     use HasFactory;
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(fn (Project $project) => app(AttachmentCleanup::class)->forProject($project));
+    }
 
     protected $casts = [
         'external_widget_enabled' => 'boolean',

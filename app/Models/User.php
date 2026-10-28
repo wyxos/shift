@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AttachmentCleanup;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,6 +15,11 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::deleting(fn (User $user) => app(AttachmentCleanup::class)->forUser($user));
+    }
 
     /**
      * The attributes that are mass assignable.

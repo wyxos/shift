@@ -1,3 +1,4 @@
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import axios from 'axios';
 import type { Ref } from 'vue';
 import { ref } from 'vue';
@@ -16,7 +17,7 @@ interface ExistingAttachment {
 
 export function useTaskAttachments(initialAttachments: ExistingAttachment[] = []) {
     // Generate a unique identifier for temporary files
-    const tempIdentifier: Ref<string> = ref(Date.now().toString());
+    const tempIdentifier: Ref<string> = ref(createUploadIdentifier());
     const uploadedFiles: Ref<AttachmentFile[]> = ref([]);
     const existingAttachments: Ref<ExistingAttachment[]> = ref([...initialAttachments]);
     const deletedAttachmentIds: Ref<number[]> = ref([]);

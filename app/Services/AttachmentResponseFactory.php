@@ -31,7 +31,19 @@ class AttachmentResponseFactory
         ?string $disposition = null,
         ?string $filename = null,
     ): StreamedResponse {
+        $safeInlineTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+        if (! in_array(strtolower($mimeType), $safeInlineTypes, true)) {
+            $disposition = ResponseHeaderBag::DISPOSITION_ATTACHMENT;
+            $filename ??= basename($path);
+            if (in_array(strtolower($mimeType), ['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/xml'], true)) {
+                $mimeType = 'application/octet-stream';
+            }
+        }
+
         $headers = [
+            'Cache-Control' => 'no-store, private',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+            'X-Content-Type-Options' => 'nosniff',
             'Content-Type' => $mimeType,
             'Content-Length' => (string) Storage::size($path),
         ];

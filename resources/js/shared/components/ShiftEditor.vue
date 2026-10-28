@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
@@ -88,7 +89,7 @@ const props = withDefaults(
     },
 );
 
-const tempIdentifier = ref<string>(props.tempIdentifier ?? Date.now().toString());
+const tempIdentifier = ref<string>(props.tempIdentifier ?? createUploadIdentifier());
 const hasUploadPlaceholder = ref(false);
 const editorFocused = ref(false);
 const hasAiImprovableText = ref(containsAiImprovableText(resolveEditorContent(props.modelValue)));

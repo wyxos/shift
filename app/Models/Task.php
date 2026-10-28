@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\RequirementStatus;
 use App\Enums\TaskCollaboratorKind;
+use App\Services\AttachmentCleanup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -133,18 +134,7 @@ class Task extends Model
      */
     protected static function booted(): void
     {
-        static::deleting(function ($task) {
-            // Delete all attachments associated with this task
-            foreach ($task->attachments as $attachment) {
-                // Delete the file from storage if it exists
-                if (\Illuminate\Support\Facades\Storage::exists($attachment->path)) {
-                    \Illuminate\Support\Facades\Storage::delete($attachment->path);
-                }
-
-                // Delete the attachment record
-                $attachment->delete();
-            }
-        });
+        static::deleting(fn (Task $task) => app(AttachmentCleanup::class)->forTask($task));
     }
 
     public function project(): BelongsTo
