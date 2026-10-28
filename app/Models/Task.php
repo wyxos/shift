@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Spatie\Activitylog\Contracts\Activity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -49,6 +50,29 @@ class Task extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $metadataFields = [
+            'status', 'priority', 'project_id', 'submitter_type', 'submitter_id',
+            'error_signature', 'error_occurrences_count', 'error_last_seen_at',
+        ];
+        $properties = $activity->properties;
+        $changes = array_merge($properties->get('old', []), $properties->get('attributes', []));
+        $safeProperties = ['changed_fields' => array_values(array_intersect(
+            array_keys($changes),
+            ['title', 'description', ...$metadataFields],
+        ))];
+
+        foreach (['attributes', 'old'] as $key) {
+            $values = array_intersect_key($properties->get($key, []), array_flip($metadataFields));
+            if ($values !== []) {
+                $safeProperties[$key] = $values;
+            }
+        }
+
+        $activity->properties = collect($safeProperties);
     }
 
     /**
