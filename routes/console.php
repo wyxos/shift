@@ -13,3 +13,8 @@ Schedule::command('attachments:clean-temp')
     ->timezone(config('app.timezone'))
     ->withoutOverlapping(60)
     ->onOneServer();
+
+Schedule::command('model:prune', ['--model' => [App\Models\McpRefreshRecovery::class]])
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();

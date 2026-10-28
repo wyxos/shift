@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Mcp\AccessTokenController;
 use App\Http\Controllers\Mcp\OAuthAuthorizationServerController;
 use App\Http\Controllers\Mcp\OAuthProtectedResourceController;
 use App\Http\Controllers\Mcp\RegisterOAuthClientController;
@@ -11,7 +12,6 @@ use App\Mcp\Support\ShiftMcpAccess;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Server\Middleware\ReorderJsonAccept;
-use Laravel\Passport\Http\Controllers\AccessTokenController;
 use Laravel\Passport\Http\Controllers\ApproveAuthorizationController;
 use Laravel\Passport\Http\Controllers\AuthorizationController;
 use Laravel\Passport\Http\Controllers\DenyAuthorizationController;
