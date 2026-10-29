@@ -127,6 +127,22 @@ describe('TaskErrorOccurrencesPane', () => {
         expect(wrapper.find('[data-testid="error-occurrence-stack"]').exists()).toBe(false);
     });
 
+    it('keeps fatal error summaries concise while retaining the complete diagnostic message and release', () => {
+        const state = makeState();
+        const summary = 'Uncaught Error: Call to undefined function Symfony\\Component\\ErrorHandler\\highlight_file()';
+        const message = `${summary} Stack trace: #0 /app/vendor/trace.php(36): render() #1 /app/public/index.php(20): handle() thrown`;
+        const sha = '7e671aa394607f5a58f2790c92fd508df69be466';
+        Object.assign(state.errorOccurrences[0], { message, git_sha: sha });
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+
+        expect(wrapper.get('#error-event-trigger-31 .line-clamp-2').text()).toBe(summary);
+        expect(wrapper.get('[data-testid="error-occurrence-message"]').text()).toBe(summary);
+        expect(wrapper.get('[data-testid="error-occurrence-full-message"] pre').text()).toBe(message);
+        expect(wrapper.get('[data-testid="error-occurrence-full-message"]').attributes('open')).toBeUndefined();
+        expect(wrapper.get('[data-testid="error-occurrence-release"]').text()).toBe(sha.slice(0, 8));
+        expect(wrapper.get('[data-testid="error-occurrence-release"]').attributes('title')).toBe(sha);
+    });
+
     it('preserves API receipt order when event numbers differ and opens the first event on a new page', async () => {
         const state = reactive(makeState());
         state.errorOccurrences[0].number = 1;

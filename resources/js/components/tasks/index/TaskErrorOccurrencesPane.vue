@@ -55,6 +55,17 @@ const occurrenceName = (occurrence: TaskErrorOccurrence | null) => {
     return parts[parts.length - 1] || name;
 };
 
+const messageSummary = (occurrence: TaskErrorOccurrence) => {
+    return occurrence.message?.split(/\s+Stack trace:\s*/u)[0] || 'No message captured.';
+};
+
+const hasLongMessage = (occurrence: TaskErrorOccurrence) => {
+    return Boolean(
+        occurrence.message &&
+        (occurrence.message !== messageSummary(occurrence) || occurrence.message.length > 240 || occurrence.message.includes('\n')),
+    );
+};
+
 const formatTime = (value?: string | null) => {
     if (!value) return 'Unknown';
 
@@ -200,9 +211,11 @@ watch(
                                     formatTime(occurrence.received_at || occurrence.created_at)
                                 }}</span>
                             </span>
-                            <span class="text-muted-foreground line-clamp-2 block text-xs break-all">{{
-                                occurrence.message || 'No message captured.'
-                            }}</span>
+                            <span
+                                class="text-muted-foreground line-clamp-2 text-xs [overflow-wrap:anywhere] break-words"
+                                :data-testid="`error-event-summary-${occurrence.id}`"
+                                >{{ messageSummary(occurrence) }}</span
+                            >
                             <span
                                 v-if="notificationLabel(occurrence)"
                                 class="text-primary block text-xs font-medium"
@@ -227,19 +240,34 @@ watch(
                             role="region"
                         >
                             <div class="border-border/50 space-y-5 border-t px-4 py-5 sm:px-5" data-testid="error-occurrence-stack">
-                                <div class="border-border/50 flex min-w-0 flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between">
-                                    <p class="text-foreground min-w-0 text-sm break-all">{{ occurrence.message || 'No message captured.' }}</p>
-                                    <div class="flex min-w-0 flex-wrap gap-2 text-xs md:shrink-0">
+                                <div class="border-border/50 min-w-0 space-y-3 border-b pb-4">
+                                    <div class="flex min-w-0 flex-wrap items-center gap-2 text-xs">
                                         <span class="bg-muted text-muted-foreground rounded px-2 py-1" data-testid="error-occurrence-source-badge">
                                             {{ occurrence.source }}
                                         </span>
                                         <span
                                             v-if="occurrence.git_sha || occurrence.release"
-                                            class="bg-muted text-muted-foreground max-w-full rounded px-2 py-1 break-all"
+                                            class="bg-muted text-muted-foreground max-w-full truncate rounded px-2 py-1 font-mono"
+                                            :title="occurrence.git_sha || occurrence.release || undefined"
+                                            :aria-label="`Release ${occurrence.git_sha || occurrence.release}`"
+                                            data-testid="error-occurrence-release"
                                         >
-                                            {{ occurrence.git_sha || occurrence.release }}
+                                            {{ occurrence.git_sha ? occurrence.git_sha.slice(0, 8) : occurrence.release }}
                                         </span>
                                     </div>
+                                    <p class="text-foreground text-sm [overflow-wrap:anywhere] break-words" data-testid="error-occurrence-message">
+                                        {{ messageSummary(occurrence) }}
+                                    </p>
+                                    <details v-if="hasLongMessage(occurrence)" class="min-w-0" data-testid="error-occurrence-full-message">
+                                        <summary
+                                            class="text-muted-foreground focus-visible:ring-ring cursor-pointer rounded py-2 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
+                                        >
+                                            Full error message
+                                        </summary>
+                                        <pre
+                                            class="shift-scrollbar bg-muted/40 text-foreground mt-2 max-h-72 max-w-full overflow-auto rounded-md p-3 font-mono text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap"
+                                            >{{ occurrence.message }}</pre>
+                                    </details>
                                 </div>
 
                                 <div class="grid gap-5 py-1 lg:grid-cols-2">
