@@ -8,6 +8,7 @@ use App\Services\OrganisationTransfer\OrganisationTransferSelection;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Filesystem\Path;
 use Throwable;
 
 class ExportOrganisationTransfer extends Command
@@ -72,7 +73,7 @@ class ExportOrganisationTransfer extends Command
     {
         $requested = $this->option('output');
         if (is_string($requested) && $requested !== '') {
-            return str_starts_with($requested, '/') ? $requested : base_path($requested);
+            return Path::isAbsolute($requested) ? $requested : base_path($requested);
         }
 
         $slug = Str::slug((string) $organisation->name) ?: 'organisation-'.$organisation->getKey();
