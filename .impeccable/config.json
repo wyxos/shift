@@ -9,6 +9,12 @@
         "value": "arial",
         "createdAt": "2026-10-29T18:11:11.607Z",
         "reason": "Approved email mockup uses an email-safe Arial stack; web font loading is unsuitable for transactional mail."
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-10-29T18:26:35.338Z",
+        "reason": "Transactional email uses the approved Arial stack for broad email-client compatibility; website display-font guidance does not apply."
       }
     ]
   }
