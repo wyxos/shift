@@ -26,6 +26,9 @@ class Project extends Model
         'external_widget_enabled' => 'boolean',
         'external_widget_guest_submissions_enabled' => 'boolean',
         'mcp_enabled' => 'boolean',
+        'app_error_recurrence_enabled' => 'boolean',
+        'app_error_quiet_hours' => 'integer',
+        'app_error_daily_summary_enabled' => 'boolean',
     ];
 
     /**

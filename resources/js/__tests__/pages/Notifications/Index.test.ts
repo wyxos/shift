@@ -375,4 +375,14 @@ describe('Notifications/Index.vue', () => {
             description: 'The previous statuses were restored. Please try again.',
         });
     });
+    it('shows daily error summary notifications with their project link', () => {
+        const wrapper = mountPage([
+            createNotification({
+                type: 'App\\Notifications\\AppErrorSummaryNotification',
+                data: { task_title: 'Example · Daily error summary', project_name: 'Example', url: '/error-reports?project_id=7' },
+            }),
+        ]);
+        expect(wrapper.get('a[href="/error-reports?project_id=7"]').text()).toBe('Example · Daily error summary');
+        expect(wrapper.text()).toContain('Daily error activity in project: Example');
+    });
 });

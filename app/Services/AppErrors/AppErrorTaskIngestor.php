@@ -32,15 +32,14 @@ class AppErrorTaskIngestor
     public function record(Project $project, User $sender, array $payload): array
     {
         $signature = $this->signature->build($project, $payload);
-        $receivedAt = now();
         $occurredAt = $this->occurredAt($payload);
         $scrubbedPayload = $this->scrubber->scrubArray($payload);
         $message = $this->message($payload);
 
         try {
-            return $this->recordOccurrence($project, $sender, $signature, $receivedAt, $occurredAt, $scrubbedPayload, $message);
+            return $this->recordOccurrence($project, $sender, $signature, $occurredAt, $scrubbedPayload, $message);
         } catch (UniqueConstraintViolationException) {
-            return $this->recordOccurrence($project, $sender, $signature, $receivedAt, $occurredAt, $scrubbedPayload, $message);
+            return $this->recordOccurrence($project, $sender, $signature, $occurredAt, $scrubbedPayload, $message);
         }
     }
 
@@ -48,19 +47,18 @@ class AppErrorTaskIngestor
         Project $project,
         User $sender,
         array $signature,
-        Carbon $receivedAt,
         ?Carbon $occurredAt,
         array $scrubbedPayload,
         ?string $message,
     ): array {
-        [$task, $occurrence, $notificationReason] = DB::transaction(function () use ($project, $sender, $signature, $receivedAt, $occurredAt, $scrubbedPayload, $message) {
+        [$task, $occurrence, $notificationReason] = DB::transaction(function () use ($project, $sender, $signature, $occurredAt, $scrubbedPayload, $message) {
             $task = Task::query()
                 ->where('project_id', $project->id)
                 ->where('error_signature', $signature['signature'])
                 ->lockForUpdate()
                 ->first();
 
-            $notificationReason = null;
+            $receivedAt = now();
 
             if (! $task instanceof Task) {
                 $task = new Task([
@@ -73,10 +71,16 @@ class AppErrorTaskIngestor
                     'error_occurrences_count' => 0,
                 ]);
                 $task->submitter()->associate($sender);
-                $notificationReason = 'created';
-            } elseif ($task->status === TaskStatus::Completed->value) {
+            }
+
+            $notificationReason = app(AppErrorRecurrence::class)->reason($project, $task, $receivedAt);
+
+            if ($notificationReason === 'reopened') {
                 $task->status = TaskStatus::Pending->value;
-                $notificationReason = 'reopened';
+            }
+
+            if ($notificationReason !== null) {
+                $task->error_last_alert_at = $receivedAt;
             }
 
             $occurrenceNumber = ((int) $task->error_occurrences_count) + 1;
@@ -110,6 +114,8 @@ class AppErrorTaskIngestor
 
             $occurrence = $task->errorOccurrences()->create([
                 'number' => $occurrenceNumber,
+                'notification_reason' => $notificationReason,
+                'notification_status' => $notificationReason !== null ? 'pending' : null,
                 'source' => $signature['source'],
                 'environment' => $signature['environment'],
                 'release' => $signature['release'],
@@ -134,16 +140,24 @@ class AppErrorTaskIngestor
             ]);
 
             return [$task->refresh(), $occurrence->refresh(), $notificationReason];
-        });
+        }, 5);
 
-        if ($notificationReason !== null) {
-            $this->notifyConfiguredRecipients($task, $notificationReason);
-        }
+        DB::afterCommit(function () use ($task, $occurrence, $notificationReason): void {
+            if ($notificationReason !== null) {
+                $this->notifyConfiguredRecipients($task, $occurrence, $notificationReason);
+            }
+
+            try {
+                app(AppErrorSummaryScheduler::class)->schedule($task->project);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
 
         return [$task, $occurrence];
     }
 
-    private function notifyConfiguredRecipients(Task $task, string $reason): void
+    private function notifyConfiguredRecipients(Task $task, TaskErrorOccurrence $occurrence, string $reason): void
     {
         $task->loadMissing('project');
 
@@ -154,12 +168,16 @@ class AppErrorTaskIngestor
         $recipients = $this->notifications->recipients($task->project);
 
         if ($recipients->isEmpty()) {
+            $occurrence->update(['notification_status' => 'no_recipients']);
+
             return;
         }
 
         try {
-            Notification::send($recipients, new AppErrorReportedNotification($task, $reason));
+            Notification::send($recipients, (new AppErrorReportedNotification($task, $reason))->afterCommit());
+            $occurrence->update(['notification_status' => 'queued', 'notification_queued_at' => now()]);
         } catch (Throwable $exception) {
+            $occurrence->update(['notification_status' => 'failed']);
             report($exception);
 
             Log::warning('Failed to dispatch app error notification.', [

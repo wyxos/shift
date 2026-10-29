@@ -76,6 +76,11 @@ class ListTaskErrorOccurrencesTool extends Tool
                     ],
                     'occurred_at' => $occurrence->occurred_at?->toIso8601String(),
                     'received_at' => $occurrence->received_at?->toIso8601String(),
+                    'notification' => $occurrence->notification_reason === null ? null : [
+                        'reason' => $occurrence->notification_reason,
+                        'status' => $occurrence->notification_status,
+                        'queued_at' => $occurrence->notification_queued_at?->toIso8601String(),
+                    ],
                     'stacktrace' => $occurrence->stacktrace ?? [],
                     'context' => $occurrence->context ?? [],
                     'user' => $occurrence->user ?? [],

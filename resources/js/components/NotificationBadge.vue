@@ -221,6 +221,8 @@ const getNotificationTitle = (notification: NotificationItem) => {
     switch (type) {
         case 'TaskCreationNotification':
             return `New Task: ${data.task_title}`;
+        case 'AppErrorSummaryNotification':
+            return data.task_title ?? 'Daily error summary';
         case 'AppErrorReportedNotification':
             return data.task_title ?? 'Application error';
         case 'TaskThreadUpdated':

@@ -29,6 +29,7 @@ class Task extends Model
     protected $casts = [
         'error_first_seen_at' => 'datetime',
         'error_last_seen_at' => 'datetime',
+        'error_last_alert_at' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

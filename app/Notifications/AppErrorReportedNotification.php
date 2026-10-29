@@ -53,7 +53,7 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
 
         $project = Project::query()->find($this->task->project_id);
 
-        if (! $project instanceof Project) {
+        if (! $project instanceof Project || ($this->reason === 'recurring' && ! $project->app_error_recurrence_enabled)) {
             return false;
         }
 
@@ -68,9 +68,13 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $event = $this->reason === 'reopened' ? 'Reopened' : 'Reported';
-        $subject = $event === 'Reopened'
-            ? $this->task->project->name.' Reopened - '.$this->task->title
+        $event = match ($this->reason) {
+            'reopened' => 'Reopened',
+            'recurring' => 'Recurring',
+            default => 'Reported',
+        };
+        $subject = $event !== 'Reported'
+            ? $this->task->project->name.' '.$event.' - '.$this->task->title
             : $this->task->project->name.' - '.$this->task->title;
 
         $message = (new MailMessage)
@@ -78,6 +82,10 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
             ->greeting($this->task->title)
             ->line('Project: '.$this->task->project->name)
             ->line('Event: '.$event);
+
+        if ($this->reason === 'recurring') {
+            $message->line('This open error has returned after a quiet period. Further retries are recorded silently.');
+        }
 
         if (filled($this->task->error_environment)) {
             $message->line('Environment: '.$this->task->error_environment);

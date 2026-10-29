@@ -142,6 +142,8 @@ const getNotificationTitle = (notification: Notification): string => {
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
             return `New Task: ${data.task_title}`;
+        case 'App\\Notifications\\AppErrorSummaryNotification':
+            return data.task_title ?? 'Daily error summary';
         case 'App\\Notifications\\AppErrorReportedNotification':
             return data.task_title ?? 'Application error';
         case 'App\\Notifications\\TaskThreadUpdated':
@@ -200,6 +202,8 @@ const getNotificationDescription = (notification: Notification): string => {
     switch (type) {
         case 'App\\Notifications\\TaskCreationNotification':
             return `Task created in project: ${data.project_name}`;
+        case 'App\\Notifications\\AppErrorSummaryNotification':
+            return `Daily error activity in project: ${data.project_name}`;
         case 'App\\Notifications\\AppErrorReportedNotification':
             return `App error reported in project: ${data.project_name}`;
         case 'App\\Notifications\\TaskThreadUpdated':

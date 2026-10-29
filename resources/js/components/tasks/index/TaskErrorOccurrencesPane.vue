@@ -61,6 +61,23 @@ const formatTime = (value?: string | null) => {
     return value.replace('T', ' ').slice(0, 16);
 };
 
+const notificationLabel = (occurrence: TaskErrorOccurrence): string | null => {
+    const notification = occurrence.notification;
+    if (!notification) return null;
+    const reason =
+        notification.reason === 'recurring' ? 'Recurrence alert' : notification.reason === 'reopened' ? 'Reopened alert' : 'New error alert';
+    switch (notification.status) {
+        case 'queued':
+            return `${reason} queued`;
+        case 'failed':
+            return `${reason} could not be queued`;
+        case 'no_recipients':
+            return `${reason} · no recipients`;
+        default:
+            return `${reason} pending`;
+    }
+};
+
 const sourceLocationLabel = (occurrence: TaskErrorOccurrence | null) => {
     const file = occurrence?.culprit?.file;
 
@@ -186,6 +203,12 @@ watch(
                             <span class="text-muted-foreground line-clamp-2 block text-xs break-all">{{
                                 occurrence.message || 'No message captured.'
                             }}</span>
+                            <span
+                                v-if="notificationLabel(occurrence)"
+                                class="text-primary block text-xs font-medium"
+                                :data-testid="`error-event-notification-${occurrence.id}`"
+                                >{{ notificationLabel(occurrence) }}</span
+                            >
                             <span class="text-muted-foreground block truncate font-mono text-xs" :title="sourceLocationLabel(occurrence)">
                                 {{ sourceLocationLabel(occurrence) }}
                             </span>

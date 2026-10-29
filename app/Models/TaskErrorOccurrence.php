@@ -17,6 +17,7 @@ class TaskErrorOccurrence extends Model
         'metadata' => 'array',
         'occurred_at' => 'datetime',
         'received_at' => 'datetime',
+        'notification_queued_at' => 'datetime',
     ];
 
     public function task(): BelongsTo

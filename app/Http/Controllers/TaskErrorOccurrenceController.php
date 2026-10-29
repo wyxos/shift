@@ -42,6 +42,11 @@ class TaskErrorOccurrenceController extends Controller
         return [
             'id' => $occurrence->id,
             'number' => $occurrence->number,
+            'notification' => $occurrence->notification_reason === null ? null : [
+                'reason' => $occurrence->notification_reason,
+                'status' => $occurrence->notification_status,
+                'queued_at' => $occurrence->notification_queued_at?->toIso8601String(),
+            ],
             'source' => $occurrence->source,
             'environment' => $occurrence->environment,
             'release' => $occurrence->release,

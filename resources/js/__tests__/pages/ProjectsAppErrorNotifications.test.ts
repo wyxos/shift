@@ -74,6 +74,13 @@ vi.mock('@/components/ui/checkbox', () => ({
     },
 }));
 
+vi.mock('@/components/ui/select', () => ({
+    Select: {
+        props: ['modelValue', 'disabled', 'options', 'testId'],
+        template: '<button :data-testid="testId" :disabled="disabled">{{ modelValue }}</button>',
+    },
+}));
+
 vi.mock('@/components/ui/badge', () => ({
     Badge: {
         template: '<span v-bind="$attrs"><slot /></span>',
@@ -208,6 +215,8 @@ describe('Projects app error notifications', () => {
 
         expect(wrapper.get('[data-testid="project-app-error-notifications-count"]').text()).toContain('1 selected');
 
+        expect(wrapper.get('[data-testid="project-error-quiet-hours"]').attributes('type')).toBe('number');
+        expect(wrapper.get('[data-testid="project-error-summary-timezone"]').text()).toBe('UTC');
         await wrapper.get('[data-testid="project-app-error-notification-user-8-checkbox"]').setValue(true);
         await wrapper.get('[data-testid="save-app-error-notifications"]').trigger('click');
         await flushPromises();
@@ -220,6 +229,13 @@ describe('Projects app error notifications', () => {
             '/projects/1/app-error-notifications',
             {
                 user_ids: [7, 8],
+                settings: {
+                    recurrence_enabled: true,
+                    quiet_hours: 1,
+                    daily_summary_enabled: true,
+                    daily_summary_time: '09:00',
+                    daily_summary_timezone: 'UTC',
+                },
             },
             expect.objectContaining({ headers: { Accept: 'application/json' } }),
         );

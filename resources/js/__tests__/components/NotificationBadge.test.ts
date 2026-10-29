@@ -424,4 +424,23 @@ describe('NotificationBadge', () => {
 
         expect(wrapper.get('a[href="/dashboard"]').text()).toContain('New user registered: New User');
     });
+    it('shows the daily error summary title and project error link', async () => {
+        (globalThis as any).route = vi.fn((name: string) => `/${name}`);
+        axiosGetMock.mockResolvedValue({
+            data: {
+                notifications: [
+                    {
+                        id: 'daily-summary',
+                        type: 'AppErrorSummaryNotification',
+                        data: { task_title: 'Example · Daily error summary', url: '/error-reports?project_id=7' },
+                        created_at: 'just now',
+                    },
+                ],
+                count: 1,
+            },
+        });
+        const wrapper = mount(NotificationBadge);
+        await flushPromises();
+        expect(wrapper.get('a[href="/error-reports?project_id=7"]').text()).toContain('Example · Daily error summary');
+    });
 });

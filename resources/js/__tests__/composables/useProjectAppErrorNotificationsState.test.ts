@@ -90,4 +90,65 @@ describe('useProjectAppErrorNotificationsState', () => {
         expect(mocks.axiosPut).not.toHaveBeenCalled();
         expect(mocks.routerReload).not.toHaveBeenCalled();
     });
+    it('loads alert rules and preserves all edited values after a failed save', async () => {
+        const settings = {
+            recurrence_enabled: true,
+            quiet_hours: 3,
+            daily_summary_enabled: true,
+            daily_summary_time: '10:15',
+            daily_summary_timezone: 'Asia/Dubai',
+        };
+        mocks.axiosGet.mockResolvedValue({ data: { selected_user_ids: [7], users: [], settings } });
+        mocks.axiosPut.mockRejectedValueOnce({ response: { data: { errors: { 'settings.quiet_hours': ['Choose a valid quiet period.'] } } } });
+        const state = useProjectAppErrorNotificationsState();
+        await state.openAppErrorNotificationsModal({ id: 1, name: 'Project' } as any);
+        state.appErrorNotificationsForm.value.settings.quiet_hours = 4;
+        await state.saveAppErrorNotifications();
+        expect(state.appErrorNotificationsOpen.value).toBe(true);
+        expect(state.appErrorNotificationsForm.value.settings.quiet_hours).toBe(4);
+        expect(state.appErrorNotificationsForm.value.selected_user_ids).toEqual([7]);
+        expect(state.appErrorNotificationsError.value).toBe('Choose a valid quiet period.');
+        await state.saveAppErrorNotifications();
+        expect(mocks.axiosPut).toHaveBeenLastCalledWith(
+            '/projects/1/app-error-notifications',
+            { user_ids: [7], settings: { ...settings, quiet_hours: 4 } },
+            expect.anything(),
+        );
+        expect(state.appErrorNotificationsOpen.value).toBe(false);
+    });
+
+    it('does not let an older save close or overwrite a newly opened project', async () => {
+        const pendingSave = deferred<{ data: Record<string, never> }>();
+        mocks.axiosGet.mockResolvedValue({ data: { selected_user_ids: [], users: [] } });
+        const state = useProjectAppErrorNotificationsState();
+        await state.openAppErrorNotificationsModal({ id: 1, name: 'First' } as any);
+        mocks.axiosPut.mockReturnValueOnce(pendingSave.promise);
+        const save = state.saveAppErrorNotifications();
+        await state.openAppErrorNotificationsModal({ id: 2, name: 'Second' } as any);
+        pendingSave.resolve({ data: {} });
+        await save;
+        expect(state.appErrorNotificationsOpen.value).toBe(true);
+        expect(state.appErrorNotificationsForm.value.project_id).toBe(2);
+        expect(mocks.routerReload).not.toHaveBeenCalled();
+    });
+
+    it('keeps the settings visible when scheduling fails after persistence', async () => {
+        mocks.axiosGet.mockResolvedValue({ data: { selected_user_ids: [], users: [] } });
+        mocks.axiosPut.mockResolvedValueOnce({ data: { scheduling_warning: 'Settings saved; retry scheduling.' } });
+        const state = useProjectAppErrorNotificationsState();
+        await state.openAppErrorNotificationsModal({ id: 1, name: 'Project' } as any);
+        await state.saveAppErrorNotifications();
+        expect(state.appErrorNotificationsOpen.value).toBe(true);
+        expect(state.appErrorNotificationsLoading.value).toBe(false);
+        expect(state.appErrorNotificationsError.value).toBe('Settings saved; retry scheduling.');
+    });
+
+    it('rejects malformed remote rules and prevents saving unconfirmed defaults', async () => {
+        mocks.axiosGet.mockResolvedValue({ data: { selected_user_ids: [], users: [], settings: { quiet_hours: '1' } } });
+        const state = useProjectAppErrorNotificationsState();
+        await state.openAppErrorNotificationsModal({ id: 1, name: 'Project' } as any);
+        await state.saveAppErrorNotifications();
+        expect(state.appErrorNotificationsLoaded.value).toBe(false);
+        expect(mocks.axiosPut).not.toHaveBeenCalled();
+    });
 });

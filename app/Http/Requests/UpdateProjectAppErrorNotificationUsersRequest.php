@@ -31,6 +31,22 @@ class UpdateProjectAppErrorNotificationUsersRequest extends FormRequest
         return [
             'user_ids' => ['present', 'array'],
             'user_ids.*' => ['integer', 'min:1', 'distinct'],
+            'settings' => ['sometimes', 'array:recurrence_enabled,quiet_hours,daily_summary_enabled,daily_summary_time,daily_summary_timezone'],
+            'settings.recurrence_enabled' => ['sometimes', 'required', 'boolean'],
+            'settings.quiet_hours' => ['sometimes', 'required', 'integer', 'between:1,168'],
+            'settings.daily_summary_enabled' => ['sometimes', 'required', 'boolean'],
+            'settings.daily_summary_time' => ['sometimes', 'required', 'date_format:H:i'],
+            'settings.daily_summary_timezone' => ['sometimes', 'required', 'timezone'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'settings.quiet_hours.between' => 'Choose a quiet period between 1 and 168 hours.',
+            'settings.quiet_hours.integer' => 'The quiet period must be a whole number of hours.',
+            'settings.daily_summary_time.date_format' => 'Choose a valid daily summary time.',
+            'settings.daily_summary_timezone.timezone' => 'Choose a valid time zone.',
         ];
     }
 

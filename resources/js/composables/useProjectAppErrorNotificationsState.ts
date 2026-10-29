@@ -1,4 +1,9 @@
-import { type ProjectAppErrorNotificationSettings, type ProjectRow } from '@/components/admin/projects/project-shared';
+import {
+    defaultAppErrorAlertRules,
+    type ProjectAppErrorAlertRules,
+    type ProjectAppErrorNotificationSettings,
+    type ProjectRow,
+} from '@/components/admin/projects/project-shared';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref } from 'vue';
@@ -13,6 +18,7 @@ export function useProjectAppErrorNotificationsState() {
         project_name: '',
         selected_user_ids: [] as number[],
         users: [] as ProjectAppErrorNotificationSettings['users'],
+        settings: defaultAppErrorAlertRules(),
     });
     let appErrorNotificationsRequestId = 0;
 
@@ -23,6 +29,7 @@ export function useProjectAppErrorNotificationsState() {
             project_name: project.name,
             selected_user_ids: [],
             users: [],
+            settings: defaultAppErrorAlertRules(),
         };
         appErrorNotificationsError.value = null;
         appErrorNotificationsLoaded.value = false;
@@ -36,6 +43,7 @@ export function useProjectAppErrorNotificationsState() {
 
             if (!isCurrentAppErrorNotificationsRequest(requestId, project.id)) return;
 
+            appErrorNotificationsForm.value.settings = parseAlertRules(response.data.settings);
             appErrorNotificationsForm.value.selected_user_ids = (response.data.selected_user_ids ?? []).map(Number);
             appErrorNotificationsForm.value.users = response.data.users ?? [];
             appErrorNotificationsLoaded.value = true;
@@ -61,25 +69,91 @@ export function useProjectAppErrorNotificationsState() {
     async function saveAppErrorNotifications() {
         if (!appErrorNotificationsForm.value.project_id || !appErrorNotificationsLoaded.value || appErrorNotificationsLoading.value) return;
 
+        const projectId = appErrorNotificationsForm.value.project_id;
+        const requestId = ++appErrorNotificationsRequestId;
+        const rules = appErrorNotificationsForm.value.settings;
+        if (!Number.isInteger(rules.quiet_hours) || rules.quiet_hours < 1 || rules.quiet_hours > 168) {
+            appErrorNotificationsError.value = 'Choose a whole number between 1 and 168 hours.';
+            return;
+        }
+
         appErrorNotificationsLoading.value = true;
         appErrorNotificationsError.value = null;
 
         try {
-            await axios.put(
-                `/projects/${appErrorNotificationsForm.value.project_id}/app-error-notifications`,
+            const response = await axios.put<{ scheduling_warning?: string | null }>(
+                `/projects/${projectId}/app-error-notifications`,
                 {
-                    user_ids: appErrorNotificationsForm.value.selected_user_ids,
+                    user_ids: [...appErrorNotificationsForm.value.selected_user_ids],
+                    settings: { ...rules },
                 },
                 { headers: { Accept: 'application/json' } },
             );
+            if (!isCurrentAppErrorNotificationsRequest(requestId, projectId)) return;
+
+            if (typeof response.data.scheduling_warning === 'string' && response.data.scheduling_warning) {
+                appErrorNotificationsError.value = response.data.scheduling_warning;
+                return;
+            }
+
             closeAppErrorNotificationsModal();
             router.reload({ only: ['projects'] });
         } catch (error) {
+            if (!isCurrentAppErrorNotificationsRequest(requestId, projectId)) return;
+
             console.error('Error saving app error notification settings:', error);
-            appErrorNotificationsError.value = 'Unable to save notification settings right now.';
+            appErrorNotificationsError.value =
+                responseErrorMessage(error) ?? 'Unable to save notification settings right now. Your changes are kept here.';
         } finally {
-            appErrorNotificationsLoading.value = false;
+            if (isCurrentAppErrorNotificationsRequest(requestId, projectId) || !appErrorNotificationsOpen.value) {
+                appErrorNotificationsLoading.value = false;
+            }
         }
+    }
+
+    function parseAlertRules(value: unknown): ProjectAppErrorAlertRules {
+        if (value === undefined) return defaultAppErrorAlertRules();
+        if (
+            typeof value !== 'object' ||
+            value === null ||
+            !('recurrence_enabled' in value) ||
+            typeof value.recurrence_enabled !== 'boolean' ||
+            !('quiet_hours' in value) ||
+            typeof value.quiet_hours !== 'number' ||
+            !Number.isInteger(value.quiet_hours) ||
+            value.quiet_hours < 1 ||
+            value.quiet_hours > 168 ||
+            !('daily_summary_enabled' in value) ||
+            typeof value.daily_summary_enabled !== 'boolean' ||
+            !('daily_summary_time' in value) ||
+            typeof value.daily_summary_time !== 'string' ||
+            !/^([01]\d|2[0-3]):[0-5]\d$/.test(value.daily_summary_time) ||
+            !('daily_summary_timezone' in value) ||
+            typeof value.daily_summary_timezone !== 'string'
+        )
+            throw new Error('Invalid error alert settings.');
+
+        return {
+            recurrence_enabled: value.recurrence_enabled,
+            quiet_hours: value.quiet_hours,
+            daily_summary_enabled: value.daily_summary_enabled,
+            daily_summary_time: value.daily_summary_time,
+            daily_summary_timezone: value.daily_summary_timezone,
+        };
+    }
+
+    function responseErrorMessage(error: unknown): string | null {
+        if (typeof error !== 'object' || error === null || !('response' in error)) return null;
+        const response = error.response;
+        if (typeof response !== 'object' || response === null || !('data' in response)) return null;
+        const data = response.data;
+        if (typeof data !== 'object' || data === null || !('errors' in data)) return null;
+        const errors = data.errors;
+        if (typeof errors !== 'object' || errors === null) return null;
+        for (const messages of Object.values(errors)) {
+            if (Array.isArray(messages) && typeof messages[0] === 'string') return messages[0];
+        }
+        return null;
     }
 
     function isCurrentAppErrorNotificationsRequest(requestId: number, projectId: number) {

@@ -200,3 +200,21 @@ describe('TaskErrorOccurrencesPane', () => {
         expect(context).toContain('$gateway->capture($cart);');
     });
 });
+
+it('shows queued recurrence history without claiming delivery', () => {
+    const state = makeState();
+    Object.assign(state.errorOccurrences[0], { notification: { reason: 'recurring', status: 'queued' } });
+    const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+    expect(wrapper.get('[data-testid="error-event-notification-31"]').text()).toBe('Recurrence alert queued');
+    expect(wrapper.text()).not.toContain('alert sent');
+});
+
+it('distinguishes a missing notification audience from dispatch failure', async () => {
+    const state = makeState();
+    Object.assign(state.errorOccurrences[0], { notification: { reason: 'created', status: 'no_recipients' } });
+    const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+    expect(wrapper.get('[data-testid="error-event-notification-31"]').text()).toBe('New error alert · no recipients');
+    Object.assign(state.errorOccurrences[1], { notification: { reason: 'reopened', status: 'failed' } });
+    await wrapper.setProps({ state: { ...state } });
+    expect(wrapper.get('[data-testid="error-event-notification-30"]').text()).toBe('Reopened alert could not be queued');
+});

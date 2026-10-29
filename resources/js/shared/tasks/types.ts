@@ -92,6 +92,11 @@ export type TaskDetail = Task & {
 };
 
 export type TaskErrorOccurrence = {
+    notification?: {
+        reason: 'created' | 'reopened' | 'recurring';
+        status: 'pending' | 'queued' | 'failed' | 'no_recipients';
+        queued_at?: string | null;
+    } | null;
     id: number;
     number: number;
     source: string;

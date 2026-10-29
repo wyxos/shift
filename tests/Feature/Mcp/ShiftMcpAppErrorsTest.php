@@ -118,3 +118,13 @@ test('mcp error event pagination validates bounds', function (array $arguments) 
     ShiftServer::actingAs($this->operator)->tool(ListTaskErrorOccurrencesTool::class, ['task_id' => $this->errorTask->id, ...$arguments])
         ->assertHasErrors();
 })->with([[['per_page' => 0]], [['per_page' => 21]], [['page' => 0]]]);
+
+test('mcp error events explain why a recurrence notification was queued', function () {
+    mcpErrorEvent($this->errorTask, 1, [
+        'notification_reason' => 'recurring',
+        'notification_status' => 'queued',
+        'notification_queued_at' => '2026-10-22 10:00:00',
+    ]);
+    ShiftServer::actingAs($this->operator)->tool(ListTaskErrorOccurrencesTool::class, ['task_id' => $this->errorTask->id])
+        ->assertOk()->assertSee(['"reason":"recurring"', '"status":"queued"', '"queued_at":"2026-10-22T10:00:00+00:00"']);
+});

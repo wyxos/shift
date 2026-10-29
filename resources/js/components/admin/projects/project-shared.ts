@@ -57,10 +57,29 @@ export type ProjectAppErrorNotificationUser = {
     email: string;
 };
 
+export type ProjectAppErrorAlertRules = {
+    recurrence_enabled: boolean;
+    quiet_hours: number;
+    daily_summary_enabled: boolean;
+    daily_summary_time: string;
+    daily_summary_timezone: string;
+};
+
+export function defaultAppErrorAlertRules(): ProjectAppErrorAlertRules {
+    return {
+        recurrence_enabled: true,
+        quiet_hours: 1,
+        daily_summary_enabled: true,
+        daily_summary_time: '09:00',
+        daily_summary_timezone: 'UTC',
+    };
+}
+
 export type ProjectAppErrorNotificationSettings = {
     project_id?: number;
     selected_user_ids: number[];
     users: ProjectAppErrorNotificationUser[];
+    settings?: ProjectAppErrorAlertRules;
 };
 
 export type SortBy = 'newest' | 'oldest' | 'name';
