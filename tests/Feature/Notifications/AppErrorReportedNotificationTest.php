@@ -46,7 +46,7 @@ it('renders app error mail with the error summary first', function () {
         ]);
 
     expect($html)
-        ->toContain('RuntimeException at vendor/symfony/console/Application.php:112')
-        ->toContain('Project: Example')
+        ->toContain('A new error was reported', 'RuntimeException', 'Application.php:112', 'Example', 'production')
         ->not->toContain('Hello!');
+    expect(strip_tags($html))->toContain('vendor/symfony/console/Application.php:112');
 });

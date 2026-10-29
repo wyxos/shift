@@ -95,7 +95,31 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
             $message->line('Occurrences: '.$this->task->error_occurrences_count);
         }
 
+        $title = explode(' at ', $this->task->title, 2);
+        $location = $this->task->error_culprit_file;
+        if (filled($location) && filled($this->task->error_culprit_line)) {
+            $location .= ':'.$this->task->error_culprit_line;
+        }
+
         return $message
+            ->markdown('notifications::email', [
+                'notificationType' => 'Error report',
+                'errorReport' => [
+                    'heading' => match ($this->reason) {
+                        'recurring' => 'An error has returned',
+                        'reopened' => 'An error has reopened',
+                        default => 'A new error was reported',
+                    },
+                    'event' => $event,
+                    'exception' => $this->task->error_exception_class
+                        ? class_basename($this->task->error_exception_class)
+                        : ($this->task->error_name ?: $title[0]),
+                    'location' => $location ?: ($title[1] ?? null),
+                    'project' => $this->task->project->name,
+                    'environment' => $this->task->error_environment,
+                    'occurrences' => $this->task->error_occurrences_count,
+                ],
+            ])
             ->action('View Task', $this->resolveUrl())
             ->line('Please do not reply to this email directly.');
     }

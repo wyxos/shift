@@ -1,13 +1,16 @@
-@props(['url'])
-
-@php
-    $brandName = trim($slot) === 'Laravel' ? 'SHIFT' : trim($slot);
-@endphp
+@props(['url', 'type' => 'Notification'])
 
 <tr>
-<td class="header">
-<a href="{{ $url }}" style="display: inline-block;">
-{{ $brandName }}
+<td class="header" bgcolor="#0f172a">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+<tr>
+<td>
+<a href="{{ $url }}" aria-label="SHIFT">
+<img src="{{ rtrim(config('app.url'), '/') }}/brand/shift-wordmark-email.png" width="124" height="31" class="logo" alt="SHIFT">
 </a>
+</td>
+<td class="notification-type" align="right">{{ $type }}</td>
+</tr>
+</table>
 </td>
 </tr>

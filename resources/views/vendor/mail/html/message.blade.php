@@ -1,3 +1,5 @@
+@props(['type' => 'Notification'])
+
 @php
     $brandName = config('app.name', 'SHIFT') === 'Laravel' ? 'SHIFT' : config('app.name', 'SHIFT');
 @endphp
@@ -5,7 +7,7 @@
 <x-mail::layout>
 {{-- Header --}}
 <x-slot:header>
-<x-mail::header :url="config('app.url')">
+<x-mail::header :url="config('app.url')" :type="$type">
 {{ $brandName }}
 </x-mail::header>
 </x-slot:header>
@@ -25,6 +27,7 @@
 {{-- Footer --}}
 <x-slot:footer>
 <x-mail::footer>
+{{ __('Sent by SHIFT') }}<br>
 © {{ date('Y') }} {{ $brandName }}. {{ __('All rights reserved.') }}
 </x-mail::footer>
 </x-slot:footer>

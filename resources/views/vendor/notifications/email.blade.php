@@ -1,8 +1,7 @@
-@php
-    $brandName = config('app.name', 'SHIFT') === 'Laravel' ? 'SHIFT' : config('app.name', 'SHIFT');
-@endphp
-
-<x-mail::message>
+<x-mail::message :type="$notificationType ?? 'Notification'">
+@isset($errorReport)
+<x-mail::error-report :report="$errorReport" />
+@else
 {{-- Greeting --}}
 @if (! empty($greeting))
 # {{ $greeting }}
@@ -19,6 +18,7 @@
 {{ $line }}
 
 @endforeach
+@endisset
 
 {{-- Action Button --}}
 @isset($actionText)
@@ -28,35 +28,31 @@
         default => 'primary',
     };
 ?>
-<x-mail::button :url="$actionUrl" :color="$color">
+<x-mail::button :url="$actionUrl" :color="$color" align="left">
 {{ $actionText }}
 </x-mail::button>
 @endisset
 
 {{-- Outro Lines --}}
 @foreach ($outroLines as $line)
+@if ($line === 'Please do not reply to this email directly.')
+<p class="notification-note">{{ $line }}</p>
+@else
 {{ $line }}
+@endif
 
 @endforeach
 
 {{-- Salutation --}}
 @if (! empty($salutation))
 {{ $salutation }}
-@else
-@lang('Regards,')<br>
-{{ $brandName }}
 @endif
 
 {{-- Subcopy --}}
 @isset($actionText)
 <x-slot:subcopy>
-@lang(
-    "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\n".
-    'into your web browser:',
-    [
-        'actionText' => $actionText,
-    ]
-) <span class="break-all">[{{ $displayableActionUrl }}]({{ $actionUrl }})</span>
+@lang('Or open this link in your browser:')<br>
+<span class="break-all">[{{ $displayableActionUrl }}]({{ $actionUrl }})</span>
 </x-slot:subcopy>
 @endisset
 </x-mail::message>

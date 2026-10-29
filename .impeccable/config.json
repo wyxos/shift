@@ -1,3 +1,15 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "createdAt": "2026-10-29T18:11:11.607Z",
+        "reason": "Approved email mockup uses an email-safe Arial stack; web font loading is unsuitable for transactional mail."
+      }
+    ]
+  }
 }
