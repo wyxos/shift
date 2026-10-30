@@ -101,11 +101,7 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
             ->markdown('notifications::email', [
                 'notificationType' => 'Error report',
                 'errorReport' => [
-                    'heading' => match ($this->reason) {
-                        'recurring' => 'Error detected again',
-                        'reopened' => 'Regression detected',
-                        default => 'A new error was reported',
-                    },
+                    'heading' => 'Exception detected',
                     'event' => $event,
                     'exception' => $this->task->error_exception_class
                         ? class_basename($this->task->error_exception_class)

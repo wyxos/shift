@@ -33,9 +33,9 @@ it('renders each error alert with structured details and an equivalent plain tex
         file_put_contents($directory.'/'.$reason.'.html', $html);
     }
 })->with([
-    'reported' => ['reported', 'A new error was reported', 'Reported'],
-    'recurring' => ['recurring', 'Error detected again', 'Recurring'],
-    'reopened' => ['reopened', 'Regression detected', 'Regressed'],
+    'reported' => ['reported', 'Exception detected', 'Reported'],
+    'recurring' => ['recurring', 'Exception detected', 'Recurring'],
+    'reopened' => ['reopened', 'Exception detected', 'Regressed'],
 ]);
 
 it('escapes error metadata and handles absent environment and source fields', function () {
