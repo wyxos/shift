@@ -102,6 +102,25 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskErrorOccurrencesPane', () => {
+    it('shows browser columns so minified bundle failures can be distinguished', () => {
+        const state = makeState();
+        Object.assign(state.errorOccurrences[0].stacktrace.frames[0], { file: '/shift-assets/workspace.js', line: 1, column: 9876 });
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+        expect(wrapper.get('[data-testid="error-occurrence-stack"]').text()).toContain('/shift-assets/workspace.js:1:9876');
+    });
+
+    it('identifies the SDK and installed version separately from the app release', () => {
+        const state = makeState();
+        state.errorOccurrences[0] = {
+            ...state.errorOccurrences[0],
+            metadata: { component: 'shift_sdk', sdk_version: '1.3.8', operation: 'save task', correlation_id: 'request-42' },
+        } as (typeof state.errorOccurrences)[0];
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+        expect(wrapper.get('[data-testid="error-occurrence-sdk"]').text()).toBe('SHIFT SDK · 1.3.8');
+        expect(wrapper.get('[data-testid="error-occurrence-sdk-context"]').text()).toContain('save task');
+        expect(wrapper.get('[data-testid="error-occurrence-sdk-context"]').text()).toContain('request-42');
+    });
+
     it('opens the latest event first and expands the event selected by its heading', async () => {
         const wrapper = mount(TaskErrorOccurrencesPane, {
             props: { state: makeState() },

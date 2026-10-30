@@ -36,6 +36,7 @@ class AppErrorController extends Controller
                 'id' => $task->id,
                 'signature' => $task->error_signature,
                 'source' => $task->error_source,
+                'component' => $task->error_component,
                 'environment' => $task->error_environment,
                 'status' => $task->status,
                 'priority' => $task->priority,

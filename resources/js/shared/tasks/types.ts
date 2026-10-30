@@ -78,6 +78,7 @@ export type TaskDetail = Task & {
     external_collaborators?: CollaboratorOption[];
     error_signature?: string | null;
     error_source?: string | null;
+    error_component?: string | null;
     error_environment?: string | null;
     error_release?: string | null;
     error_git_sha?: string | null;
@@ -134,6 +135,7 @@ export type TaskErrorOccurrence = {
 export type TaskErrorStackFrame = {
     file?: string | null;
     line?: number | null;
+    column?: number | null;
     function?: string | null;
     in_app?: boolean | null;
     context?: {
@@ -182,6 +184,7 @@ export type ThreadMention = {
 };
 
 export type TaskIndexFilters = {
+    component?: string | null;
     status?: string[] | string | null;
     priority?: string[] | string | null;
     search?: string | null;

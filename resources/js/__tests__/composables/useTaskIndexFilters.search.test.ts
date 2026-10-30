@@ -8,6 +8,24 @@ vi.mock('@inertiajs/vue3', () => ({
 }));
 
 describe('useTaskIndexFilters title search', () => {
+    it('preserves SDK classification through search and pagination and clears it on reset', () => {
+        const filters = useTaskIndexFilters({ surface: 'app-errors', filters: { component: 'shift_sdk' } });
+        expect(filters.activeFilterCount.value).toBe(1);
+        expect(filters.canResetFilters.value).toBe(true);
+        expect(filters.buildListQuery(3)).toMatchObject({ component: 'shift_sdk', page: 3 });
+        filters.searchTasks('save');
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/error-reports',
+            expect.objectContaining({ component: 'shift_sdk', search: 'save' }),
+            expect.anything(),
+        );
+        filters.setComponent('application');
+        expect(filters.buildListQuery(1)).toMatchObject({ component: 'application', search: 'save' });
+        filters.resetFilters();
+        expect(filters.buildListQuery(1)).not.toHaveProperty('component');
+        expect(filters.activeFilterCount.value).toBe(0);
+    });
+
     it('searches with applied filters while leaving unsaved sheet choices untouched', () => {
         const filters = useTaskIndexFilters({ filters: { search: 'original', priority: ['high'], environment: 'production' } });
         filters.filtersOpen.value = true;

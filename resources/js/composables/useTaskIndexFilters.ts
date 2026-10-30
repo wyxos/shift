@@ -3,6 +3,7 @@ import type { TaskIndexFilters, TaskIndexSurface } from '@/shared/tasks/types';
 import { useTaskFilterState } from '@/shared/tasks/useTaskFilterState';
 import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 type UseTaskIndexFiltersOptions = {
     filters: TaskIndexFilters;
@@ -18,6 +19,11 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
         completedStatuses: options.surface === 'requirements' ? [] : ['completed'],
         statusOptions: options.surface === 'requirements' ? getRequirementStatusOptions() : undefined,
     });
+    const appliedComponent = ref(
+        options.surface === 'app-errors' && ['shift_sdk', 'application'].includes(options.filters.component ?? '') ? options.filters.component! : '',
+    );
+    const activeFilterCount = computed(() => state.activeFilterCount.value + (appliedComponent.value ? 1 : 0));
+    const canResetFilters = computed(() => state.canResetFilters.value || Boolean(appliedComponent.value));
     const providedOrganisationId =
         typeof options.filters.organisation_id === 'number' || typeof options.filters.organisation_id === 'string'
             ? String(options.filters.organisation_id)
@@ -44,7 +50,10 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
     }
 
     function buildListQuery(page: number) {
-        const query = state.buildListQuery(page);
+        const query = {
+            ...state.buildListQuery(page),
+            ...(appliedComponent.value ? { component: appliedComponent.value } : {}),
+        };
 
         if (isScopedOrganisationRoute()) {
             return Object.fromEntries(Object.entries(query).filter(([key]) => key !== 'organisation_id'));
@@ -55,6 +64,7 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
 
     function resetFilters() {
         state.resetFilters();
+        appliedComponent.value = '';
         router.get(indexPath(), buildListQuery(1), { preserveState: true, preserveScroll: true, replace: true });
         state.filtersOpen.value = false;
     }
@@ -65,6 +75,11 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
         state.filtersOpen.value = false;
     }
 
+    function setComponent(value: string) {
+        appliedComponent.value = ['shift_sdk', 'application'].includes(value) ? value : '';
+        router.get(indexPath(), buildListQuery(1), { preserveState: true, preserveScroll: true, replace: true });
+    }
+
     function searchTasks(term: string) {
         state.appliedSearchTerm.value = term.trim();
         if (!state.filtersOpen.value) state.draftSearchTerm.value = state.appliedSearchTerm.value;
@@ -73,6 +88,10 @@ export function useTaskIndexFilters(options: UseTaskIndexFiltersOptions) {
 
     return {
         ...state,
+        activeFilterCount,
+        canResetFilters,
+        appliedComponent,
+        setComponent,
         applyFilters,
         buildListQuery,
         indexPath,

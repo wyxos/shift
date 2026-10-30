@@ -8,9 +8,12 @@ use Illuminate\Support\Str;
 
 class AppErrorSignature
 {
+    public function __construct(private readonly AppErrorScrubber $scrubber) {}
+
     /**
      * @return array{
      *     signature: string,
+     *     component: string|null,
      *     source: string,
      *     environment: string|null,
      *     release: string|null,
@@ -41,7 +44,24 @@ class AppErrorSignature
             'function' => $culpritFunction,
         ];
 
+        $component = Arr::get($payload, 'metadata.component') === 'shift_sdk' ? 'shift_sdk' : null;
+
+        if ($component !== null) {
+            $components['component'] = $component;
+            $components['surface'] = $this->nullableString(Arr::get($payload, 'metadata.surface'));
+            $components['operation'] = $this->nullableString(Arr::get($payload, 'metadata.operation') ?? Arr::get($payload, 'context.operation'));
+
+            if ($payload['source'] === 'ui') {
+                $components['column'] = $this->nullableInt($frame['column'] ?? null);
+            }
+
+            if ($culpritFile === null) {
+                $components['message'] = $this->fallbackMessage($payload);
+            }
+        }
+
         return [
+            'component' => $component,
             'signature' => hash('sha256', json_encode($components, JSON_THROW_ON_ERROR)),
             'source' => (string) $payload['source'],
             'environment' => $this->nullableString($payload['environment'] ?? null),
@@ -53,6 +73,23 @@ class AppErrorSignature
             'culprit_line' => $culpritLine,
             'culprit_function' => $culpritFunction,
         ];
+    }
+
+    private function fallbackMessage(array $payload): ?string
+    {
+        $message = $this->nullableString(Arr::get($payload, 'exception.message')
+            ?? Arr::get($payload, 'error.message') ?? Arr::get($payload, 'message'));
+        $message = $this->scrubber->scrubString($message, 4000);
+
+        if ($message === null) {
+            return null;
+        }
+
+        $message = preg_replace('/\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b/i', ':uuid', $message) ?? $message;
+        $message = preg_replace('/(?<=\/)\d+(?=\/|[?#\s]|$)/', ':id', $message) ?? $message;
+        $message = preg_replace('/\b((?:task|request|user|record|item|invoice)(?:[_ -]?id)?[ #:=]+)\d+\b/i', '$1:id', $message) ?? $message;
+
+        return trim(preg_replace('/\s+/', ' ', $message) ?? $message);
     }
 
     private function topFrame(mixed $frames): array

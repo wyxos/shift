@@ -117,7 +117,7 @@ const stackFrames = (occurrence: TaskErrorOccurrence | null): TaskErrorStackFram
 const frameLocation = (frame: TaskErrorStackFrame) => {
     const file = frame.file || '[unknown file]';
 
-    return `${file}${frame.line ? `:${frame.line}` : ''}`;
+    return `${file}${frame.line ? `:${frame.line}` : ''}${frame.column != null ? `:${frame.column}` : ''}`;
 };
 
 const frameContextLines = (frame: TaskErrorStackFrame) => {
@@ -246,6 +246,13 @@ watch(
                                             {{ occurrence.source }}
                                         </span>
                                         <span
+                                            v-if="occurrence.metadata?.component === 'shift_sdk'"
+                                            class="bg-muted text-muted-foreground rounded px-2 py-1"
+                                            data-testid="error-occurrence-sdk"
+                                        >
+                                            SHIFT SDK<span v-if="occurrence.metadata?.sdk_version"> · {{ occurrence.metadata.sdk_version }}</span>
+                                        </span>
+                                        <span
                                             v-if="occurrence.git_sha || occurrence.release"
                                             class="bg-muted text-muted-foreground max-w-full truncate rounded px-2 py-1 font-mono"
                                             :title="occurrence.git_sha || occurrence.release || undefined"
@@ -255,6 +262,20 @@ watch(
                                             {{ occurrence.git_sha ? occurrence.git_sha.slice(0, 8) : occurrence.release }}
                                         </span>
                                     </div>
+                                    <dl
+                                        v-if="occurrence.metadata?.component === 'shift_sdk'"
+                                        class="grid min-w-0 gap-2 text-xs sm:grid-cols-2"
+                                        data-testid="error-occurrence-sdk-context"
+                                    >
+                                        <div v-if="occurrence.metadata?.operation" class="min-w-0">
+                                            <dt class="text-muted-foreground">Operation</dt>
+                                            <dd class="font-mono break-all">{{ occurrence.metadata.operation }}</dd>
+                                        </div>
+                                        <div v-if="occurrence.metadata?.correlation_id" class="min-w-0">
+                                            <dt class="text-muted-foreground">Correlation ID</dt>
+                                            <dd class="font-mono break-all">{{ occurrence.metadata.correlation_id }}</dd>
+                                        </div>
+                                    </dl>
                                     <p class="text-foreground text-sm [overflow-wrap:anywhere] break-words" data-testid="error-occurrence-message">
                                         {{ messageSummary(occurrence) }}
                                     </p>

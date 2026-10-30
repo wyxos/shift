@@ -40,6 +40,7 @@ class StoreAppErrorRequest extends FormRequest
             'stacktrace.frames' => ['nullable', 'array', 'max:100'],
             'stacktrace.frames.*.file' => ['nullable', 'string', 'max:2048'],
             'stacktrace.frames.*.line' => ['nullable', 'integer', 'min:0'],
+            'stacktrace.frames.*.column' => ['nullable', 'integer', 'min:0'],
             'stacktrace.frames.*.function' => ['nullable', 'string', 'max:512'],
             'stacktrace.frames.*.in_app' => ['nullable', 'boolean'],
             'context' => ['nullable', 'array'],

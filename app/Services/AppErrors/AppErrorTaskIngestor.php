@@ -89,6 +89,7 @@ class AppErrorTaskIngestor
                 'title' => $this->title($signature),
                 'error_signature' => $signature['signature'],
                 'error_source' => $signature['source'],
+                'error_component' => $signature['component'],
                 'error_environment' => $signature['environment'],
                 'error_release' => $signature['release'],
                 'error_git_sha' => $signature['git_sha'],

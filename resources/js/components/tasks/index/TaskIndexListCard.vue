@@ -6,6 +6,7 @@ import ConfirmRequestDialog from '@shared/components/ConfirmRequestDialog.vue';
 import TaskListOverviewPanel from '@shared/components/tasks/TaskListOverviewPanel.vue';
 import { getTaskEnvironment } from '@shared/tasks/metadata';
 import { computed, ref, unref } from 'vue';
+import TaskErrorComponentFilter from './TaskErrorComponentFilter.vue';
 
 const props = defineProps<{
     filters: any;
@@ -235,6 +236,11 @@ async function confirmRequirementBatchFinalize() {
         :go-to-page="state.goToPage"
     >
         <template #actions>
+            <TaskErrorComponentFilter
+                v-if="surface === 'app-errors'"
+                :model-value="filters.appliedComponent"
+                @update:model-value="filters.setComponent"
+            />
             <TaskCreateSheet
                 v-if="surface !== 'app-errors' && createProjects.length > 0"
                 :projects="createProjects"
