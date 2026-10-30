@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskErrorOccurrence;
 use App\Models\User;
 use App\Notifications\AppErrorReportedNotification;
+use App\Services\AppErrors\SourceMaps\SdkSourceMapResolver;
 use App\Services\ProjectAppErrorNotificationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
@@ -31,6 +32,7 @@ class AppErrorTaskIngestor
      */
     public function record(Project $project, User $sender, array $payload): array
     {
+        $payload = app(SdkSourceMapResolver::class)->resolve($payload);
         $signature = $this->signature->build($project, $payload);
         $occurredAt = $this->occurredAt($payload);
         $scrubbedPayload = $this->scrubber->scrubArray($payload);

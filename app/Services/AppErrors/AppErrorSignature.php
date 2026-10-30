@@ -27,7 +27,17 @@ class AppErrorSignature
      */
     public function build(Project $project, array $payload): array
     {
-        $frame = $this->topFrame(Arr::get($payload, 'stacktrace.frames', []));
+        $frames = Arr::get($payload, 'stacktrace.frames', []);
+        if (Arr::get($payload, 'metadata.component') === 'shift_sdk' && ($payload['source'] ?? null) === 'ui') {
+            $resolved = array_values(array_filter(
+                Arr::get($payload, 'stacktrace.resolved_frames', []),
+                fn (array $frame): bool => ($frame['resolved'] ?? false) === true,
+            ));
+            if ($resolved !== []) {
+                $frames = $resolved;
+            }
+        }
+        $frame = $this->topFrame($frames);
         $exceptionClass = $this->nullableString(Arr::get($payload, 'exception.class'));
         $errorName = $this->nullableString(Arr::get($payload, 'error.name'));
         $culpritFile = $this->normalizeFile($frame['file'] ?? null);

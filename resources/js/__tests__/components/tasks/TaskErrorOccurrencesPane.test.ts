@@ -102,6 +102,41 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskErrorOccurrencesPane', () => {
+    it('shows original source with context and keeps the compiled position', async () => {
+        const state = makeState();
+        Object.assign(state.errorOccurrences[0], {
+            source: 'ui',
+            metadata: { component: 'shift_sdk', frontend_build_id: 'a'.repeat(64) },
+            stacktrace: {
+                frames: [{ file: '/shift-assets/workspace.js', line: 1, column: 450 }],
+                resolved_frames: [
+                    {
+                        resolved: true,
+                        file: 'ui/src/components/TaskList.vue',
+                        line: 20,
+                        column: 5,
+                        function: 'save',
+                        in_app: true,
+                        generated: { file: '/shift-assets/workspace.js', line: 1, column: 450 },
+                        context: {
+                            start_line: 19,
+                            lines: [
+                                { number: 19, text: 'const task = props.task;' },
+                                { number: 20, text: 'return task.title.trim();', active: true },
+                            ],
+                        },
+                    },
+                ],
+                resolution: { status: 'resolved', matched_frames: 1, total_frames: 1 },
+            },
+        });
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+        expect(wrapper.get('[data-testid="error-occurrence-stack"]').text()).toContain('ui/src/components/TaskList.vue:20:5');
+        expect(wrapper.get('[data-testid="error-frame-generated"]').text()).toContain('/shift-assets/workspace.js:1:450');
+        await wrapper.get('[data-testid="error-stack-frame-context-0"]').trigger('click');
+        expect(wrapper.get('[data-testid="error-stack-frame-context-lines-0"]').text()).toContain('return task.title.trim();');
+    });
+
     it('shows browser columns so minified bundle failures can be distinguished', () => {
         const state = makeState();
         Object.assign(state.errorOccurrences[0].stacktrace.frames[0], { file: '/shift-assets/workspace.js', line: 1, column: 9876 });

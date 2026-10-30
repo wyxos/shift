@@ -126,6 +126,8 @@ export type TaskErrorOccurrence = {
     payload?: Record<string, unknown>;
     stacktrace?: {
         frames?: TaskErrorStackFrame[];
+        resolved_frames?: TaskErrorStackFrame[];
+        resolution?: TaskErrorSourceResolution;
     };
     context?: Record<string, unknown>;
     user?: Record<string, unknown>;
@@ -138,6 +140,14 @@ export type TaskErrorStackFrame = {
     column?: number | null;
     function?: string | null;
     in_app?: boolean | null;
+    symbol?: string | null;
+    resolved?: boolean;
+    generated?: {
+        file?: string | null;
+        line?: number | null;
+        column?: number | null;
+        function?: string | null;
+    };
     context?: {
         start_line?: number | null;
         lines?: Array<{
@@ -146,6 +156,17 @@ export type TaskErrorStackFrame = {
             active?: boolean | null;
         }>;
     } | null;
+};
+
+export type TaskErrorSourceResolution = {
+    status: string;
+    build_id?: string | null;
+    matched_frames?: number;
+    total_frames?: number;
+    sdk_revision?: string | null;
+    portal_revision?: string | null;
+    sdk_dirty?: boolean | null;
+    portal_dirty?: boolean | null;
 };
 
 export type TaskErrorOccurrencePagination = {

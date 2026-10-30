@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TaskErrorSourceMapStatus from '@/components/tasks/index/TaskErrorSourceMapStatus.vue';
 import { Button } from '@/components/ui/button';
 import type { TaskErrorOccurrence, TaskErrorStackFrame } from '@/shared/tasks/types';
 import { ChevronDown } from 'lucide-vue-next';
@@ -109,6 +110,10 @@ const hasObjectValues = (value: unknown) => {
 };
 
 const stackFrames = (occurrence: TaskErrorOccurrence | null): TaskErrorStackFrame[] => {
+    const resolved = occurrence?.stacktrace?.resolved_frames;
+    if (Array.isArray(resolved) && resolved.some((frame) => frame.resolved === true)) {
+        return resolved;
+    }
     const frames = occurrence?.stacktrace?.frames;
 
     return Array.isArray(frames) ? frames : [];
@@ -276,6 +281,11 @@ watch(
                                             <dd class="font-mono break-all">{{ occurrence.metadata.correlation_id }}</dd>
                                         </div>
                                     </dl>
+                                    <TaskErrorSourceMapStatus
+                                        v-if="occurrence.metadata?.component === 'shift_sdk' && occurrence.source === 'ui'"
+                                        :build-id="occurrence.metadata?.frontend_build_id"
+                                        :resolution="occurrence.stacktrace?.resolution"
+                                    />
                                     <p class="text-foreground text-sm [overflow-wrap:anywhere] break-words" data-testid="error-occurrence-message">
                                         {{ messageSummary(occurrence) }}
                                     </p>
@@ -335,9 +345,16 @@ watch(
                                         >
                                             <div class="min-w-0">
                                                 <div class="text-foreground truncate font-mono text-xs">
-                                                    {{ frame.function || '(anonymous)' }}
+                                                    {{ frame.symbol || frame.function || '(anonymous)' }}
                                                 </div>
                                                 <div class="text-muted-foreground mt-1 font-mono text-xs break-all">{{ frameLocation(frame) }}</div>
+                                                <div
+                                                    v-if="frame.resolved && frame.generated"
+                                                    class="text-muted-foreground mt-1 font-mono text-xs break-all"
+                                                    data-testid="error-frame-generated"
+                                                >
+                                                    Compiled: {{ frameLocation(frame.generated) }}
+                                                </div>
                                                 <button
                                                     v-if="hasFrameContext(frame)"
                                                     class="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-2 rounded text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
@@ -364,6 +381,9 @@ watch(
                                                 </div>
                                             </div>
                                             <div class="flex items-start gap-2">
+                                                <span v-if="frame.resolved" class="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs"
+                                                    >Original</span
+                                                >
                                                 <span
                                                     v-if="frame.in_app"
                                                     class="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100"
