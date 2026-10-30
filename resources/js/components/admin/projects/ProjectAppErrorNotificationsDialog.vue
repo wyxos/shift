@@ -38,7 +38,7 @@ const emit = defineEmits<{
 }>();
 
 const selectedCount = computed(() => form.selected_user_ids.length);
-const quietPeriodInvalid = computed(
+const cooldownInvalid = computed(
     () => !Number.isInteger(form.settings.quiet_hours) || form.settings.quiet_hours < 1 || form.settings.quiet_hours > 168,
 );
 const timezoneOptions = computed(() => {
@@ -82,7 +82,7 @@ function toggleUser(userId: number, selected: boolean) {
                         </div>
                         <div class="space-y-3 border-t pt-4">
                             <label class="flex min-h-11 items-center justify-between gap-4 text-sm font-medium" for="error-recurrence-enabled">
-                                Returning open errors
+                                Repeat alerts for open errors
                                 <Checkbox
                                     id="error-recurrence-enabled"
                                     :disabled="loading"
@@ -92,10 +92,10 @@ function toggleUser(userId: number, selected: boolean) {
                                 />
                             </label>
                             <p class="text-muted-foreground text-sm">
-                                Alert when an open error returns after a quiet period. Repeated events and retries stay in its history.
+                                Alert on the next occurrence after the cooldown ends. Repeated events do not restart the cooldown.
                             </p>
                             <div class="flex flex-wrap items-center gap-3">
-                                <label class="text-sm" for="error-quiet-hours">Quiet period</label>
+                                <label class="text-sm" for="error-quiet-hours">Alert cooldown</label>
                                 <Input
                                     id="error-quiet-hours"
                                     class="w-20"
@@ -105,18 +105,18 @@ function toggleUser(userId: number, selected: boolean) {
                                     step="1"
                                     :disabled="loading || !form.settings.recurrence_enabled"
                                     :model-value="form.settings.quiet_hours"
-                                    :aria-invalid="quietPeriodInvalid"
+                                    :aria-invalid="cooldownInvalid"
                                     aria-describedby="error-quiet-help"
                                     data-testid="project-error-quiet-hours"
                                     @update:model-value="form.settings.quiet_hours = Number($event)"
                                 />
                                 <span class="text-sm">{{ form.settings.quiet_hours === 1 ? 'hour' : 'hours' }}</span>
                             </div>
-                            <p id="error-quiet-help" :class="quietPeriodInvalid ? 'text-destructive' : 'text-muted-foreground'" class="text-xs">
+                            <p id="error-quiet-help" :class="cooldownInvalid ? 'text-destructive' : 'text-muted-foreground'" class="text-xs">
                                 {{
-                                    quietPeriodInvalid
+                                    cooldownInvalid
                                         ? 'Choose a whole number between 1 and 168 hours.'
-                                        : 'Default: 1 hour. At most one recurrence alert per error during this period.'
+                                        : 'Default: 1 hour. Measured from the last alert for each error.'
                                 }}
                             </p>
                         </div>
@@ -197,7 +197,7 @@ function toggleUser(userId: number, selected: boolean) {
                 <Button type="button" variant="outline" :disabled="loading" @click="updateOpen(false)">Cancel</Button>
                 <RequestButton
                     type="button"
-                    :disabled="!loaded || quietPeriodInvalid"
+                    :disabled="!loaded || cooldownInvalid"
                     :loading="loading"
                     loading-label="Saving..."
                     data-testid="save-app-error-notifications"

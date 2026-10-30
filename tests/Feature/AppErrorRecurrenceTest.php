@@ -38,19 +38,43 @@ it('alerts once when an open error returns at the default one hour boundary', fu
         ->and(Task::query()->sole()->error_occurrences_count)->toBe(3);
 });
 
-it('measures silence from the latest received event rather than the latest alert', function () {
+it('alerts at each cooldown boundary while the error continues every five minutes', function (int $hours) {
+    $this->alertProject->update(['app_error_quiet_hours' => $hours]);
     $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
-    foreach ([59, 59, 59] as $minutes) {
-        $this->travel($minutes)->minutes();
+
+    for ($event = 1; $event <= $hours * 24; $event++) {
+        $this->travel(5)->minutes();
         $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+        Notification::assertSentToTimes(
+            $this->alertUser,
+            AppErrorReportedNotification::class,
+            1 + intdiv($event, $hours * 12),
+        );
     }
+
+    expect(Task::query()->sole()->error_occurrences_count)->toBe(1 + $hours * 24);
+})->with([1, 5]);
+
+it('waits for the next event after cooldown and starts the next cooldown from that alert', function () {
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    $this->travel(59)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
     Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 1);
-    $this->travel(60)->minutes();
+
+    $this->travel(2)->minutes();
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 1);
     $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
     Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 2);
+
+    $this->travel(59)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 2);
+    $this->travel(1)->minute();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 3);
 });
 
-it('uses the project quiet period and ignores client occurrence timestamps', function () {
+it('uses the project cooldown and ignores client occurrence timestamps', function () {
     $this->alertProject->update(['app_error_quiet_hours' => 3]);
     $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
     $this->travel(2)->hours();
@@ -59,6 +83,36 @@ it('uses the project quiet period and ignores client occurrence timestamps', fun
     $this->travel(3)->hours();
     $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
     Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 2);
+});
+
+it('starts a cooldown on the next event for an existing error without alert history', function () {
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    Task::query()->sole()->update(['error_last_alert_at' => null]);
+    $this->travel(5)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    $this->travel(5)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 2);
+    expect(Task::query()->sole()->error_last_alert_at->equalTo(now()->subMinutes(5)))->toBeTrue();
+});
+
+it('alerts immediately when a completed error returns and restarts the cooldown', function () {
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    $this->travel(5)->minutes();
+    Task::query()->sole()->update(['status' => 'completed']);
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+
+    $alerts = Notification::sent($this->alertUser, AppErrorReportedNotification::class);
+    expect($alerts)->toHaveCount(2)
+        ->and($alerts->last()->toArray($this->alertUser)['reason'])->toBe('reopened');
+
+    $this->travel(55)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 2);
+    $this->travel(5)->minutes();
+    $this->postJson('/api/errors', $this->alertPayload)->assertCreated();
+    Notification::assertSentToTimes($this->alertUser, AppErrorReportedNotification::class, 3);
 });
 
 it('can disable recurrence while keeping creation and reopening alerts', function () {

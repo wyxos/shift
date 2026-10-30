@@ -99,7 +99,7 @@ describe('useProjectAppErrorNotificationsState', () => {
             daily_summary_timezone: 'Asia/Dubai',
         };
         mocks.axiosGet.mockResolvedValue({ data: { selected_user_ids: [7], users: [], settings } });
-        mocks.axiosPut.mockRejectedValueOnce({ response: { data: { errors: { 'settings.quiet_hours': ['Choose a valid quiet period.'] } } } });
+        mocks.axiosPut.mockRejectedValueOnce({ response: { data: { errors: { 'settings.quiet_hours': ['Choose a valid alert cooldown.'] } } } });
         const state = useProjectAppErrorNotificationsState();
         await state.openAppErrorNotificationsModal({ id: 1, name: 'Project' } as any);
         state.appErrorNotificationsForm.value.settings.quiet_hours = 4;
@@ -107,7 +107,7 @@ describe('useProjectAppErrorNotificationsState', () => {
         expect(state.appErrorNotificationsOpen.value).toBe(true);
         expect(state.appErrorNotificationsForm.value.settings.quiet_hours).toBe(4);
         expect(state.appErrorNotificationsForm.value.selected_user_ids).toEqual([7]);
-        expect(state.appErrorNotificationsError.value).toBe('Choose a valid quiet period.');
+        expect(state.appErrorNotificationsError.value).toBe('Choose a valid alert cooldown.');
         await state.saveAppErrorNotifications();
         expect(mocks.axiosPut).toHaveBeenLastCalledWith(
             '/projects/1/app-error-notifications',

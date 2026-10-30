@@ -201,7 +201,7 @@ it('forbids project members who cannot manage technical settings', function () {
         ->assertForbidden();
 });
 
-it('returns the default one hour quiet period and daily summary settings', function () {
+it('returns the default one hour alert cooldown and daily summary settings', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withAuthor($owner->id)->create();
 
@@ -246,10 +246,19 @@ it('rejects invalid alert settings without changing recipients or saved rules', 
     $project = Project::factory()->withAuthor($owner->id)->create();
     $project->appErrorNotificationUsers()->attach($owner->id);
 
-    $this->actingAs($owner)->putJson(route('projects.app-error-notifications.update', $project), [
+    $response = $this->actingAs($owner)->putJson(route('projects.app-error-notifications.update', $project), [
         'user_ids' => [],
         'settings' => $settings,
     ])->assertUnprocessable()->assertJsonValidationErrors('settings.'.$field);
+
+    if ($field === 'quiet_hours') {
+        $this->assertSame(
+            is_int($settings['quiet_hours'])
+                ? 'Choose an alert cooldown between 1 and 168 hours.'
+                : 'The alert cooldown must be a whole number of hours.',
+            $response->json('errors')['settings.quiet_hours'][0],
+        );
+    }
 
     expect($project->refresh()->app_error_quiet_hours)->toBe(1)
         ->and($project->appErrorNotificationUsers()->pluck('users.id')->all())->toBe([$owner->id]);

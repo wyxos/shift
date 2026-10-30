@@ -214,6 +214,10 @@ describe('Projects app error notifications', () => {
         await flushPromises();
 
         expect(wrapper.get('[data-testid="project-app-error-notifications-count"]').text()).toContain('1 selected');
+        expect(wrapper.text()).toContain('Alert cooldown');
+        expect(wrapper.text()).toContain('Alert on the next occurrence after the cooldown ends. Repeated events do not restart the cooldown.');
+        expect(wrapper.text()).toContain('Measured from the last alert for each error.');
+        expect(wrapper.text()).not.toContain('Quiet period');
 
         expect(wrapper.get('[data-testid="project-error-quiet-hours"]').attributes('type')).toBe('number');
         expect(wrapper.get('[data-testid="project-error-summary-timezone"]').text()).toBe('UTC');

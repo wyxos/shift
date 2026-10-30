@@ -19,17 +19,13 @@ class AppErrorRecurrence
             return 'reopened';
         }
 
-        if (! $project->app_error_recurrence_enabled || $task->error_last_seen_at === null) {
+        if (! $project->app_error_recurrence_enabled) {
             return null;
         }
 
-        $quietBefore = $receivedAt->copy()->subHours(max(1, (int) $project->app_error_quiet_hours));
+        $cooldownBefore = $receivedAt->copy()->subHours(max(1, (int) $project->app_error_quiet_hours));
 
-        if ($task->error_last_seen_at->greaterThan($quietBefore)) {
-            return null;
-        }
-
-        if ($task->error_last_alert_at?->greaterThan($quietBefore)) {
+        if ($task->error_last_alert_at?->greaterThan($cooldownBefore)) {
             return null;
         }
 

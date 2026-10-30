@@ -43,8 +43,8 @@ class UpdateProjectAppErrorNotificationUsersRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'settings.quiet_hours.between' => 'Choose a quiet period between 1 and 168 hours.',
-            'settings.quiet_hours.integer' => 'The quiet period must be a whole number of hours.',
+            'settings.quiet_hours.between' => 'Choose an alert cooldown between 1 and 168 hours.',
+            'settings.quiet_hours.integer' => 'The alert cooldown must be a whole number of hours.',
             'settings.daily_summary_time.date_format' => 'Choose a valid daily summary time.',
             'settings.daily_summary_timezone.timezone' => 'Choose a valid time zone.',
         ];
