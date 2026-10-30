@@ -20,24 +20,7 @@ class SdkBuildStore
         if ($root === false || ! is_dir($root)) {
             throw new RuntimeException('SDK build artifact directory does not exist.');
         }
-        $manifest = $this->manifest($root);
-        $files = ['manifest.json'];
-        $totalBytes = 0;
-        foreach ($manifest['assets'] as $asset => $attributes) {
-            foreach ([$asset => $attributes['sha256'], $attributes['map'] => $attributes['map_sha256']] as $relative => $digest) {
-                $path = $this->file($root, $relative, str_ends_with($relative, '.map') ? 32000000 : 16000000);
-                $totalBytes += filesize($path);
-                if ($totalBytes > 128000000 || ! hash_equals($digest, hash_file('sha256', $path))) {
-                    throw new RuntimeException('SDK build artifact checksum or size does not match.');
-                }
-                $files[] = $relative;
-            }
-            $map = $this->json($this->file($root, $attributes['map'], 32000000));
-            $this->reader->validate($map);
-            if (isset($map['file']) && (! is_string($map['file']) || basename($map['file']) !== basename($asset))) {
-                throw new RuntimeException('Source map does not identify its generated asset.');
-            }
-        }
+        [$manifest, $files] = $this->inspect($root);
         $store = $destination ?? $this->path();
         $this->privateDirectory($store);
         $store = realpath($store);
@@ -73,6 +56,54 @@ class SdkBuildStore
         }
 
         return $manifest;
+    }
+
+    public function verify(string $id, ?string $destination = null): array
+    {
+        if (! $this->validId($id)) {
+            throw new RuntimeException('Invalid SDK build identifier.');
+        }
+        $root = $this->buildDirectory($id, $destination ?? $this->path());
+        if ($root === null) {
+            throw new RuntimeException('SDK build is not registered.');
+        }
+        [$manifest] = $this->inspect($root);
+        if ($manifest['build_id'] !== $id) {
+            throw new RuntimeException('Stored SDK build does not match the requested identifier.');
+        }
+
+        return [
+            'schema_version' => 1,
+            'build_id' => $id,
+            'manifest_sha256' => hash_file('sha256', $this->file($root, 'manifest.json', 1000000)),
+            'assets_count' => count($manifest['assets']),
+            'verified' => true,
+        ];
+    }
+
+    /** @return array{array, array} */
+    private function inspect(string $root): array
+    {
+        $manifest = $this->manifest($root);
+        $files = ['manifest.json'];
+        $totalBytes = 0;
+        foreach ($manifest['assets'] as $asset => $attributes) {
+            foreach ([$asset => $attributes['sha256'], $attributes['map'] => $attributes['map_sha256']] as $relative => $digest) {
+                $path = $this->file($root, $relative, str_ends_with($relative, '.map') ? 32000000 : 16000000);
+                $totalBytes += filesize($path);
+                if ($totalBytes > 128000000 || ! hash_equals($digest, hash_file('sha256', $path))) {
+                    throw new RuntimeException('SDK build artifact checksum or size does not match.');
+                }
+                $files[] = $relative;
+            }
+            $map = $this->json($this->file($root, $attributes['map'], 32000000));
+            $this->reader->validate($map);
+            if (isset($map['file']) && (! is_string($map['file']) || basename($map['file']) !== basename($asset))) {
+                throw new RuntimeException('Source map does not identify its generated asset.');
+            }
+        }
+
+        return [$manifest, $files];
     }
 
     public function manifest(string $root): array
@@ -113,7 +144,17 @@ class SdkBuildStore
         if (! $this->validId($id)) {
             return null;
         }
-        $store = realpath($this->path());
+
+        return $this->buildDirectory($id, $this->path());
+    }
+
+    private function buildDirectory(string $id, string $path): ?string
+    {
+        $store = realpath($path);
+        $public = realpath(public_path());
+        if ($store !== false && $public !== false && ($store === $public || str_starts_with($store, $public.DIRECTORY_SEPARATOR))) {
+            throw new RuntimeException('SDK source maps must stay outside the public directory.');
+        }
         $target = $store === false ? false : realpath($store.'/'.$id);
         if ($store === false || $target === false) {
             return null;

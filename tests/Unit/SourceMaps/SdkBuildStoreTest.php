@@ -130,3 +130,30 @@ it('accepts truthful missing Git provenance and rejects malformed revision metad
     file_put_contents($input.'/manifest.json', json_encode($manifest));
     expect(fn () => app(SdkBuildStore::class)->import($input))->toThrow(RuntimeException::class, 'revision');
 });
+
+it('returns verified machine receipts for import and read-back checks', function () {
+    [$input, $manifest] = sdkStoreFixture($this->scratch);
+    $arguments = ['path' => $input, '--json' => true];
+    expect(\Illuminate\Support\Facades\Artisan::call('shift:sdk-build:import', $arguments))->toBe(0);
+    $imported = json_decode(\Illuminate\Support\Facades\Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    expect($imported)->toBe([
+        'schema_version' => 1, 'build_id' => $manifest['build_id'],
+        'manifest_sha256' => hash_file('sha256', $input.'/manifest.json'),
+        'assets_count' => 1, 'verified' => true,
+    ]);
+    expect(\Illuminate\Support\Facades\Artisan::call('shift:sdk-build:verify', ['build_id' => $manifest['build_id'], '--json' => true]))->toBe(0);
+    expect(json_decode(\Illuminate\Support\Facades\Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe($imported);
+});
+
+it('verifies alternate private stores and refuses corrupted or missing registered builds', function () {
+    [$input, $manifest] = sdkStoreFixture($this->scratch);
+    $alternate = $this->scratch.'/alternate';
+    $store = app(SdkBuildStore::class);
+    $store->import($input, $alternate);
+    expect($store->verify($manifest['build_id'], $alternate)['verified'])->toBeTrue();
+    expect(fn () => $store->verify($manifest['build_id']))->toThrow(RuntimeException::class, 'not registered');
+    file_put_contents($alternate.'/'.$manifest['build_id'].'/assets/workspace.js', 'corrupted');
+    expect(fn () => $store->verify($manifest['build_id'], $alternate))->toThrow(RuntimeException::class, 'checksum');
+    $this->artisan('shift:sdk-build:verify', ['build_id' => $manifest['build_id'], '--store' => $alternate, '--json' => true])->assertFailed();
+    $this->artisan('shift:sdk-build:verify', ['build_id' => '../../private'])->assertFailed();
+});
