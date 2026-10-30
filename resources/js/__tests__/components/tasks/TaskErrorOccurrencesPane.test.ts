@@ -102,6 +102,32 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TaskErrorOccurrencesPane', () => {
+    it('uses meaningful source ownership without repeating source-map badges', () => {
+        const state = makeState();
+        Object.assign(state.errorOccurrences[0], {
+            source: 'ui',
+            metadata: { component: 'shift_sdk' },
+            stacktrace: {
+                frames: [],
+                resolved_frames: [
+                    { resolved: true, file: 'sdk/ui/src/Component.vue', in_app: true },
+                    { resolved: true, file: 'portal/components/SharedButton.vue', in_app: true },
+                    { resolved: true, file: 'dependency/vue/runtime.js', in_app: false },
+                    { resolved: true, file: 'app/Service.php', in_app: true },
+                ],
+            },
+        });
+        const wrapper = mount(TaskErrorOccurrencesPane, { props: { state } });
+        expect(wrapper.findAll('[data-testid="error-frame-code-owner"]').map((item) => item.text())).toEqual([
+            'SDK code',
+            'SDK code',
+            'Application code',
+        ]);
+        const trace = wrapper.get('[data-testid="error-occurrence-stack"] ol');
+        expect(trace.findAll('span').some((item) => item.text() === 'Original')).toBe(false);
+        expect(trace.findAll('span').some((item) => item.text() === 'in app')).toBe(false);
+    });
+
     it('shows original source with context and keeps the compiled position', async () => {
         const state = makeState();
         Object.assign(state.errorOccurrences[0], {

@@ -2,7 +2,9 @@
 
 use App\Mcp\Servers\ShiftServer;
 use App\Mcp\Tools\ListTaskErrorOccurrencesTool;
+use App\Models\Organisation;
 use App\Models\Project;
+use App\Models\ProjectUser;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
@@ -102,3 +104,74 @@ it('discards forged resolved source claims from application reports', function (
     $trace = Task::findOrFail($id)->errorOccurrences()->firstOrFail()->stacktrace;
     expect($trace)->not->toHaveKeys(['resolution', 'resolved_frames']);
 });
+
+it('keeps identical SDK errors and resolved source inside their project and organisation', function (string $source) {
+    Notification::fake();
+    [$root, $buildId] = sourceMapIngestionFixture();
+    $this->artisan('shift:sdk-build:import', ['path' => $root.'/input'])->assertSuccessful();
+    $owners = User::factory()->count(2)->create();
+    $organisations = $owners->map(fn (User $owner) => Organisation::factory()->create(['author_id' => $owner->id]));
+    $projects = collect([0, 0, 1])->map(fn (int $organisation, int $index) => Project::factory()->create([
+        'client_id' => null, 'author_id' => null, 'organisation_id' => $organisations[$organisation]->id,
+        'token' => 'tenant-project-'.$index, 'mcp_enabled' => true,
+    ]));
+    $member = User::factory()->create();
+    ProjectUser::create([
+        'project_id' => $projects[0]->id, 'user_id' => $member->id,
+        'user_email' => $member->email, 'user_name' => $member->name, 'registration_status' => 'registered',
+    ]);
+    $tasks = collect();
+
+    foreach ($projects as $index => $project) {
+        $owner = $owners[$index === 2 ? 1 : 0];
+        $payload = sourceMapIngestionPayload($buildId);
+        $payload['project'] = $project->token;
+        $payload['source'] = $source;
+        $payload['metadata']['surface'] = $source === 'ui' ? 'workspace_ui' : 'sdk_backend';
+        $payload['metadata']['operation'] = 'Save task';
+        $id = $this->actingAs($owner)->postJson('/api/errors', $payload)->assertCreated()->json('task.id');
+        $this->postJson('/api/errors', $payload)->assertCreated()
+            ->assertJsonPath('task.id', $id)->assertJsonPath('task.occurrences_count', 2);
+        $task = Task::findOrFail($id);
+        expect($task->project_id)->toBe($project->id)
+            ->and($task->project->organisation_id)->toBe($project->organisation_id);
+        if ($source === 'ui') {
+            expect($task->errorOccurrences()->firstOrFail()->stacktrace['resolution']['status'])->toBe('resolved');
+        }
+        $tasks->push($task);
+    }
+
+    expect($tasks->pluck('id')->unique())->toHaveCount(3)
+        ->and(Task::query()->count())->toBe(3);
+    foreach ([[$owners[0], [0, 1]], [$owners[1], [2]], [$member, [0]]] as [$actor, $visible]) {
+        $expectedIds = $tasks->only($visible)->pluck('id')->sort()->values()->all();
+        $this->actingAs($actor)->get('/error-reports?component=shift_sdk')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('tasks.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === $expectedIds));
+        foreach ($tasks as $index => $task) {
+            $response = $this->getJson('/tasks/'.$task->id.'/error-occurrences');
+            if (in_array($index, $visible, true)) {
+                $response->assertOk()->assertJsonCount(2, 'occurrences');
+            } else {
+                $response->assertNotFound()->assertDontSee('Example.vue')->assertDontSee('Cannot read title');
+                $payload = sourceMapIngestionPayload($buildId);
+                $payload['project'] = $task->project->token;
+                $this->postJson('/api/errors', $payload)->assertNotFound();
+            }
+        }
+    }
+
+    foreach ($tasks as $index => $task) {
+        $memberResponse = ShiftServer::actingAs($member)->tool(ListTaskErrorOccurrencesTool::class, ['task_id' => $task->id]);
+        if ($index === 0) {
+            $memberResponse->assertOk()->assertSee('Cannot read title');
+        } else {
+            $memberResponse->assertHasErrors()->assertDontSee(['Example.vue', 'Cannot read title']);
+        }
+        ShiftServer::actingAs($owners[$index === 2 ? 0 : 1])->tool(ListTaskErrorOccurrencesTool::class, ['task_id' => $task->id])
+            ->assertHasErrors()->assertDontSee(['Example.vue', 'Cannot read title']);
+    }
+    expect(Task::query()->count())->toBe(3);
+    foreach ($tasks as $task) {
+        expect($task->errorOccurrences()->count())->toBe(2);
+    }
+})->with(['browser' => 'ui', 'SDK exception' => 'backend']);

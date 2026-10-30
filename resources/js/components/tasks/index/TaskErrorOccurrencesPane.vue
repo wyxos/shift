@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TaskErrorSourceContext from '@/components/tasks/index/TaskErrorSourceContext.vue';
 import TaskErrorSourceMapStatus from '@/components/tasks/index/TaskErrorSourceMapStatus.vue';
 import { Button } from '@/components/ui/button';
 import type { TaskErrorOccurrence, TaskErrorStackFrame } from '@/shared/tasks/types';
@@ -132,6 +133,20 @@ const frameContextLines = (frame: TaskErrorStackFrame) => {
 };
 
 const hasFrameContext = (frame: TaskErrorStackFrame) => frameContextLines(frame).length > 0;
+
+const frameCodeOwner = (frame: TaskErrorStackFrame, occurrence: TaskErrorOccurrence): string | null => {
+    const file = frame.file?.replace(/\\/g, '/') ?? '';
+    if (
+        /(?:^|\/)(?:sdk\/|packages\/shift-php\/|vendor\/wyxos\/shift-php\/)/.test(file) ||
+        (occurrence.metadata?.component === 'shift_sdk' && /^(?:portal\/|ui\/src\/|\/?shift-assets\/)/.test(file))
+    ) {
+        return 'SDK code';
+    }
+    if (file && frame.in_app === true && !/(?:^|\/)(?:vendor|node_modules)\//.test(file)) {
+        return 'Application code';
+    }
+    return null;
+};
 
 const frameExpansionKey = (occurrence: TaskErrorOccurrence | null, index: number) => `${occurrence?.id ?? 'none'}-${index}`;
 
@@ -357,38 +372,26 @@ watch(
                                                 </div>
                                                 <button
                                                     v-if="hasFrameContext(frame)"
-                                                    class="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-2 rounded text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                                    class="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-1 min-h-11 min-w-11 rounded py-2 text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                                     :data-testid="`error-stack-frame-context-${index}`"
                                                     type="button"
                                                     @click="toggleFrameContext(occurrence, index)"
                                                 >
                                                     {{ isFrameContextExpanded(occurrence, index) ? 'Hide source context' : 'Show source context' }}
                                                 </button>
-                                                <div
+                                                <TaskErrorSourceContext
                                                     v-if="hasFrameContext(frame) && isFrameContextExpanded(occurrence, index)"
-                                                    class="shift-scrollbar border-muted-foreground/10 bg-muted/25 mt-2 max-h-80 overflow-auto rounded-md border py-2 font-mono text-xs"
+                                                    :frame="frame"
                                                     :data-testid="`error-stack-frame-context-lines-${index}`"
-                                                >
-                                                    <div
-                                                        v-for="line in frameContextLines(frame)"
-                                                        :key="line.number"
-                                                        :class="line.active ? 'bg-primary/10 text-foreground' : 'text-muted-foreground'"
-                                                        class="grid grid-cols-[4rem_minmax(0,1fr)] gap-3 px-3 py-0.5"
-                                                    >
-                                                        <span class="text-right select-none">{{ line.number }}</span>
-                                                        <code class="min-w-0 break-words whitespace-pre-wrap">{{ line.text || ' ' }}</code>
-                                                    </div>
-                                                </div>
+                                                />
                                             </div>
                                             <div class="flex items-start gap-2">
-                                                <span v-if="frame.resolved" class="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs"
-                                                    >Original</span
-                                                >
                                                 <span
-                                                    v-if="frame.in_app"
-                                                    class="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100"
+                                                    v-if="frameCodeOwner(frame, occurrence)"
+                                                    class="text-muted-foreground text-xs"
+                                                    data-testid="error-frame-code-owner"
                                                 >
-                                                    in app
+                                                    {{ frameCodeOwner(frame, occurrence) }}
                                                 </span>
                                                 <span class="text-muted-foreground font-mono text-xs">#{{ index + 1 }}</span>
                                             </div>
