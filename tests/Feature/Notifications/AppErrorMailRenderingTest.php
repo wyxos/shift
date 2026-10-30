@@ -21,8 +21,8 @@ it('renders each error alert with structured details and an equivalent plain tex
     $html = (string) $mail->render();
     $text = (string) app(Markdown::class)->renderText($mail->markdown, $mail->data());
 
-    expect($html)->toContain($heading, $event, 'SalesforceRequestException', 'SalesforceEndpoint.php:282', 'Home Installation', 'production', 'Occurrences', $url, 'Error report')
-        ->not->toContain('quiet period', 'retries', 'recorded silently', 'Reopened')
+    expect($html)->toContain($heading, $event, 'SalesforceRequestException', 'SalesforceEndpoint.php:282', 'Home Installation', 'production', 'Occurrences', $url, 'alt="SHIFT"')
+        ->not->toContain('notification-type', 'Error report', 'quiet period', 'retries', 'recorded silently', 'Reopened')
         ->and($text)->toContain($heading, $event, $task->title, 'Project: Home Installation', 'Environment: production', 'Occurrences: 9', $url)
         ->not->toContain('<table', '<span', '<wbr', '<img', 'quiet period', 'retries', 'recorded silently', 'Reopened');
     expect($mail->introLines)->not->toContain('This open error has returned after a quiet period. Further retries are recorded silently.');

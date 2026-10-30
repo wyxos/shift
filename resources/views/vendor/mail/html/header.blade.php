@@ -9,7 +9,9 @@
 <img src="{{ rtrim(config('app.url'), '/') }}/brand/shift-wordmark-email.png" width="124" height="31" class="logo" alt="SHIFT">
 </a>
 </td>
+@if (filled($type))
 <td class="notification-type" align="right">{{ $type }}</td>
+@endif
 </tr>
 </table>
 </td>

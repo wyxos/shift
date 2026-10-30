@@ -99,7 +99,7 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
 
         return $message
             ->markdown('notifications::email', [
-                'notificationType' => 'Error report',
+                'notificationType' => '',
                 'errorReport' => [
                     'heading' => 'Exception detected',
                     'event' => $event,
