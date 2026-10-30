@@ -35,7 +35,7 @@ it('renders each error alert with structured details and an equivalent plain tex
 })->with([
     'reported' => ['reported', 'A new error was reported', 'Reported'],
     'recurring' => ['recurring', 'Error detected again', 'Recurring'],
-    'reopened' => ['reopened', 'Error regressed', 'Regressed'],
+    'reopened' => ['reopened', 'Regression detected', 'Regressed'],
 ]);
 
 it('escapes error metadata and handles absent environment and source fields', function () {

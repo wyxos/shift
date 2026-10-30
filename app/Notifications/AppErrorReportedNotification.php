@@ -103,7 +103,7 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
                 'errorReport' => [
                     'heading' => match ($this->reason) {
                         'recurring' => 'Error detected again',
-                        'reopened' => 'Error regressed',
+                        'reopened' => 'Regression detected',
                         default => 'A new error was reported',
                     },
                     'event' => $event,
