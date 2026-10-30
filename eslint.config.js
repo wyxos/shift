@@ -27,7 +27,16 @@ export default tseslint.config(
         },
     },
     {
-        ignores: ['vendor', 'node_modules', 'public', 'coverage', 'bootstrap/ssr', 'tailwind.config.js', 'resources/js/components/ui/*'],
+        ignores: [
+            'vendor',
+            'node_modules',
+            'public',
+            'coverage',
+            'bootstrap/ssr',
+            'storage/app/private/shift-sdk-builds/**',
+            'tailwind.config.js',
+            'resources/js/components/ui/*',
+        ],
     },
     {
         rules: {
