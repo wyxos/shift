@@ -1,9 +1,6 @@
 @props(['report'])
 <h1>{{ $report['heading'] }}</h1>
 <p class="status-row"><span class="status">{{ $report['event'] }}</span></p>
-@if ($report['event'] === 'Recurring')
-<p class="summary">{{ __('This open error has returned after a quiet period. Further retries are recorded silently.') }}</p>
-@endif
 <table class="exception" width="100%" cellpadding="0" cellspacing="0" role="presentation">
 <tr><td class="exception-cell">
 <strong>{{ $report['exception'] }}</strong>

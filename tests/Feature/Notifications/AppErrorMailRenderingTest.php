@@ -22,9 +22,11 @@ it('renders each error alert with structured details and an equivalent plain tex
     $text = (string) app(Markdown::class)->renderText($mail->markdown, $mail->data());
 
     expect($html)->toContain($heading, $event, 'SalesforceRequestException', 'SalesforceEndpoint.php:282', 'Home Installation', 'production', 'Occurrences', $url, 'Error report')
+        ->not->toContain('quiet period', 'retries', 'recorded silently', 'Reopened')
         ->and($text)->toContain($heading, $event, $task->title, 'Project: Home Installation', 'Environment: production', 'Occurrences: 9', $url)
-        ->not->toContain('<table', '<span', '<wbr', '<img');
-    expect(str_contains($html, 'quiet period'))->toBe($reason === 'recurring');
+        ->not->toContain('<table', '<span', '<wbr', '<img', 'quiet period', 'retries', 'recorded silently', 'Reopened');
+    expect($mail->introLines)->not->toContain('This open error has returned after a quiet period. Further retries are recorded silently.');
+    expect($mail->subject)->toContain($event === 'Reported' ? 'Home Installation -' : 'Home Installation '.$event.' -');
 
     if ($directory = getenv('SHIFT_MAIL_REVIEW_DIR')) {
         @mkdir($directory, 0777, true);
@@ -32,8 +34,8 @@ it('renders each error alert with structured details and an equivalent plain tex
     }
 })->with([
     'reported' => ['reported', 'A new error was reported', 'Reported'],
-    'recurring' => ['recurring', 'An error has returned', 'Recurring'],
-    'reopened' => ['reopened', 'An error has reopened', 'Reopened'],
+    'recurring' => ['recurring', 'Error detected again', 'Recurring'],
+    'reopened' => ['reopened', 'Error regressed', 'Regressed'],
 ]);
 
 it('escapes error metadata and handles absent environment and source fields', function () {

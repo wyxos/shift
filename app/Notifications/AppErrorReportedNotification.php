@@ -69,7 +69,7 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $event = match ($this->reason) {
-            'reopened' => 'Reopened',
+            'reopened' => 'Regressed',
             'recurring' => 'Recurring',
             default => 'Reported',
         };
@@ -82,10 +82,6 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
             ->greeting($this->task->title)
             ->line('Project: '.$this->task->project->name)
             ->line('Event: '.$event);
-
-        if ($this->reason === 'recurring') {
-            $message->line('This open error has returned after a quiet period. Further retries are recorded silently.');
-        }
 
         if (filled($this->task->error_environment)) {
             $message->line('Environment: '.$this->task->error_environment);
@@ -106,8 +102,8 @@ class AppErrorReportedNotification extends Notification implements ShouldQueue
                 'notificationType' => 'Error report',
                 'errorReport' => [
                     'heading' => match ($this->reason) {
-                        'recurring' => 'An error has returned',
-                        'reopened' => 'An error has reopened',
+                        'recurring' => 'Error detected again',
+                        'reopened' => 'Error regressed',
                         default => 'A new error was reported',
                     },
                     'event' => $event,
