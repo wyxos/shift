@@ -97,25 +97,29 @@ class Project extends Model
             return false;
         }
 
-        $managedByOrganisationAdmin = false;
-        if ($this->client?->organisation) {
-            $managedByOrganisationAdmin = $this->client->organisation->organisationUsers()
-                ->where('user_id', $userId)
-                ->where('role', OrganisationRole::Administrator->value)
-                ->exists();
+        if ($this->author_id === $userId) {
+            return true;
         }
 
-        if (! $managedByOrganisationAdmin && $this->organisation) {
-            $managedByOrganisationAdmin = $this->organisation->organisationUsers()
-                ->where('user_id', $userId)
-                ->where('role', OrganisationRole::Administrator->value)
-                ->exists();
+        foreach ([$this->organisation, $this->client?->organisation] as $organisation) {
+            if (! $organisation) {
+                continue;
+            }
+
+            if ($organisation->author_id === $userId) {
+                return true;
+            }
+
+            $membership = $organisation->relationLoaded('organisationUsers')
+                ? $organisation->organisationUsers->firstWhere('user_id', $userId)
+                : $organisation->organisationUsers()->where('user_id', $userId)->first();
+
+            if ($membership?->role === OrganisationRole::Administrator) {
+                return true;
+            }
         }
 
-        return $this->client?->organisation?->author_id === $userId
-            || $this->organisation?->author_id === $userId
-            || $this->author_id === $userId
-            || $managedByOrganisationAdmin;
+        return false;
     }
 
     public function isVisibleToUser(?int $userId): bool

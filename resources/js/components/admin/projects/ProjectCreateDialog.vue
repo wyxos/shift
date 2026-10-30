@@ -75,7 +75,7 @@ function updateOpen(value: boolean) {
                     {{
                         scopedOrganisation
                             ? `Create a project in ${scopedOrganisation.name}.`
-                            : 'Create a project and attach it to either a client or an organisation.'
+                            : 'Create a standalone project, or choose a client or organisation.'
                     }}
                 </DialogDescription>
             </DialogHeader>

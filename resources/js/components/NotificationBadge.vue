@@ -74,7 +74,7 @@ function getProjectNotificationsUrl(data: NotificationData): string | null {
         return route('organisation.projects', { organisation: data.organisation_id });
     }
 
-    return route('dashboard');
+    return route('projects.index');
 }
 
 function getOrganisationNotificationsUrl(): string | null {

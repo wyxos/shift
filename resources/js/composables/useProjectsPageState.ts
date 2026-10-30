@@ -41,6 +41,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     const deleteError = ref<string | null>(null);
     const manageUsersLoading = ref(false);
     const manageUsersError = ref<string | null>(null);
+    let manageUsersRequestId = 0;
     const removingAccessId = ref<number | null>(null);
     const apiTokenLoading = ref(false);
     const apiTokenError = ref<string | null>(null);
@@ -193,6 +194,7 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     }
 
     async function openManageUsersModal(project: ProjectRow) {
+        const requestId = ++manageUsersRequestId;
         manageUsersForm.project_id = project.id;
         manageUsersForm.project_name = project.name;
         manageUsersForm.users = [];
@@ -208,12 +210,13 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
         try {
             const response = await fetch(`/projects/${project.id}/users`);
             if (!response.ok) throw new Error(`Failed to load users for project ${project.id}`);
-            manageUsersForm.users = await response.json();
+            const users = await response.json();
+            if (requestId === manageUsersRequestId) manageUsersForm.users = users;
         } catch (error) {
             console.error('Error fetching project users:', error);
-            manageUsersError.value = 'Unable to load project access right now.';
+            if (requestId === manageUsersRequestId) manageUsersError.value = 'Unable to load project access right now.';
         } finally {
-            manageUsersLoading.value = false;
+            if (requestId === manageUsersRequestId) manageUsersLoading.value = false;
         }
     }
 
@@ -262,9 +265,8 @@ export function useProjectsPageState(props: ProjectsPageStateProps) {
     function openProjectParticipants(project: ProjectRow) {
         const organisationId = isScopedOrganisationRoute.value ? appliedOrganisationId.value : project.organisation_id;
 
-        if (!organisationId) return;
-
-        router.get(`/organisation/${organisationId}/project-participants`, { project_id: project.id });
+        const path = organisationId ? `/organisation/${organisationId}/project-participants` : '/project-participants';
+        router.get(path, { project_id: project.id });
     }
 
     function closeEditModal() {

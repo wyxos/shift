@@ -38,10 +38,6 @@ class ProjectUserController extends Controller
 
         $organisation = $project->accessOrganisation();
 
-        if (! $organisation) {
-            return response()->json(['message' => 'Project must belong to an organisation before access can be granted.'], 422);
-        }
-
         // Find the user by email if they exist
         $user = User::whereRaw('LOWER(email) = LOWER(?)', [$validated['email']])->first();
 
@@ -57,7 +53,9 @@ class ProjectUserController extends Controller
             ->first();
 
         if ($existingUser) {
-            OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+            if ($organisation) {
+                OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+            }
 
             return response()->json(['message' => 'User already has access to this project'], 422);
         }
@@ -71,9 +69,11 @@ class ProjectUserController extends Controller
             'registration_status' => $user ? 'registered' : 'pending', // Set status based on user existence
         ]);
 
-        $organisationUser = OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
-        if ($organisationUser->role === null) {
-            $organisationUser->forceFill(['role' => OrganisationRole::Developer])->save();
+        if ($organisation) {
+            $organisationUser = OrganisationUser::ensureForIdentity($organisation, $user, $validated['email'], $validated['name']);
+            if ($organisationUser->role === null) {
+                $organisationUser->forceFill(['role' => OrganisationRole::Developer])->save();
+            }
         }
 
         // If the user doesn't exist, send an invitation email
@@ -124,7 +124,8 @@ class ProjectUserController extends Controller
     public static function updateUserRegistration(User $user)
     {
         // Find all project users with matching email and pending status
-        $pendingProjectUsers = ProjectUser::whereRaw('LOWER(user_email) = LOWER(?)', [$user->email])
+        $pendingProjectUsers = ProjectUser::with(['project.organisation', 'project.client.organisation'])
+            ->whereRaw('LOWER(user_email) = LOWER(?)', [$user->email])
             ->where('registration_status', 'pending')
             ->get();
 

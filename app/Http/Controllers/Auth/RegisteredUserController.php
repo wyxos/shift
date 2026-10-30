@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ProjectUserController;
 use App\Models\OrganisationUser;
 use App\Models\Project;
 use App\Models\ProjectUser;
@@ -73,12 +74,7 @@ class RegisteredUserController extends Controller
         // If the user was invited to a project, update the project_user record and redirect to the project
         if ($request->project_id) {
             // Update the project_user record with the new user_id and set registration_status to registered
-            ProjectUser::where('project_id', $request->project_id)
-                ->whereRaw('LOWER(user_email) = LOWER(?)', [$request->email])
-                ->update([
-                    'user_id' => $user->id,
-                    'registration_status' => 'registered',
-                ]);
+            ProjectUserController::updateUserRegistration($user);
 
             // Notify the project owner that a user has completed registration
             $project = Project::find($request->project_id);
@@ -97,7 +93,7 @@ class RegisteredUserController extends Controller
                 ]);
             }
 
-            return to_route('dashboard');
+            return to_route('projects.index', ['highlight' => $request->project_id]);
         }
 
         // If the user was invited to an organisation, update the organisation_user record and redirect to the organisation

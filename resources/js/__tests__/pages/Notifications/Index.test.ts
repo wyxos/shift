@@ -237,6 +237,8 @@ describe('Notifications/Index.vue', () => {
             switch (name) {
                 case 'dashboard':
                     return '/dashboard';
+                case 'projects.index':
+                    return '/projects';
                 case 'notifications.index':
                     return '/notifications';
                 case 'notifications.mark-as-read':
@@ -303,6 +305,17 @@ describe('Notifications/Index.vue', () => {
         ]);
 
         expect(wrapper.get('a[href="/organisation/3/projects"]').text()).toContain('Invited to project: Atlas Billing Console');
+    });
+
+    it('opens standalone project notifications from the global projects list', () => {
+        const wrapper = mountPage([
+            createNotification({
+                type: 'App\\Notifications\\ProjectUserRegisteredNotification',
+                data: { project_name: 'Independent project', user_name: 'Invited member' },
+            }),
+        ]);
+
+        expect(wrapper.get('a[href="/projects"]').text()).toContain('Invited member');
     });
 
     it('shows a disabled loading state and confirms a successful read mutation', async () => {

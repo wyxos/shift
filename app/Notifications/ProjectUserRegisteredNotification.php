@@ -54,7 +54,7 @@ class ProjectUserRegisteredNotification extends Notification implements ShouldQu
         $organisation = $this->project->accessOrganisation();
         $url = $organisation
             ? route('organisation.projects', $organisation)
-            : route('dashboard');
+            : route('projects.index');
 
         return (new MailMessage)
             ->subject('New User Registration in Your Project')

@@ -12,10 +12,10 @@ beforeEach(function () {
     $this->user = User::factory()->create();
 });
 
-test('global projects index is not available', function () {
+test('global projects index is available', function () {
     $this->actingAs($this->user)
         ->get('/projects')
-        ->assertNotFound();
+        ->assertOk();
 });
 
 test('organisation projects index includes scoped projects with ownership context', function () {

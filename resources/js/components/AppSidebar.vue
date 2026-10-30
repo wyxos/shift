@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-/* eslint-disable max-lines */
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -18,6 +17,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
+import { mainNavItems } from '@/lib/sidebar-navigation';
 import { type NavItem, type SharedData, type SidebarOrganisation } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, Briefcase, Bug, Folder, Inbox, LayoutGrid, ListTodo, LoaderCircle, Network, Plus, Settings, Users } from 'lucide-vue-next';
@@ -26,29 +26,6 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage<SharedData>();
 const { setOpenMobile } = useSidebar();
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Tasks',
-        href: '/tasks',
-        icon: Folder,
-    },
-    {
-        title: 'App errors',
-        href: '/error-reports',
-        icon: Bug,
-    },
-    {
-        title: 'Requirements',
-        href: '/requirements',
-        icon: Inbox,
-    },
-];
 
 const footerNavItems: NavItem[] = [];
 

@@ -78,7 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
 
     // projects
-    Route::get('projects', fn () => abort(404));
+    Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
@@ -140,7 +140,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('ai/improve', [AiRewriteController::class, 'improve'])->middleware('throttle:ai-rewrite')->name('ai.improve');
 
     // Project participants and legacy external account routes.
-    Route::get('project-participants', fn () => abort(404));
+    Route::get('project-participants', [ProjectParticipantController::class, 'index'])->name('project-participants.index');
     Route::put('project-participants/{externalIdentity}', [ProjectParticipantController::class, 'update'])->name('project-participants.update');
     Route::post('project-participants/{externalIdentity}/linked-accounts', [ProjectParticipantController::class, 'linkAccount'])->name('project-participants.linked-accounts.store');
     Route::delete('project-participants/{externalIdentity}/linked-accounts/{linkedExternalIdentity}', [ProjectParticipantController::class, 'unlinkAccount'])->name('project-participants.linked-accounts.destroy');

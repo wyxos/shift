@@ -21,9 +21,9 @@ class ShiftPermissionService
             return OrganisationRole::Administrator;
         }
 
-        $membership = $organisation->organisationUsers()
-            ->where('user_id', $userId)
-            ->first();
+        $membership = $organisation->relationLoaded('organisationUsers')
+            ? $organisation->organisationUsers->firstWhere('user_id', $userId)
+            : $organisation->organisationUsers()->where('user_id', $userId)->first();
 
         return $membership?->role;
     }
@@ -208,12 +208,14 @@ class ShiftPermissionService
      */
     public function projectCapabilities(Project $project, ?int $userId): array
     {
+        $role = $this->roleForProject($project, $userId);
+
         return [
-            'can_manage_project_access' => $this->canManageProjectAccess($project, $userId),
-            'can_edit_project' => $this->canManageProject($project, $userId),
-            'can_delete_project' => $this->canManageProject($project, $userId),
-            'can_manage_technical_settings' => $this->canManageTechnicalSettings($project, $userId),
-            'can_create_task' => $this->canCreateTaskForProject($project, $userId),
+            'can_manage_project_access' => $role?->canManageAccess() === true,
+            'can_edit_project' => $role?->canManageOrganisation() === true,
+            'can_delete_project' => $role?->canManageOrganisation() === true,
+            'can_manage_technical_settings' => $role?->canManageTechnicalSettings() === true,
+            'can_create_task' => $role?->canManageTaskScope() === true,
         ];
     }
 

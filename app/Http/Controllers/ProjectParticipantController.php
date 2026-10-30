@@ -43,6 +43,7 @@ class ProjectParticipantController extends Controller
             'role' => $externalIdentity->role?->value,
             'role_label' => $externalIdentity->role?->label(),
             'can_manage_role' => $canManageLinkedAccounts,
+            'can_edit_profile' => $canManageLinkedAccounts || $externalIdentity->project?->accessOrganisation() !== null,
             'can_update_role' => $externalIdentity->project
                 ? $this->permissions->canManageExternalRoles($externalIdentity->project, auth()->id())
                 : false,
@@ -269,6 +270,12 @@ class ProjectParticipantController extends Controller
             ->whereIn('project_id', $projectIds)
             ->findOrFail($id);
 
+        abort_unless(
+            $externalIdentity->project?->accessOrganisation() !== null
+                || $this->permissions->canManageExternalRoles($externalIdentity->project, $request->user()?->id),
+            403,
+        );
+
         $payload = [
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
@@ -310,7 +317,7 @@ class ProjectParticipantController extends Controller
             ]);
         }
 
-        return redirect()->route('dashboard');
+        return redirect()->route('project-participants.index', ['project_id' => $externalIdentity->project_id]);
     }
 
     public function linkAccount(Request $request, string $externalIdentity)

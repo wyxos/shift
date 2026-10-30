@@ -194,6 +194,7 @@ describe('AppSidebar', () => {
         expect(wrapper.text()).toContain('Northwind Studio');
         expect(wrapper.text()).toContain('shared');
         expect(wrapper.find('a[href="/requirements"]').exists()).toBe(true);
+        expect(wrapper.find('a[href="/projects"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/error-reports"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/3/dashboard"]').exists()).toBe(true);
         expect(wrapper.find('a[href="/organisation/4/dashboard"]').exists()).toBe(true);

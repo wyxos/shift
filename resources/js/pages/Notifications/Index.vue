@@ -181,7 +181,7 @@ const getNotificationUrl = (notification: Notification): string => {
             return data.url ?? '#';
         case 'App\\Notifications\\ProjectInvitationNotification':
         case 'App\\Notifications\\ProjectUserRegisteredNotification':
-            return data.organisation_id ? route('organisation.projects', { organisation: data.organisation_id }) : route('dashboard');
+            return data.organisation_id ? route('organisation.projects', { organisation: data.organisation_id }) : route('projects.index');
         case 'App\\Notifications\\OrganisationInvitationNotification':
         case 'App\\Notifications\\OrganisationAccessNotification':
             return route('organisations.index');

@@ -293,13 +293,13 @@ describe('ProjectParticipants/Index.vue', () => {
         expect(wrapper.text()).toContain('No project assigned');
     });
 
-    it('applies search and sort filters', async () => {
+    it.each([3, null])('applies search and sort filters for organisation %s', async (organisationId) => {
         routerGetMock.mockReset();
 
         const wrapper = mount(ProjectParticipantsIndex, {
             props: {
                 externalIdentities,
-                filters: { search: '', sort_by: null, organisation_id: 3 },
+                filters: { search: '', sort_by: null, organisation_id: organisationId },
                 projects: [{ id: 2, name: 'Portal' }],
             },
         });
@@ -313,7 +313,7 @@ describe('ProjectParticipants/Index.vue', () => {
         await wrapper.get('[data-testid="filters-apply"]').trigger('click');
 
         expect(routerGetMock).toHaveBeenCalledWith(
-            '/organisation/3/project-participants',
+            organisationId ? `/organisation/${organisationId}/project-participants` : '/project-participants',
             {
                 page: 1,
                 project_id: '2',

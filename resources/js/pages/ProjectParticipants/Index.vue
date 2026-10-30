@@ -38,6 +38,7 @@ type ExternalIdentityRow = {
     role?: string | null;
     role_label?: string | null;
     can_manage_role?: boolean | null;
+    can_edit_profile?: boolean;
     canManageRole?: boolean | null;
     linked_accounts?: LinkedAccount[];
     linkedAccounts?: LinkedAccount[];
@@ -104,7 +105,7 @@ const editForm = ref({
     role: '',
 });
 const indexPath = computed(() =>
-    props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/project-participants` : '/dashboard',
+    props.filters.organisation_id ? `/organisation/${props.filters.organisation_id}/project-participants` : '/project-participants',
 );
 const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: 'Project participants', href: indexPath.value }]);
 const projectFilterOptions = computed<SelectOption[]>(() => [
@@ -355,6 +356,7 @@ function roleLabel(externalIdentity: ExternalIdentityRow) {
                                             size="sm"
                                             variant="outline"
                                             data-row-action
+                                            v-if="externalIdentity.can_edit_profile !== false"
                                             :data-testid="`external-identity-edit-${externalIdentity.id}`"
                                             title="Edit application account"
                                             @click="openEditSheet(externalIdentity)"

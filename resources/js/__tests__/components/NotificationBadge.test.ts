@@ -382,7 +382,7 @@ describe('NotificationBadge', () => {
         expect(wrapper.get('a[href="/organisation/3/projects"]').text()).toContain('Invited to project: Atlas Billing Console');
     });
 
-    it('uses the dashboard as the project notification fallback when no organisation is present', async () => {
+    it('opens the global projects list when a project notification has no organisation', async () => {
         (globalThis as any).route = vi.fn((name: string, params?: Record<string, unknown>) => {
             switch (name) {
                 case 'notifications.unread':
@@ -395,8 +395,8 @@ describe('NotificationBadge', () => {
                     return `/notifications/${params?.id}/mark-as-read`;
                 case 'organisation.projects':
                     return `/organisation/${params?.organisation}/projects`;
-                case 'dashboard':
-                    return '/dashboard';
+                case 'projects.index':
+                    return '/projects';
                 default:
                     return `/${name}`;
             }
@@ -422,7 +422,7 @@ describe('NotificationBadge', () => {
         const wrapper = mount(NotificationBadge);
         await flushPromises();
 
-        expect(wrapper.get('a[href="/dashboard"]').text()).toContain('New user registered: New User');
+        expect(wrapper.get('a[href="/projects"]').text()).toContain('New user registered: New User');
     });
     it('shows the daily error summary title and project error link', async () => {
         (globalThis as any).route = vi.fn((name: string) => `/${name}`);

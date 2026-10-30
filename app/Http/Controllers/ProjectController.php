@@ -32,8 +32,7 @@ class ProjectController extends Controller
 
         $sortBy = request('sort_by');
         $organisationId = $organisation?->id ?? request('organisation_id');
-        $canCreateProject = $organisation instanceof Organisation
-            && $this->permissions->canManageOrganisation($organisation, $userId);
+        $canCreateProject = ! $organisation || $this->permissions->canManageOrganisation($organisation, $userId);
 
         $projects = Project::query()
             ->with([
@@ -41,6 +40,8 @@ class ProjectController extends Controller
                 'client.organisation:id,name,author_id',
                 'environments:id,project_id,environment,url,external_widget_enabled,external_widget_guest_submissions_enabled',
                 'organisation:id,name,author_id',
+                'organisation.organisationUsers' => fn ($query) => $query->where('user_id', $userId),
+                'client.organisation.organisationUsers' => fn ($query) => $query->where('user_id', $userId),
             ])
             ->visibleTo($userId)
             ->when(filled($organisationId), function (Builder $query) use ($organisationId) {
@@ -80,28 +81,37 @@ class ProjectController extends Controller
                 'projects' => $projects
                     ->paginate(10)
                     ->withQueryString()
-                    ->through(fn (Project $project) => [
-                        ...$project->toArray(),
-                        'client_name' => $project->client?->name,
-                        'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
-                        'environments' => $project->environments
-                            ->sortBy('environment')
-                            ->map(fn ($environment) => $this->environmentPayload($environment))
-                            ->values(),
-                        'isOwner' => $project->isManagedByUser($userId),
-                        ...$this->permissions->projectCapabilities($project, $userId),
-                    ]),
+                    ->through(function (Project $project) use ($userId) {
+                        $capabilities = $this->permissions->projectCapabilities($project, $userId);
+                        $attributes = $project->toArray();
+                        if (! $capabilities['can_manage_technical_settings']) {
+                            unset($attributes['token']);
+                        }
+
+                        return [
+                            ...$attributes,
+                            'client_name' => $project->client?->name,
+                            'organisation_name' => $project->organisation?->name ?? $project->client?->organisation?->name,
+                            'environments' => $project->environments
+                                ->sortBy('environment')
+                                ->map(fn ($environment) => $this->environmentPayload($environment))
+                                ->values(),
+                            'isOwner' => $project->isManagedByUser($userId),
+                            ...$capabilities,
+                        ];
+                    }),
                 'clients' => $canCreateProject
                     ? Client::query()
-                        ->where('organisation_id', $organisation->id)
+                        ->when($organisation, fn ($query) => $query->where('organisation_id', $organisation->id),
+                            fn ($query) => $query->whereIn('organisation_id', $this->manageableOrganisationsQuery()->select('id')))
                         ->orderBy('name')
                         ->get(['id', 'name'])
                     : collect(),
                 'organisations' => $canCreateProject
-                    ? collect([[
+                    ? ($organisation ? collect([[
                         'id' => $organisation->id,
                         'name' => $organisation->name,
-                    ]])
+                    ]]) : $this->manageableOrganisationsQuery()->orderBy('name')->get(['id', 'name']))
                     : collect(),
                 'currentOrganisation' => $organisation ? [
                     'id' => $organisation->id,
@@ -299,7 +309,7 @@ class ProjectController extends Controller
             return redirect()->route('organisation.projects', $organisation);
         }
 
-        return redirect()->route('dashboard');
+        return redirect()->route('projects.index');
     }
 
     private function manageableOrganisationsQuery(): Builder

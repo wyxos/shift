@@ -62,7 +62,13 @@ const toneClass = computed(() => {
                     <span class="sr-only">{{ label }}</span>
                 </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">{{ buttonTitle }}</TooltipContent>
+            <TooltipContent class="action-icon-tooltip pointer-events-none" side="top">{{ buttonTitle }}</TooltipContent>
         </Tooltip>
     </TooltipProvider>
 </template>
+
+<style>
+[data-reka-popper-content-wrapper]:has(> .action-icon-tooltip) {
+    pointer-events: none;
+}
+</style>
