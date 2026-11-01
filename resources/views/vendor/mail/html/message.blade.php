@@ -1,4 +1,4 @@
-@props(['type' => 'Notification'])
+@props(['type' => 'Notification', 'message' => null])
 
 @php
     $brandName = config('app.name', 'SHIFT') === 'Laravel' ? 'SHIFT' : config('app.name', 'SHIFT');
@@ -7,7 +7,7 @@
 <x-mail::layout>
 {{-- Header --}}
 <x-slot:header>
-<x-mail::header :url="config('app.url')" :type="$type">
+<x-mail::header :url="config('app.url')" :type="$type" :message="$message">
 {{ $brandName }}
 </x-mail::header>
 </x-slot:header>

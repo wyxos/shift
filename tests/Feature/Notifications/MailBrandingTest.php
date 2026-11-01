@@ -49,11 +49,21 @@ test('notification emails deliver the branded HTML and readable text with the or
     $html = $message->getHtmlBody();
     $text = $message->getTextBody();
 
-    expect($html)->toContain('https://shift.example.test/brand/shift-wordmark-email.png', 'alt="SHIFT"', '#0f172a', '#2563eb', 'Or open this link in your browser:')
+    expect($html)->toContain('cid:', 'alt="SHIFT"', '#0f172a', '#2563eb', 'Or open this link in your browser:')
         ->not->toContain('Button not working', 'having trouble', 'Regards,');
     expect($text)->toContain('Task updated', 'The request is ready to review.', $url, 'Or open this link in your browser:')
         ->not->toContain('<table', '<img', '<style', '<br');
     expect($message->getTo()[0]->getAddress())->toBe('1@example.com');
+    $attachments = $message->getAttachments();
+    expect($attachments)->toHaveCount(1);
+    $logo = $attachments[0];
+    expect($logo->getFilename())->toBe('shift-wordmark-email.png')
+        ->and($logo->getDisposition())->toBe('inline')
+        ->and($logo->getBody())->toBe(file_get_contents(public_path('brand/shift-wordmark-email.png')));
+    expect($html)->toContain('cid:'.$logo->getContentId())
+        ->not->toContain('https://shift.example.test/brand/shift-wordmark-email.png');
+    $mime = $message->toString();
+    expect($mime)->toContain('Content-ID: <'.$logo->getContentId().'>', 'Content-Type: image/png');
 
     $document = new DOMDocument;
     @$document->loadHTML($html);

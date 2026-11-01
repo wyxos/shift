@@ -1,4 +1,10 @@
-@props(['url', 'type' => 'Notification'])
+@props(['url', 'type' => 'Notification', 'message' => null])
+
+@php
+    $logo = $message instanceof \Illuminate\Mail\Message
+        ? $message->embed(public_path('brand/shift-wordmark-email.png'))
+        : rtrim(config('app.url'), '/').'/brand/shift-wordmark-email.png';
+@endphp
 
 <tr>
 <td class="header" bgcolor="#0f172a">
@@ -6,7 +12,7 @@
 <tr>
 <td>
 <a href="{{ $url }}" aria-label="SHIFT">
-<img src="{{ rtrim(config('app.url'), '/') }}/brand/shift-wordmark-email.png" width="124" height="31" class="logo" alt="SHIFT">
+<img src="{{ $logo }}" width="124" height="31" class="logo" alt="SHIFT">
 </a>
 </td>
 @if (filled($type))

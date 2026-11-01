@@ -1,4 +1,4 @@
-<x-mail::message :type="$notificationType ?? 'Notification'">
+<x-mail::message :message="$message ?? null" :type="$notificationType ?? 'Notification'">
 @isset($errorReport)
 <x-mail::error-report :report="$errorReport" />
 @else
