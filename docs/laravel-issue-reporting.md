@@ -24,16 +24,10 @@ php artisan install:shift
 
 The installer uses browser verification by default. It detects the local app URL and environment, asks a portal user to approve the install, writes the project credentials, registers the app URL, creates a collaborator resolver when needed, and publishes the dashboard assets.
 
-Use the hosted portal URL:
+Set the URL of your SHIFT portal (replace the example domain with your own):
 
 ```env
-SHIFT_URL=https://shift.source.example
-```
-
-Use a local or self-hosted portal URL for development or a private server:
-
-```env
-SHIFT_URL=https://shift.test
+SHIFT_URL=https://shift.example.com
 ```
 
 Local and private URLs are supported by the installer and package client. The selected portal still needs to reach the app URL for collaborator lookup.

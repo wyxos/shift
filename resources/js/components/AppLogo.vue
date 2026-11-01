@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 
-const DEFAULT_SHIFT_URL = 'https://shift.source.example';
-
 type ShiftRuntimeConfig = {
     shiftUrl?: string;
 };
@@ -20,7 +18,7 @@ function shiftBrandBase(): string {
 
     const configured = typeof shiftConfig.shiftUrl === 'string' ? shiftConfig.shiftUrl.trim().replace(/\/$/, '') : '';
 
-    return configured === '' ? DEFAULT_SHIFT_URL : configured;
+    return configured;
 }
 
 const brandBase = shiftBrandBase();

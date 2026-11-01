@@ -52,17 +52,14 @@ describe('SHIFT branding', () => {
         expect(wrapper.find('svg').exists()).toBe(false);
     });
 
-    it('falls back to the hosted SHIFT URL when the SDK config omits shiftUrl', () => {
-        runtimeWindow().shiftConfig = {};
+    it.each([{}, { shiftUrl: '' }, { shiftUrl: '   ' }])('uses same-origin brand assets for an unconfigured SHIFT URL (%j)', (config) => {
+        runtimeWindow().shiftConfig = config;
 
         const wrapper = mount(AppLogo);
         const imageSources = wrapper.findAll('img').map((image) => image.attributes('src'));
 
-        expect(imageSources).toEqual([
-            'https://shift.source.example/brand/shift-logo.svg',
-            'https://shift.source.example/brand/shift-wordmark-black.svg',
-            'https://shift.source.example/brand/shift-wordmark-white.svg',
-        ]);
+        expect(imageSources).toEqual(['/brand/shift-wordmark-black.svg', '/brand/shift-wordmark-white.svg']);
+        expect(wrapper.find('svg').exists()).toBe(true);
     });
 
     it('uses a solid symbol without the old low-contrast gradient and accepts sizing', () => {

@@ -2,10 +2,6 @@
 
 Read only the files relevant to the current task.
 
-## Knowledge MCP
-
-- `project guidance`
-
 ## Files
 
 - `foundation.md` - foundation rules
