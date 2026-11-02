@@ -21,13 +21,13 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[IsOpenWorld(false)]
-class AddTaskThreadCommentTool extends Tool
+class PublishTaskThreadCommentTool extends Tool
 {
     use FormatsShiftRecords;
 
-    protected string $name = 'add_task_thread_comment';
+    protected string $name = 'publish_task_thread_comment';
 
-    protected string $description = 'Add an All or Team comment to a visible SHIFT task. Requires comment permission and the mcp:write OAuth scope.';
+    protected string $description = 'Publish an All or Team comment immediately to a visible SHIFT task and send applicable notifications. Use only when the user gives explicit authorization to publish this reply. Ticket updates should use draft_task_thread_comment by default for user review and sending. Requires comment permission and the mcp:write OAuth scope.';
 
     protected bool $draft = false;
 

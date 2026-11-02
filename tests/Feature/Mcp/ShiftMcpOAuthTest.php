@@ -191,7 +191,26 @@ test('completes a PKCE OAuth flow and uses the resulting token for MCP', functio
     $tools = $this->postJson('/mcp/shift', [
         'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list',
     ])->assertOk()->json('result.tools');
-    expect(collect($tools)->pluck('name'))->toContain('list_task_error_occurrences');
+    expect(collect($tools)->pluck('name'))
+        ->toContain('list_task_error_occurrences', 'draft_task_thread_comment', 'publish_task_thread_comment')
+        ->not->toContain('add_task_thread_comment');
+    $publishTool = collect($tools)->firstWhere('name', 'publish_task_thread_comment');
+    $draftTool = collect($tools)->firstWhere('name', 'draft_task_thread_comment');
+    expect($publishTool['description'])->toContain('immediately', 'explicit', 'draft_task_thread_comment')
+        ->and($draftTool['description'])->toContain('default', 'no notifications');
+    if (in_array('mcp:write', $scopes, true)) {
+        Illuminate\Support\Facades\Notification::fake();
+
+        foreach (['draft_task_thread_comment' => true, 'publish_task_thread_comment' => false] as $name => $isDraft) {
+            $this->postJson('/mcp/shift', [
+                'jsonrpc' => '2.0', 'id' => $isDraft ? 4 : 5, 'method' => 'tools/call',
+                'params' => ['name' => $name, 'arguments' => [
+                    'task_id' => $task->id, 'content' => '<p>OAuth reply.</p>', 'audience' => 'team',
+                ]],
+            ])->assertOk()->assertJsonPath('result.structuredContent.thread.is_draft', $isDraft);
+        }
+    }
+
     $eventTool = collect($tools)->firstWhere('name', 'list_task_error_occurrences');
     expect($eventTool['annotations']['readOnlyHint'])->toBeTrue();
 
