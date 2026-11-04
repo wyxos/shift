@@ -3,6 +3,7 @@
 use App\Jobs\SendTaskThreadNotification;
 use App\Jobs\SendTaskThreadNotifications;
 use App\Mcp\Servers\ShiftServer;
+use App\Mcp\Tools\AttachFileToTaskThreadDraftTool;
 use App\Mcp\Tools\DraftTaskThreadCommentTool;
 use App\Mcp\Tools\EditTaskThreadCommentTool;
 use App\Mcp\Tools\GetTaskTool;
@@ -379,3 +380,77 @@ test('All draft edits cannot expose another unpublished drafts permanent inline 
     Notification::assertNothingSent();
     Queue::assertNothingPushed();
 })->with(['portal', 'mcp']);
+
+test('MCP attaches a file to an owned draft and safely retries the same upload', function () {
+    Storage::fake('local');
+    $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrZkAAAAASUVORK5CYII=', true);
+    $arguments = [
+        'thread_id' => $this->draft->id,
+        'filename' => 'review.png',
+        'content_base64' => base64_encode($bytes),
+    ];
+
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, $arguments)
+            ->assertOk()->assertSee('review.png')->assertDontSee($arguments['content_base64']);
+    }
+
+    $attachment = $this->draft->attachments()->sole();
+    expect(Storage::get($attachment->path))->toBe($bytes);
+    $this->actingAs($this->author)->get(route('attachments.download', $attachment))
+        ->assertOk()->assertStreamedContent($bytes);
+    $this->actingAs($this->other)->get(route('attachments.download', $attachment))->assertNotFound();
+    expect($this->draft->refresh()->is_draft)->toBeTrue()
+        ->and($this->draft->published_at)->toBeNull();
+    $this->actingAs($this->author)->deleteJson(route('task-threads.destroy', [$this->task, $this->draft]))->assertOk();
+    Storage::assertMissing($attachment->path);
+    $this->assertDatabaseMissing('attachments', ['id' => $attachment->id]);
+    Notification::assertNothingSent();
+    Queue::assertNothingPushed();
+});
+
+test('MCP draft attachment rejects read-only grants and unavailable drafts', function () {
+    Storage::fake('local');
+    $arguments = [
+        'thread_id' => $this->draft->id,
+        'filename' => 'review.png',
+        'content_base64' => base64_encode('Draft file'),
+    ];
+
+    draftMcpAs($this->author, ['mcp:read'])->tool(AttachFileToTaskThreadDraftTool::class, $arguments)
+        ->assertHasErrors(['mcp:write']);
+    draftMcpAs($this->other)->tool(AttachFileToTaskThreadDraftTool::class, $arguments)
+        ->assertHasErrors(['editable draft']);
+    $this->project->update(['mcp_enabled' => false]);
+    draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, $arguments)
+        ->assertHasErrors(['editable draft']);
+    $this->project->update(['mcp_enabled' => true]);
+    $this->draft->update(['is_draft' => false, 'published_at' => now()]);
+    draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, $arguments)
+        ->assertHasErrors(['editable draft']);
+
+    $this->assertDatabaseCount('attachments', 0);
+    expect(Storage::allFiles())->toBeEmpty();
+});
+
+test('MCP draft attachment rejects invalid bytes, path names and files over the limit', function () {
+    Storage::fake('local');
+    $arguments = [
+        'thread_id' => $this->draft->id,
+        'filename' => 'review.png',
+        'content_base64' => base64_encode('Draft file'),
+    ];
+
+    draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, [
+        ...$arguments, 'filename' => '../review.txt',
+    ])->assertHasErrors(['filename without a path']);
+    draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, [
+        ...$arguments, 'content_base64' => '%invalid%',
+    ])->assertHasErrors(['valid standard base64']);
+    draftMcpAs($this->author)->tool(AttachFileToTaskThreadDraftTool::class, [
+        ...$arguments, 'content_base64' => base64_encode(str_repeat('a', AttachFileToTaskThreadDraftTool::MAX_BYTES + 1)),
+    ])->assertHasErrors(['512 KiB']);
+
+    $this->assertDatabaseCount('attachments', 0);
+    expect(Storage::allFiles())->toBeEmpty();
+});

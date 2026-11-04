@@ -118,8 +118,13 @@ class GetTaskWriteContextTool extends Tool
                 'audience' => ['type' => 'enum', 'values' => ['all', 'team'], 'default' => 'team'],
                 'type' => ['type' => 'legacy_enum', 'values' => ['internal', 'external']],
             ],
+            'draft_attachments' => [
+                'tool' => 'attach_file_to_task_thread_draft',
+                'max_bytes_per_file' => AttachFileToTaskThreadDraftTool::MAX_BYTES,
+                'encoding' => 'base64',
+            ],
             'unsupported_mcp_fields' => [
-                'attachments',
+                'task_attachments',
                 'temporary_uploads',
                 'mentions',
                 'collaborator_additions',

@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\AttachFileToTaskThreadDraftTool;
 use App\Mcp\Tools\CreateTaskTool;
 use App\Mcp\Tools\DraftTaskThreadCommentTool;
 use App\Mcp\Tools\EditTaskThreadCommentTool;
@@ -20,7 +21,7 @@ class ShiftServer extends Server
 {
     protected string $name = 'SHIFT';
 
-    protected string $version = '0.2.0';
+    protected string $version = '0.3.0';
 
     protected string $instructions = <<<'MARKDOWN'
         Access to the SHIFT portal, scoped to the authenticated SHIFT user.
@@ -40,6 +41,9 @@ class ShiftServer extends Server
         what changed and what the client needs to review or confirm. Keep internal test
         counts and deployment details in the internal handover unless requested or needed
         for the client to act.
+        Use attach_file_to_task_thread_draft to add an explicitly authorized file to
+        an existing private draft. The file is limited to 512 KiB and stays private
+        with the draft until the author publishes it.
         Drafts are private to their author and must be published by that person in SHIFT.
     MARKDOWN;
 
@@ -58,6 +62,7 @@ class ShiftServer extends Server
         EditTaskTool::class,
         PublishTaskThreadCommentTool::class,
         DraftTaskThreadCommentTool::class,
+        AttachFileToTaskThreadDraftTool::class,
         EditTaskThreadCommentTool::class,
     ];
 }

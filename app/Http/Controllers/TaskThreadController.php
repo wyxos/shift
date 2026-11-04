@@ -356,19 +356,13 @@ class TaskThreadController extends Controller
             return response()->json(['error' => 'You can only delete your own messages'], 403);
         }
 
-        // Delete all attachments
-        foreach ($thread->attachments as $attachment) {
-            // Delete the file from storage
-            if (Storage::exists($attachment->path)) {
-                Storage::delete($attachment->path);
-            }
-
-            // Delete the attachment record
-            $attachment->delete();
-        }
-
-        // Delete the thread
-        $thread->delete();
+        DB::transaction(function () use ($thread): void {
+            TaskThread::query()
+                ->withDraftsFor(Auth::user())
+                ->lockForUpdate()
+                ->findOrFail($thread->id)
+                ->delete();
+        });
 
         return response()->json(['message' => 'Thread message deleted successfully']);
     }
