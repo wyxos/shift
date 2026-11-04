@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // task threads
         Route::get('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'index'])->name('task-threads.index');
         Route::post('/tasks/{task}/threads', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'store'])->name('task-threads.store');
+        Route::put('/tasks/{task}/threads/{threadId}/reaction', \App\Http\Controllers\TaskThreadReactionController::class)->whereNumber('threadId')->name('task-threads.reaction');
         Route::get('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'show'])->name('task-threads.show');
         Route::put('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'update'])->name('task-threads.update');
         Route::delete('/tasks/{task}/threads/{threadId}', [\App\Http\Controllers\Api\ExternalTaskThreadController::class, 'destroy'])->name('task-threads.destroy');

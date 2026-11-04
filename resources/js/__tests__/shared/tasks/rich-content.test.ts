@@ -1,4 +1,10 @@
-import { buildReplyQuoteHtml, extractPlainTextFromContent, renderRichContent, sanitizeRichHtml } from '@shared/tasks/rich-content';
+import {
+    buildReplyQuoteHtml,
+    extractPlainTextFromContent,
+    renderRichContent,
+    renderThreadContent,
+    sanitizeRichHtml,
+} from '@shared/tasks/rich-content';
 import { describe, expect, it } from 'vitest';
 
 describe('shared/tasks/rich-content', () => {
@@ -66,5 +72,21 @@ describe('shared/tasks/rich-content', () => {
 
     it('returns empty reply quote html when id is missing', () => {
         expect(buildReplyQuoteHtml({ content: 'hello' })).toBe('');
+    });
+});
+
+describe('thread code detection', () => {
+    it('highlights escaped HTML and JSON while preserving surrounding prose', () => {
+        const html = renderThreadContent(
+            '<p><strong>Response</strong></p><p>&lt;!DOCTYPE html&gt;<br>&lt;script&gt;alert(1)&lt;/script&gt;</p><p>{"count": 3}</p>',
+        );
+        const root = document.createElement('div');
+        root.innerHTML = html;
+
+        expect(root.querySelector('strong')?.textContent).toBe('Response');
+        expect(root.querySelector('.language-html .hljs-name')?.textContent).toBe('script');
+        expect(root.querySelector('script')).toBeNull();
+        expect(root.querySelector('.language-json .hljs-number')?.textContent).toBe('3');
+        expect(renderThreadContent('<p>{unfinished</p><p>Use &lt;main&gt; here.</p>')).not.toContain('<pre>');
     });
 });

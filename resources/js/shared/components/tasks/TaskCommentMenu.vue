@@ -10,6 +10,22 @@ const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 const container = ref<HTMLElement | null>(null);
 const focusDestination = ref<string | null>(null);
 
+function positionQuickActions() {
+    const menu = container.value;
+    const history = menu?.closest('.task-comments-history');
+    if (!menu || !history) return;
+
+    const palette = menu.querySelector('.task-comment-reaction-palette');
+    if (!palette) return;
+
+    const clearance = menu.getBoundingClientRect().top - history.getBoundingClientRect().top;
+    if (clearance >= Math.max(48, palette.getBoundingClientRect().height)) {
+        menu.style.removeProperty('--quick-actions-offset');
+        return;
+    }
+    menu.style.setProperty('--quick-actions-offset', `${Math.max(0, -clearance)}px`);
+}
+
 function onOpenChange(open: boolean) {
     if (open) focusDestination.value = null;
     emit('update:open', open);
@@ -36,7 +52,13 @@ function onCloseAutoFocus(event: Event) {
 </script>
 
 <template>
-    <div ref="container" class="relative max-w-full" :class="{ 'task-comment-menu-own': own }">
+    <div
+        ref="container"
+        class="task-comment-menu relative max-w-full"
+        :class="{ 'task-comment-menu-own': own }"
+        @pointerenter="positionQuickActions"
+        @focusin="positionQuickActions"
+    >
         <ContextMenuRoot @update:open="onOpenChange">
             <ContextMenuTrigger as-child :disabled="disabled">
                 <slot />
@@ -52,6 +74,7 @@ function onCloseAutoFocus(event: Event) {
                 </ContextMenuContent>
             </ContextMenuPortal>
         </ContextMenuRoot>
+        <slot name="quick-actions" />
         <DropdownMenu @update:open="onOpenChange">
             <DropdownMenuTrigger as-child>
                 <Button

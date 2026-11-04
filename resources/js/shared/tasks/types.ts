@@ -193,9 +193,17 @@ export type ThreadMessage = {
     canPublish?: boolean;
     publishing?: boolean;
     publishError?: string | null;
+    reactions?: ThreadReaction[];
+    reacting?: boolean;
     audience: 'all' | 'team';
     attachments?: TaskAttachment[];
     mentions?: ThreadMention[];
+};
+
+export type ThreadReaction = {
+    emoji: string;
+    count: number;
+    reacted: boolean;
 };
 
 export type ThreadMention = {

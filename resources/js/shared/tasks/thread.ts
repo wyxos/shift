@@ -1,4 +1,4 @@
-import type { ThreadMessage } from './types';
+import type { ThreadMessage, ThreadReaction } from './types';
 
 export type MappedThreadMessage<TAttachment = unknown> = {
     clientId: string;
@@ -11,6 +11,7 @@ export type MappedThreadMessage<TAttachment = unknown> = {
     isYou: boolean;
     isDraft: boolean;
     canPublish: boolean;
+    reactions?: ThreadReaction[];
     audience: 'all' | 'team';
     attachments: TAttachment[];
     mentions: Array<{
@@ -141,6 +142,7 @@ export function mapThreadToMessage<TAttachment = unknown>(thread: any): MappedTh
         isYou,
         isDraft,
         canPublish,
+        ...(Array.isArray(thread?.reactions) ? { reactions: thread.reactions } : {}),
         audience,
         attachments,
         mentions,

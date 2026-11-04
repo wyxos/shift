@@ -1,43 +1,17 @@
 import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
-import { nextTick, ref, type Ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import type { MentionIdentity } from '../components/shift-editor/types';
 import { resolveTouchTap, shouldIgnoreEditGesture as shouldIgnoreEditGestureForEvent } from './interaction';
 import { buildReplyQuoteHtml } from './rich-content';
 import { createThreadRequestId, getThreadErrorMessage, mapPendingThreadAttachments, mapThreadToMessage, mergeDeliveredThreadMessage } from './thread';
+import type { ThreadPayload, UseTaskThreadStateOptions } from './thread-state-types';
 import type { TaskAttachment, ThreadMessage } from './types';
-import { useTaskThreadAudienceState, type TaskThreadMentionCandidateFetcher } from './useTaskThreadAudienceState';
+import { useTaskThreadAudienceState } from './useTaskThreadAudienceState';
+import { useTaskThreadReactions } from './useTaskThreadReactions';
 import { useTaskThreadRichInteraction } from './useTaskThreadRichInteraction';
 import { useTaskThreadViewport } from './useTaskThreadViewport';
 
-type ThreadPayload = {
-    html: string;
-    tempIdentifier: string;
-    clientRequestId?: string;
-    audience: 'all' | 'team';
-    mentions: MentionIdentity[];
-    addCollaborators: MentionIdentity[];
-};
-
 type PendingThread = { taskId: number; payload: ThreadPayload };
-
-type UseTaskThreadStateOptions<TTaskDetail> = {
-    editOpen: Ref<boolean>;
-    editTask: Ref<TTaskDetail | null>;
-    getTaskId: (task: TTaskDetail) => number;
-    fetchThreads: (taskId: number) => Promise<unknown[]>;
-    createThread: (taskId: number, payload: ThreadPayload) => Promise<unknown>;
-    updateThread: (taskId: number, threadId: number, payload: ThreadPayload) => Promise<unknown>;
-    deleteThread: (taskId: number, threadId: number) => Promise<void>;
-    publishThread?: (taskId: number, threadId: number) => Promise<unknown>;
-    fetchMentionCandidates?: TaskThreadMentionCandidateFetcher;
-    optimisticAuthor?: () => string;
-    onCopyMessageSuccess?: () => void;
-    onCopyMessageError?: () => void;
-    onCopySelectionSuccess?: () => void;
-    onCopySelectionError?: () => void;
-    onSendError?: (message: string) => void;
-    onDeleteError?: (message: string) => void;
-};
 
 export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptions<TTaskDetail>) {
     const threadTempIdentifier = ref(createUploadIdentifier());
@@ -49,6 +23,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     const pendingThreads = new Map<string, PendingThread>();
     const clientIdsByRequest = new Map<string, string>();
     let activeTaskId: number | null = null;
+    const { isReactionPending, toggleThreadReaction } = useTaskThreadReactions(options, threadMessages, () => activeTaskId);
     let fetchGeneration = 0;
     let localMessageSequence = 0;
     const threadComposerRef = ref<any>(null);
@@ -79,7 +54,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
     });
     const lastTouchTapAt = ref(0);
     const lastTouchTapId = ref<number | null>(null);
-    const { commentsScrollRef, onCommentsMediaLoadCapture, scrollCommentsToBottomSoon } = useTaskThreadViewport(options.editOpen, threadMessages);
+    const { commentsScrollRef, onCommentsMediaLoadCapture, scrollCommentsToBottomSoon } = useTaskThreadViewport(options.editOpen);
     const {
         contextMenuMessageId,
         contextMenuSelectionText,
@@ -130,6 +105,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
 
     async function fetchThreads(taskId: number, { quiet = false }: { quiet?: boolean } = {}) {
         const generation = ++fetchGeneration;
+        const reactionsAtStart = new Map(threadMessages.value.map((message) => [message.id, message.reactions]));
         const deliveredAtStart = new Set(threadMessages.value.filter((message) => message.id).map((message) => message.id));
         activeTaskId = taskId;
         if (!quiet) {
@@ -142,7 +118,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
             const transient = transientMessages.get(taskId) ?? [];
             const reconciledIds = new Set<string>();
             const fetched = list.map((thread) => {
-                const message = mapThreadToMessage<TaskAttachment>(thread);
+                const message: ThreadMessage = mapThreadToMessage<TaskAttachment>(thread);
                 const matching = transient.find((item) => item.clientRequestId && item.clientRequestId === message.clientRequestId);
                 if (matching) {
                     reconciledIds.add(matching.clientId);
@@ -151,6 +127,8 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
                 const knownClientId = message.clientRequestId ? clientIdsByRequest.get(message.clientRequestId) : undefined;
                 if (matching || knownClientId) message.clientId = matching?.clientId ?? knownClientId!;
                 const current = threadMessages.value.find((item) => item.id === message.id);
+                if (current && current.reactions !== reactionsAtStart.get(message.id)) message.reactions = current.reactions;
+                if (isReactionPending(taskId, message.id)) message.reacting = true;
                 if (current?.publishing && message.isDraft) return { ...message, publishing: true };
                 if (current?.publishError && message.isDraft) return { ...message, publishError: current.publishError };
                 return message;
@@ -474,6 +452,7 @@ export function useTaskThreadState<TTaskDetail>(options: UseTaskThreadStateOptio
         resetThreadState,
         retryThreadSend,
         publishThreadMessage,
+        toggleThreadReaction,
         scrollCommentsToBottomSoon,
         shouldShowCopySelection,
         startReplyToMessage,

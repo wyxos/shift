@@ -81,20 +81,6 @@ function ensureHighlightLanguagesRegistered(): void {
     highlightLanguagesRegistered = true;
 }
 
-export function highlightRichCodeBlocks(root: ParentNode | null | undefined): void {
-    if (!root || typeof root.querySelectorAll !== 'function') return;
-
-    ensureHighlightLanguagesRegistered();
-
-    root.querySelectorAll('pre code').forEach((element) => {
-        if (!(element instanceof HTMLElement)) return;
-
-        try {
-            hljs.highlightElement(element);
-        } catch {}
-    });
-}
-
 export function hasHtmlMarkup(content: string): boolean {
     return /<\/?[a-z][\s\S]*>/i.test(content);
 }
@@ -412,6 +398,55 @@ export function renderRichContent(content: string | null | undefined): string {
     if (hasHtmlMarkup(value)) return sanitizeRichHtml(normalizeLegacyListMarkup(value));
     const rendered = marked.parse(value);
     return typeof rendered === 'string' ? sanitizeRichHtml(rendered) : value;
+}
+
+function detectPastedCodeLanguage(text: string): string | undefined {
+    if (/^<!doctype html\s*>/i.test(text) || /^<([a-z][\w-]*)\b[^>]*>[\s\S]*<\/\1>$/i.test(text)) {
+        return 'html';
+    }
+
+    if (/^(?:\{|\[)/.test(text)) {
+        try {
+            JSON.parse(text);
+            return 'json';
+        } catch {
+            // A partial payload or prose stays as written.
+        }
+    }
+}
+
+export function renderThreadContent(content: string): string {
+    const html = renderRichContent(content);
+    if (!html || typeof document === 'undefined') return html;
+
+    const root = document.createElement('template');
+    root.innerHTML = html;
+    for (const paragraph of Array.from(root.content.children)) {
+        if (paragraph.tagName !== 'P' || Array.from(paragraph.children).some((child) => child.tagName !== 'BR')) continue;
+
+        const text = Array.from(paragraph.childNodes, (node) => (node.nodeName === 'BR' ? '\n' : node.textContent))
+            .join('')
+            .trim();
+        const language = detectPastedCodeLanguage(text);
+        if (!language) continue;
+
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.className = `language-${language}`;
+        code.textContent = text;
+        pre.append(code);
+        paragraph.replaceWith(pre);
+    }
+
+    ensureHighlightLanguagesRegistered();
+    root.content.querySelectorAll<HTMLElement>('pre > code').forEach((code) => {
+        // The highlighter receives source text only, including for legacy blocks containing markup.
+        code.textContent = code.textContent;
+        hljs.highlightElement(code);
+        code.parentElement?.setAttribute('tabindex', '0');
+    });
+
+    return root.innerHTML;
 }
 
 export function escapeHtml(value: string): string {

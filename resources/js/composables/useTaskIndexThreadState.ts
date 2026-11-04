@@ -59,6 +59,11 @@ export function useTaskIndexThreadState(options: UseTaskIndexThreadStateOptions)
         deleteThread: async (taskId, threadId) => {
             await axios.delete(route('task-threads.destroy', { task: taskId, thread: threadId }));
         },
+        setThreadReaction: async (taskId, threadId, emoji, reacted) => {
+            const response = await axios.put(route('task-threads.reaction', { task: taskId, thread: threadId }), { emoji, reacted });
+            return response.data.reactions;
+        },
+        onReactionError: (message) => toast.error('Unable to update reaction', { description: message }),
         publishThread: async (taskId, threadId) => {
             const response = await axios.post(route('task-threads.publish', { task: taskId, thread: threadId }));
             return response.data?.thread ?? response.data;

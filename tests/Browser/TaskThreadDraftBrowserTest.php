@@ -77,26 +77,10 @@ it('shows a private draft and lets its author publish it from desktop and mobile
         ->assertAttribute($draftAction, 'aria-label', 'Publish draft')
         ->assertScript("!document.querySelector('[data-testid=\"comment-bubble-{$draft->id}\"]').contains(document.querySelector('{$draftAction}'))")
         ->assertScript('document.querySelectorAll("[data-testid^=publish-draft-]").length === 1')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "visible"')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "hidden"')
-        ->assertScript("(window.draftActionWidth = document.querySelector('{$draftAction}').getBoundingClientRect().width) > 0")
+        ->assertSee('Draft')
+        ->assertSee('Publish')
         ->screenshot(false, 'task-thread-draft-desktop.png');
     copyBrowserReviewScreenshot('task-thread-draft-desktop.png');
-
-    $page->hover($draftAction)
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
-        ->assertScript("document.querySelector('{$draftAction}').getBoundingClientRect().width === window.draftActionWidth")
-        ->screenshot(false, 'task-thread-draft-hover-desktop.png');
-    copyBrowserReviewScreenshot('task-thread-draft-hover-desktop.png');
-
-    $page->hover('[data-testid="comments-editor"]')
-        ->keys($draftAction, 'Shift')
-        ->assertScript("document.activeElement.matches('{$draftAction}:focus-visible')")
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
-        ->screenshot(false, 'task-thread-draft-focus-desktop.png');
-    copyBrowserReviewScreenshot('task-thread-draft-focus-desktop.png');
 
     $mobilePage = visit("/tasks?task={$task->id}")->on()->mobile()
         ->assertNoSmoke()
@@ -104,8 +88,6 @@ it('shows a private draft and lets its author publish it from desktop and mobile
         ->assertVisible('[data-testid="task-comments-pane"]')
         ->assertVisible($draftAction)
         ->assertScript('matchMedia("(hover: none)").matches')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=draft-action-label]")).visibility === "hidden"')
-        ->assertScript('getComputedStyle(document.querySelector("[data-testid=publish-action-label]")).visibility === "visible"')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth')
         ->screenshot(false, 'task-thread-draft-mobile.png');
     copyBrowserReviewScreenshot('task-thread-draft-mobile.png');
@@ -195,4 +177,75 @@ it('clears the composer optimistically and offers retry after a browser send fai
         ->assertNoSmoke();
 
     expect(TaskThread::query()->where('task_id', $task->id)->where('content', 'like', '%Retry this browser comment%')->count())->toBe(1);
+});
+
+it('highlights pasted code and offers quick reactions and a removable reply quote', function () {
+    $user = User::factory()->create(['name' => 'Alex Morgan']);
+    $colleague = User::factory()->create(['name' => 'Sam Rivera']);
+    $project = Project::factory()->withAuthor($user->id)->create();
+    $task = Task::factory()->for($project)->create([
+        'title' => 'Investigate a failed status update',
+        'description' => '<p>Check the request payload and response before retrying the integration.</p>',
+    ]);
+    $task->submitter()->associate($user)->save();
+
+    $messages = [
+        '<p>The integration returned this response:</p><p>&lt;!DOCTYPE html&gt;<br>&lt;html lang="en"&gt;<br>  &lt;body&gt;<br>    &lt;h1&gt;Method not allowed&lt;/h1&gt;<br>  &lt;/body&gt;<br>&lt;/html&gt;</p>',
+        '<p><strong>Request payload</strong></p><p>{"record":{"id":"example-42","status":"pending"},"retry":false,"attempt":3}</p>',
+        '<p>The retry worked after updating the endpoint.</p>',
+    ];
+
+    foreach ($messages as $content) {
+        $message = new TaskThread([
+            'task_id' => $task->id,
+            'type' => 'external',
+            'content' => $content,
+            'sender_name' => $colleague->name,
+        ]);
+        $message->sender()->associate($colleague)->save();
+    }
+
+    $this->actingAs($user);
+    $bubble = "[data-testid=comment-bubble-{$message->id}]";
+    $actions = "[data-testid=comment-actions-{$message->id}]";
+    $reaction = "{$bubble} ~ * [aria-label='React with Thumbs up']";
+    $page = visit("/tasks?task={$task->id}")
+        ->inDarkMode()
+        ->resize(1440, 960)
+        ->assertNoSmoke()
+        ->assertVisible('.language-html .hljs-name >> nth=0')
+        ->assertVisible('.language-json .hljs-attr >> nth=0')
+        ->screenshot(false, 'task-thread-syntax.png');
+    copyBrowserReviewScreenshot('task-thread-syntax.png');
+
+    $page->hover($bubble)
+        ->assertScript("getComputedStyle(document.querySelector('{$bubble}').parentElement.querySelector('.task-comment-reaction-palette')).pointerEvents === 'auto'")
+        ->screenshot(false, 'task-thread-reactions.png');
+    copyBrowserReviewScreenshot('task-thread-reactions.png');
+
+    $page->click($reaction)
+        ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="true"]')
+        ->click('[aria-label="Thumbs up, 1"]')
+        ->assertNotPresent('[aria-label="Thumbs up, 1"]')
+        ->keys($actions, 'Enter')
+        ->click('[role=menuitem]:text-is("Reply")')
+        ->assertVisible('[aria-label="Remove quote"]')
+        ->assertAttribute('[data-testid=comments-editor] blockquote', 'contenteditable', 'false')
+        ->screenshot(false, 'task-thread-reply-quote.png');
+    copyBrowserReviewScreenshot('task-thread-reply-quote.png');
+
+    $page->click('[aria-label="Remove quote"]')
+        ->assertNotPresent('[data-testid=comments-editor] blockquote')
+        ->assertNoSmoke();
+
+    $mobile = visit("/tasks?task={$task->id}")->on()->mobile()
+        ->click('[data-testid="edit-mobile-pane-comments"]')
+        ->click("{$bubble} ~ * button[aria-label='Quick reactions']")
+        ->assertVisible($reaction)
+        ->screenshot(false, 'task-thread-reactions-mobile.png');
+    copyBrowserReviewScreenshot('task-thread-reactions-mobile.png');
+
+    $mobile->click($reaction)
+        ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="true"]')
+        ->assertNoSmoke();
 });

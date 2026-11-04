@@ -90,6 +90,11 @@ class TaskThread extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(TaskThreadReaction::class);
+    }
+
     public function mentions(): HasMany
     {
         return $this->hasMany(TaskThreadMention::class);

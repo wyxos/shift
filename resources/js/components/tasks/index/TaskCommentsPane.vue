@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import ConfirmRequestDialog from '@/shared/components/ConfirmRequestDialog.vue';
 import type { MentionCandidate } from '@/shared/components/shift-editor/types';
+import TaskCommentContent from '@/shared/components/tasks/TaskCommentContent.vue';
 import TaskCommentMenu from '@/shared/components/tasks/TaskCommentMenu.vue';
+import TaskCommentReactions from '@/shared/components/tasks/TaskCommentReactions.vue';
 import TaskReportContext from '@/shared/components/tasks/TaskReportContext.vue';
-import { imageTiles } from '@/shared/tasks/image-tile';
-import { renderRichContent } from '@/shared/tasks/rich-content';
 import { shouldShowThreadMessageMeta } from '@/shared/tasks/thread';
 import { LoaderCircle, Paperclip, RotateCcw } from 'lucide-vue-next';
 import { ContextMenuItem, ContextMenuSeparator } from 'reka-ui';
@@ -17,7 +17,6 @@ import { computed, ref, unref, watch, type ComponentPublicInstance } from 'vue';
 const props = defineProps<{
     state: any;
 }>();
-const vImageTiles = imageTiles;
 const state = props.state;
 const threadComposerHtmlModel = computed({
     get: () => state.threadComposerHtml,
@@ -184,30 +183,30 @@ watch(deleteDialogOpen, (open) => {
                             :id="message.id ? `comment-${message.id}` : undefined"
                             :data-testid="message.id ? `comment-bubble-${message.id}` : undefined"
                             :class="
-                                message.isYou
-                                    ? 'task-comment-own rounded-br-md'
-                                    : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
+                                message.isDraft
+                                    ? 'task-comment-draft border-border rounded-br-md border'
+                                    : message.isYou
+                                      ? 'task-comment-own rounded-br-md'
+                                      : 'border-muted-foreground/10 bg-background/70 text-foreground rounded-bl-md border'
                             "
                             class="w-fit max-w-full rounded-lg px-3 py-2 text-sm shadow-sm"
                             @copy="state.onMessageCopy(message, $event)"
                             @dblclick="state.canComment && state.onMessageDblClick(message, $event)"
                             @touchend="state.canComment && state.onMessageTouchEnd(message, $event)"
                         >
+                            <div v-if="message.isDraft" class="text-muted-foreground mb-1 text-xs font-medium" data-testid="thread-draft-badge">
+                                Draft
+                            </div>
                             <div v-if="message.audience === 'team'" class="mb-1 flex items-center justify-end gap-1 text-xs font-semibold">
                                 <Badge
                                     variant="secondary"
-                                    :class="message.isYou ? 'border-white/20 bg-black/10 text-white' : ''"
+                                    :class="message.isYou && !message.isDraft ? 'border-white/20 bg-black/10 text-white' : ''"
                                     class="px-1.5 py-0 text-xs"
                                 >
                                     Team
                                 </Badge>
                             </div>
-                            <div
-                                v-image-tiles
-                                class="shift-rich text-inherit [&_img]:my-2 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-lg [&_img]:shadow-sm [&_img.editor-tile]:aspect-square [&_img.editor-tile]:w-[200px] [&_img.editor-tile]:max-w-[200px] [&_img.editor-tile]:object-contain"
-                                @click="state.onRichContentClick"
-                                v-html="renderRichContent(message.content)"
-                            ></div>
+                            <TaskCommentContent :content="message.content" @click="state.onRichContentClick" />
                             <div v-if="message.attachments?.length" class="mt-3 flex flex-wrap gap-2">
                                 <component
                                     :is="message.pending || message.failed ? 'span' : 'a'"
@@ -215,7 +214,7 @@ watch(deleteDialogOpen, (open) => {
                                     :key="attachment.id"
                                     :href="message.pending || message.failed ? undefined : attachment.url"
                                     :class="
-                                        message.isYou
+                                        message.isYou && !message.isDraft
                                             ? 'border-white/20 bg-black/10 text-white hover:bg-black/20'
                                             : 'border-muted-foreground/20 bg-muted/20 text-foreground hover:bg-muted/30'
                                     "
@@ -245,6 +244,16 @@ watch(deleteDialogOpen, (open) => {
                                 </button>
                             </div>
                         </div>
+                        <template
+                            v-if="state.canComment && message.reactions && !message.isDraft && !message.pending && !message.failed"
+                            #quick-actions
+                        >
+                            <TaskCommentReactions
+                                :reactions="message.reactions"
+                                :reacting="message.reacting"
+                                @select="state.toggleThreadReaction(message, $event)"
+                            />
+                        </template>
                         <template #items>
                             <ContextMenuItem
                                 v-if="!message.isYou"
@@ -295,34 +304,26 @@ watch(deleteDialogOpen, (open) => {
                             </ContextMenuItem>
                         </template>
                     </TaskCommentMenu>
+                    <TaskCommentReactions
+                        v-if="state.canComment && message.reactions && !message.isDraft"
+                        summary
+                        :reactions="message.reactions"
+                        :reacting="message.reacting"
+                        @select="state.toggleThreadReaction(message, $event)"
+                    />
                     <div v-if="message.isDraft" class="mt-1 flex flex-col items-end gap-1">
                         <Button
+                            v-if="message.canPublish || message.publishing"
                             type="button"
-                            variant="destructive"
                             size="sm"
-                            class="group/draft rounded-full"
+                            class="hover:bg-primary h-7 rounded-md px-2.5 text-xs"
                             :data-testid="`publish-draft-${message.id}`"
-                            :aria-label="message.publishing ? 'Publishing draft' : message.canPublish ? 'Publish draft' : 'Draft'"
-                            :disabled="message.publishing || !message.canPublish"
+                            :aria-label="message.publishing ? 'Publishing draft' : 'Publish draft'"
+                            :disabled="message.publishing"
                             @click="state.publishThreadMessage(message)"
                         >
                             <LoaderCircle v-if="message.publishing" class="animate-spin" aria-hidden="true" />
-                            <span v-if="message.publishing">Publishing...</span>
-                            <span v-else-if="!message.canPublish">Draft</span>
-                            <span v-else class="grid" aria-hidden="true">
-                                <span
-                                    data-testid="draft-action-label"
-                                    class="col-start-1 row-start-1 group-hover/draft:invisible group-focus-visible/draft:invisible [@media(hover:none)]:invisible"
-                                >
-                                    Draft
-                                </span>
-                                <span
-                                    data-testid="publish-action-label"
-                                    class="invisible col-start-1 row-start-1 group-hover/draft:visible group-focus-visible/draft:visible [@media(hover:none)]:visible"
-                                >
-                                    Publish
-                                </span>
-                            </span>
+                            {{ message.publishing ? 'Publishing…' : 'Publish' }}
                         </Button>
                         <span v-if="message.publishError" class="text-destructive text-xs" role="alert">{{ message.publishError }}</span>
                     </div>

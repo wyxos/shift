@@ -1,8 +1,6 @@
 import { nextTick, ref, watch, type Ref } from 'vue';
-import { highlightRichCodeBlocks } from './rich-content';
-import type { ThreadMessage } from './types';
 
-export function useTaskThreadViewport(editOpen: Ref<boolean>, threadMessages: Ref<ThreadMessage[]>) {
+export function useTaskThreadViewport(editOpen: Ref<boolean>) {
     const commentsScrollRef = ref<HTMLElement | null>(null);
 
     function scrollCommentsToBottom() {
@@ -23,10 +21,6 @@ export function useTaskThreadViewport(editOpen: Ref<boolean>, threadMessages: Re
         window.setTimeout(scrollCommentsToBottom, 250);
     }
 
-    function highlightCommentsSoon() {
-        void nextTick().then(() => highlightRichCodeBlocks(commentsScrollRef.value));
-    }
-
     function onCommentsMediaLoadCapture(event: Event) {
         const target = event.target as HTMLElement | null;
         if (!target) return;
@@ -40,15 +34,7 @@ export function useTaskThreadViewport(editOpen: Ref<boolean>, threadMessages: Re
     watch(editOpen, (open) => {
         if (!open) return;
         scrollCommentsToBottomSoon();
-        highlightCommentsSoon();
     });
-
-    watch(
-        () => threadMessages.value.map((message) => `${message.id ?? message.clientId}:${message.content}`).join('\n'),
-        () => {
-            if (editOpen.value) highlightCommentsSoon();
-        },
-    );
 
     return { commentsScrollRef, onCommentsMediaLoadCapture, scrollCommentsToBottomSoon };
 }

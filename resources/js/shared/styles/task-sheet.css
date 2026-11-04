@@ -76,3 +76,101 @@
         max-height: 4rem;
     }
 }
+
+.task-comment-draft {
+    background-color: var(--muted);
+    color: var(--foreground);
+}
+
+.task-comment-reaction-palette {
+    inset-inline-start: 0;
+    top: 0;
+    transform: translateY(var(--quick-actions-offset, -100%));
+}
+
+.task-comment-menu-own .task-comment-reaction-palette {
+    inset-inline: auto 0;
+}
+
+.task-comment-reaction-trigger {
+    display: none;
+}
+
+@media (hover: hover) {
+    .task-comment-reaction-palette {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+    }
+
+    .task-comment-menu:hover .task-comment-reaction-palette,
+    .task-comment-menu:focus-within .task-comment-reaction-palette {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+@media (hover: none) {
+    .task-comment-reaction-trigger {
+        display: inline-grid;
+        inset-inline-start: calc(100% + 0.25rem);
+    }
+
+    .task-comment-menu-own .task-comment-reaction-trigger {
+        inset-inline: auto calc(100% + 0.25rem);
+    }
+
+    .task-comment-reaction-palette:not(.is-open) {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .task-comment-reaction-palette {
+        transition: none;
+    }
+}
+
+.dark .task-comments-history .shift-rich pre {
+    border-color: var(--border);
+    background: var(--card);
+    color: var(--foreground);
+}
+
+.dark .task-comments-history .shift-rich pre code {
+    color: var(--foreground);
+}
+
+.dark .task-comments-history .shift-rich .hljs-attr,
+.dark .task-comments-history .shift-rich .hljs-number,
+.dark .task-comments-history .shift-rich .hljs-literal {
+    color: #79c0ff;
+}
+
+.dark .task-comments-history .shift-rich .hljs-string,
+.dark .task-comments-history .shift-rich .hljs-meta {
+    color: #a5d6ff;
+}
+
+.dark .task-comments-history .shift-rich .hljs-name {
+    color: #7ee787;
+}
+
+.dark .task-comments-history .shift-rich .hljs-keyword,
+.dark .task-comments-history .shift-rich .hljs-selector-tag {
+    color: #ff7b72;
+}
+
+.dark .task-comments-history .shift-rich .hljs-title {
+    color: #d2a8ff;
+}
+
+.dark .task-comments-history .shift-rich .hljs-comment {
+    color: var(--muted-foreground);
+}
+
+.task-comments-history .shift-rich pre code.language-json {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}

@@ -61,12 +61,11 @@ describe('Tasks/Index.vue draft comments', () => {
         await flushPromises();
 
         const draftAction = wrapper.get('[data-testid="publish-draft-21"]');
-        expect(wrapper.find('[data-testid="thread-draft-badge"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="thread-draft-badge"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="comment-bubble-21"]').element.contains(draftAction.element)).toBe(false);
         expect(draftAction.attributes('aria-label')).toBe('Publish draft');
-        expect(draftAction.classes()).toContain('destructive');
-        expect(draftAction.get('[data-testid="draft-action-label"]').text()).toBe('Draft');
-        expect(draftAction.get('[data-testid="publish-action-label"]').text()).toBe('Publish');
+        expect(draftAction.text()).toBe('Publish');
+        expect(wrapper.get('[data-testid="comment-bubble-21"]').classes()).toContain('task-comment-draft');
         expect(wrapper.get('[data-testid="comment-bubble-21"]').text()).toContain('Ready for review');
         await draftAction.trigger('click');
         await flushPromises();

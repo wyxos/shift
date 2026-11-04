@@ -83,7 +83,7 @@ class ExternalTaskThreadController extends Controller
             return response()->json(['error' => 'Unauthorized to view this task'], 403);
         }
 
-        $externalThreads = $this->getThreadsByType($task, 'external');
+        $externalThreads = $this->getThreadsByType($task, $externalIdentity);
 
         return response()->json([
             'external' => $externalThreads,
@@ -95,17 +95,18 @@ class ExternalTaskThreadController extends Controller
      *
      * @return array
      */
-    private function getThreadsByType(Task $task, string $type)
+    private function getThreadsByType(Task $task, ExternalIdentity $externalIdentity)
     {
         return $task->threads()
-            ->ofType($type)
+            ->ofType('external')
             ->orderBy('created_at', 'asc')
+            ->with(['attachments', 'reactions' => fn ($query) => $query->summaryFor($externalIdentity)])
             ->get()
-            ->map(function ($thread) {
+            ->map(function (TaskThread $thread) use ($externalIdentity) {
                 $content = (string) ($thread->content ?? '');
                 $clientUrl = request('metadata.url') ?? request('user.url') ?? config('app.url');
 
-                $attachments = $thread->attachments()->get()
+                $attachments = $thread->attachments
                     ->filter(function ($attachment) use ($content) {
                         $downloadUrlRel = route('attachments.download', $attachment, false);
                         $downloadUrlAbs = url($downloadUrlRel);
@@ -124,16 +125,6 @@ class ExternalTaskThreadController extends Controller
                     })
                     ->values();
 
-                // Determine if the current user is the sender
-                $isCurrentUser = false;
-                if ($thread->sender_type === ExternalIdentity::class) {
-                    $externalIdentity = $thread->sender;
-                    $isCurrentUser = $externalIdentity &&
-                        $externalIdentity->external_id == request('user.id') &&
-                        $externalIdentity->environment == request('user.environment') &&
-                        $externalIdentity->url == request('user.url');
-                }
-
                 return [
                     'id' => $thread->id,
                     'client_request_id' => $thread->client_request_id,
@@ -141,7 +132,8 @@ class ExternalTaskThreadController extends Controller
                     'can_publish' => false,
                     'content' => $this->rewriteContentUrlsToClientProxyUrls($thread->content ?? '', (string) $clientUrl),
                     'sender_name' => $thread->sender_name,
-                    'is_current_user' => $isCurrentUser,
+                    'is_current_user' => $thread->sender_type === ExternalIdentity::class && $thread->sender_id === $externalIdentity->id,
+                    'reactions' => $thread->reactions->map->summary()->values(),
                     'created_at' => $thread->created_at,
                     'attachments' => $attachments,
                 ];
@@ -267,6 +259,7 @@ class ExternalTaskThreadController extends Controller
                 'is_current_user' => true,
                 'created_at' => $thread->created_at,
                 'attachments' => $responseAttachments,
+                'reactions' => $thread->reactions()->summaryFor($externalIdentity)->get()->map->summary()->values(),
             ],
         ], 201);
     }

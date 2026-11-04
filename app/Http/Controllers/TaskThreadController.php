@@ -67,12 +67,15 @@ class TaskThreadController extends Controller
      */
     private function getThreadsByType(Task $task, string $type): array
     {
+        $user = Auth::user();
+
         return $task->threads()
-            ->withDraftsFor(Auth::user())
+            ->withDraftsFor($user)
             ->ofType($type)
             ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
             ->with(['attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name'])
+            ->with(['reactions' => fn ($query) => $query->summaryFor($user)])
             ->get()
             ->map(function (TaskThread $thread) use ($task) {
                 // Filter out attachments that are already embedded in the content
@@ -106,6 +109,7 @@ class TaskThreadController extends Controller
                     'attachments' => $attachments,
                     'audience' => $this->audiences->audience($thread)->value,
                     'mentions' => $this->mentions->serialize($thread),
+                    'reactions' => $thread->reactions->map->summary()->values(),
                 ];
             })
             ->toArray();
@@ -243,6 +247,7 @@ class TaskThreadController extends Controller
                 'attachments' => $responseAttachments,
                 'audience' => $this->audiences->audience($thread)->value,
                 'mentions' => $this->mentions->serialize($thread),
+                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
             ],
         ], 201);
     }
@@ -336,6 +341,7 @@ class TaskThreadController extends Controller
                 'attachments' => $attachments,
                 'audience' => $this->audiences->audience($thread)->value,
                 'mentions' => $this->mentions->serialize($thread),
+                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
             ],
         ]);
     }
@@ -515,6 +521,7 @@ class TaskThreadController extends Controller
                 'attachments' => $responseAttachments,
                 'audience' => $audience->value,
                 'mentions' => $this->mentions->serialize($thread),
+                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
             ],
         ]);
     }

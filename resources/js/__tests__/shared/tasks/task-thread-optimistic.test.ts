@@ -17,6 +17,7 @@ function mountThreadState(
     createThread: ReturnType<typeof vi.fn>,
     fetchThreads = vi.fn().mockResolvedValue([]),
     publishThread?: ReturnType<typeof vi.fn>,
+    setThreadReaction?: ReturnType<typeof vi.fn>,
 ) {
     return mount(
         defineComponent({
@@ -31,6 +32,7 @@ function mountThreadState(
                         fetchThreads,
                         createThread,
                         publishThread,
+                        setThreadReaction,
                         updateThread: vi.fn(),
                         deleteThread: vi.fn(),
                     }),
@@ -195,6 +197,35 @@ describe('optimistic task comments', () => {
 
         await state.fetchThreads(1, { quiet: true });
         expect(state.threadMessages).toEqual([]);
+        wrapper.unmount();
+    });
+
+    it('retains a confirmed reaction and merges a newer comment from an overlapping refresh', async () => {
+        const refresh = deferred<unknown[]>();
+        const request = deferred<unknown>();
+        const message = { ...sentMessage, reactions: [] };
+        const fetchThreads = vi.fn().mockResolvedValueOnce([message]).mockReturnValueOnce(refresh.promise);
+        const setThreadReaction = vi.fn().mockReturnValueOnce(request.promise).mockResolvedValueOnce([]);
+        const wrapper = mountThreadState(vi.fn(), fetchThreads, undefined, setThreadReaction);
+        const state = wrapper.vm as any;
+        await state.fetchThreads(1);
+
+        const staleRefresh = state.fetchThreads(1, { quiet: true });
+        const reacting = state.toggleThreadReaction(state.threadMessages[0], '👍');
+        await state.toggleThreadReaction(state.threadMessages[0], '👍');
+        expect(setThreadReaction).toHaveBeenCalledExactlyOnceWith(1, 42, '👍', true);
+        const confirmed = [{ emoji: '👍', count: 1, reacted: true }];
+        request.resolve(confirmed);
+        await reacting;
+
+        refresh.resolve([message, { ...message, id: 43 }]);
+        await staleRefresh;
+        expect(state.threadMessages).toHaveLength(2);
+        expect(state.threadMessages[0].reactions).toEqual(confirmed);
+
+        await state.toggleThreadReaction(state.threadMessages[0], '👍');
+        expect(setThreadReaction).toHaveBeenLastCalledWith(1, 42, '👍', false);
+        expect(state.threadMessages[0].reactions).toEqual([]);
         wrapper.unmount();
     });
 

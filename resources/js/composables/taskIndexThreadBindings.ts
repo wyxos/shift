@@ -17,6 +17,7 @@ export function taskIndexThreadBindings(thread: TaskIndexThreadState) {
         handleThreadSend: thread.handleThreadSend,
         retryThreadSend: thread.retryThreadSend,
         publishThreadMessage: thread.publishThreadMessage,
+        toggleThreadReaction: thread.toggleThreadReaction,
         lightboxAlt: thread.lightboxAlt,
         lightboxOpen: thread.lightboxOpen,
         lightboxSrc: thread.lightboxSrc,
