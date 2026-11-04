@@ -62,12 +62,12 @@ describe('shared/tasks/rich-content', () => {
         const html = buildReplyQuoteHtml({
             id: 42,
             author: 'A <B>',
-            content: 'first line\nsecond line',
+            content: '<p>first line<br>second line</p><p>third line</p>',
         });
 
         expect(html).toContain('data-reply-to="42"');
         expect(html).toContain('Replying to A &lt;B&gt;');
-        expect(html).toContain('first line<br>second line');
+        expect(html).toContain('first line<br>second line<br>third line');
     });
 
     it('returns empty reply quote html when id is missing', () => {
@@ -76,6 +76,15 @@ describe('shared/tasks/rich-content', () => {
 });
 
 describe('thread code detection', () => {
+    it('indents detected JSON while preserving the original values and keys', () => {
+        const root = document.createElement('div');
+        root.innerHTML = renderThreadContent('<p>{"id":9007199254740993,"id":1e6,"data":["a, b",{},[]]}</p>');
+
+        expect(root.querySelector('code')?.textContent).toBe(
+            '{\n  "id": 9007199254740993,\n  "id": 1e6,\n  "data": [\n    "a, b",\n    {},\n    []\n  ]\n}',
+        );
+    });
+
     it('highlights escaped HTML and JSON while preserving surrounding prose', () => {
         const html = renderThreadContent(
             '<p><strong>Response</strong></p><p>&lt;!DOCTYPE html&gt;<br>&lt;script&gt;alert(1)&lt;/script&gt;</p><p>{"count": 3}</p>',

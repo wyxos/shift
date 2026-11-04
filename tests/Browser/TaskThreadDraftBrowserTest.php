@@ -192,7 +192,7 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
     $messages = [
         '<p>The integration returned this response:</p><p>&lt;!DOCTYPE html&gt;<br>&lt;html lang="en"&gt;<br>  &lt;body&gt;<br>    &lt;h1&gt;Method not allowed&lt;/h1&gt;<br>  &lt;/body&gt;<br>&lt;/html&gt;</p>',
         '<p><strong>Request payload</strong></p><p>{"record":{"id":"example-42","status":"pending"},"retry":false,"attempt":3}</p>',
-        '<p>The retry worked after updating the endpoint.</p>',
+        '<p>The retry worked after updating the endpoint. The status now appears in the dashboard and the integration returned the expected response. I also checked the activity history to confirm that the retry created a single entry.</p>',
     ];
 
     foreach ($messages as $content) {
@@ -215,6 +215,9 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
         ->assertNoSmoke()
         ->assertVisible('.language-html .hljs-name >> nth=0')
         ->assertVisible('.language-json .hljs-attr >> nth=0')
+        ->assertScript(<<<'JS'
+            document.querySelector('.language-json').textContent.split('\n')[1] === '  "record": {'
+            JS)
         ->screenshot(false, 'task-thread-syntax.png');
     copyBrowserReviewScreenshot('task-thread-syntax.png');
 
@@ -225,12 +228,24 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
 
     $page->click($reaction)
         ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="true"]')
-        ->click('[aria-label="Thumbs up, 1"]')
+        ->click('[data-testid="comments-editor"] .ProseMirror')
+        ->assertScript("getComputedStyle(document.querySelector('{$bubble}').parentElement.querySelector('.task-comment-reaction-palette')).opacity === '0'")
+        ->screenshot(false, 'task-thread-reaction-applied.png');
+    copyBrowserReviewScreenshot('task-thread-reaction-applied.png');
+
+    $page->click('[aria-label="Thumbs up, 1"]')
         ->assertNotPresent('[aria-label="Thumbs up, 1"]')
         ->keys($actions, 'Enter')
         ->click('[role=menuitem]:text-is("Reply")')
         ->assertVisible('[aria-label="Remove quote"]')
         ->assertAttribute('[data-testid=comments-editor] blockquote', 'contenteditable', 'false')
+        ->assertScript(<<<'JS'
+            (() => {
+                const quote = document.querySelector('[data-testid=comments-editor] blockquote > p + p');
+                const lineHeight = parseFloat(getComputedStyle(quote).lineHeight);
+                return Math.abs(quote.clientHeight - lineHeight * 2) <= 1 && quote.scrollHeight > quote.clientHeight;
+            })()
+            JS)
         ->screenshot(false, 'task-thread-reply-quote.png');
     copyBrowserReviewScreenshot('task-thread-reply-quote.png');
 

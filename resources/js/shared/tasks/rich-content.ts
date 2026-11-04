@@ -8,6 +8,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import xmlLang from 'highlight.js/lib/languages/xml';
 import 'highlight.js/styles/github.css';
 import { marked } from 'marked';
+import { prettyJson } from './pretty-json';
 
 const ALLOWED_TAGS = new Set([
     'a',
@@ -433,7 +434,7 @@ export function renderThreadContent(content: string): string {
         const pre = document.createElement('pre');
         const code = document.createElement('code');
         code.className = `language-${language}`;
-        code.textContent = text;
+        code.textContent = language === 'json' ? prettyJson(text) : text;
         pre.append(code);
         paragraph.replaceWith(pre);
     }
@@ -455,7 +456,7 @@ export function escapeHtml(value: string): string {
 
 export function extractPlainTextFromContent(content: string): string {
     const rendered = renderRichContent(content);
-    return decodeHtmlToText(rendered)
+    return decodeHtmlToText(rendered.replace(/<br\s*\/?>|<\/(?:p|li|h[1-6])>/gi, '\n'))
         .replace(/\r/g, '')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/[ \t]+\n/g, '\n')
