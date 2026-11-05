@@ -33,6 +33,7 @@ class TaskThreadNotificationService
                     return;
                 }
 
+                $this->scheduleEmails($lockedThread);
                 Bus::dispatch((new SendTaskThreadNotifications($lockedThread->id))
                     ->onConnection($queueConnection)->beforeCommit());
                 $lockedThread->forceFill(['notifications_queued_at' => now()])->save();
@@ -55,6 +56,7 @@ class TaskThreadNotificationService
             return;
         }
 
+        $this->scheduleEmails($thread);
         $internalSenderId = $thread->sender_type === User::class
             ? (int) $thread->sender_id
             : null;
@@ -72,7 +74,7 @@ class TaskThreadNotificationService
                     'thread_id' => $thread->id,
                     'content' => $thread->content,
                     'url' => route('tasks.index', ['task' => $task->id]),
-                ])
+                ], includeMail: false)
             );
         }
 
@@ -101,8 +103,35 @@ class TaskThreadNotificationService
                     'task_title' => $task->title,
                     'thread_id' => $thread->id,
                     'content' => $thread->content,
-                ]
+                ],
+                groupEmail: true,
             );
         }
+    }
+
+    private function scheduleEmails(TaskThread $thread): void
+    {
+        if ($thread->is_draft) {
+            return;
+        }
+
+        $thread->getConnection()->transaction(function () use ($thread): void {
+            $thread = TaskThread::query()->lockForUpdate()->find($thread->id);
+            if (! $thread || $thread->emails_queued_at !== null || ! $thread->task) {
+                return;
+            }
+            $thread->forceFill(['emails_queued_at' => now()])->save();
+            $senderId = $thread->sender_type === User::class ? (int) $thread->sender_id : null;
+            foreach ($this->taskCollaboratorService->internalReplyAudience($thread->task, $senderId) as $recipient) {
+                app(TaskThreadEmailBatchService::class)->schedule($thread, $recipient);
+            }
+            if ($thread->type !== 'external') {
+                return;
+            }
+            $senderId = $thread->sender_type === ExternalIdentity::class ? (int) $thread->sender_id : null;
+            foreach ($this->taskCollaboratorService->externalReplyAudience($thread->task, $senderId) as $recipient) {
+                app(TaskThreadEmailBatchService::class)->schedule($thread, $recipient);
+            }
+        }, attempts: 3);
     }
 }

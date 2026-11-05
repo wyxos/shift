@@ -62,6 +62,7 @@ class TaskThread extends Model
         'is_draft' => 'boolean',
         'published_at' => 'datetime',
         'notifications_queued_at' => 'datetime',
+        'emails_queued_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

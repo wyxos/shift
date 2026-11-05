@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\SendTaskThreadEmailBatch;
 use App\Jobs\SendTaskThreadNotification;
 use App\Jobs\SendTaskThreadNotifications;
 use App\Mcp\Servers\ShiftServer;
@@ -309,8 +310,9 @@ test('publication atomically persists a durable database notification job', func
     $this->actingAs($this->author)->postJson($url)->assertOk();
     $this->actingAs($this->author)->postJson($url)->assertOk();
 
-    expect(DB::table('jobs')->count())->toBe(1)
-        ->and(json_decode(DB::table('jobs')->value('payload'), true)['displayName'])->toBe(SendTaskThreadNotifications::class)
+    expect(DB::table('jobs')->count())->toBe(2)
+        ->and(DB::table('jobs')->pluck('payload')->map(fn ($payload) => json_decode($payload, true)['displayName'])->all())
+        ->toEqualCanonicalizing([SendTaskThreadEmailBatch::class, SendTaskThreadNotifications::class])
         ->and(TaskThread::query()->findOrFail($this->draft->id)->notifications_queued_at)->not->toBeNull();
     Notification::assertNothingSent();
 });

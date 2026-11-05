@@ -140,7 +140,8 @@ test('internal replies notify only internal task collaborators except the author
         [$this->internalSender, $this->projectOwner, $this->projectMember],
         TaskThreadUpdated::class,
     );
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(SendTaskThreadNotification::class);
+    Queue::assertPushed(\App\Jobs\SendTaskThreadEmailBatch::class, 1);
 });
 
 test('external replies from an internal collaborator notify internal and external collaborators except the author', function () {

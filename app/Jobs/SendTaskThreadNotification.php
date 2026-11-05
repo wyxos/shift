@@ -20,6 +20,8 @@ class SendTaskThreadNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    protected bool $groupEmail = false;
+
     public int $tries = 3;
 
     public int $timeout = 45;
@@ -34,7 +36,9 @@ class SendTaskThreadNotification implements ShouldQueue
         protected int $threadId,
         protected array $externalUserData,
         protected array $payload,
+        bool $groupEmail = false,
     ) {
+        $this->groupEmail = $groupEmail;
         $this->delay(60);
     }
 
@@ -67,6 +71,14 @@ class SendTaskThreadNotification implements ShouldQueue
         if ($identity) {
             $this->externalUserData['external_identity_id'] = $identity->id;
         }
+        if ($this->groupEmail) {
+            if ($identity && $thread->task?->externalCollaborators()->whereKey($identity->id)->exists()) {
+                app(ExternalInboxService::class)->recordThread($thread, $identity);
+            }
+
+            return;
+        }
+
         $delivery = $recipients->delivery($thread, $this->externalUserData, $identity);
         $project = $thread->task?->project;
 

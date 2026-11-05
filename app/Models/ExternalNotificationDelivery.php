@@ -87,6 +87,11 @@ class ExternalNotificationDelivery extends Model
         return $this->belongsTo(TaskThread::class);
     }
 
+    public function taskThreadEmailBatch(): BelongsTo
+    {
+        return $this->belongsTo(TaskThreadEmailBatch::class);
+    }
+
     public function recordAttempt(): void
     {
         $this->increment('attempts', 1, [

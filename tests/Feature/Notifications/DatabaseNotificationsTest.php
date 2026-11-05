@@ -3,6 +3,7 @@
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskCreationNotification;
+use App\Notifications\TaskThreadEmailDigest;
 use Illuminate\Support\Facades\Notification;
 
 test('notifications are stored in database', function () {
@@ -30,7 +31,7 @@ test('notifications are stored in database', function () {
     expect($data['url'])->toEqual(route('tasks.index', ['task' => $task->id]));
 });
 
-test('all notification classes use database channel', function () {
+test('in-app notification classes use database channel', function () {
     // Mock the notification to avoid actually sending it
     Notification::fake();
 
@@ -45,7 +46,7 @@ test('all notification classes use database channel', function () {
             return 'App\\Notifications\\'.$className;
         })
         ->filter(function ($class) {
-            return class_exists($class);
+            return class_exists($class) && $class !== TaskThreadEmailDigest::class;
         });
 
     // For each notification class, check if it uses the database channel
@@ -79,7 +80,7 @@ test('all notification classes use database channel', function () {
     }
 });
 
-test('all notification classes use broadcast channel', function () {
+test('in-app notification classes use broadcast channel', function () {
     Notification::fake();
 
     $user = User::factory()->create();
@@ -91,7 +92,7 @@ test('all notification classes use broadcast channel', function () {
             return 'App\\Notifications\\'.$className;
         })
         ->filter(function ($class) {
-            return class_exists($class);
+            return class_exists($class) && $class !== TaskThreadEmailDigest::class;
         });
 
     foreach ($notificationClasses as $notificationClass) {

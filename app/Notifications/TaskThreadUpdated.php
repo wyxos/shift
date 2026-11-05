@@ -9,10 +9,15 @@ use Shift\Core\Notifications\TaskThreadUpdated as CoreTaskThreadUpdated;
 
 class TaskThreadUpdated extends CoreTaskThreadUpdated implements ShouldQueue
 {
+    private bool $includeMail = true;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct(public array $data) {}
+    public function __construct(public array $data, bool $includeMail = true)
+    {
+        $this->includeMail = $includeMail;
+    }
 
     /**
      * Get the notification's delivery channels.
@@ -21,7 +26,7 @@ class TaskThreadUpdated extends CoreTaskThreadUpdated implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database', 'broadcast'];
+        return $this->includeMail ? ['mail', 'database', 'broadcast'] : ['database', 'broadcast'];
     }
 
     public function toMail(object $notifiable): MailMessage

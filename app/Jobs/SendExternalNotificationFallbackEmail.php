@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ExternalNotificationDelivery;
+use App\Models\TaskThread;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,6 +42,32 @@ class SendExternalNotificationFallbackEmail implements ShouldBeUnique, ShouldQue
 
         if (! $delivery || $delivery->completed_at || $delivery->cancelled_at) {
             return;
+        }
+
+        if ($delivery->task_thread_email_batch_id) {
+            $batch = $delivery->taskThreadEmailBatch;
+            $identity = $batch?->externalIdentity;
+            $snapshot = $batch?->payload['_recipient'] ?? [];
+            if (! $batch?->task || ! $identity
+                || ! $batch->task->externalCollaborators()->whereKey($identity->id)->exists()
+                || $identity->email !== $this->email
+                || $identity->url !== ($snapshot['url'] ?? null)
+                || $identity->environment !== ($snapshot['environment'] ?? null)
+                || (string) $identity->external_id !== (string) ($snapshot['external_id'] ?? null)) {
+                $delivery->markCancelled();
+
+                return;
+            }
+
+            $messages = collect($batch->payload['messages'])->keyBy('thread_id');
+            $threads = TaskThread::query()->where('task_id', $batch->task_id)->ofType('external')
+                ->whereIn('id', $messages->keys())->get();
+            if ($threads->count() !== $messages->count()
+                || ! $threads->every(fn (TaskThread $thread) => $thread->content === $messages[$thread->id]['content'])) {
+                $delivery->markCancelled();
+
+                return;
+            }
         }
 
         $pending = $delivery->taskCollaboratorNotification;

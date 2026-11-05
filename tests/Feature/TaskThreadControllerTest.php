@@ -4,9 +4,12 @@ use App\Models\ExternalIdentity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskThread;
+use App\Models\TaskThreadEmailBatch;
 use App\Models\User;
+use App\Notifications\TaskThreadEmailDigest;
 use App\Notifications\TaskThreadUpdated;
 use App\Services\OutboundUrlPolicy;
+use App\Services\TaskThreadEmailBatchService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -14,6 +17,13 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
+    $this->deliverDueEmails = function (): void {
+        $this->travel(121)->seconds();
+        foreach (TaskThreadEmailBatch::query()->get() as $batch) {
+            app(TaskThreadEmailBatchService::class)->send($batch->id);
+        }
+    };
+
     // Create a user
     $this->user = User::factory()->create();
 
@@ -112,9 +122,9 @@ test('external thread creation sends notification to external collaborator in no
 
     $response->assertStatus(201);
 
-    // Assert that a notification was sent to the external user
+    ($this->deliverDueEmails)();
     Notification::assertSentOnDemand(
-        TaskThreadUpdated::class,
+        TaskThreadEmailDigest::class,
         function ($notification, $channels, $notifiable) {
             return $notifiable->routes['mail'] === $this->externalIdentity->email
                 && ($notification->data['url'] ?? null) === 'https://example.com/shift/tasks?task='.$this->task->id;
@@ -169,7 +179,7 @@ test('internal thread creation only notifies internal task collaborators except 
 
     Notification::assertSentTo($internalCollaborator, TaskThreadUpdated::class);
     Notification::assertNotSentTo($this->user, TaskThreadUpdated::class);
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(\App\Jobs\SendTaskThreadNotification::class);
 });
 
 test('external thread creation with non external submitter sends notification to external users', function () {
@@ -200,9 +210,9 @@ test('external thread creation with non external submitter sends notification to
 
     $response->assertStatus(201);
 
-    // Assert that a notification was sent to the external user
+    ($this->deliverDueEmails)();
     Notification::assertSentOnDemand(
-        TaskThreadUpdated::class,
+        TaskThreadEmailDigest::class,
         function ($notification, $channels, $notifiable) {
             return $notifiable->routes['mail'] === $this->externalIdentity->email;
         }
@@ -252,16 +262,16 @@ test('external thread creation sends notification to multiple external users', f
 
     $response->assertStatus(201);
 
-    // Assert that notifications were sent to both external users
+    ($this->deliverDueEmails)();
     Notification::assertSentOnDemand(
-        TaskThreadUpdated::class,
+        TaskThreadEmailDigest::class,
         function ($notification, $channels, $notifiable) {
             return $notifiable->routes['mail'] === $this->externalIdentity->email;
         }
     );
 
     Notification::assertSentOnDemand(
-        TaskThreadUpdated::class,
+        TaskThreadEmailDigest::class,
         function ($notification, $channels, $notifiable) use ($anotherExternalIdentity) {
             return $notifiable->routes['mail'] === $anotherExternalIdentity->email;
         }
