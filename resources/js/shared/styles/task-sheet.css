@@ -83,6 +83,7 @@
 }
 
 .task-comment-reaction-palette {
+    visibility: var(--quick-actions-visibility, visible);
     inset-inline-start: 0;
     top: 0;
     transform: translateY(var(--quick-actions-offset, -100%));

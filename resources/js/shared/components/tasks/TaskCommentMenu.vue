@@ -4,27 +4,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { Ellipsis } from 'lucide-vue-next';
 import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from 'reka-ui';
 import { ref } from 'vue';
+import { useTaskCommentQuickActions } from '../../tasks/useTaskCommentQuickActions';
 
 defineProps<{ label: string; triggerId: string; disabled?: boolean; own?: boolean }>();
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 const container = ref<HTMLElement | null>(null);
 const focusDestination = ref<string | null>(null);
 
-function positionQuickActions() {
-    const menu = container.value;
-    const history = menu?.closest('.task-comments-history');
-    if (!menu || !history) return;
-
-    const palette = menu.querySelector('.task-comment-reaction-palette');
-    if (!palette) return;
-
-    const clearance = menu.getBoundingClientRect().top - history.getBoundingClientRect().top;
-    if (clearance >= Math.max(48, palette.getBoundingClientRect().height)) {
-        menu.style.removeProperty('--quick-actions-offset');
-        return;
-    }
-    menu.style.setProperty('--quick-actions-offset', `${Math.max(0, -clearance)}px`);
-}
+const { onPointerEnter, onPointerLeave, onFocusIn, onFocusOut } = useTaskCommentQuickActions(container);
 
 function onOpenChange(open: boolean) {
     if (open) focusDestination.value = null;
@@ -56,8 +43,10 @@ function onCloseAutoFocus(event: Event) {
         ref="container"
         class="task-comment-menu relative max-w-full"
         :class="{ 'task-comment-menu-own': own }"
-        @pointerenter="positionQuickActions"
-        @focusin="positionQuickActions"
+        @pointerenter="onPointerEnter"
+        @pointerleave="onPointerLeave"
+        @focusin="onFocusIn"
+        @focusout="onFocusOut"
     >
         <ContextMenuRoot @update:open="onOpenChange">
             <ContextMenuTrigger as-child :disabled="disabled">
