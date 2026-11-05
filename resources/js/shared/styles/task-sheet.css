@@ -183,3 +183,8 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
 }
+
+.task-reaction-people {
+    width: min(16rem, var(--reka-tooltip-content-available-width));
+    max-height: min(20rem, var(--reka-tooltip-content-available-height));
+}

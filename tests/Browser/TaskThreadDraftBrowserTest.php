@@ -244,6 +244,15 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
         ->assertVisible('[role="tooltip"]')
         ->assertSeeIn('[role="tooltip"]', 'Alex Morgan')
         ->assertSeeIn('[role="tooltip"]', 'Sam Rivera')
+        ->assertScript(<<<'JS'
+            (() => {
+                const history = document.querySelector('.task-comments-history').getBoundingClientRect();
+                const panel = document.querySelector('.task-reaction-people').getBoundingClientRect();
+                const rows = document.querySelectorAll('.task-reaction-people li');
+                return panel.left >= history.left && panel.right <= history.right
+                    && rows.length === 2 && [...rows].every(row => row.textContent.includes('👍') && row.querySelector('[data-slot="avatar"]'));
+            })()
+            JS)
         ->screenshot(false, 'task-thread-reaction-people.png');
     copyBrowserReviewScreenshot('task-thread-reaction-people.png');
 
@@ -283,4 +292,43 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
     $mobile->click($reaction)
         ->assertVisible('[aria-label="Thumbs up, 2"][aria-pressed="true"]')
         ->assertNoSmoke();
+});
+
+it('keeps reactor lists inside both edges of desktop and phone threads', function () {
+    $user = User::factory()->create(['name' => 'Alex Morgan']);
+    $project = Project::factory()->withAuthor($user->id)->create();
+    $task = Task::factory()->for($project)->create(['title' => 'Reaction list boundary review']);
+    $task->submitter()->associate($user)->save();
+    foreach ([$user, User::factory()->create(['name' => 'Sam Rivera'])] as $sender) {
+        $thread = $task->threads()->create([
+            'type' => 'external', 'content' => '<p>Checked the latest response.</p>',
+            'sender_type' => $sender->getMorphClass(), 'sender_id' => $sender->id, 'sender_name' => $sender->name,
+        ]);
+        $thread->reactions()->insert([
+            'task_thread_id' => $thread->id, 'actor_type' => $user->getMorphClass(),
+            'actor_id' => $user->id, 'emoji_key' => 'thumbs_up',
+        ]);
+    }
+    $contained = <<<'JS'
+        (() => {
+            const history = document.querySelector('.task-comments-history').getBoundingClientRect();
+            const panel = document.querySelector('.task-reaction-people').getBoundingClientRect();
+            return panel.width > 100 && panel.left >= history.left && panel.right <= history.right;
+        })()
+        JS;
+    $this->actingAs($user);
+    $desktop = visit("/tasks?task={$task->id}")->resize(1440, 960)->assertNoSmoke();
+    foreach ([0, 1] as $index) {
+        $desktop->script("document.querySelectorAll('[aria-label=\"Thumbs up, 1\"]')[{$index}].focus()");
+        $desktop->assertVisible('[role="tooltip"]')->assertScript($contained);
+    }
+
+    $mobile = visit("/tasks?task={$task->id}")->on()->mobile()
+        ->click('[data-testid="edit-mobile-pane-comments"]')->assertNoSmoke();
+    foreach ([0, 1] as $index) {
+        $mobile->script("document.querySelectorAll('[aria-label=\"Thumbs up, 1\"]')[{$index}].focus()");
+        $mobile->assertVisible('[role="tooltip"]')->assertScript($contained);
+    }
+    $mobile->screenshot(false, 'task-thread-reaction-list-mobile.png');
+    copyBrowserReviewScreenshot('task-thread-reaction-list-mobile.png');
 });

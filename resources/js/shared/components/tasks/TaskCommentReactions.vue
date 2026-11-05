@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getInitials } from '@/composables/useInitials';
 import { SmilePlus } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { TooltipContent, TooltipPortal } from 'reka-ui';
+import { ref, shallowRef, watch } from 'vue';
 import type { ThreadReaction } from '../../tasks/types';
 
 const props = defineProps<{
@@ -12,6 +15,11 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [emoji: string] }>();
 const open = ref(false);
 const trigger = ref<HTMLButtonElement | null>(null);
+const summaryElement = ref<HTMLElement | null>(null);
+const threadBoundary = shallowRef<HTMLElement | null>(null);
+watch(summaryElement, (element) => {
+    threadBoundary.value = element?.closest<HTMLElement>('.task-comments-history') ?? null;
+});
 const options = [
     { emoji: '👍', label: 'Thumbs up' },
     { emoji: '✅', label: 'Check mark' },
@@ -38,7 +46,7 @@ function select(emoji: string) {
 </script>
 
 <template>
-    <div v-if="summary && reactions.length" class="mt-1 flex flex-wrap gap-1" aria-label="Reactions">
+    <div v-if="summary && reactions.length" ref="summaryElement" class="mt-1 flex flex-wrap gap-1" aria-label="Reactions">
         <TooltipProvider :delay-duration="150">
             <Tooltip v-for="reaction in reactions" :key="reaction.emoji">
                 <TooltipTrigger as-child>
@@ -53,9 +61,26 @@ function select(emoji: string) {
                         {{ reaction.emoji }} {{ reaction.count }}
                     </button>
                 </TooltipTrigger>
-                <TooltipContent v-if="reaction.reactors?.length" class="max-w-64 break-words whitespace-normal motion-reduce:animate-none">
-                    {{ reaction.reactors.join(', ') }}
-                </TooltipContent>
+                <TooltipPortal>
+                    <TooltipContent
+                        v-if="reaction.reactors?.length"
+                        :collision-boundary="threadBoundary"
+                        :collision-padding="8"
+                        :side-offset="6"
+                        align="start"
+                        class="task-reaction-people bg-popover text-popover-foreground border-border data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 z-50 overflow-y-auto rounded-md border p-1.5 shadow-md motion-reduce:animate-none"
+                    >
+                        <ul class="m-0 list-none space-y-1 p-0" aria-label="People who reacted">
+                            <li v-for="(name, index) in reaction.reactors" :key="index" class="flex items-center gap-2 rounded-sm px-1.5 py-1">
+                                <Avatar class="size-7 shrink-0" aria-hidden="true">
+                                    <AvatarFallback class="text-xs font-medium">{{ getInitials(name) }}</AvatarFallback>
+                                </Avatar>
+                                <span class="min-w-0 flex-1 text-sm break-words">{{ name }}</span>
+                                <span class="shrink-0 text-base">{{ reaction.emoji }}</span>
+                            </li>
+                        </ul>
+                    </TooltipContent>
+                </TooltipPortal>
             </Tooltip>
         </TooltipProvider>
     </div>
