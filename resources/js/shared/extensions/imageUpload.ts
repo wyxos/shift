@@ -1,6 +1,7 @@
 import { createUploadIdentifier } from '@shared/lib/uploadIdentifier';
-import type { Editor } from '@tiptap/core';
+import type { CommandProps, Editor } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
+import { Plugin, TextSelection, type EditorState } from '@tiptap/pm/state';
 import axiosDefault, { type AxiosInstance } from 'axios';
 import { uploadChunkedFile, type UploadEndpoints } from '../lib/chunkedUpload';
 
@@ -104,6 +105,7 @@ function findImagePosByTitle(editor: Editor, title: string): number | null {
 function insertUploadPlaceholderImage(editor: Editor, uploadId: string, filename: string) {
     // Defer to next tick to avoid dispatching while other transactions are applying
     setTimeout(() => {
+        if (editor.isDestroyed) return;
         const state = editor?.state;
         const $from = state?.selection?.$from;
         const before = $from?.nodeBefore;
@@ -201,6 +203,20 @@ async function uploadImage(
         });
 }
 
+function imageCaptionNodes(state: EditorState, from: number, to: number, text: string) {
+    const before = state.doc.resolve(from).nodeBefore;
+    const after = state.doc.resolve(to).nodeAfter;
+    const beforeImage = before?.type.name === 'image';
+    const afterImage = after?.type.name === 'image';
+    if (!beforeImage && !afterImage) return null;
+    const nodes = [
+        ...(beforeImage ? [state.schema.nodes.hardBreak.create()] : []),
+        state.schema.text(text, state.storedMarks ?? state.doc.resolve(from).marks()),
+        ...(afterImage ? [state.schema.nodes.hardBreak.create()] : []),
+    ];
+    return { nodes, cursor: from + (beforeImage ? 1 : 0) + text.length };
+}
+
 export const ImageUpload = Extension.create<ImageUploadOptions>({
     name: 'image-upload',
 
@@ -236,24 +252,34 @@ export const ImageUpload = Extension.create<ImageUploadOptions>({
                 },
             typeText:
                 (text: string) =>
-                ({ editor }: { editor: Editor }) => {
-                    const state = editor.state;
-                    const $from = state.selection.$from;
-                    const before = ($from as any).nodeBefore;
-                    const after = ($from as any).nodeAfter;
-                    const isNextToImage = (n: any) => n && n.type && n.type.name === 'image';
-                    if (isNextToImage(before) || isNextToImage(after)) {
-                        setTimeout(() => editor.chain().focus().setHardBreak().insertContent(text).run(), 0);
-                        return true;
+                ({ state, tr, dispatch }: CommandProps) => {
+                    const nodes = imageCaptionNodes(state, state.selection.from, state.selection.to, text);
+                    if (!nodes) return false;
+                    if (dispatch) {
+                        tr.replaceWith(state.selection.from, state.selection.to, nodes.nodes);
+                        tr.setSelection(TextSelection.create(tr.doc, nodes.cursor));
                     }
-                    return false;
+                    return true;
                 },
         };
     },
 
     addProseMirrorPlugins() {
-        // We expose commands only; UI events are wired in the Vue component
-        return [] as any;
+        return [
+            new Plugin({
+                props: {
+                    handleTextInput: (view, from, to, text) => {
+                        if (view.composing) return false;
+                        const nodes = imageCaptionNodes(view.state, from, to, text);
+                        if (!nodes) return false;
+                        const transaction = view.state.tr.replaceWith(from, to, nodes.nodes);
+                        transaction.setSelection(TextSelection.create(transaction.doc, nodes.cursor));
+                        view.dispatch(transaction.scrollIntoView());
+                        return true;
+                    },
+                },
+            }),
+        ];
     },
 });
 

@@ -8,6 +8,7 @@ import tsLang from 'highlight.js/lib/languages/typescript';
 import xmlLang from 'highlight.js/lib/languages/xml';
 import 'highlight.js/styles/github.css';
 import { marked } from 'marked';
+import { groupMessageImages } from './message-images';
 import { prettyJson } from './pretty-json';
 
 const ALLOWED_TAGS = new Set([
@@ -447,6 +448,7 @@ export function renderThreadContent(content: string): string {
         code.parentElement?.setAttribute('tabindex', '0');
     });
 
+    groupMessageImages(root.content);
     return root.innerHTML;
 }
 

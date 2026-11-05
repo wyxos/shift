@@ -77,9 +77,13 @@ export function useTaskThreadRichInteraction(options: RichInteractionOptions) {
     function onRichContentClick(event: MouseEvent) {
         const target = event.target as HTMLElement | null;
         if (!target || handleReplyReferenceClick(target, event)) return;
-        const img = target.closest('img') as HTMLImageElement | null;
+        const img = (target.closest('img') ?? target.closest('[data-message-image]')?.querySelector('img')) as HTMLImageElement | null;
         if (!img) return;
-        const inRich = Boolean(img.closest('.shift-rich')) || Boolean(img.closest('.tiptap')) || img.classList.contains('editor-tile');
+        const inRich =
+            Boolean(img.closest('.shift-rich')) ||
+            Boolean(img.closest('.tiptap')) ||
+            img.classList.contains('editor-tile') ||
+            Boolean(img.closest('[data-message-image]'));
         if (!inRich) return;
         event.preventDefault();
         event.stopPropagation();

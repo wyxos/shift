@@ -13,11 +13,12 @@ const remove = () => {
 </script>
 
 <template>
-    <NodeViewWrapper as="span" class="group relative inline-block align-middle">
+    <NodeViewWrapper as="span" class="group relative inline-block max-w-full align-middle">
         <img class="editor-tile" :src="props.node.attrs.src" :alt="props.node.attrs.alt || ''" :title="props.node.attrs.title || ''" />
         <button
             type="button"
             contenteditable="false"
+            aria-label="Remove image"
             class="absolute top-2 right-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-100 hover:text-red-700 hover:ring-red-300 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
             @click="remove"
         >

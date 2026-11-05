@@ -1,0 +1,39 @@
+.shift-image-run {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    margin-block: 4px;
+}
+
+.shift-rich img.editor-tile,
+.tiptap img.editor-tile,
+.ProseMirror img.editor-tile {
+    display: inline-block;
+    width: 180px;
+    height: auto;
+    max-width: 100%;
+    aspect-ratio: 1;
+    flex: 0 1 auto;
+    object-fit: scale-down;
+    object-position: center;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    vertical-align: middle;
+}
+
+.shift-image-run img.editor-tile {
+    margin: 0;
+    cursor: zoom-in;
+}
+
+.shift-rich {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* The image row already starts a new line; retain additional explicit blank lines. */
+.shift-image-run + br {
+    display: none;
+}

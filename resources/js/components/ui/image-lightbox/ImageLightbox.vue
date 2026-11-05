@@ -147,7 +147,7 @@ watch(
           v-if="src"
           :src="src"
           :alt="alt || ''"
-          class="absolute left-1/2 top-1/2 max-h-none max-w-none select-none"
+          class="absolute left-1/2 top-1/2 max-h-full max-w-full object-contain select-none"
           :class="scale > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'"
           :style="{
             transform: `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px)) scale(${scale})`,

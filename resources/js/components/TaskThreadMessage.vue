@@ -1,28 +1,9 @@
 <script setup lang="ts">
-import { imageTiles } from '@/shared/tasks/image-tile';
-import hljs from 'highlight.js/lib/core';
-import cssLang from 'highlight.js/lib/languages/css';
-import jsLang from 'highlight.js/lib/languages/javascript';
-import jsonLang from 'highlight.js/lib/languages/json';
-import phpLang from 'highlight.js/lib/languages/php';
-import pythonLang from 'highlight.js/lib/languages/python';
-import tsLang from 'highlight.js/lib/languages/typescript';
-import xmlLang from 'highlight.js/lib/languages/xml';
-import 'highlight.js/styles/github.css';
-import { Paperclip, Trash2 } from 'lucide-vue-next';
-import { nextTick, onMounted, ref, watch } from 'vue';
-
-hljs.registerLanguage('javascript', jsLang);
-hljs.registerLanguage('js', jsLang);
-hljs.registerLanguage('typescript', tsLang);
-hljs.registerLanguage('ts', tsLang);
-hljs.registerLanguage('json', jsonLang);
-hljs.registerLanguage('css', cssLang);
-hljs.registerLanguage('php', phpLang);
-hljs.registerLanguage('xml', xmlLang);
-hljs.registerLanguage('html', xmlLang);
-hljs.registerLanguage('python', pythonLang);
-hljs.registerLanguage('py', pythonLang);
+import { ImageLightbox } from '@/components/ui/image-lightbox';
+import TaskCommentContent from '@/shared/components/tasks/TaskCommentContent.vue';
+import TaskMessageAttachments from '@/shared/components/tasks/TaskMessageAttachments.vue';
+import { Trash2 } from 'lucide-vue-next';
+import { reactive } from 'vue';
 
 interface Message {
     id: number;
@@ -46,29 +27,19 @@ interface Emits {
     (e: 'deleteMessage', messageId: number, messageType: 'internal' | 'external'): void;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 defineEmits<Emits>();
-const vImageTiles = imageTiles;
-
-const contentRef = ref<HTMLElement | null>(null);
-
-function highlight() {
-    nextTick(() => {
-        const root = contentRef.value;
-        if (!root) return;
-        root.querySelectorAll('pre code').forEach((el) => {
-            try {
-                hljs.highlightElement(el as HTMLElement);
-            } catch {}
-        });
-    });
+const preview = reactive({ open: false, src: '', alt: '' });
+function openImage(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const image = target.closest('img') ?? target.closest('[data-message-image]')?.querySelector('img');
+    if (!(image instanceof HTMLImageElement)) return;
+    event.preventDefault();
+    preview.src = image.currentSrc || image.src;
+    preview.alt = image.alt || 'Image';
+    preview.open = true;
 }
-
-onMounted(() => highlight());
-watch(
-    () => props.message.content,
-    () => highlight(),
-);
 </script>
 
 <template>
@@ -100,19 +71,11 @@ watch(
                     :class="message.isCurrentUser ? 'rounded-br-none bg-blue-200' : 'rounded-bl-none bg-gray-200 text-gray-800'"
                     class="tiptap ProseMirror !h-auto !max-h-none rounded-lg p-3 text-left"
                 >
-                    <div ref="contentRef" v-image-tiles v-html="message.content"></div>
+                    <TaskCommentContent :content="message.content" @click="openImage" />
                 </div>
-                <!-- Display message attachments if any (backend already filters embedded ones) -->
-                <div v-if="(message.attachments || []).length > 0" class="mt-2">
-                    <p class="text-xs font-semibold">Attachments:</p>
-                    <div v-for="attachment in message.attachments" :key="attachment.id" class="mt-1">
-                        <a :href="attachment.url" class="flex items-center text-xs underline" target="_blank" data-inertia-prevent>
-                            <Paperclip :size="12" class="mr-1" />
-                            {{ truncateFilename(attachment.original_filename) }}
-                        </a>
-                    </div>
-                </div>
+                <TaskMessageAttachments :attachments="message.attachments || []" :own="message.isCurrentUser" @image-click="openImage" />
             </div>
         </div>
+        <ImageLightbox v-model:open="preview.open" :src="preview.src" :alt="preview.alt" />
     </div>
 </template>

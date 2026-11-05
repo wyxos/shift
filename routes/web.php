@@ -35,6 +35,23 @@ Route::get('docs/laravel-issue-reporting-demo/{screen}', function (string $scree
     ]);
 })->name('docs.laravel-issue-reporting-demo');
 
+Route::get('qa/image-messages/{scenario?}', function (string $scenario = 'T01') {
+    abort_unless(app()->environment('local', 'testing'), 404);
+    abort_unless(preg_match('/^T(?:0[1-9]|1[0-5])$/', $scenario), 404);
+
+    return \Inertia\Inertia::render('qa/ImageMessages', ['scenario' => $scenario]);
+})->name('qa.image-messages');
+
+Route::get('qa/image-message-fixtures/{shape}', function (string $shape) {
+    abort_unless(app()->environment('local', 'testing'), 404);
+    abort_unless(in_array($shape, ['tiny', 'small', 'square', 'large', 'wide', 'tall', 'banner'], true), 404);
+
+    return response()->file(resource_path('js/pages/qa/fixtures/'.$shape.'.png'), [
+        'Content-Type' => 'image/png',
+        'X-Content-Type-Options' => 'nosniff',
+    ]);
+})->name('qa.image-message-fixtures');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sdk/install', [\App\Http\Controllers\SdkInstallController::class, 'show'])->name('sdk-install.verify');
     Route::post('sdk/install/approve', [\App\Http\Controllers\SdkInstallController::class, 'approve'])->name('sdk-install.approve');

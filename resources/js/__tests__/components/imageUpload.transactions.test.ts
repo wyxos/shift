@@ -134,3 +134,69 @@ it('ignores deferred adjacent-image typing after the editor is destroyed', () =>
     editor.destroy();
     expect(() => vi.advanceTimersByTime(0)).not.toThrow();
 });
+
+it('places real keyboard text after an image on its own line', () => {
+    const { editor } = fixture();
+    vi.advanceTimersByTime(0);
+    const image = uploadedNode(editor);
+    editor.commands.setTextSelection(image.pos + image.node.nodeSize);
+    let handled = false;
+    editor.view.someProp('handleTextInput', (handler) => {
+        handled = Boolean(handler(editor.view, editor.state.selection.from, editor.state.selection.to, 'Caption', () => editor.state.tr));
+        return handled;
+    });
+    expect(handled).toBe(true);
+    const paragraph = editor.getJSON().content?.[0].content ?? [];
+    const index = paragraph.findIndex((node) => node.type === 'image');
+    expect(paragraph[index + 1].type).toBe('hardBreak');
+    expect(paragraph[index + 2]).toMatchObject({ type: 'text', text: 'Caption' });
+    editor.destroy();
+});
+
+it('keeps consecutive uploads together and retains their order when completion is out of order', async () => {
+    const { editor } = fixture();
+    editor.commands.clearContent(false);
+    // The first upload was already queued; let its placeholder settle before resetting.
+    vi.advanceTimersByTime(0);
+    editor.commands.clearContent(false);
+    const requests: Array<{ name: string; complete: (value: ChunkedUploadResult) => void }> = [];
+    upload.mockImplementation(({ file }: { file: File }) => new Promise((complete) => requests.push({ name: file.name, complete })));
+    editor.commands.insertFiles([new File(['first'], 'first.png', { type: 'image/png' }), new File(['second'], 'second.png', { type: 'image/png' })]);
+    vi.advanceTimersByTime(0);
+    requests[1].complete({ path: 'temp/second.png', url: '/second.png', original_filename: 'second.png' });
+    requests[0].complete({ path: 'temp/first.png', url: '/first.png', original_filename: 'first.png' });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(0);
+    const nodes = editor.getJSON().content?.[0].content ?? [];
+    expect(nodes.map((node) => node.type)).toEqual(['image', 'image']);
+    expect(nodes.map((node) => node.attrs?.src)).toEqual(['/first.png', '/second.png']);
+    editor.destroy();
+});
+
+it('keeps a multi-character caption before an image on one line', () => {
+    const { editor } = fixture();
+    vi.advanceTimersByTime(0);
+    editor.commands.setTextSelection(uploadedNode(editor).pos);
+    expect(editor.commands.typeText('C')).toBe(true);
+    // Subsequent normal text input must stay before the separator, not beside the image.
+    editor.commands.insertContent('aption');
+    const nodes = editor.getJSON().content?.[0].content ?? [];
+    const imageIndex = nodes.findIndex((node) => node.type === 'image');
+    expect(nodes[imageIndex - 2]).toMatchObject({ type: 'text', text: 'Caption' });
+    expect(nodes[imageIndex - 1].type).toBe('hardBreak');
+    editor.destroy();
+});
+
+it('retains active formatting when typing a caption beside an image', () => {
+    const { editor } = fixture();
+    vi.advanceTimersByTime(0);
+    const image = uploadedNode(editor);
+    editor.commands.setTextSelection(image.pos + image.node.nodeSize);
+    editor.commands.toggleBold();
+    editor.commands.typeText('Caption');
+    const text = editor.getJSON().content?.[0].content?.find((node) => node.text === 'Caption');
+    expect(text?.marks).toEqual([{ type: 'bold' }]);
+    editor.destroy();
+});

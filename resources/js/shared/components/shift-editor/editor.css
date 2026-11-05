@@ -1,14 +1,11 @@
 @reference "tailwindcss";
 
+@import '../../styles/message-images.css';
+
 .ProseMirror img.editor-tile,
 .tiptap img.editor-tile {
-    width: 200px;
-    height: 200px;
-    object-fit: contain;
-    object-position: center;
-    box-sizing: border-box;
     display: inline-block;
-    margin: 4px;
+    margin: 2px;
 }
 
 .tiptap {
