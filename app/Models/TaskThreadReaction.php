@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class TaskThreadReaction extends Model
 {
@@ -17,21 +18,26 @@ class TaskThreadReaction extends Model
 
     public $timestamps = false;
 
-    public function scopeSummaryFor(Builder $query, User|ExternalIdentity $actor): Builder
+    public function actor(): MorphTo
     {
-        return $query->select('task_thread_id', 'emoji_key')
-            ->selectRaw('COUNT(*) AS reaction_count')
-            ->selectRaw('MAX(CASE WHEN actor_type = ? AND actor_id = ? THEN 1 ELSE 0 END) AS reacted', [$actor->getMorphClass(), $actor->getKey()])
-            ->groupBy('task_thread_id', 'emoji_key');
+        return $this->morphTo();
     }
 
-    /** @return array{emoji: string, count: int, reacted: bool} */
-    public function summary(): array
+    /**
+     * @param  Collection<int, TaskThreadReaction>  $reactions
+     * @return array<int, array{emoji: string, count: int, reacted: bool, reactors: list<string>}>
+     */
+    public static function summarize(Collection $reactions, User|ExternalIdentity $actor): array
     {
-        return [
-            'emoji' => self::EMOJI[$this->emoji_key],
-            'count' => (int) $this->getAttribute('reaction_count'),
-            'reacted' => (bool) $this->getAttribute('reacted'),
-        ];
+        return $reactions->groupBy('emoji_key')->sortKeys()
+            ->map(fn ($group, string $key) => [
+                'emoji' => self::EMOJI[$key],
+                'count' => $group->count(),
+                'reacted' => $group->contains(fn (TaskThreadReaction $reaction) => $reaction->actor_type === $actor->getMorphClass()
+                    && (string) $reaction->actor_id === (string) $actor->getKey()),
+                'reactors' => $group->map(fn (TaskThreadReaction $reaction) => trim((string) $reaction->actor?->name) ?: 'Unknown user')
+                    ->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
+            ])
+            ->values()->all();
     }
 }

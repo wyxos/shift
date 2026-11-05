@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SmilePlus } from 'lucide-vue-next';
 import { ref } from 'vue';
+import type { ThreadReaction } from '../../tasks/types';
 
 const props = defineProps<{
-    reactions: { emoji: string; count: number; reacted: boolean }[];
+    reactions: ThreadReaction[];
     reacting?: boolean;
     summary?: boolean;
 }>();
@@ -37,18 +39,25 @@ function select(emoji: string) {
 
 <template>
     <div v-if="summary && reactions.length" class="mt-1 flex flex-wrap gap-1" aria-label="Reactions">
-        <button
-            v-for="reaction in reactions"
-            :key="reaction.emoji"
-            type="button"
-            class="border-border bg-background text-foreground hover:bg-accent aria-pressed:border-primary aria-pressed:bg-secondary inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs"
-            :aria-label="`${options.find((option) => option.emoji === reaction.emoji)?.label ?? reaction.emoji}, ${reaction.count}`"
-            :aria-pressed="reaction.reacted"
-            :aria-disabled="reacting || undefined"
-            @click="!reacting && select(reaction.emoji)"
-        >
-            {{ reaction.emoji }} {{ reaction.count }}
-        </button>
+        <TooltipProvider :delay-duration="150">
+            <Tooltip v-for="reaction in reactions" :key="reaction.emoji">
+                <TooltipTrigger as-child>
+                    <button
+                        type="button"
+                        class="border-border bg-background text-foreground hover:bg-accent aria-pressed:border-primary aria-pressed:bg-secondary inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs"
+                        :aria-label="`${options.find((option) => option.emoji === reaction.emoji)?.label ?? reaction.emoji}, ${reaction.count}`"
+                        :aria-pressed="reaction.reacted"
+                        :aria-disabled="reacting || undefined"
+                        @click="!reacting && select(reaction.emoji)"
+                    >
+                        {{ reaction.emoji }} {{ reaction.count }}
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent v-if="reaction.reactors?.length" class="max-w-64 break-words whitespace-normal motion-reduce:animate-none">
+                    {{ reaction.reactors.join(', ') }}
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     </div>
     <div v-else-if="!summary" class="task-comment-reactions" @focusout="closeOnBlur">
         <button

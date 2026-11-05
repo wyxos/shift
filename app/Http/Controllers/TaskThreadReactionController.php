@@ -27,7 +27,7 @@ class TaskThreadReactionController extends Controller
         }
 
         return response()->json([
-            'reactions' => $thread->reactions()->summaryFor($actor)->get()->map->summary()->values(),
+            'reactions' => $thread->reactionSummary($actor),
         ]);
     }
 }

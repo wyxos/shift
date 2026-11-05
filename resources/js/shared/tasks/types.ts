@@ -204,6 +204,7 @@ export type ThreadReaction = {
     emoji: string;
     count: number;
     reacted: boolean;
+    reactors?: string[];
 };
 
 export type ThreadMention = {

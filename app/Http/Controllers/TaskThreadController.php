@@ -75,9 +75,9 @@ class TaskThreadController extends Controller
             ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
             ->with(['attachments', 'mentions.user:id,name', 'mentions.externalIdentity:id,external_id,environment,name'])
-            ->with(['reactions' => fn ($query) => $query->summaryFor($user)])
+            ->with('reactions.actor:id,name')
             ->get()
-            ->map(function (TaskThread $thread) use ($task) {
+            ->map(function (TaskThread $thread) use ($task, $user) {
                 // Filter out attachments that are already embedded in the content
                 $content = (string) ($thread->content ?? '');
                 $attachments = $thread->attachments
@@ -109,7 +109,7 @@ class TaskThreadController extends Controller
                     'attachments' => $attachments,
                     'audience' => $this->audiences->audience($thread)->value,
                     'mentions' => $this->mentions->serialize($thread),
-                    'reactions' => $thread->reactions->map->summary()->values(),
+                    'reactions' => $thread->reactionSummary($user),
                 ];
             })
             ->toArray();
@@ -247,7 +247,7 @@ class TaskThreadController extends Controller
                 'attachments' => $responseAttachments,
                 'audience' => $this->audiences->audience($thread)->value,
                 'mentions' => $this->mentions->serialize($thread),
-                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
+                'reactions' => $thread->reactionSummary(Auth::user()),
             ],
         ], 201);
     }
@@ -341,7 +341,7 @@ class TaskThreadController extends Controller
                 'attachments' => $attachments,
                 'audience' => $this->audiences->audience($thread)->value,
                 'mentions' => $this->mentions->serialize($thread),
-                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
+                'reactions' => $thread->reactionSummary(Auth::user()),
             ],
         ]);
     }
@@ -521,7 +521,7 @@ class TaskThreadController extends Controller
                 'attachments' => $responseAttachments,
                 'audience' => $audience->value,
                 'mentions' => $this->mentions->serialize($thread),
-                'reactions' => $thread->reactions()->summaryFor(Auth::user())->get()->map->summary()->values(),
+                'reactions' => $thread->reactionSummary(Auth::user()),
             ],
         ]);
     }

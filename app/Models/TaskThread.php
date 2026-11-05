@@ -90,6 +90,14 @@ class TaskThread extends Model
         return $this->morphMany(Attachment::class, 'attachable');
     }
 
+    /** @return array<int, array{emoji: string, count: int, reacted: bool, reactors: list<string>}> */
+    public function reactionSummary(User|ExternalIdentity $actor): array
+    {
+        $this->loadMissing('reactions.actor:id,name');
+
+        return TaskThreadReaction::summarize($this->reactions, $actor);
+    }
+
     public function reactions(): HasMany
     {
         return $this->hasMany(TaskThreadReaction::class);

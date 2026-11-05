@@ -205,6 +205,13 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
         $message->sender()->associate($colleague)->save();
     }
 
+    \App\Models\TaskThreadReaction::query()->insert([
+        'task_thread_id' => $message->id,
+        'actor_type' => $colleague->getMorphClass(),
+        'actor_id' => $colleague->id,
+        'emoji_key' => 'thumbs_up',
+    ]);
+
     $this->actingAs($user);
     $bubble = "[data-testid=comment-bubble-{$message->id}]";
     $actions = "[data-testid=comment-actions-{$message->id}]";
@@ -227,14 +234,27 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
     copyBrowserReviewScreenshot('task-thread-reactions.png');
 
     $page->click($reaction)
-        ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="true"]')
+        ->assertVisible('[aria-label="Thumbs up, 2"][aria-pressed="true"]')
         ->click('[data-testid="comments-editor"] .ProseMirror')
         ->assertScript("getComputedStyle(document.querySelector('{$bubble}').parentElement.querySelector('.task-comment-reaction-palette')).opacity === '0'")
         ->screenshot(false, 'task-thread-reaction-applied.png');
     copyBrowserReviewScreenshot('task-thread-reaction-applied.png');
 
-    $page->click('[aria-label="Thumbs up, 1"]')
-        ->assertNotPresent('[aria-label="Thumbs up, 1"]')
+    $page->hover('[aria-label="Thumbs up, 2"]')
+        ->assertVisible('[role="tooltip"]')
+        ->assertSeeIn('[role="tooltip"]', 'Alex Morgan')
+        ->assertSeeIn('[role="tooltip"]', 'Sam Rivera')
+        ->screenshot(false, 'task-thread-reaction-people.png');
+    copyBrowserReviewScreenshot('task-thread-reaction-people.png');
+
+    $page->click('[data-testid="comments-editor"] .ProseMirror')
+        ->assertNotPresent('[role="tooltip"]');
+    $page->script('document.querySelector(\'[aria-label="Thumbs up, 2"]\').focus()');
+    $page->assertVisible('[role="tooltip"]')
+        ->assertSeeIn('[role="tooltip"]', 'Sam Rivera');
+
+    $page->click('[aria-label="Thumbs up, 2"]')
+        ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="false"]')
         ->keys($actions, 'Enter')
         ->click('[role=menuitem]:text-is("Reply")')
         ->assertVisible('[aria-label="Remove quote"]')
@@ -261,6 +281,6 @@ it('highlights pasted code and offers quick reactions and a removable reply quot
     copyBrowserReviewScreenshot('task-thread-reactions-mobile.png');
 
     $mobile->click($reaction)
-        ->assertVisible('[aria-label="Thumbs up, 1"][aria-pressed="true"]')
+        ->assertVisible('[aria-label="Thumbs up, 2"][aria-pressed="true"]')
         ->assertNoSmoke();
 });
